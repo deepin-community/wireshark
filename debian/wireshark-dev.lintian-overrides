@@ -1,0 +1,2 @@
+# the package can create Debian packages
+wireshark-dev: binary-package-depends-on-toolchain-package

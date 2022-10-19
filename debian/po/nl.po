@@ -1,0 +1,174 @@
+# Dutch translation of wireshark debconf templates.
+# Copyright (C) 2011 Jeroen Schot <schot@a-eskwadraat.nl>
+# This file is distributed under the same license as the wireshark package.
+#
+# Translators:
+# Jeroen Schot <schot@a-eskwadraat.nl>, 2011.
+# Frans Spiesschaert <Frans.Spiesschaert@yucom.be>, 2017, 2019.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: wireshark_2.4.1-1\n"
+"Report-Msgid-Bugs-To: wireshark@packages.debian.org\n"
+"POT-Creation-Date: 2019-09-13 00:04+0200\n"
+"PO-Revision-Date: 2019-10-30 18:00+0100\n"
+"Last-Translator: Frans Spiesschaert <Frans.Spiesschaert@yucom.be>\n"
+"Language-Team: Debian Dutch l10n Team <debian-l10n-dutch@lists.debian.org>\n"
+"Language: nl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Gtranslator 2.91.7\n"
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid "Should non-superusers be able to capture packets?"
+msgstr ""
+"Moet het voor niet-systeembeheerders mogelijk zijn om pakketjes te "
+"onderscheppen?"
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid ""
+"Dumpcap can be installed in a way that allows members of the \"wireshark\" "
+"system group to capture packets. This is recommended over the alternative of "
+"running Wireshark/Tshark directly as root, because less of the code will run "
+"with elevated privileges."
+msgstr ""
+"Dumpcap kan zodanig worden geïnstalleerd dat leden van de systeemgroep "
+"\"wireshark\" netwerkpakketjes mogen onderscheppen. Dit wordt aanbevolen "
+"boven het rechtstreeks uitvoeren van Wireshark/Tshark als systeembeheerder, "
+"omdat op deze manier minder code wordt uitgevoerd met verhoogde privileges."
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+#| msgid ""
+#| "For more detailed information please see /usr/share/doc/wireshark-common/"
+#| "README.Debian."
+msgid ""
+"For more detailed information please see /usr/share/doc/wireshark-common/"
+"README.Debian.gz once the package is installed."
+msgstr ""
+"Uitgebreide informatie hierover is te vinden in /usr/share/doc/wireshark-"
+"common/README.Debian.gz na de installatie van het pakket."
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid ""
+"Enabling this feature may be a security risk, so it is disabled by default. "
+"If in doubt, it is suggested to leave it disabled."
+msgstr ""
+"Het activeren van deze functionaliteit kan een beveiligingsrisico inhouden "
+"en daarom staat dit niet standaard aan. Bij twijfel is het aangeraden om dit "
+"niet te activeren."
+
+#. Type: error
+#. Description
+#: ../templates:3001
+msgid "Creating the wireshark system group failed"
+msgstr "Het aanmaken van de systeemgroep wireshark mislukte"
+
+#. Type: error
+#. Description
+#: ../templates:3001
+msgid ""
+"The wireshark group does not exist, and creating it failed, so Wireshark "
+"cannot be configured to capture traffic as an unprivileged user."
+msgstr ""
+"De groep wireshark bestaat niet en het aanmaken ervan mislukte. Daarom kan "
+"Wireshark niet ingesteld worden om als niet-bevoorrechte gebruiker trafiek "
+"te onderscheppen,"
+
+#. Type: error
+#. Description
+#: ../templates:3001
+msgid ""
+"Please create the wireshark system group and try configuring wireshark-"
+"common again."
+msgstr ""
+"Maak de systeemgroep wireshark aan en probeer wireshark-common nogmaals te "
+"configureren."
+
+#. Type: error
+#. Description
+#: ../templates:4001
+msgid "The wireshark group is a system group"
+msgstr "De groep wireshark is een systeemgroep"
+
+#. Type: error
+#. Description
+#: ../templates:4001
+msgid ""
+"The wireshark group exists as a user group, but the preferred configuration "
+"is for it to be created as a system group."
+msgstr ""
+"De groep wireshark bestaat als gebruikersgroep, maar bij voorkeur wordt de "
+"configuratie zo uitgevoerd dat hij als systeemgroep aangemaakt wordt."
+
+#. Type: error
+#. Description
+#: ../templates:4001
+msgid ""
+"As a result, purging wireshark-common will not remove the wireshark group, "
+"but everything else should work properly."
+msgstr ""
+"Het gevolg is dat bij het wissen van wireshark-common de groep wireshark "
+"niet verwijderd zal worden, maar voor het overige zou alles normaal moeten "
+"werken."
+
+#. Type: error
+#. Description
+#: ../templates:5001
+msgid "Setting capabilities for dumpcap failed"
+msgstr "Het instellen van \"capabilities\" voor dumpcap mislukte"
+
+#. Type: error
+#. Description
+#: ../templates:5001
+msgid ""
+"The attempt to use Linux capabilities to grant packet-capturing privileges "
+"to the dumpcap binary failed. Instead, it has had the set-user-id bit set."
+msgstr ""
+"De poging om via \"Linux capabilities\" aan het programma dumpcap rechten "
+"toe te kennen om pakketten te onderscheppen mislukte. In plaats daarvan werd "
+"het \"set-user-id bit\" ervan ingesteld."
+
+#. Type: error
+#. Description
+#: ../templates:6001
+msgid "Removal of the wireshark group failed"
+msgstr "Het verwijderen van de groep wireshark is mislukt"
+
+#. Type: error
+#. Description
+#: ../templates:6001
+msgid ""
+"When the wireshark-common package is configured to allow non-superusers to "
+"capture packets the postinst script of wireshark-common creates the "
+"wireshark group as a system group."
+msgstr ""
+"Als het pakket wireshark-common geconfigureerd wordt om niet-"
+"systeembeheerders pakketten te laten onderscheppen, maakt het postinst-"
+"script van wireshark-common de groep wireshark aan als een systeemgroep."
+
+#. Type: error
+#. Description
+#: ../templates:6001
+msgid ""
+"However, on this system the wireshark group is a user group instead of being "
+"a system group, so purging wireshark-common did not remove it."
+msgstr ""
+"Echter, op dit systeem is de groep wireshark een gebruikersgroep in plaats "
+"van een systeemgroep. Daarom heeft het wissen van wireshark-common die niet "
+"verwijderd."
+
+#. Type: error
+#. Description
+#: ../templates:6001
+msgid "If the group is no longer needed, please remove it manually."
+msgstr "Als de groep niet langer nodig is, verwijder hem dan handmatig."

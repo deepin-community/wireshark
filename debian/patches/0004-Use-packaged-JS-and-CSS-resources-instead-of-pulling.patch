@@ -1,0 +1,48 @@
+From: Balint Reczey <balint.reczey@canonical.com>
+Date: Sun, 10 Mar 2019 19:51:39 +0100
+Subject: Use packaged JS and CSS resources instead of pulling them from the
+ Internet
+
+Change-Id: I75aa5c14a9305ccff12cf4d6f751c2f8eb359c0b
+---
+ ipmap.html | 20 +++++---------------
+ 1 file changed, 5 insertions(+), 15 deletions(-)
+
+diff --git a/ipmap.html b/ipmap.html
+index fa8b542..708b84c 100644
+--- a/ipmap.html
++++ b/ipmap.html
+@@ -2,15 +2,9 @@
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
+ <title>Wireshark: IP Location Map</title>
+-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css"
+-    integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA=="
+-    crossorigin="">
+-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css"
+-    integrity="sha512-BBToHPBStgMiw0lD4AtkRIZmdndhB6aQbXpX7omcrXeG2PauGBl2lzq2xUZTxaLxYz5IDHlmneCZ1IJ+P3kYtQ=="
+-    crossorigin="">
+-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css"
+-    integrity="sha512-RLEjtaFGdC4iQMJDbMzim/dOvAu+8Qp9sw7QE4wIMYcg2goVoivzwgSZq9CsIxp4xKAZPKh5J2f2lOko2Ze6FQ=="
+-    crossorigin="">
++<link rel="stylesheet" href="file:///usr/share/javascript/leaflet/leaflet.css">
++<link rel="stylesheet" href="file:///usr/share/javascript/leaflet/MarkerCluster.Default.css">
++<link rel="stylesheet" href="file:///usr/share/javascript/leaflet/MarkerCluster.css">
+ <!--
+ <link rel="stylesheet" href="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.css"
+     integrity="sha512-wgiKVjb46JxgnGNL6xagIy2+vpqLQmmHH7fWD/BnPzouddSmbRTf6xatWIRbH2Rgr2F+tLtCZKbxnhm5Xz0BcA=="
+@@ -43,12 +37,8 @@ html, body {
+ .range-control-input { padding: 0; width: 130px; }
+ .range-control-input, .range-control-label { vertical-align: middle; }
+ </style>
+-<script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"
+-    integrity="sha512-QVftwZFqvtRNi0ZyCtsznlKSWOStnDORoefr1enyq5mVL4tmKB3S/EnC3rRJcxCPavG10IcrVGSmPh6Qw5lwrg=="
+-    crossorigin=""></script>
+-<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"
+-    integrity="sha512-MQlyPV+ol2lp4KodaU/Xmrn+txc1TP15pOBF/2Sfre7MRsA/pB4Vy58bEqe9u7a7DczMLtU5wT8n7OblJepKbg=="
+-    crossorigin=""></script>
++<script src="file:///usr/share/javascript/leaflet/leaflet.js"></script>
++<script src="file:///usr/share/javascript/leaflet/leaflet.markercluster.js"></script>
+ <!--
+ <script src="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.js"
+     integrity="sha512-ovh6EqS7MUI3QjLWBM7CY8Gu8cSM5x6vQofUMwKGbHVDPSAS2lmNv6Wq5es5WCz1muyojQxcc8rA3CvVjD2Z+A=="
