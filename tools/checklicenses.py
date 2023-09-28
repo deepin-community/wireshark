@@ -32,7 +32,7 @@ Examples:
 
 
 ALLOWED_LICENSES = [
-    'BSD',
+    'BSD (1 clause)',
     'BSD (2 clause)',
     'BSD (2 clause) GPL (v2 or later)',
     'BSD (3 clause)',
@@ -61,13 +61,13 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
     'wsutil/strnatcmp.h': [
         'Zlib',
     ],
-    'dtds': [
+    'resources/protocols/dtds': [
         'UNKNOWN',
     ],
-    'diameter/dictionary.dtd': [
+    'resources/protocols/diameter/dictionary.dtd': [
         'UNKNOWN',
     ],
-    'wimaxasncp/dictionary.dtd': [
+    'resources/protocols/wimaxasncp/dictionary.dtd': [
         'UNKNOWN',
     ],
     'doc/': [
@@ -97,7 +97,7 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
     'epan/except.h': [
         'UNKNOWN',
     ],
-    # Generated header files by lex/yacc/whatever
+    # Generated header files by lex/lemon/whatever
     'epan/dtd_grammar.h': [
         'UNKNOWN',
     ],
@@ -117,7 +117,7 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
     'plugins/mate/mate_grammar.h': [
         'UNKNOWN',
     ],
-    'version.h': [
+    'vcs_version.h': [
         'UNKNOWN',
     ],
     # Special IDL license that appears to be compatible as far as I (not a
@@ -147,6 +147,9 @@ PATH_SPECIFIC_ALLOWED_LICENSES = {
         'GPL (v2)'
     ],
     '.gitlab/': [
+        'UNKNOWN',
+    ],
+    'wsutil/safe-math.h': [ # Public domain (CC0)
         'UNKNOWN',
     ],
 }

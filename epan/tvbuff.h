@@ -1,4 +1,4 @@
-/* tvbuff.h
+/** @file
  *
  * Testy, Virtual(-izable) Buffer of guint8*'s
  *
@@ -23,7 +23,7 @@
 
 #include <glib.h>
 #include <epan/guid-utils.h>
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 #include <epan/ipv6.h>
 
 #include <wsutil/nstime.h>
@@ -104,8 +104,15 @@ typedef void (*tvbuff_free_cb_t)(void*);
 /** Extracts 'number of bits' starting at 'bit offset'.
  * Returns a pointer to a newly initialized g_malloc'd REAL_DATA
  * tvbuff with the bits octet aligned.
+ * Bits are counted from MSB (0) to LSB (7) within octets.
  */
 WS_DLL_PUBLIC tvbuff_t *tvb_new_octet_aligned(tvbuff_t *tvb,
+    guint32 bit_offset, gint32 no_of_bits);
+
+/** Extracts 'number of bits' starting at 'bit offset'.
+ * Bits are counted from LSB (0) to MSB (7) within octets.
+ */
+WS_DLL_PUBLIC tvbuff_t *tvb_new_octet_right_aligned(tvbuff_t *tvb,
     guint32 bit_offset, gint32 no_of_bits);
 
 WS_DLL_PUBLIC tvbuff_t *tvb_new_chain(tvbuff_t *parent, tvbuff_t *backing);
@@ -252,20 +259,32 @@ WS_DLL_PUBLIC guint tvb_reported_length(const tvbuff_t *tvb);
 WS_DLL_PUBLIC gint tvb_reported_length_remaining(const tvbuff_t *tvb,
     const gint offset);
 
+/** Same as above, but throws an exception if the offset is out of bounds. */
+WS_DLL_PUBLIC guint tvb_ensure_reported_length_remaining(const tvbuff_t *tvb,
+    const gint offset);
+
 /** Set the reported length of a tvbuff to a given value; used for protocols
    whose headers contain an explicit length and where the calling
    dissector's payload may include padding as well as the packet for
    this protocol.
 
-   Also adjusts the data length. */
+   Also adjusts the available and contained length. */
 WS_DLL_PUBLIC void tvb_set_reported_length(tvbuff_t *tvb, const guint);
+
+/* Repair a tvbuff where the captured length is greater than the
+ * reported length; such a tvbuff makes no sense, as it's impossible
+ * to capture more data than is in the packet.
+ */
+WS_DLL_PUBLIC void tvb_fix_reported_length(tvbuff_t *tvb);
 
 WS_DLL_PUBLIC guint tvb_offset_from_real_beginning(const tvbuff_t *tvb);
 
 /* Returns the offset from the first byte of real data. */
 WS_DLL_PUBLIC gint tvb_raw_offset(tvbuff_t *tvb);
 
-/** Set the "this is a fragment" flag. */
+/** Set the "this is a fragment" flag. This affects whether
+ * FragmentBoundsError is thrown instead of ContainedBoundsError
+ * or ReportedBoundsError. */
 WS_DLL_PUBLIC void tvb_set_fragment(tvbuff_t *tvb);
 
 WS_DLL_PUBLIC struct tvbuff *tvb_get_ds_tvb(tvbuff_t *tvb);
@@ -410,7 +429,7 @@ WS_DLL_PUBLIC void tvb_get_guid(tvbuff_t *tvb, const gint offset,
 
 /* Fetches a byte array given a bit offset in a tvb */
 WS_DLL_PUBLIC guint8* tvb_get_bits_array(wmem_allocator_t *scope, tvbuff_t *tvb,
-    const gint offset, size_t length, size_t *data_length);
+    const gint offset, size_t length, size_t *data_length, const guint encoding);
 
 /* Fetch a specified number of bits from bit offset in a tvb.  All of these
  * functions are equivalent, except for the type of the return value.  Note
@@ -540,10 +559,9 @@ WS_DLL_PUBLIC gint tvb_strnlen(tvbuff_t *tvb, const gint offset,
     const guint maxlength);
 
 /**
- * Format the data in the tvb from offset for size.  Returned string is
- * wmem packet_scoped so call must be in that scope.
+ * Format the data in the tvb from offset for size.
  */
-WS_DLL_PUBLIC gchar *tvb_format_text(tvbuff_t *tvb, const gint offset,
+WS_DLL_PUBLIC gchar *tvb_format_text(wmem_allocator_t *scope, tvbuff_t *tvb, const gint offset,
     const gint size);
 
 /**
@@ -555,10 +573,9 @@ WS_DLL_PUBLIC gchar *tvb_format_text_wsp(wmem_allocator_t* allocator, tvbuff_t *
 
 /**
  * Like "tvb_format_text()", but for null-padded strings; don't show
- * the null padding characters as "\000".  Returned string is wmem packet_scoped
- * so call must be in that scope.
+ * the null padding characters as "\000".
  */
-extern gchar *tvb_format_stringzpad(tvbuff_t *tvb, const gint offset,
+extern gchar *tvb_format_stringzpad(wmem_allocator_t *scope, tvbuff_t *tvb, const gint offset,
     const gint size);
 
 /**
@@ -762,7 +779,7 @@ WS_DLL_PUBLIC const guint8 *tvb_get_const_stringz(tvbuff_t *tvb,
  * no more than bufsize number of bytes, including terminating NUL, to buffer.
  * Returns length of string (not including terminating NUL), or -1 if the
  * string was truncated in the buffer due to not having reached the terminating
- * NUL.  In this way, it acts like g_snprintf().
+ * NUL.  In this way, it acts like snprintf().
  *
  * When processing a packet where the remaining number of bytes is less
  * than bufsize, an exception is not thrown if the end of the packet
@@ -796,6 +813,18 @@ WS_DLL_PUBLIC gint tvb_get_raw_bytes_as_string(tvbuff_t *tvb, const gint offset,
 * Returns TRUE if all bytes are printable, FALSE otherwise
 */
 WS_DLL_PUBLIC gboolean tvb_ascii_isprint(tvbuff_t *tvb, const gint offset,
+	const gint length);
+
+/** Iterates over the provided portion of the tvb checking that it is
+* valid UTF-8 consisting entirely of printable characters. (The characters
+* must be complete; if the portion ends in a partial sequence that could
+* begin a valid character, this returns FALSE.) The length may be -1 for
+* "all the way to the end of the tvbuff".
+* Returns TRUE if printable, FALSE otherwise
+*
+* @see isprint_utf8_string()
+*/
+WS_DLL_PUBLIC gboolean tvb_utf_8_isprint(tvbuff_t *tvb, const gint offset,
 	const gint length);
 
 /**
@@ -927,7 +956,7 @@ WS_DLL_PUBLIC gchar *tvb_bytes_to_str(wmem_allocator_t *allocator, tvbuff_t *tvb
  * tvbuff"), fetch BCD encoded digits from a tvbuff starting from either
  * the low or high half byte, formatting the digits according to an input digit
  * set, if NUL a default digit set of 0-9 returning "?" for overdecadic digits
- * will be used.  A pointer to the packet-scope (WMEM-allocated) string will
+ * will be used.  A pointer to the WMEM-allocated string will
  * be returned. Note a tvbuff content of 0xf is considered a 'filler' and will
  * end the conversion.
  */
@@ -937,8 +966,23 @@ typedef struct dgt_set_t
 }
 dgt_set_t;
 
-WS_DLL_PUBLIC const gchar *tvb_bcd_dig_to_wmem_packet_str(tvbuff_t *tvb,
-    const gint offset, const gint len, const dgt_set_t *dgt,
+WS_DLL_PUBLIC const gchar *tvb_bcd_dig_to_str(wmem_allocator_t *scope,
+    tvbuff_t *tvb, const gint offset, const gint len, const dgt_set_t *dgt,
+    gboolean skip_first);
+
+/**
+ * Given a tvbuff, an offset into the tvbuff, and a length that starts
+ * at that offset (which may be -1 for "all the way to the end of the
+ * tvbuff"), fetch BCD encoded digits from a tvbuff starting from either
+ * the low or high half byte, formatting the digits according to an input digit
+ * set, if NUL a default digit set of 0-9 returning "?" for overdecadic digits
+ * will be used.  A pointer to the WMEM-allocated string will
+ * be returned. Note a tvbuff content of 0xf is considered a 'filler' and will
+ * end the conversion. Function uses big endian convetion: first digit is based
+ * on high order nibble, second digit is based on low order nibble.
+ */
+WS_DLL_PUBLIC const gchar *tvb_bcd_dig_to_str_be(wmem_allocator_t *scope,
+    tvbuff_t *tvb, const gint offset, const gint len, const dgt_set_t *dgt,
     gboolean skip_first);
 
 /**
@@ -951,11 +995,14 @@ WS_DLL_PUBLIC const gchar *tvb_bcd_dig_to_wmem_packet_str(tvbuff_t *tvb,
  * byte), formating the digits into characters according to the
  * input digit set, and return a pointer to a UTF-8 string, allocated
  * using the wmem scope.  A high-order nibble of 0xf is considered a
- * 'filler' and will end the conversion.
+ * 'filler' and will end the conversion. If odd is set the high order
+ * nibble in the last octet will be skipped. If bigendian is set then
+ * high order nibble is taken as first digit of a byte and low order
+ * nibble as second digit.
  */
 WS_DLL_PUBLIC gchar *tvb_get_bcd_string(wmem_allocator_t *scope, tvbuff_t *tvb,
     const gint offset, gint len, const dgt_set_t *dgt,
-    gboolean skip_first);
+    gboolean skip_first, gboolean odd, gboolean bigendian);
 
 /** Locate a sub-tvbuff within another tvbuff, starting at position
  * 'haystack_offset'. Returns the index of the beginning of 'needle' within
@@ -1073,6 +1120,19 @@ WS_DLL_PUBLIC tvbuff_t *tvb_child_uncompress_lznt1(tvbuff_t *parent,
  */
 extern tvbuff_t* base64_to_tvb(tvbuff_t *parent, const char *base64);
 
+
+/** Return a tvb that contains the binary representation of a base64
+ *  encoded string in the parent tvb as a child of the indicated tvb.
+ *
+ * @param parent The parent tvbuff.
+ * @param offset Start of the base64 string in the tvb
+ * @param length Length of the base64 string in the tvb
+ *
+ * @return   A tvb with the binary representation of the base64 decoded string.
+ */
+extern tvbuff_t* base64_tvb_to_new_tvb(tvbuff_t* parent, int offset, int length);
+
+extern tvbuff_t* base64uri_tvb_to_new_tvb(tvbuff_t* parent, int offset, int length);
 /**
  * Extract a variable length integer from a tvbuff.
  * Each byte in a varint, except the last byte, has the most significant bit (msb)

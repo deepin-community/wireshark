@@ -322,8 +322,8 @@ static const value_string format_units [] = {
 	{ 41, "Kilo-Volt-Amps-Reactive (kVAr)"},
 	{ 42, "Megawatt hours (MWh)"},
 	{ 43, "Kilowatt hours (kWh)"},
-	{ 44, "Degrees Celcius ('C)"},
-	{ 45, "Reciprocal of degrees celcius (/'C)"},
+	{ 44, "Degrees Celsius ('C)"},
+	{ 45, "Reciprocal of degrees Celsius (/'C)"},
 	{ 46, "Kilogram-metres squared (kgm^2)"},
 	{ 47, "Newton metres (Nm)"},
 	{ 48, "Newton metres per ampere (Nm/A)"},
@@ -1199,11 +1199,11 @@ static int display_raw_cyclic_data(guint8 display, int offset, guint16 buffer_si
 				/* we hit end of the current line  */
 				/* add final value to string */
 				if (display == cyclic_display_byte_format) {
-					g_snprintf(&pdata[idx], 32, "%02x",value8);
+					snprintf(&pdata[idx], 32, "%02x",value8);
 				} else if (display == cyclic_display_word_format) {
-						g_snprintf(&pdata[idx], 32, "%04x",value16);
+						snprintf(&pdata[idx], 32, "%04x",value16);
 				} else if (display == cyclic_display_long_format) {
-					g_snprintf(&pdata[idx], 32, "%08x",value32);
+					snprintf(&pdata[idx], 32, "%08x",value32);
 				}
 
 				/* display the completed line in the sub-tree  */
@@ -1218,13 +1218,13 @@ static int display_raw_cyclic_data(guint8 display, int offset, guint16 buffer_si
 				/* we're still adding to the current line  */
 				/* add current value to string */
 				if (display == cyclic_display_byte_format) {
-					g_snprintf(&pdata[idx], 32, "%02x ",value8);
+					snprintf(&pdata[idx], 32, "%02x ",value8);
 					idx += 3;
 				} else if (display == cyclic_display_word_format) {
-					g_snprintf(&pdata[idx], 32, "%04x ",value16);
+					snprintf(&pdata[idx], 32, "%04x ",value16);
 					idx += 5;
 				} else if (display == cyclic_display_long_format) {
-					g_snprintf(&pdata[idx], 32, "%08x ",value32);
+					snprintf(&pdata[idx], 32, "%08x ",value32);
 					idx += 9;
 				}
 			}
@@ -3233,7 +3233,7 @@ void proto_register_ecmp (void)
 	{ "Factory Fitted Option ID", "ecmp.drive_factory_fit_category_id", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 
 	{ &hf_ecmp_category_id,
-	{ "Option ID", "ecmp.category_id", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+	{ "Option ID", "ecmp.category_id", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 
 	{ &hf_ecmp_cyclic_link_num,
 	{ "Cyclic Link Number", "ecmp.link_num", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
@@ -3248,13 +3248,13 @@ void proto_register_ecmp (void)
 	{ "Cyclic Link Number Display", "ecmp.link_num_display", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 
 	{ &hf_ecmp_buffer_size,
-	{"Buffer Size", "ecmp.buffer_size", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}},
+	{"Buffer Size", "ecmp.buffer_size", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}},
 
 	{ &hf_ecmp_max_response,
-	{"Maximum Response Time", "ecmp.max_response", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}},
+	{"Maximum Response Time", "ecmp.max_response", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}},
 
 	{ &hf_ecmp_max_handle,
-	{"Maximum Handle Period", "ecmp.max_handle", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}},
+	{"Maximum Handle Period", "ecmp.max_handle", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}},
 
 	{ &hf_ecmp_info_address,
 	{"Number of Default Route Addresses", "ecmp.count", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}},

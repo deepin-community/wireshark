@@ -48,6 +48,8 @@
 
 #include "config.h"
 
+#define WS_LOG_DOMAIN LOG_DOMAIN_WIRETAP
+
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -56,12 +58,7 @@
 #include "ipfix.h"
 
 #include <wsutil/strtoi.h>
-
-#if 0
-#define ipfix_debug(...) g_warning(__VA_ARGS__)
-#else
-#define ipfix_debug(...)
-#endif
+#include <wsutil/wslog.h>
 
 #define RECORDS_FOR_IPFIX_CHECK 20
 
@@ -94,6 +91,10 @@ typedef struct ipfix_set_header_s {
 #define IPFIX_SET_HDR_SIZE 4
 
 
+static int ipfix_file_type_subtype = -1;
+
+void register_ipfix(void);
+
 /* Read IPFIX message header from file.  Return true on success.  Set *err to
  * 0 on EOF, any other value for "real" errors (EOF is ok, since return
  * value is still FALSE)
@@ -115,19 +116,19 @@ ipfix_read_message_header(ipfix_message_header_t *pfx_hdr, FILE_T fh, int *err, 
     if (pfx_hdr->version != IPFIX_VERSION) {
         /* Not an ipfix file. */
         *err = WTAP_ERR_BAD_FILE;
-        *err_info = g_strdup_printf("ipfix: wrong version %d", pfx_hdr->version);
+        *err_info = ws_strdup_printf("ipfix: wrong version %d", pfx_hdr->version);
         return FALSE;
     }
 
     if (pfx_hdr->message_length < 16) {
         *err = WTAP_ERR_BAD_FILE;
-        *err_info = g_strdup_printf("ipfix: message length %u is too short", pfx_hdr->message_length);
+        *err_info = ws_strdup_printf("ipfix: message length %u is too short", pfx_hdr->message_length);
         return FALSE;
     }
 
     /* go back to before header */
     if (file_seek(fh, 0 - IPFIX_MSG_HDR_SIZE, SEEK_CUR, err) == -1) {
-        ipfix_debug("ipfix_read: couldn't go back in file before header");
+        ws_debug("couldn't go back in file before header");
         return FALSE;
     }
 
@@ -135,7 +136,7 @@ ipfix_read_message_header(ipfix_message_header_t *pfx_hdr, FILE_T fh, int *err, 
 }
 
 
-/* Read IPFIX message header from file and fill in the struct wtap_pkthdr
+/* Read IPFIX message header from file and fill in the struct wtap_rec
  * for the packet, and, if that succeeds, read the packet data.
  * Return true on success.  Set *err to 0 on EOF, any other value for "real"
  * errors (EOF is ok, since return value is still FALSE).
@@ -154,6 +155,7 @@ ipfix_read_message(FILE_T fh, wtap_rec *rec, Buffer *buf, int *err, gchar **err_
      */
 
     rec->rec_type = REC_TYPE_PACKET;
+    rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
     rec->presence_flags = WTAP_HAS_TS;
     rec->rec_header.packet_header.len = msg_hdr.message_length;
     rec->rec_header.packet_header.caplen = msg_hdr.message_length;
@@ -178,7 +180,7 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
     ipfix_message_header_t msg_hdr;
     ipfix_set_header_t set_hdr;
 
-    ipfix_debug("ipfix_open: opening file");
+    ws_debug("opening file");
 
     /* number of records to scan before deciding if this really is IPFIX */
     if ((s = getenv("IPFIX_RECORDS_TO_CHECK")) != NULL) {
@@ -195,7 +197,7 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
     for (i = 0; i < records_for_ipfix_check; i++) {
         /* read first message header to check version */
         if (!ipfix_read_message_header(&msg_hdr, wth->fh, err, err_info)) {
-            ipfix_debug("ipfix_open: couldn't read message header #%d with err code #%d (%s)",
+            ws_debug("couldn't read message header #%d with err code #%d (%s)",
                          i, *err, *err_info);
             if (*err == WTAP_ERR_BAD_FILE) {
                 *err = 0;            /* not actually an error in this case */
@@ -219,7 +221,7 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
             break;
         }
         if (file_seek(wth->fh, IPFIX_MSG_HDR_SIZE, SEEK_CUR, err) == -1) {
-            ipfix_debug("ipfix_open: failed seek to next message in file, %d bytes away",
+            ws_debug("failed seek to next message in file, %d bytes away",
                          msg_hdr.message_length);
             return WTAP_OPEN_NOT_MINE;
         }
@@ -231,7 +233,7 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
                                  err, err_info)) {
                 if (*err == WTAP_ERR_SHORT_READ) {
                     /* Not a valid IPFIX Set, so not an IPFIX file. */
-                    ipfix_debug("ipfix_open: error %d reading set", *err);
+                    ws_debug("error %d reading set", *err);
                     return WTAP_OPEN_NOT_MINE;
                 }
 
@@ -241,7 +243,7 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
             set_hdr.set_length = g_ntohs(set_hdr.set_length);
             if ((set_hdr.set_length < IPFIX_SET_HDR_SIZE) ||
                 ((set_hdr.set_length + checked_len) > msg_hdr.message_length))  {
-                ipfix_debug("ipfix_open: found invalid set_length of %d",
+                ws_debug("found invalid set_length of %d",
                              set_hdr.set_length);
                 return WTAP_OPEN_NOT_MINE;
             }
@@ -249,7 +251,7 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
             if (file_seek(wth->fh, set_hdr.set_length - IPFIX_SET_HDR_SIZE,
                  SEEK_CUR, err) == -1)
             {
-                ipfix_debug("ipfix_open: failed seek to next set in file, %d bytes away",
+                ws_debug("failed seek to next set in file, %d bytes away",
                              set_hdr.set_length - IPFIX_SET_HDR_SIZE);
                 return WTAP_OPEN_ERROR;
             }
@@ -269,7 +271,7 @@ ipfix_open(wtap *wth, int *err, gchar **err_info)
     wth->file_tsprec = WTAP_TSPREC_SEC;
     wth->subtype_read = ipfix_read;
     wth->subtype_seek_read = ipfix_seek_read;
-    wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_IPFIX;
+    wth->file_type_subtype = ipfix_file_type_subtype;
 
     /*
      * Add an IDB; we don't know how many interfaces were
@@ -289,10 +291,10 @@ ipfix_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err,
     gchar **err_info, gint64 *data_offset)
 {
     *data_offset = file_tell(wth->fh);
-    ipfix_debug("ipfix_read: offset is initially %" G_GINT64_MODIFIER "d", *data_offset);
+    ws_debug("offset is initially %" PRId64, *data_offset);
 
     if (!ipfix_read_message(wth->fh, rec, buf, err, err_info)) {
-        ipfix_debug("ipfix_read: couldn't read message header with code: %d\n, and error '%s'",
+        ws_debug("couldn't read message header with code: %d\n, and error '%s'",
                      *err, *err_info);
         return FALSE;
     }
@@ -308,20 +310,45 @@ ipfix_seek_read(wtap *wth, gint64 seek_off, wtap_rec *rec,
 {
     /* seek to the right file position */
     if (file_seek(wth->random_fh, seek_off, SEEK_SET, err) == -1) {
-        ipfix_debug("ipfix_seek_read: couldn't read message header with code: %d\n, and error '%s'",
+        ws_debug("couldn't read message header with code: %d\n, and error '%s'",
                      *err, *err_info);
         return FALSE;   /* Seek error */
     }
 
-    ipfix_debug("ipfix_seek_read: reading at offset %" G_GINT64_MODIFIER "u", seek_off);
+    ws_debug("reading at offset %" PRIu64, seek_off);
 
     if (!ipfix_read_message(wth->random_fh, rec, buf, err, err_info)) {
-        ipfix_debug("ipfix_seek_read: couldn't read message header");
+        ws_debug("couldn't read message header");
         if (*err == 0)
             *err = WTAP_ERR_SHORT_READ;
         return FALSE;
     }
     return TRUE;
+}
+
+static const struct supported_block_type ipfix_blocks_supported[] = {
+    /*
+     * We support packet blocks, with no comments or other options.
+     */
+    { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info ipfix_info = {
+    "IPFIX File Format", "ipfix", "pfx", "ipfix",
+    FALSE, BLOCKS_SUPPORTED(ipfix_blocks_supported),
+    NULL, NULL, NULL
+};
+
+void register_ipfix(void)
+{
+    ipfix_file_type_subtype = wtap_register_file_type_subtype(&ipfix_info);
+
+    /*
+     * Register name for backwards compatibility with the
+     * wtap_filetypes table in Lua.
+     */
+    wtap_register_backwards_compatibility_lua_name("IPFIX",
+                                                   ipfix_file_type_subtype);
 }
 
 /*

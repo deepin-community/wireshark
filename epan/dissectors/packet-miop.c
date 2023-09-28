@@ -120,7 +120,7 @@ static int dissect_miop (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree,
 
   guint32 unique_id_len;
 
-  wmem_strbuf_t *flags_strbuf = wmem_strbuf_new_label(wmem_packet_scope());
+  wmem_strbuf_t *flags_strbuf = wmem_strbuf_new_label(pinfo->pool);
   wmem_strbuf_append(flags_strbuf, "none");
 
   if (!dissect_miop_heur_check(tvb, pinfo, tree, data))
@@ -177,7 +177,7 @@ static int dissect_miop (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree,
       miop_tree = proto_item_add_subtree (ti, ett_miop);
 
       /* XXX - Should we bail out if we don't have the right magic number? */
-      proto_tree_add_item(miop_tree, hf_miop_magic, tvb, offset, 4, ENC_ASCII|ENC_NA);
+      proto_tree_add_item(miop_tree, hf_miop_magic, tvb, offset, 4, ENC_ASCII);
       offset += 4;
       proto_tree_add_uint_format_value(miop_tree, hf_miop_hdr_version, tvb, offset, 1, hdr_version,
                                  "%u.%u", version_major, version_minor);

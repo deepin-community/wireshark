@@ -492,7 +492,7 @@ static guint dissect_ttp(tvbuff_t* tvb, packet_info* pinfo, proto_tree* root, gb
 
     head = tvb_get_guint8(tvb, offset);
 
-    g_snprintf(buf, 128, ", Credit=%d", head & ~TTP_PARAMETERS);
+    snprintf(buf, 128, ", Credit=%d", head & ~TTP_PARAMETERS);
     col_append_str(pinfo->cinfo, COL_INFO, buf);
 
     if (root)
@@ -557,7 +557,7 @@ static void dissect_iap_request(tvbuff_t* tvb, packet_info* pinfo, proto_tree* r
 
             set_address(&destaddr, irda_address_type, 1, &circuit_id);
 
-            conv = find_conversation(pinfo->num, &srcaddr, &destaddr, ENDPOINT_NONE, pinfo->srcport, pinfo->destport, 0);
+            conv = find_conversation(pinfo->num, &srcaddr, &destaddr, CONVERSATION_NONE, pinfo->srcport, pinfo->destport, 0);
             if (conv)
             {
                 iap_conv = (iap_conversation_t*)conversation_get_proto_data(conv, proto_iap);
@@ -579,7 +579,7 @@ static void dissect_iap_request(tvbuff_t* tvb, packet_info* pinfo, proto_tree* r
             }
             else
             {
-                conv = conversation_new(pinfo->num, &srcaddr, &destaddr, ENDPOINT_NONE, pinfo->srcport, pinfo->destport, 0);
+                conv = conversation_new(pinfo->num, &srcaddr, &destaddr, CONVERSATION_NONE, pinfo->srcport, pinfo->destport, 0);
                 iap_conv = wmem_new(wmem_file_scope(), iap_conversation_t);
                 conversation_add_proto_data(conv, proto_iap, (void*)iap_conv);
             }
@@ -590,12 +590,12 @@ static void dissect_iap_request(tvbuff_t* tvb, packet_info* pinfo, proto_tree* r
                 iap_conv->pattr_dissector = NULL;
             }
 
-            char   *class_name = (char *) tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 1 + 1, clen, ENC_ASCII|ENC_NA);
-            char   *attr_name = (char *) tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 1 + 1 + clen + 1, alen, ENC_ASCII|ENC_NA);
+            char   *class_name = (char *) tvb_get_string_enc(pinfo->pool, tvb, offset + 1 + 1, clen, ENC_ASCII|ENC_NA);
+            char   *attr_name = (char *) tvb_get_string_enc(pinfo->pool, tvb, offset + 1 + 1 + clen + 1, alen, ENC_ASCII|ENC_NA);
 
             col_add_fstr(pinfo->cinfo, COL_INFO, "GetValueByClass: \"%s\" \"%s\"",
-                format_text(wmem_packet_scope(), (guchar *) class_name, strlen(class_name)),
-                format_text(wmem_packet_scope(), (guchar *) attr_name, strlen(attr_name)));
+                format_text(pinfo->pool, (guchar *) class_name, strlen(class_name)),
+                format_text(pinfo->pool, (guchar *) attr_name, strlen(attr_name)));
 
             /* Dissect IAP query if it is new */
             if (iap_conv)
@@ -699,7 +699,7 @@ static void dissect_iap_result(tvbuff_t* tvb, packet_info* pinfo, proto_tree* ro
     set_address(&destaddr, irda_address_type, 1, &circuit_id);
 
     /* Find result value dissector */
-    conv = find_conversation(pinfo->num, &srcaddr, &destaddr, ENDPOINT_NONE, pinfo->srcport, pinfo->destport, 0);
+    conv = find_conversation(pinfo->num, &srcaddr, &destaddr, CONVERSATION_NONE, pinfo->srcport, pinfo->destport, 0);
     if (conv)
     {
         num = pinfo->num;
@@ -743,12 +743,12 @@ static void dissect_iap_result(tvbuff_t* tvb, packet_info* pinfo, proto_tree* ro
                         break;
 
                     case IAS_OCT_SEQ:
-                        g_snprintf(buf, 300, ", %d Octets", tvb_get_ntohs(tvb, offset + 7));
+                        snprintf(buf, 300, ", %d Octets", tvb_get_ntohs(tvb, offset + 7));
                         break;
 
                     case IAS_STRING:
                         n = tvb_get_guint8(tvb, offset + 8);
-                        col_append_fstr(pinfo->cinfo, COL_INFO, ", \"%s\"", tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 9, n, ENC_ASCII));
+                        col_append_fstr(pinfo->cinfo, COL_INFO, ", \"%s\"", tvb_get_string_enc(pinfo->pool, tvb, offset + 9, n, ENC_ASCII));
                         break;
                     default:
                         break;
@@ -980,7 +980,7 @@ static void dissect_appl_proto(tvbuff_t* tvb, packet_info* pinfo, proto_tree* ro
     set_address(&destaddr, irda_address_type, 1, &circuit_id);
 
     /* Find result value dissector */
-    conv = find_conversation(pinfo->num, &srcaddr, &destaddr, ENDPOINT_NONE, pinfo->srcport, pinfo->destport, 0);
+    conv = find_conversation(pinfo->num, &srcaddr, &destaddr, CONVERSATION_NONE, pinfo->srcport, pinfo->destport, 0);
     if (conv)
     {
         num = pinfo->num;
@@ -1007,8 +1007,8 @@ static void dissect_appl_proto(tvbuff_t* tvb, packet_info* pinfo, proto_tree* ro
 
     if (lmp_conv)
     {
-/*g_message("%x:%d->%x:%d = %p\n", src, pinfo->srcport, circuit_id, pinfo->destport, lmp_conv); */
-/*g_message("->%d: %d %d %p\n", pinfo->num, lmp_conv->iap_result_frame, lmp_conv->ttp, lmp_conv->proto_dissector); */
+/*ws_message("%x:%d->%x:%d = %p\n", src, pinfo->srcport, circuit_id, pinfo->destport, lmp_conv); */
+/*ws_message("->%d: %d %d %p\n", pinfo->num, lmp_conv->iap_result_frame, lmp_conv->ttp, lmp_conv->proto_dissector); */
         if ((lmp_conv->ttp) && (pdu_type != DISCONNECT_PDU))
         {
             offset += dissect_ttp(tvb, pinfo, root, (pdu_type == DATA_PDU));
@@ -1203,12 +1203,12 @@ void add_lmp_conversation(packet_info* pinfo, guint8 dlsap, gboolean ttp, dissec
     lmp_conversation_t* lmp_conv = NULL;
 
 
-/*g_message("%d: add_lmp_conversation(%p, %d, %d, %p) = ", pinfo->num, pinfo, dlsap, ttp, proto_dissector); */
+/*ws_message("%d: add_lmp_conversation(%p, %d, %d, %p) = ", pinfo->num, pinfo, dlsap, ttp, proto_dissector); */
     set_address(&srcaddr, irda_address_type, 1, &circuit_id);
     dest = circuit_id ^ CMD_FRAME;
     set_address(&destaddr, irda_address_type, 1, &dest);
 
-    conv = find_conversation(pinfo->num, &destaddr, &srcaddr, ENDPOINT_NONE, dlsap, 0, NO_PORT_B);
+    conv = find_conversation(pinfo->num, &destaddr, &srcaddr, CONVERSATION_NONE, dlsap, 0, NO_PORT_B);
     if (conv)
     {
         lmp_conv = (lmp_conversation_t*)conversation_get_proto_data(conv, proto_irlmp);
@@ -1229,7 +1229,7 @@ void add_lmp_conversation(packet_info* pinfo, guint8 dlsap, gboolean ttp, dissec
     }
     else
     {
-        conv = conversation_new(pinfo->num, &destaddr, &srcaddr, ENDPOINT_NONE, dlsap, 0, NO_PORT_B);
+        conv = conversation_new(pinfo->num, &destaddr, &srcaddr, CONVERSATION_NONE, dlsap, 0, NO_PORT2);
         lmp_conv = wmem_new(wmem_file_scope(), lmp_conversation_t);
         conversation_add_proto_data(conv, proto_irlmp, (void*)lmp_conv);
     }
@@ -1239,7 +1239,7 @@ void add_lmp_conversation(packet_info* pinfo, guint8 dlsap, gboolean ttp, dissec
     lmp_conv->ttp              = ttp;
     lmp_conv->dissector        = dissector;
 
-/*g_message("%p\n", lmp_conv); */
+/*ws_message("%p\n", lmp_conv); */
 }
 
 
@@ -1272,25 +1272,25 @@ static guint dissect_negotiation(tvbuff_t* tvb, proto_tree* tree, guint offset)
                     proto_item_append_text(ti, ": Baud Rate (");
 
                     if (pv & 0x01)
-                        g_strlcat(buf, ", 2400", 256);
+                        (void) g_strlcat(buf, ", 2400", 256);
                     if (pv & 0x02)
-                        g_strlcat(buf, ", 9600", 256);
+                        (void) g_strlcat(buf, ", 9600", 256);
                     if (pv & 0x04)
-                        g_strlcat(buf, ", 19200", 256);
+                        (void) g_strlcat(buf, ", 19200", 256);
                     if (pv & 0x08)
-                        g_strlcat(buf, ", 38400", 256);
+                        (void) g_strlcat(buf, ", 38400", 256);
                     if (pv & 0x10)
-                        g_strlcat(buf, ", 57600", 256);
+                        (void) g_strlcat(buf, ", 57600", 256);
                     if (pv & 0x20)
-                        g_strlcat(buf, ", 115200", 256);
+                        (void) g_strlcat(buf, ", 115200", 256);
                     if (pv & 0x40)
-                        g_strlcat(buf, ", 576000", 256);
+                        (void) g_strlcat(buf, ", 576000", 256);
                     if (pv & 0x80)
-                        g_strlcat(buf, ", 1152000", 256);
+                        (void) g_strlcat(buf, ", 1152000", 256);
                     if ((p_len > 1) && (tvb_get_guint8(tvb, offset+3) & 0x01))
-                        g_strlcat(buf, ", 4000000", 256);
+                        (void) g_strlcat(buf, ", 4000000", 256);
 
-                    g_strlcat(buf, " bps)", 256);
+                    (void) g_strlcat(buf, " bps)", 256);
 
                     proto_item_append_text(ti, "%s", buf+2);
 
@@ -1300,15 +1300,15 @@ static guint dissect_negotiation(tvbuff_t* tvb, proto_tree* tree, guint offset)
                     proto_item_append_text(ti, ": Maximum Turn Time (");
 
                     if (pv & 0x01)
-                        g_strlcat(buf, ", 500", 256);
+                        (void) g_strlcat(buf, ", 500", 256);
                     if (pv & 0x02)
-                        g_strlcat(buf, ", 250", 256);
+                        (void) g_strlcat(buf, ", 250", 256);
                     if (pv & 0x04)
-                        g_strlcat(buf, ", 100", 256);
+                        (void) g_strlcat(buf, ", 100", 256);
                     if (pv & 0x08)
-                        g_strlcat(buf, ", 50", 256);
+                        (void) g_strlcat(buf, ", 50", 256);
 
-                    g_strlcat(buf, " ms)", 256);
+                    (void) g_strlcat(buf, " ms)", 256);
 
                     proto_item_append_text(ti, "%s", buf+2);
 
@@ -1318,19 +1318,19 @@ static guint dissect_negotiation(tvbuff_t* tvb, proto_tree* tree, guint offset)
                     proto_item_append_text(ti, ": Data Size (");
 
                     if (pv & 0x01)
-                        g_strlcat(buf, ", 64", 256);
+                        (void) g_strlcat(buf, ", 64", 256);
                     if (pv & 0x02)
-                        g_strlcat(buf, ", 128", 256);
+                        (void) g_strlcat(buf, ", 128", 256);
                     if (pv & 0x04)
-                        g_strlcat(buf, ", 256", 256);
+                        (void) g_strlcat(buf, ", 256", 256);
                     if (pv & 0x08)
-                        g_strlcat(buf, ", 512", 256);
+                        (void) g_strlcat(buf, ", 512", 256);
                     if (pv & 0x10)
-                        g_strlcat(buf, ", 1024", 256);
+                        (void) g_strlcat(buf, ", 1024", 256);
                     if (pv & 0x20)
-                        g_strlcat(buf, ", 2048", 256);
+                        (void) g_strlcat(buf, ", 2048", 256);
 
-                    g_strlcat(buf, " bytes)", 256);
+                    (void) g_strlcat(buf, " bytes)", 256);
 
                     proto_item_append_text(ti, "%s", buf+2);
 
@@ -1340,21 +1340,21 @@ static guint dissect_negotiation(tvbuff_t* tvb, proto_tree* tree, guint offset)
                     proto_item_append_text(ti, ": Window Size (");
 
                     if (pv & 0x01)
-                        g_strlcat(buf, ", 1", 256);
+                        (void) g_strlcat(buf, ", 1", 256);
                     if (pv & 0x02)
-                        g_strlcat(buf, ", 2", 256);
+                        (void) g_strlcat(buf, ", 2", 256);
                     if (pv & 0x04)
-                        g_strlcat(buf, ", 3", 256);
+                        (void) g_strlcat(buf, ", 3", 256);
                     if (pv & 0x08)
-                        g_strlcat(buf, ", 4", 256);
+                        (void) g_strlcat(buf, ", 4", 256);
                     if (pv & 0x10)
-                        g_strlcat(buf, ", 5", 256);
+                        (void) g_strlcat(buf, ", 5", 256);
                     if (pv & 0x20)
-                        g_strlcat(buf, ", 6", 256);
+                        (void) g_strlcat(buf, ", 6", 256);
                     if (pv & 0x40)
-                        g_strlcat(buf, ", 7", 256);
+                        (void) g_strlcat(buf, ", 7", 256);
 
-                    g_strlcat(buf, " frame window)", 256);
+                    (void) g_strlcat(buf, " frame window)", 256);
 
                     proto_item_append_text(ti, "%s", buf+2);
 
@@ -1364,23 +1364,23 @@ static guint dissect_negotiation(tvbuff_t* tvb, proto_tree* tree, guint offset)
                     proto_item_append_text(ti, ": Additional BOFs (");
 
                     if (pv & 0x01)
-                        g_strlcat(buf, ", 48", 256);
+                        (void) g_strlcat(buf, ", 48", 256);
                     if (pv & 0x02)
-                        g_strlcat(buf, ", 24", 256);
+                        (void) g_strlcat(buf, ", 24", 256);
                     if (pv & 0x04)
-                        g_strlcat(buf, ", 12", 256);
+                        (void) g_strlcat(buf, ", 12", 256);
                     if (pv & 0x08)
-                        g_strlcat(buf, ", 5", 256);
+                        (void) g_strlcat(buf, ", 5", 256);
                     if (pv & 0x10)
-                        g_strlcat(buf, ", 3", 256);
+                        (void) g_strlcat(buf, ", 3", 256);
                     if (pv & 0x20)
-                        g_strlcat(buf, ", 2", 256);
+                        (void) g_strlcat(buf, ", 2", 256);
                     if (pv & 0x40)
-                        g_strlcat(buf, ", 1", 256);
+                        (void) g_strlcat(buf, ", 1", 256);
                     if (pv & 0x80)
-                        g_strlcat(buf, ", 0", 256);
+                        (void) g_strlcat(buf, ", 0", 256);
 
-                    g_strlcat(buf, " additional BOFs at 115200)", 256);
+                    (void) g_strlcat(buf, " additional BOFs at 115200)", 256);
 
                     proto_item_append_text(ti, "%s", buf+2);
 
@@ -1390,23 +1390,23 @@ static guint dissect_negotiation(tvbuff_t* tvb, proto_tree* tree, guint offset)
                     proto_item_append_text(ti, ": Minimum Turn Time (");
 
                     if (pv & 0x01)
-                        g_strlcat(buf, ", 10", 256);
+                        (void) g_strlcat(buf, ", 10", 256);
                     if (pv & 0x02)
-                        g_strlcat(buf, ", 5", 256);
+                        (void) g_strlcat(buf, ", 5", 256);
                     if (pv & 0x04)
-                        g_strlcat(buf, ", 1", 256);
+                        (void) g_strlcat(buf, ", 1", 256);
                     if (pv & 0x08)
-                        g_strlcat(buf, ", 0.5", 256);
+                        (void) g_strlcat(buf, ", 0.5", 256);
                     if (pv & 0x10)
-                        g_strlcat(buf, ", 0.1", 256);
+                        (void) g_strlcat(buf, ", 0.1", 256);
                     if (pv & 0x20)
-                        g_strlcat(buf, ", 0.05", 256);
+                        (void) g_strlcat(buf, ", 0.05", 256);
                     if (pv & 0x40)
-                        g_strlcat(buf, ", 0.01", 256);
+                        (void) g_strlcat(buf, ", 0.01", 256);
                     if (pv & 0x80)
-                        g_strlcat(buf, ", 0", 256);
+                        (void) g_strlcat(buf, ", 0", 256);
 
-                    g_strlcat(buf, " ms)", 256);
+                    (void) g_strlcat(buf, " ms)", 256);
 
                     proto_item_append_text(ti, "%s", buf+2);
 
@@ -1416,23 +1416,23 @@ static guint dissect_negotiation(tvbuff_t* tvb, proto_tree* tree, guint offset)
                     proto_item_append_text(ti, ": Link Disconnect/Threshold Time (");
 
                     if (pv & 0x01)
-                        g_strlcat(buf, ", 3/0", 256);
+                        (void) g_strlcat(buf, ", 3/0", 256);
                     if (pv & 0x02)
-                        g_strlcat(buf, ", 8/3", 256);
+                        (void) g_strlcat(buf, ", 8/3", 256);
                     if (pv & 0x04)
-                        g_strlcat(buf, ", 12/3", 256);
+                        (void) g_strlcat(buf, ", 12/3", 256);
                     if (pv & 0x08)
-                        g_strlcat(buf, ", 16/3", 256);
+                        (void) g_strlcat(buf, ", 16/3", 256);
                     if (pv & 0x10)
-                        g_strlcat(buf, ", 20/3", 256);
+                        (void) g_strlcat(buf, ", 20/3", 256);
                     if (pv & 0x20)
-                        g_strlcat(buf, ", 25/3", 256);
+                        (void) g_strlcat(buf, ", 25/3", 256);
                     if (pv & 0x40)
-                        g_strlcat(buf, ", 30/3", 256);
+                        (void) g_strlcat(buf, ", 30/3", 256);
                     if (pv & 0x80)
-                        g_strlcat(buf, ", 40/3", 256);
+                        (void) g_strlcat(buf, ", 40/3", 256);
 
-                    g_strlcat(buf, " s)", 256);
+                    (void) g_strlcat(buf, " s)", 256);
 
                     proto_item_append_text(ti, "%s", buf+2);
 
@@ -1556,29 +1556,29 @@ static void dissect_xid(tvbuff_t* tvb, packet_info* pinfo, proto_tree* root, pro
                 service_hints[0] = 0;
 
                 if (hint1 & 0x01)
-                    g_strlcat(service_hints, ", PnP Compatible", 256);
+                    (void) g_strlcat(service_hints, ", PnP Compatible", 256);
                 if (hint1 & 0x02)
-                    g_strlcat(service_hints, ", PDA/Palmtop", 256);
+                    (void) g_strlcat(service_hints, ", PDA/Palmtop", 256);
                 if (hint1 & 0x04)
-                    g_strlcat(service_hints, ", Computer", 256);
+                    (void) g_strlcat(service_hints, ", Computer", 256);
                 if (hint1 & 0x08)
-                    g_strlcat(service_hints, ", Printer", 256);
+                    (void) g_strlcat(service_hints, ", Printer", 256);
                 if (hint1 & 0x10)
-                    g_strlcat(service_hints, ", Modem", 256);
+                    (void) g_strlcat(service_hints, ", Modem", 256);
                 if (hint1 & 0x20)
-                    g_strlcat(service_hints, ", Fax", 256);
+                    (void) g_strlcat(service_hints, ", Fax", 256);
                 if (hint1 & 0x40)
-                    g_strlcat(service_hints, ", LAN Access", 256);
+                    (void) g_strlcat(service_hints, ", LAN Access", 256);
                 if (hint2 & 0x01)
-                    g_strlcat(service_hints, ", Telephony", 256);
+                    (void) g_strlcat(service_hints, ", Telephony", 256);
                 if (hint2 & 0x02)
-                    g_strlcat(service_hints, ", File Server", 256);
+                    (void) g_strlcat(service_hints, ", File Server", 256);
                 if (hint2 & 0x04)
-                    g_strlcat(service_hints, ", IrCOMM", 256);
+                    (void) g_strlcat(service_hints, ", IrCOMM", 256);
                 if (hint2 & 0x20)
-                    g_strlcat(service_hints, ", OBEX", 256);
+                    (void) g_strlcat(service_hints, ", OBEX", 256);
 
-                g_strlcat(service_hints, ")", 256);
+                (void) g_strlcat(service_hints, ")", 256);
                 service_hints[0] = ' ';
                 service_hints[1] = '(';
 
@@ -1668,8 +1668,8 @@ static void dissect_xid(tvbuff_t* tvb, packet_info* pinfo, proto_tree* root, pro
 
                 if (have_encoding)
                 {
-                    name = (gchar *) tvb_get_string_enc(wmem_packet_scope(), tvb, offset, name_len, encoding);
-                    col_append_fstr(pinfo->cinfo, COL_INFO, ", \"%s\"", format_text(wmem_packet_scope(), (guchar *) name, strlen(name)));
+                    name = (gchar *) tvb_get_string_enc(pinfo->pool, tvb, offset, name_len, encoding);
+                    col_append_fstr(pinfo->cinfo, COL_INFO, ", \"%s\"", format_text(pinfo->pool, (guchar *) name, strlen(name)));
                     if (root)
                         proto_tree_add_item(lmp_tree, hf_lmp_xid_name, tvb, offset,
                                             -1, encoding);
@@ -1705,13 +1705,13 @@ static void dissect_log(tvbuff_t* tvb, packet_info* pinfo, proto_tree* root)
         char   *buf;
 
         length = tvb_captured_length(tvb);
-        buf = (char *) tvb_get_string_enc(wmem_packet_scope(), tvb, 0, length, ENC_ASCII|ENC_NA);
+        buf = (char *) tvb_get_string_enc(pinfo->pool, tvb, 0, length, ENC_ASCII|ENC_NA);
         if (length > 0 && buf[length-1] == '\n')
             buf[length-1] = 0;
         else if (length > 1 && buf[length-2] == '\n')
             buf[length-2] = 0;
 
-        col_add_str(pinfo->cinfo, COL_INFO, format_text(wmem_packet_scope(), (guchar *) buf, strlen(buf)));
+        col_add_str(pinfo->cinfo, COL_INFO, format_text(pinfo->pool, (guchar *) buf, strlen(buf)));
     }
 
     if (root)
@@ -1764,7 +1764,7 @@ static void dissect_irlap(tvbuff_t* tvb, packet_info* pinfo, proto_tree* root)
     circuit_id = tvb_get_guint8(tvb, 0);
 
     /* initially set address columns to connection address */
-    g_snprintf(addr, sizeof(addr)-1, "0x%02X", circuit_id >> 1);
+    snprintf(addr, sizeof(addr)-1, "0x%02X", circuit_id >> 1);
     col_add_str(pinfo->cinfo, COL_DEF_SRC, addr);
     col_add_str(pinfo->cinfo, COL_DEF_DST, addr);
 

@@ -78,6 +78,7 @@ static dissector_table_t xid_subdissector_table;
 
 static dissector_table_t ethertype_subdissector_table;
 static dissector_table_t hpteam_subdissector_table;
+static dissector_table_t other_control_dissector_table;
 
 static dissector_handle_t bpdu_handle;
 static dissector_handle_t eth_withoutfcs_handle;
@@ -87,7 +88,7 @@ static dissector_handle_t tr_handle;
 static dissector_handle_t turbo_handle;
 static dissector_handle_t mesh_handle;
 static dissector_handle_t llc_handle;
-
+static dissector_handle_t epd_llc_handle;
 
 /*
  * Group/Individual bit, in the DSAP.
@@ -209,7 +210,7 @@ static wmem_map_t *oui_info_table = NULL;
 static void
 llc_sap_value( gchar *result, guint32 sap )
 {
-	g_snprintf( result, ITEM_LABEL_LENGTH, "%s", val_to_str_const(sap<<1, sap_vals, "Unknown"));
+	snprintf( result, ITEM_LABEL_LENGTH, "%s", val_to_str_const(sap<<1, sap_vals, "Unknown"));
 }
 
 /*
@@ -365,14 +366,20 @@ dissect_basicxid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 	return tvb_captured_length(tvb);
 }
 
+/*
+ * IEEE Std 802.2-1998 and ISO/IEC 8802-2.
+ *
+ * This is what IEEE Std 802-2014 describes in section 5.2.2 "LLC sublayer"
+ * as "LLC protocol discrimination (LPD)".
+ */
 static int
-dissect_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
+dissect_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
 	proto_tree	*llc_tree;
 	proto_tree	*field_tree;
 	proto_item	*ti, *sap_item;
 	int		is_snap;
-	guint16		control, etype;
+	guint16		control;
 	int		llc_header_len;
 	guint8		dsap, ssap, format;
 	tvbuff_t	*next_tvb;
@@ -384,20 +391,6 @@ dissect_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
 	ti = proto_tree_add_item(tree, proto_llc, tvb, 0, -1, ENC_NA);
 	llc_tree = proto_item_add_subtree(ti, ett_llc);
-	/* IEEE 1609.3 Ch 5.2.1
-	 * The LLC sublayer header consists solely of a 2-octet field
-	* that contains an EtherType that identifies the higher layer protocol...
-	* Check for 0x86DD too?
-	*/
-	if (tvb_bytes_exist(tvb, 0, 2) &&
-	    (etype = tvb_get_ntohs(tvb, 0)) == 0x88DC) {
-		proto_tree_add_item(llc_tree, hf_llc_type, tvb, 0, 2, ENC_BIG_ENDIAN);
-		next_tvb = tvb_new_subset_remaining(tvb, 2);
-		if (!dissector_try_uint(ethertype_subdissector_table,
-			etype, next_tvb, pinfo, tree))
-			call_data_dissector(next_tvb, pinfo, tree);
-		return tvb_captured_length(tvb);
-	}
 
 	sap_item = proto_tree_add_item(llc_tree, hf_llc_dsap, tvb, 0, 1, ENC_BIG_ENDIAN);
 	field_tree = proto_item_add_subtree(sap_item, ett_llc_dsap);
@@ -478,7 +471,11 @@ dissect_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 					}
 				}
 			} else {
-				call_data_dissector(next_tvb, pinfo, tree);
+				if (!dissector_try_uint(
+					other_control_dissector_table, control,
+					next_tvb, pinfo, tree)) {
+					call_data_dissector(next_tvb, pinfo, tree);
+				}
 			}
 		}
 	}
@@ -706,6 +703,31 @@ get_snap_oui_info(guint32 oui)
 		return NULL;
 }
 
+/*
+ * This is what IEEE Std 802-2014 describes in section 5.2.2 "LLC sublayer"
+ * as "EtherType protocol discrimination (EPD)".
+ */
+static int
+dissect_epd_llc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
+{
+	proto_tree	*llc_tree;
+	proto_item	*ti;
+	guint32		etype;
+	tvbuff_t	*next_tvb;
+
+	col_set_str(pinfo->cinfo, COL_PROTOCOL, "LLC");
+	col_clear(pinfo->cinfo, COL_INFO);
+
+	ti = proto_tree_add_item(tree, proto_llc, tvb, 0, 2, ENC_NA);
+	llc_tree = proto_item_add_subtree(ti, ett_llc);
+	proto_tree_add_item_ret_uint(llc_tree, hf_llc_type, tvb, 0, 2, ENC_BIG_ENDIAN, &etype);
+	next_tvb = tvb_new_subset_remaining(tvb, 2);
+	if (dissector_try_uint(ethertype_subdissector_table, etype, next_tvb,
+	    pinfo, tree) == 0)
+		call_data_dissector(next_tvb, pinfo, tree);
+	return tvb_captured_length(tvb);
+}
+
 void
 proto_register_llc(void)
 {
@@ -818,9 +840,13 @@ proto_register_llc(void)
 	  "LLC SAP", proto_llc, FT_UINT8, BASE_HEX);
 	xid_subdissector_table = register_dissector_table("llc.xid_dsap",
 	  "LLC XID SAP", proto_llc, FT_UINT8, BASE_HEX);
+	other_control_dissector_table = register_dissector_table("llc.control",
+	  "LLC Control", proto_llc, FT_UINT16, BASE_HEX);
 	register_capture_dissector_table("llc.dsap", "LLC");
 
 	llc_handle = register_dissector("llc", dissect_llc, proto_llc);
+	epd_llc_handle = register_dissector("epd_llc", dissect_epd_llc,
+	  proto_llc);
 
 	register_capture_dissector("llc", capture_llc, proto_llc);
 }

@@ -53,6 +53,8 @@ void proto_reg_handoff_gsm_a_rr(void);
 static dissector_handle_t rrc_irat_ho_info_handle;
 static dissector_handle_t rrc_irat_ho_to_utran_cmd_handle;
 
+static guint gsm_a_rr_nri_length = 0;
+
 #define PADDING_BYTE 0x2B
 
 /* 3GPP TS 44.018 version 11.2.0 Release 11 */
@@ -165,7 +167,7 @@ const value_string gsm_a_dtap_msg_rr_strings[] = {
     {    0, NULL }
 };
 
-const value_string gsm_a_dtap_msg_rr_ec_ccch_strings[] = {
+static const value_string gsm_a_dtap_msg_rr_ec_ccch_strings[] = {
     /* Channel establishment messages */
     { 0x01, "EC-Immediate Assignment Type 2" },
     { 0x02, "EC-Immediate Assignment Reject" },
@@ -324,8 +326,8 @@ static const value_string gsm_rr_elem_strings[] = {
  * 10.5.2.79 DL-DCCH-Message
  * 10.5.2.80 CN to MS transparent information
  * 10.5.2.81 PLMN Index
- * 10.5.2.82 Extended TSC Set
  */
+    { DE_RR_EXTENDED_TSC_SET, "Extended TSC Set" },                     /* 10.5.2.82 Extended TSC Set */
     { DE_RR_EC_REQUEST_REFERENCE, "EC Request Reference" },             /* 10.5.2.83 EC Request reference */
     { DE_RR_EC_PKT_CH_DSC1, "EC Packet Channel Description Type 1" },   /* 10.5.2.84 EC Packet Channel Description Type 1 */
     { DE_RR_EC_PKT_CH_DSC2, "EC Packet Channel Description Type 2" },   /* 10.5.2.85 EC Packet Channel Description Type 2 */
@@ -334,7 +336,7 @@ static const value_string gsm_rr_elem_strings[] = {
 };
 value_string_ext gsm_rr_elem_strings_ext = VALUE_STRING_EXT_INIT(gsm_rr_elem_strings);
 
-const value_string gsm_rr_rest_octets_elem_strings[] = {
+static const value_string gsm_rr_rest_octets_elem_strings[] = {
     /* RR Rest Octets information elements */
     { 0, "UTRAN FDD Description" },
     { 0, "UTRAN TDD Description" },
@@ -403,7 +405,7 @@ const value_string gsm_rr_rest_octets_elem_strings[] = {
 
 /* RR cause value (octet 2) 3GPP TS 24.018, section 10.5.2.31 */
 /* public symbol for packet-gsm_gsup.c */
-const value_string gsm_a_rr_RR_cause_vals[] = {
+static const value_string gsm_a_rr_RR_cause_vals[] = {
     {    0, "Normal event"},
     {    1, "Abnormal release, unspecified"},
     {    2, "Abnormal release, channel unacceptable"},
@@ -517,6 +519,7 @@ static int hf_gsm_a_rr_start_mode = -1;
 static int hf_gsm_a_rr_timing_adv = -1;
 static int hf_gsm_a_rr_time_diff = -1;
 static int hf_gsm_a_rr_tlli = -1;
+static int hf_gsm_a_rr_nri = -1;
 static int hf_gsm_a_rr_target_mode = -1;
 static int hf_gsm_a_rr_wait_indication = -1;
 static int hf_gsm_a_rr_seq_code = -1;
@@ -1047,6 +1050,7 @@ static int hf_gsm_a_rr_multiband_reporting_present = -1;
 static int hf_gsm_a_rr_report_priority_description = -1;
 static int hf_gsm_a_rr_tdd_reporting_offset_present = -1;
 static int hf_gsm_a_rr_amr_config_present = -1;
+static int hf_gsm_a_rr_rand_bit_stream_ind = -1;
 static int hf_gsm_a_rr_900_reporting_present = -1;
 static int hf_gsm_a_rr_rfl_number_present = -1;
 static int hf_gsm_a_rr_eutran_fdd_reporting_offset_present = -1;
@@ -1220,6 +1224,12 @@ static int hf_gsm_a_rr_implicit_reject_ps = -1;
 static int hf_gsm_a_rr_peo_dsc = -1;
 static int hf_gsm_a_rr_c1_delta_min = -1;
 static int hf_gsm_a_rr_c1_delta_max = -1;
+
+static int hf_gsm_a_rr_cs_tsc_set = -1;
+static int hf_gsm_a_rr_ps_sd_tsc_ass = -1;
+static int hf_gsm_a_rr_ps_pd_tsc_set = -1;
+static int hf_gsm_a_rr_ps_sd_tsc_set = -1;
+static int hf_gsm_a_rr_ps_sd_tsc_val = -1;
 
 /* Initialize the subtree pointers */
 static gint ett_ccch_msg = -1;
@@ -1590,7 +1600,7 @@ static void dissect_channel_list_n_range(tvbuff_t *tvb, proto_tree *tree, packet
     for (i=1; i<=imax; i++) {
         w[i] = (gint) tvb_get_bits(tvb, bit_offset, wsize, FALSE);
         proto_tree_add_bytes_format(subtree, hf_gsm_a_rr_w_elements, tvb, bit_offset>>3, ((bit_offset+wsize-1)>>3) - (bit_offset>>3) + 1 , NULL, "%s W(%d): %d",
-                            decode_bits_in_field(bit_offset, wsize, w[i]),
+                            decode_bits_in_field(pinfo->pool, bit_offset, wsize, w[i], ENC_BIG_ENDIAN),
                             i,
                             w[i]);
         bit_offset += wsize;
@@ -2746,7 +2756,7 @@ static const value_string gsm_a_rr_cbq3_vals[] = {
     { 0, "Iu mode not supported"},
     { 1, "Iu mode capable MSs barred"},
     { 2, "Iu mode supported, cell not barred"},
-    { 3, "Iu mode supported, cell not barred"},
+    { 3, "Iu mode supported, cell not barred. The network shall not use this value"},
     { 0, NULL }
 };
 
@@ -5072,7 +5082,7 @@ static const true_false_string gsm_a_rr_pow_cmd_epc_value  = {
  */
 static const true_false_string gsm_a_rr_pow_cmd_fpcepc_value  = {
     "FPC in use/EPC in use for uplink power control",
-    "FPC not in use/C not in use for uplink power control"
+    "FPC not in use/EPC not in use for uplink power control"
 };
 
 /*
@@ -7900,7 +7910,16 @@ de_rr_si6_rest_oct(tvbuff_t *tvb, proto_tree *subtree, packet_info *pinfo _U_, g
             bit_offset += 4;
         }
     }
-    gsm_rr_csn_padding_bits(subtree, tvb, bit_offset, tvb_len);
+    if (gsm_rr_csn_HL_flag(tvb, subtree, 0, bit_offset++, hf_gsm_a_rr_rand_bit_stream_ind))
+    { /* H < Random bit stream : bit **> */
+        proto_tree_add_bytes_format_value(subtree, hf_gsm_a_rr_padding, tvb,
+                                          bit_offset >> 3, -1, NULL,
+                                          "random bit stream");
+    }
+    else
+    { /* L <spare padding> -- (no randomization) */
+        gsm_rr_csn_padding_bits(subtree, tvb, bit_offset, tvb_len);
+    }
     return tvb_len - offset;
 }
 
@@ -8623,9 +8642,15 @@ de_rr_tlli(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offs
 
     tlli = tvb_get_ntohl(tvb, curr_offset);
     proto_tree_add_item(tree, hf_gsm_a_rr_tlli, tvb, curr_offset, 4, ENC_BIG_ENDIAN);
+
+    if(gsm_a_rr_nri_length > 0) {
+        /* NRI is in second byte of TLLI */
+        proto_tree_add_bits_item(tree, hf_gsm_a_rr_nri, tvb, (curr_offset+1)*8, gsm_a_rr_nri_length, ENC_BIG_ENDIAN);
+    }
+
     curr_offset = curr_offset + 4;
     if(add_string)
-        g_snprintf(add_string, string_len, " - 0x%x", tlli);
+        snprintf(add_string, string_len, " - 0x%x", tlli);
 
     return(curr_offset - offset);
 }
@@ -9000,6 +9025,36 @@ de_rr_feature_indicator(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
     return(curr_offset - offset);
 }
 
+/*
+ * [3] 10.5.2.8 Extended TSC Set
+ */
+static const value_string gsm_a_rr_cs_tsc_set_vals[] = {
+    { 0, "TSC set 1" },
+    { 1, "TSC set 2" },
+    { 2, "TSC set 3" },
+    { 3, "TSC set 4" },
+    { 0, NULL }
+};
+
+static const value_string gsm_a_rr_ps_tsc_set_vals[] = {
+    { 0, "TSC set 1" },
+    { 1, "TSC set 2 for 8PSK, 16QAM and 32QAM or TSC set 3 for GMSK" },
+    { 0, NULL }
+};
+
+static guint16
+de_rr_extended_tsc_set(tvbuff_t *tvb, proto_tree *tree,
+                       packet_info *pinfo _U_, guint32 offset, guint len _U_,
+                       gchar *add_string _U_, int string_len _U_)
+{
+    proto_tree_add_item(tree, hf_gsm_a_rr_cs_tsc_set, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(tree, hf_gsm_a_rr_ps_sd_tsc_ass, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(tree, hf_gsm_a_rr_ps_pd_tsc_set, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(tree, hf_gsm_a_rr_ps_sd_tsc_set, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(tree, hf_gsm_a_rr_ps_sd_tsc_val, tvb, offset, 1, ENC_NA);
+    return 1;
+}
+
  /*
   * 10.5.2.83 EC Request reference
   */
@@ -9028,7 +9083,7 @@ de_rr_ec_request_reference(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _
 static void
 gsm_a_rr_ec_ma_number_fmt(gchar *s, guint32 v)
 {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "EC-EGPRS Mobile Allocation set %u (%u)", v+1, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "EC-EGPRS Mobile Allocation set %u (%u)", v+1, v);
 }
 
 static guint16
@@ -9310,8 +9365,8 @@ guint16 (*rr_elem_fcn[])(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gu
  * 10.5.2.79 DL-DCCH-Message
  * 10.5.2.80 CN to MS transparent information
  * 10.5.2.81 PLMN Index
- * 10.5.2.82 Extended TSC Set
  */
+    de_rr_extended_tsc_set,                     /* 10.5.2.82 Extended TSC Set */
     NULL,                                       /* 10.5.2.83 EC Request reference */
     de_rr_ec_pkt_ch_dsc1,                       /* 10.5.2.84 EC Packet Channel Description  Type 1      */
     NULL,                                       /* 10.5.2.85 EC Packet Channel Description  Type 1      */
@@ -9342,6 +9397,9 @@ dtap_rr_add_ass(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
 
     /* Starting Time  10.5.2.38  O TV 3 */
     ELEM_OPT_TV(0x7c, GSM_A_PDU_TYPE_RR, DE_RR_STARTING_TIME, NULL);
+
+    /* 6D Extended TSC Set      10.5.2.82       O TV 2 */
+    ELEM_OPT_TV(0x6d, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, NULL);
 
     EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_gsm_a_rr_extraneous_data);
 }
@@ -9436,6 +9494,12 @@ dtap_rr_ass_cmd(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
     /* 04 VGCS Ciphering Parameters VGCS Ciphering Parameters 10.5.2.42b O TLV 3-15     */
     ELEM_OPT_TLV(0x04,GSM_A_PDU_TYPE_RR, DE_RR_VGCS_CIP_PAR, NULL);
 
+    /* 6D Extended TSC Set      10.5.2.82       O TV 2 */
+    ELEM_OPT_TV(0x6d, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, " - Extended TSC Set, after time");
+
+    /* 6E Extended TSC Set      10.5.2.82       O TV 2 */
+    ELEM_OPT_TV(0x6e, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, " - Extended TSC Set, before time");
+
     EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_gsm_a_rr_extraneous_data);
 
 }
@@ -9505,6 +9569,9 @@ dtap_rr_ch_mode_mod(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, gui
     /* 03 Multi-Rate configuration,     MultiRate configuration 10.5.2.21aa     O TLV 4-8 */
     ELEM_OPT_TLV(0x03,GSM_A_PDU_TYPE_RR, DE_RR_MULTIRATE_CONF, NULL);
 
+    /* 6D Extended TSC Set      10.5.2.82       O TV 2 */
+    ELEM_OPT_TV(0x6d, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, NULL);
+
     EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_gsm_a_rr_extraneous_data);
 
 }
@@ -9527,6 +9594,9 @@ dtap_rr_ch_mode_mod_ack(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
 
     /* Channel Mode             10.5.2.6        M V 1 */
     ELEM_MAND_V(GSM_A_PDU_TYPE_RR, DE_RR_CH_MODE, NULL, ei_gsm_a_rr_missing_mandatory_element);
+
+    /* 6D Extended TSC Set      10.5.2.82       C TV 2 */
+    ELEM_OPT_TV(0x6d, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, NULL);
 
     EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_gsm_a_rr_extraneous_data);
 
@@ -9805,6 +9875,9 @@ dtap_rr_dtm_ass_cmd(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, gui
     /* 21 Channel Description C2 Channel Description 3 10.5.2.5c O TV 3 */
     ELEM_OPT_TV(0x21,GSM_A_PDU_TYPE_RR, DE_RR_CH_DSC3, " - Channel Description C2");
 
+    /* 6D Extended TSC Set      10.5.2.82       C TV 2 */
+    ELEM_OPT_TV(0x6d, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, NULL);
+
     EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_gsm_a_rr_extraneous_data);
 }
 
@@ -9923,6 +9996,9 @@ dtap_rr_freq_redef(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guin
 
     /* Channel Description 3  10.5.2.5c  O TV 3 */
     ELEM_OPT_TV(0x12,GSM_A_PDU_TYPE_RR, DE_RR_CH_DSC3, " - Channel Description C2");
+
+    /* 6D Extended TSC Set      10.5.2.82       C TV 2 */
+    ELEM_OPT_TV(0x6d, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, NULL);
 
     EXTRANEOUS_DATA_CHECK(len, curr_offset - offset, pinfo, &ei_gsm_a_rr_extraneous_data);
 }
@@ -10087,6 +10163,12 @@ dtap_rr_ho_cmd(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 
     /* Dedicated Service Information,   Dedicated Service Information 10.5.2.59 */
     ELEM_OPT_TV(0x51,GSM_A_PDU_TYPE_RR, DE_RR_DED_SERV_INF, NULL);
 
+    /* 6D Extended TSC Set      10.5.2.82       O TV 2 */
+    ELEM_OPT_TV(0x6d, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, " - Extended TSC Set, after time");
+
+    /* 6E Extended TSC Set      10.5.2.82       O TV 2 */
+    ELEM_OPT_TV(0x6e, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, " - Extended TSC Set, before time");
+
     EXTRANEOUS_DATA_CHECK(len, curr_offset - offset, pinfo, &ei_gsm_a_rr_extraneous_data);
 
 }
@@ -10211,6 +10293,8 @@ dtap_rr_imm_ass(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
     if(tvb_reported_length_remaining(tvb,curr_offset) > 0)
         ELEM_MAND_V(GSM_A_PDU_TYPE_RR, DE_RR_IA_REST_OCT, NULL, ei_gsm_a_rr_missing_mandatory_element);
 
+    /* 6D Extended TSC Set                      10.5.2.82       O TV 2 */
+    ELEM_OPT_TV(0x6d, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, NULL);
 }
 
 /*
@@ -10341,6 +10425,9 @@ dtap_rr_pkt_assign(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guin
 
     /* 0x24 RR Packet Downlink Assignment Type 2 10.5.2.25e C TLV 3-n */
     ELEM_OPT_TLV(0x24, GSM_A_PDU_TYPE_RR, DE_RR_PKT_DL_ASS_TYPE2, NULL);
+
+    /* 0x6D Extended TSC Set 10.5.2.82 C TV 2 */
+    ELEM_OPT_TV(0x6d, GSM_A_PDU_TYPE_RR, DE_RR_EXTENDED_TSC_SET, NULL);
 
     EXTRANEOUS_DATA_CHECK(len, curr_offset - offset, pinfo, &ei_gsm_a_rr_extraneous_data);
 }
@@ -12125,10 +12212,12 @@ get_rr_short_pd_msg_params(guint8 mess_type, const gchar **msg_str, int *ett_tre
     }
 }
 
+#if 0
 const value_string short_protocol_discriminator_vals[] = {
     {0x0, "Radio Resources Management messages"},
     {  0, NULL }
 };
+#endif
 
 static int
 dissect_sacch(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
@@ -12278,17 +12367,17 @@ proto_register_gsm_a_rr(void)
             },
             { &hf_gsm_a_rr_range_lower,
               { "Range Lower","gsm_a.rr.range_lower",
-                FT_UINT16, BASE_DEC,  NULL, 0x0000,
+                FT_UINT16, BASE_DEC,  NULL, 0x0,
                 "ARFCN used as the lower limit of a range of frequencies to be used by the mobile station in cell selection (Range Lower)", HFILL }
             },
             { &hf_gsm_a_rr_range_higher,
               { "Range Higher","gsm_a.rr.range_higher",
-                FT_UINT16, BASE_DEC,  NULL, 0x0000,
+                FT_UINT16, BASE_DEC,  NULL, 0x0,
                 "ARFCN used as the higher limit of a range of frequencies to be used by the mobile station in cell selection (Range Higher)", HFILL }
             },
             { &hf_gsm_a_rr_ba_freq,
               { "BA Freq","gsm_a.rr.ba_freq",
-                FT_UINT16, BASE_DEC,  NULL, 0x0000,
+                FT_UINT16, BASE_DEC,  NULL, 0x0,
                 "ARFCN indicating a single frequency to be used by the mobile station in cell selection and reselection (BA Freq)", HFILL }
             },
             { &hf_gsm_a_rr_ho_ref_val,
@@ -12484,6 +12573,11 @@ proto_register_gsm_a_rr(void)
             { &hf_gsm_a_rr_tlli,
               { "TLLI","gsm_a.rr.tlli",
                 FT_UINT32,BASE_HEX,  NULL, 0x0,
+                NULL, HFILL }
+            },
+            { &hf_gsm_a_rr_nri,
+              { "NRI","gsm_a.rr.nri",
+                FT_UINT8,BASE_DEC,  NULL, 0x0,
                 NULL, HFILL }
             },
             { &hf_gsm_a_rr_target_mode,
@@ -12954,72 +13048,72 @@ proto_register_gsm_a_rr(void)
             },
             { &hf_gsm_a_rr_fdd_uarfcn,
               { "FDD UARFCN", "gsm_a.rr.fdd_uarfcn",
-                FT_UINT16, BASE_DEC,  NULL, 0x0000,
+                FT_UINT16, BASE_DEC,  NULL, 0x0,
                 NULL, HFILL }
             },
             { &hf_gsm_a_rr_bandwidth_fdd,
               { "Bandwidth FDD", "gsm_a.rr.bandwidth_fdd",
-                FT_UINT8, BASE_DEC,  NULL, 0x00,
+                FT_UINT8, BASE_DEC,  NULL, 0x0,
                 NULL, HFILL }
             },
             { &hf_gsm_a_rr_tdd_uarfcn,
               { "TDD UARFCN", "gsm_a.rr.tdd_uarfcn",
-                FT_UINT16, BASE_DEC,  NULL, 0x0000,
+                FT_UINT16, BASE_DEC,  NULL, 0x0,
                 NULL, HFILL }
             },
             { &hf_gsm_a_rr_bandwidth_tdd,
               { "Bandwidth TDD", "gsm_a.rr.bandwidth_tdd",
-                FT_UINT8, BASE_DEC,  NULL, 0x00,
+                FT_UINT8, BASE_DEC,  NULL, 0x0,
                 NULL, HFILL }
             },
             { &hf_gsm_a_rr_arfcn,
               { "ARFCN", "gsm_a.rr.arfcn",
-                FT_UINT16, BASE_DEC,  NULL, 0x0000,
+                FT_UINT16, BASE_DEC,  NULL, 0x0,
                 "Absolute Radio Frequency Channel Number (ARFCN)", HFILL }
             },
             { &hf_gsm_a_rr_bsic,
               { "BSIC", "gsm_a.rr.bsic",
-                FT_UINT8, BASE_DEC,  NULL, 0x00,
+                FT_UINT8, BASE_DEC,  NULL, 0x0,
                 "Base Station Identify Code (BSIC)", HFILL }
             },
             { &hf_gsm_a_rr_qsearch_i,
               { "Qsearch I", "gsm_a.rr.qsearch_i",
-                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_qsearch_x_vals), 0x00,
+                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_qsearch_x_vals), 0x0,
                 "Search for 3G cells if signal level is below (0 7) or above (8 15) threshold (Qsearch I)", HFILL }
             },
             { &hf_gsm_a_rr_fdd_qoffset,
               { "FDD Qoffset", "gsm_a.rr.fdd_qoffset",
-                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_xdd_qoffset_vals), 0x00,
+                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_xdd_qoffset_vals), 0x0,
                 "Offset to RLA_C for cell re selection to FDD access technology (FDD Qoffset)", HFILL }
             },
             { &hf_gsm_a_rr_fdd_qmin,
               { "FDD Qmin", "gsm_a.rr.fdd_qmin",
-                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_fdd_qmin_vals), 0x00,
+                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_fdd_qmin_vals), 0x0,
                 "Minimum threshold for Ec/No for UTRAN FDD cell re-selection (FDD Qmin)", HFILL }
             },
             { &hf_gsm_a_rr_tdd_qoffset,
               { "TDD Qoffset", "gsm_a.rr.tdd_qoffset",
-                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_xdd_qoffset_vals), 0x00,
+                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_xdd_qoffset_vals), 0x0,
                 "Offset to RLA_C for cell re selection to TDD access technology (TDD Qoffset)", HFILL }
             },
             { &hf_gsm_a_rr_fdd_qmin_offset,
               { "FDD Qmin Offset", "gsm_a.rr.fdd_qmin_offset",
-                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_fdd_qmin_offset_vals), 0x00,
+                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_fdd_qmin_offset_vals), 0x0,
                 "Offset to FDD Qmin value (FDD Qmin Offset)", HFILL }
             },
             { &hf_gsm_a_rr_fdd_rscpmin,
               { "FDD RSCPmin", "gsm_a.rr.fdd_rscpmin",
-                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_fdd_rscpmin_vals), 0x00,
+                FT_UINT8, BASE_DEC,  VALS(gsm_a_rr_fdd_rscpmin_vals), 0x0,
                 "Minimum threshold of RSCP for UTRAN FDD cell re-selection (FDD RSCPmin)", HFILL }
             },
             { &hf_gsm_a_rr_3g_ba_ind,
               { "3G BA-IND", "gsm_a.rr.3g_ba_ind",
-                FT_UINT8, BASE_DEC,  NULL, 0x00,
+                FT_UINT8, BASE_DEC,  NULL, 0x0,
                 "3G BCCH Allocation Indication (3G BA-IND)", HFILL }
             },
             { &hf_gsm_a_rr_mp_change_mark,
               { "Measurement Parameter Change Mark", "gsm_a.rr.mp_change_mark",
-                FT_UINT8, BASE_DEC,  NULL, 0x00,
+                FT_UINT8, BASE_DEC,  NULL, 0x0,
                 NULL, HFILL }
             },
             { &hf_gsm_a_rr_si2quater_index,
@@ -13911,12 +14005,12 @@ proto_register_gsm_a_rr(void)
             },
             { &hf_gsm_a_rr_utran_csg_fdd_uarfcn,
               { "CSG FDD UARFCN", "gsm_a.rr.utran_csg_fdd_uarfcn",
-                FT_UINT16, BASE_DEC,  NULL, 0x0000,
+                FT_UINT16, BASE_DEC,  NULL, 0x0,
                 NULL, HFILL }
             },
             { &hf_gsm_a_rr_utran_csg_tdd_uarfcn,
               { "CSG TDD UARFCN", "gsm_a.rr.utran_csg_tdd_uarfcn",
-                FT_UINT16, BASE_DEC,  NULL, 0x0000,
+                FT_UINT16, BASE_DEC,  NULL, 0x0,
                 NULL, HFILL }
             },
             { &hf_gsm_a_rr_csg_earfcn,
@@ -14269,7 +14363,7 @@ proto_register_gsm_a_rr(void)
             },
             { &hf_gsm_a_rr_ec_imsi,
               { "IMSI", "gsm_a.rr.ec_imsi",
-                FT_STRING, STR_ASCII, NULL, 0x0,
+                FT_STRING, BASE_NONE, NULL, 0x0,
                 NULL, HFILL
               }
             },
@@ -14614,6 +14708,7 @@ proto_register_gsm_a_rr(void)
             { &hf_gsm_a_rr_si13alt_position_present, { "SI3 alt position", "gsm_a.rr.si13alt_position.present", FT_BOOLEAN, BASE_NONE, TFS(&tfs_present_not_present), 0x00, NULL, HFILL }},
             { &hf_gsm_a_call_prio_present, { "Call Priority", "gsm_a.call_prio.present", FT_BOOLEAN, BASE_NONE, TFS(&tfs_present_not_present), 0x00, NULL, HFILL }},
             { &hf_gsm_a_rr_amr_config_present, { "AMR Config", "gsm_a.rr.amr_config.present", FT_BOOLEAN, BASE_NONE, TFS(&tfs_present_not_present), 0x00, NULL, HFILL }},
+            { &hf_gsm_a_rr_rand_bit_stream_ind, { "Random Bit Stream", "gsm_a.rr.rand_bit_stream.ind", FT_BOOLEAN, BASE_NONE, TFS(&tfs_present_not_present), 0x00, NULL, HFILL }},
             { &hf_gsm_a_rr_rfl_number_present, { "RFL number list", "gsm_a.rr.rfl_number.present", FT_BOOLEAN, BASE_NONE, TFS(&tfs_present_not_present), 0x00, NULL, HFILL }},
             { &hf_gsm_a_rr_gprs_mobile_allocation, { "MA", "gsm_a.rr.gprs_mobile_allocation", FT_BOOLEAN, BASE_NONE, TFS(&tfs_not_present_present), 0x00, NULL, HFILL }},
             { &hf_gsm_a_rr_arfcn_index_list, { "ARFCN index list", "gsm_a.rr.arfcn_index_list", FT_BOOLEAN, BASE_NONE, TFS(&tfs_present_not_present), 0x00, NULL, HFILL }},
@@ -14704,6 +14799,11 @@ proto_register_gsm_a_rr(void)
             { &hf_gsm_a_rr_additions_in_rel_4, { "Additions in Rel-4", "gsm_a.rr.additions_in_rel_4", FT_BOOLEAN, BASE_NONE, TFS(&tfs_present_not_present), 0x00, NULL, HFILL }},
             { &hf_gsm_a_rr_si_change_alt, { "SI CHANGE ALT", "gsm_a.rr.si_change_alt", FT_BOOLEAN, BASE_NONE, TFS(&gsm_si_change_alt_value), 0x00, NULL, HFILL } },
 
+            { &hf_gsm_a_rr_cs_tsc_set, { "CS Domain TSC Set", "gsm_a.rr.cs_tsc_set", FT_UINT8, BASE_DEC, VALS(gsm_a_rr_cs_tsc_set_vals), 0x03, NULL, HFILL } },
+            { &hf_gsm_a_rr_ps_sd_tsc_ass, { "Secondary PS Domain TSC Assigned", "gsm_a.rr.ps_sd_tsc_ass", FT_BOOLEAN, 8, TFS(&tfs_yes_no), 0x04, NULL, HFILL } },
+            { &hf_gsm_a_rr_ps_pd_tsc_set, { "Primary PS Domain TSC Set", "gsm_a.rr.ps_pd_tsc_set", FT_UINT8, BASE_DEC, VALS(gsm_a_rr_ps_tsc_set_vals), 0x08, NULL, HFILL } },
+            { &hf_gsm_a_rr_ps_sd_tsc_set, { "Secondary PS Domain TSC Set", "gsm_a.rr.ps_sd_tsc_set", FT_UINT8, BASE_DEC, VALS(gsm_a_rr_ps_tsc_set_vals), 0x10, NULL, HFILL } },
+            { &hf_gsm_a_rr_ps_sd_tsc_val, { "Secondary PS Domain TSC Value", "gsm_a.rr.ps_sd_tsc_val", FT_UINT8, BASE_DEC, NULL, 0xe0, NULL, HFILL } },
         };
 
     static hf_register_info hf_rr_short_pd[] =
@@ -14742,6 +14842,7 @@ proto_register_gsm_a_rr(void)
         { &ei_gsm_a_rr_missing_mandatory_element, { "gsm_a.rr.missing_mandatory_element", PI_PROTOCOL, PI_ERROR, "Missing Mandatory element, rest of dissection is suspect", EXPFILL }},
     };
 
+    module_t *gsm_a_rr_module;
     expert_module_t* expert_a_rr;
 
     ett[0] = &ett_ccch_msg;
@@ -14808,6 +14909,12 @@ proto_register_gsm_a_rr(void)
 
     /* subtree array (for both sub-dissectors) */
     proto_register_subtree_array(ett, array_length(ett));
+
+    /* Register configuration options */
+    gsm_a_rr_module = prefs_register_protocol(proto_a_rr, NULL);
+    prefs_register_uint_preference(gsm_a_rr_module, "nri_length", "NRI length",
+                                   "Whether to decode NRI in TLLI. NRI is not used if length is zero",
+                                   10, &gsm_a_rr_nri_length);
 }
 
 void

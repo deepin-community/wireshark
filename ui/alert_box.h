@@ -1,4 +1,5 @@
-/* alert_box.h
+/** @file
+ *
  * Routines to put up various "standard" alert boxes used in multiple
  * places
  *
@@ -127,16 +128,3 @@ extern void write_failure_alert_box(const char *filename, int err);
 #endif /* __cplusplus */
 
 #endif /* __ALERT_BOX_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

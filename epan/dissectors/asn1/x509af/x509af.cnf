@@ -32,6 +32,7 @@ Validity
 Version
 
 #.PDU
+SubjectPublicKeyInfo
 
 #.REGISTER
 Certificate				B "2.5.4.36" "id-at-userCertificate"
@@ -79,7 +80,7 @@ CertificateList/signedCertificateList/revokedCertificates/_item/userCertificate	
   if(actx->external.direct_reference) {
     algorithm_id = (const char *)wmem_strdup(wmem_file_scope(), actx->external.direct_reference);
 
-    name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference);
+    name = oid_resolved_from_string(actx->pinfo->pool, actx->external.direct_reference);
 
     proto_item_append_text(tree, " (%%s)", name ? name : actx->external.direct_reference);
   } else {
@@ -100,7 +101,7 @@ CertificateList/signedCertificateList/revokedCertificates/_item/userCertificate	
 # proto_tree *subtree;
 
   dissect_ber_bitstring(FALSE, actx, NULL, tvb, offset,
-                        NULL, 0, -1, -1, &bs_tvb);
+                        NULL, 0, hf_index, -1, &bs_tvb);
 
   /* See RFC 3279 for possible subjectPublicKey values given an Algorithm ID.
    * The contents of subjectPublicKey are always explicitly tagged. */
@@ -130,7 +131,7 @@ CertificateList/signedCertificateList/revokedCertificates/_item/userCertificate	
   %(DEFAULT_BODY)s
 
   if(actx->external.direct_reference) {
-    name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference);
+    name = oid_resolved_from_string(actx->pinfo->pool, actx->external.direct_reference);
 
     proto_item_append_text(tree, " (%%s)", name ? name : actx->external.direct_reference);
   }
@@ -152,7 +153,7 @@ CertificateList/signedCertificateList/revokedCertificates/_item/userCertificate	
   /* the 2-digit year can only be in the range 1950..2049 https://tools.ietf.org/html/rfc5280#section-4.1.2.5.1 */
   offset = dissect_ber_UTCTime(implicit_tag, actx, tree, tvb, offset, hf_index, &outstr, &tvblen);
   if (hf_index >= 0 && outstr) {
-    newstr = wmem_strconcat(wmem_packet_scope(), outstr[0] < '5' ? "20": "19", outstr, NULL);
+    newstr = wmem_strconcat(actx->pinfo->pool, outstr[0] < '5' ? "20": "19", outstr, NULL);
     proto_tree_add_string(tree, hf_index, tvb, offset - tvblen, tvblen, newstr);
   }
 

@@ -1,4 +1,4 @@
-/* export_sslkeys.h
+/** @file
  *
  * SSL session key utilities. Copied from ui/gkt/export_sslkeys.c
  * by Sake Blok <sake@euronet.nl> (20110526)
@@ -25,26 +25,15 @@ extern int ssl_session_key_count(void);
 
 /** Dump our SSL Session Keys to a string
  *
+ * @param[out] length Length of returned string.
+ *
  * @return A string containing all the SSL Session Keys. Must be freed with
  * g_free().
  */
-extern gchar* ssl_export_sessions(void);
+extern gchar* ssl_export_sessions(gsize *length);
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
 #endif /* __SSL_KEY_EXPORT_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -25,13 +25,13 @@
 #include <epan/to_str.h>
 
 #include <wsutil/str_util.h>
+#include <wsutil/ws_roundup.h>
 
 #include "packet-mtp3.h"
 #include "packet-sccp.h"
 void proto_register_sua(void);
 void proto_reg_handoff_sua(void);
 
-#define ADD_PADDING(x) ((((x) + 3) >> 2) << 2)
 #define SCTP_PORT_SUA          14001
 
 #define RESERVED_1_LENGTH      1
@@ -454,7 +454,7 @@ sua_assoc(packet_info* pinfo, address* opc, address* dpc, guint src_rn, guint ds
                 assoc = new_assoc(opck, dpck);
                 wmem_tree_insert32_array(assocs,bw_key,assoc);
                 assoc->has_bw_key = TRUE;
-                /*g_warning("CORE dpck %u,opck %u,src_rn %u",dpck,opck,src_rn);*/
+                /*ws_warning("CORE dpck %u,opck %u,src_rn %u",dpck,opck,src_rn);*/
             }
             break;
 
@@ -489,7 +489,7 @@ sua_assoc(packet_info* pinfo, address* opc, address* dpc, guint src_rn, guint ds
 
             bw_key[3].length = 0;
             bw_key[3].key = NULL;
-                    /*g_warning("MESSAGE_TYPE_COAK dst_rn %u,src_rn %u ",dst_rn,src_rn);*/
+                    /*ws_warning("MESSAGE_TYPE_COAK dst_rn %u,src_rn %u ",dst_rn,src_rn);*/
                     if ( ( assoc = (sua_assoc_info_t *)wmem_tree_lookup32_array(assocs, bw_key) ) ) {
                             goto got_assoc;
                     }
@@ -590,9 +590,9 @@ dissect_info_string_parameter(tvbuff_t *parameter_tvb, packet_info *pinfo, proto
     return;
   }
 
-  proto_tree_add_item(parameter_tree, hf_sua_info_string, parameter_tvb, INFO_STRING_OFFSET, info_string_length, ENC_UTF_8|ENC_NA);
+  proto_tree_add_item(parameter_tree, hf_sua_info_string, parameter_tvb, INFO_STRING_OFFSET, info_string_length, ENC_UTF_8);
   proto_item_append_text(parameter_item, " (%.*s)", info_string_length,
-                         tvb_format_text(parameter_tvb, INFO_STRING_OFFSET, info_string_length));
+                         tvb_format_text(pinfo->pool, parameter_tvb, INFO_STRING_OFFSET, info_string_length));
 }
 
 #define ROUTING_CONTEXT_LENGTH 4
@@ -1097,7 +1097,7 @@ dissect_receive_sequence_number_parameter(tvbuff_t *parameter_tvb, proto_tree *p
 
 static const value_string interworking_values[] = {
   { 0x0,   "No Interworking with SS7 Networks" },
-  { 0x1,   "IP-Signalling Endpoint interworking with with SS7 networks" },
+  { 0x1,   "IP-Signalling Endpoint interworking with SS7 networks" },
   { 0x2,   "Signalling Gateway" },
   { 0x3,   "Relay Node Support" },
   { 0,     NULL } };
@@ -1411,12 +1411,12 @@ dissect_global_title_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tr
     even_signal = tvb_get_guint8(parameter_tvb, offset) & GT_EVEN_SIGNAL_MASK;
     even_signal >>= GT_EVEN_SIGNAL_SHIFT;
 
-    g_strlcat(gt_digits, val_to_str_const(odd_signal, sccp_address_signal_values,
+    (void) g_strlcat(gt_digits, val_to_str_const(odd_signal, sccp_address_signal_values,
                                           "Unknown"), GT_MAX_SIGNALS+1);
 
     /* If the last signal is NOT filler */
     if (offset != (GLOBAL_TITLE_OFFSET + global_title_length - 1) || even_length == TRUE)
-      g_strlcat(gt_digits, val_to_str_const(even_signal, sccp_address_signal_values,
+      (void) g_strlcat(gt_digits, val_to_str_const(even_signal, sccp_address_signal_values,
                                             "Unknown"), GT_MAX_SIGNALS+1);
 
     offset += GT_SIGNAL_LENGTH;
@@ -1483,7 +1483,7 @@ static void
 dissect_ipv4_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, proto_item *parameter_item, gboolean source)
 {
   proto_tree_add_item(parameter_tree, source ? hf_sua_source_ipv4 : hf_sua_dest_ipv4, parameter_tvb, IPV4_ADDRESS_OFFSET, IPV4_ADDRESS_LENGTH, ENC_BIG_ENDIAN);
-  proto_item_append_text(parameter_item, " (%s)", tvb_ip_to_str(parameter_tvb, IPV4_ADDRESS_OFFSET));
+  proto_item_append_text(parameter_item, " (%s)", tvb_ip_to_str(wmem_packet_scope(), parameter_tvb, IPV4_ADDRESS_OFFSET));
 }
 
 #define HOSTNAME_OFFSET PARAMETER_VALUE_OFFSET
@@ -1496,7 +1496,7 @@ dissect_hostname_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, 
   hostname_length = tvb_get_ntohs(parameter_tvb, PARAMETER_LENGTH_OFFSET) - PARAMETER_HEADER_LENGTH;
   proto_tree_add_item(parameter_tree, source ? hf_sua_source_hostname : hf_sua_dest_hostname, parameter_tvb, HOSTNAME_OFFSET, hostname_length, ENC_ASCII|ENC_NA);
   proto_item_append_text(parameter_item, " (%.*s)", hostname_length,
-                         tvb_format_text(parameter_tvb, HOSTNAME_OFFSET, hostname_length));
+                         tvb_format_text(wmem_packet_scope(), parameter_tvb, HOSTNAME_OFFSET, hostname_length));
 }
 
 #define IPV6_ADDRESS_LENGTH 16
@@ -1506,7 +1506,7 @@ static void
 dissect_ipv6_parameter(tvbuff_t *parameter_tvb, proto_tree *parameter_tree, proto_item *parameter_item, gboolean source)
 {
   proto_tree_add_item(parameter_tree, source ? hf_sua_source_ipv6 : hf_sua_dest_ipv6, parameter_tvb, IPV6_ADDRESS_OFFSET, IPV6_ADDRESS_LENGTH, ENC_NA);
-  proto_item_append_text(parameter_item, " (%s)", tvb_ip6_to_str(parameter_tvb, IPV6_ADDRESS_OFFSET));
+  proto_item_append_text(parameter_item, " (%s)", tvb_ip6_to_str(wmem_packet_scope(), parameter_tvb, IPV6_ADDRESS_OFFSET));
 }
 
 static void
@@ -2104,7 +2104,7 @@ dissect_parameters(tvbuff_t *parameters_tvb, packet_info *pinfo, proto_tree *tre
   offset = 0;
   while((remaining_length = tvb_reported_length_remaining(parameters_tvb, offset))) {
     length       = tvb_get_ntohs(parameters_tvb, offset + PARAMETER_LENGTH_OFFSET);
-    total_length = ADD_PADDING(length);
+    total_length = WS_ROUNDUP_4(length);
     if (remaining_length >= length)
       total_length = MIN(total_length, remaining_length);
     /* create a tvb for the parameter including the padding bytes */

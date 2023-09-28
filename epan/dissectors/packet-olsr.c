@@ -204,7 +204,7 @@ static int dissect_olsrorg_lq_tc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
       nlq = tvb_get_guint8(tvb, offset + 5);
 
       address_group = proto_tree_add_bytes_format_value(olsr_tree, hf_olsr_neighbor, tvb, offset, 8,
-          NULL, "%s (%d/%d)", tvb_ip_to_str(tvb, offset), lq, nlq);
+          NULL, "%s (%d/%d)", tvb_ip_to_str(pinfo->pool, tvb, offset), lq, nlq);
 
       address_tree = proto_item_add_subtree(address_group, ett_olsr_message_neigh);
 
@@ -220,7 +220,7 @@ static int dissect_olsrorg_lq_tc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
       nlq = tvb_get_guint8(tvb, offset + 17);
 
       address_group = proto_tree_add_bytes_format_value(olsr_tree, hf_olsr_neighbor, tvb, offset, 20,
-          NULL, "%s (%d/%d)", tvb_ip6_to_str(tvb, offset), lq, nlq);
+          NULL, "%s (%d/%d)", tvb_ip6_to_str(pinfo->pool, tvb, offset), lq, nlq);
 
       address_tree = proto_item_add_subtree(address_group, ett_olsr_message_neigh);
 
@@ -365,7 +365,7 @@ static int handle_olsr_hello_olsrorg(tvbuff_t *tvb, packet_info *pinfo, proto_tr
       nlq = tvb_get_guint8(tvb, offset + 5);
 
       address_group = proto_tree_add_bytes_format_value(olsr_tree, hf_olsr_neighbor, tvb, offset, 8,
-           NULL, "%s (%d/%d)", tvb_ip_to_str(tvb, offset), lq, nlq);
+           NULL, "%s (%d/%d)", tvb_ip_to_str(pinfo->pool, tvb, offset), lq, nlq);
 
       address_tree = proto_item_add_subtree(address_group, ett_olsr_message_neigh);
 
@@ -376,7 +376,7 @@ static int handle_olsr_hello_olsrorg(tvbuff_t *tvb, packet_info *pinfo, proto_tr
       nlq = tvb_get_guint8(tvb, offset + 17);
 
       address_group = proto_tree_add_bytes_format_value(olsr_tree, hf_olsr_neighbor, tvb, offset, 20,
-          NULL, "%s (%d/%d)", tvb_ip6_to_str(tvb, offset), lq, nlq);
+          NULL, "%s (%d/%d)", tvb_ip6_to_str(pinfo->pool, tvb, offset), lq, nlq);
 
       address_tree = proto_item_add_subtree(address_group, ett_olsr_message_neigh);
 
@@ -505,7 +505,7 @@ static int dissect_olsrorg_nameservice(tvbuff_t *tvb, packet_info *pinfo, proto_
           "Not enough bytes for content of last nameservice entry");
       return message_end;
     }
-    proto_tree_add_item(olsr_ns_tree, hf_olsrorg_ns_content, tvb, offset + 20, length, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(olsr_ns_tree, hf_olsrorg_ns_content, tvb, offset + 20, length, ENC_ASCII);
     offset += 4 + 16 + ((length - 1) | 3) + 1;
   }
   return message_end;

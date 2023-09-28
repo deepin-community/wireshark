@@ -1,4 +1,4 @@
-/* welcome_page.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -59,10 +59,10 @@ private:
     QListWidget *recent_files_;
 
 signals:
-    void startCapture();
+    void startCapture(QStringList);
     void recentFileActivated(QString cfile);
     void captureFilterSyntaxChanged(bool valid);
-    void showExtcapOptions(QString &device_name);
+    void showExtcapOptions(QString &device_name, bool startCaptureOnClose);
     void interfacesChanged();
 
 public slots:
@@ -71,6 +71,7 @@ public slots:
 private slots:
     void appInitialized();
     void interfaceListChanged();
+    void setReleaseLabel();
     void captureFilterTextEdited(const QString capture_filter);
     void updateRecentCaptures();
     void openRecentItem(QListWidgetItem *item);
@@ -79,21 +80,9 @@ private slots:
     void copyRecentPath();
     void removeRecentPath();
 
-    void on_interfaceFrame_showExtcapOptions(QString device_name);
-    void on_interfaceFrame_startCapture();
+    void on_interfaceFrame_showExtcapOptions(QString device_name, bool startCaptureOnClose);
+    void on_interfaceFrame_startCapture(QStringList);
+    void captureStarting();
 };
 
 #endif // WELCOME_PAGE_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

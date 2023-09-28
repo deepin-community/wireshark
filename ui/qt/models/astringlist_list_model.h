@@ -1,4 +1,4 @@
-/* astringlist_list_model.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -21,8 +21,6 @@
 
 class AStringListListModel : public QAbstractTableModel
 {
-    Q_OBJECT
-
 public:
     explicit AStringListListModel(QObject * parent = Q_NULLPTR);
     virtual ~AStringListListModel();
@@ -72,6 +70,7 @@ public:
     void setFilterType(AStringListListFilterType type, int column = -1);
 
     void setColumnToFilter(int);
+    void setColumnsToFilter(QList<int>);
     void clearColumnsToFilter();
 
     void clearHiddenColumns();
@@ -93,7 +92,6 @@ private:
 
 class AStringListListUrlProxyModel : public QIdentityProxyModel
 {
-    Q_OBJECT
 public:
     explicit AStringListListUrlProxyModel(QObject * parent = Q_NULLPTR);
 
@@ -107,16 +105,3 @@ private:
 };
 
 #endif // ASTRINGLIST_LIST_MODEL_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

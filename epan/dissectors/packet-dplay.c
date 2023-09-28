@@ -387,43 +387,12 @@ static const value_string yes_no_val[] = {
 /* borrowed from epan/dissectors/packets-smb-common.c */
 static gint display_unicode_string(proto_tree *tree, gint hf_index, tvbuff_t *tvb, gint offset)
 {
-    char *str, *p;
+    char *str;
     gint len;
-    gint charoffset;
-    guint16 character;
 
     /* display a unicode string from the tree and return new offset */
 
-    /*
-     * Get the length of the string.
-     * XXX - is it a bug or a feature that this will throw an exception
-     * if we don't find the '\0'?  I think it's a feature.
-     */
-    len = 0;
-    while (tvb_get_letohs(tvb, offset + len) != '\0')
-        len += 2;
-    len += 2;   /* count the '\0' too */
-
-    /*
-     * Allocate a buffer for the string; "len" is the length in
-     * bytes, not the length in characters.
-     */
-    str = (char *)wmem_alloc(wmem_packet_scope(), len/2);
-
-    /*
-     * XXX - this assumes the string is just ISO 8859-1; we need
-     * to better handle multiple character sets in Wireshark,
-     * including Unicode/ISO 10646, and multiple encodings of
-     * that character set (UCS-2, UTF-8, etc.).
-     */
-    charoffset = offset;
-    p = str;
-    while ((character = tvb_get_letohs(tvb, charoffset)) != '\0') {
-        *p++ = (char) character;
-        charoffset += 2;
-    }
-    *p = '\0';
-
+    str = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &len, ENC_UTF_16|ENC_LITTLE_ENDIAN);
     proto_tree_add_string(tree, hf_index, tvb, offset, len, str);
 
     return  offset+len;
@@ -698,7 +667,7 @@ static gint dissect_dplay_header(proto_tree *tree, tvbuff_t *tvb, gint offset)
     proto_tree_add_uint(tree, hf_dplay_token, tvb, offset, 4, token);
     offset += 4;
     offset = dissect_sockaddr_in(tree, tvb, offset);
-    proto_tree_add_item(tree, hf_dplay_play_str, tvb, offset, 4, ENC_ASCII|ENC_NA); offset += 4;
+    proto_tree_add_item(tree, hf_dplay_play_str, tvb, offset, 4, ENC_ASCII); offset += 4;
     proto_tree_add_item(tree, hf_dplay_command, tvb, offset, 2, ENC_LITTLE_ENDIAN); offset += 2;
     proto_tree_add_item(tree, hf_dplay_proto_dialect, tvb, offset, 2, ENC_LITTLE_ENDIAN); offset += 2;
     return offset;
@@ -849,7 +818,7 @@ static gint dissect_type15_message(proto_tree *tree, tvbuff_t *tvb, gint offset)
 
     enc_tree = proto_tree_add_subtree(tree, tvb, offset, -1, ett_dplay_enc_packet, NULL, "DirectPlay encapsulated packet");
 
-    proto_tree_add_item(enc_tree, hf_dplay_play_str_2, tvb, offset, 4, ENC_ASCII|ENC_NA); offset += 4;
+    proto_tree_add_item(enc_tree, hf_dplay_play_str_2, tvb, offset, 4, ENC_ASCII); offset += 4;
     proto_tree_add_item(enc_tree, hf_dplay_command_2, tvb, offset, 2, ENC_LITTLE_ENDIAN); offset += 2;
     proto_tree_add_item(enc_tree, hf_dplay_proto_dialect_2, tvb, offset, 2, ENC_LITTLE_ENDIAN); offset += 2;
 
@@ -1450,7 +1419,7 @@ void proto_register_dplay(void)
         { "SecDesc CAPI provider type", "dplay.sd.capi_type", FT_UINT32, BASE_HEX,
         NULL, 0x0, NULL, HFILL}},
     { &hf_dplay_sd_enc_alg,
-        { "SecDesc encryption algorithm" , "dplay.sd.enc_alg", FT_UINT32, BASE_HEX,
+        { "SecDesc encryption algorithm", "dplay.sd.enc_alg", FT_UINT32, BASE_HEX,
         VALS(dplay_enc_alg_val), 0x0, NULL, HFILL}},
 
     /* Data fields for message type 0x0001 */

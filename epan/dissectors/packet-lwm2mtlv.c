@@ -23,12 +23,11 @@
 #include <epan/strutil.h>
 #include <wsutil/str_util.h>
 
+#include "packet-gsm_a_common.h"
 #include "packet-http.h"
 
 void proto_register_lwm2mtlv(void);
 void proto_reg_handoff_lwm2mtlv(void);
-
-static void parseArrayOfElements(tvbuff_t *tvb, proto_tree *tlv_tree, const char *uri_path);
 
 static int proto_lwm2mtlv = -1;
 
@@ -63,6 +62,7 @@ static gint ett_lwm2mtlv_resource                = -1;
 static gint ett_lwm2mtlv_resource_instance       = -1;
 static gint ett_lwm2mtlv_resource_array          = -1;
 static gint ett_lwm2mtlv_object_instance         = -1;
+static gint ett_lwm2mtlv_location_velocity       = -1;
 
 typedef enum {
 	OBJECT_INSTANCE   = 0,
@@ -118,6 +118,8 @@ typedef struct _lwm2m_resource_t {
 	gint    ett_id;
 	char   *field_name;
 } lwm2m_resource_t;
+
+static void parseArrayOfElements(packet_info *pinfo, tvbuff_t *tvb, proto_tree *tlv_tree, gint object_id, gint resource_id);
 
 /* RESOURCE_FILL initializes all the dynamic fields in a lwm2m_resource_t. */
 #define RESOURCE_FILL NULL, -1, NULL
@@ -253,6 +255,7 @@ static lwm2m_resource_t lwm2m_oma_resources[] =
 	{ 4, 9,  "SMNC", DATA_TYPE_INTEGER, RESOURCE_FILL },
 	{ 4, 10, "SMCC", DATA_TYPE_INTEGER, RESOURCE_FILL },
 	{ 4, 11, "SignalSNR", DATA_TYPE_INTEGER, RESOURCE_FILL },
+	{ 5, 12, "LAC", DATA_TYPE_INTEGER, RESOURCE_FILL },
 
 	/* Firmware Update (5) */
 	{ 5, 0,  "Package", DATA_TYPE_OPAQUE, RESOURCE_FILL },
@@ -380,7 +383,7 @@ static gboolean lwm2m_resource_update_cb(void *record, char **error)
 	/* Check for invalid characters (to avoid asserting out when registering the field). */
 	c = proto_check_field_name(rec->field_name);
 	if (c) {
-		*error = g_strdup_printf("Resource Name can't contain '%c'", c);
+		*error = ws_strdup_printf("Resource Name can't contain '%c'", c);
 		return FALSE;
 	}
 
@@ -434,7 +437,7 @@ static void lwm2m_add_resource(lwm2m_resource_t *resource, hf_register_info *hf,
 
 	hf->p_id = hf_id;
 	hf->hfinfo.name = g_strdup(resource->name);
-	hf->hfinfo.abbrev = g_strdup_printf("lwm2mtlv.resource.%s", resource_abbrev);
+	hf->hfinfo.abbrev = ws_strdup_printf("lwm2mtlv.resource.%s", resource_abbrev);
 	g_free (resource_abbrev);
 
 	switch (resource->data_type) {
@@ -662,16 +665,16 @@ addTlvHeaderTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element)
 }
 
 static proto_tree*
-addElementTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, const lwm2m_resource_t *resource)
+addElementTree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, const lwm2m_resource_t *resource)
 {
 	proto_item *item = NULL;
 	gchar *identifier = NULL;
 	gint ett_id;
 
 	if (resource) {
-		identifier = wmem_strdup_printf(wmem_packet_scope(), "[%02u] %s", element->identifier, resource->name);
+		identifier = wmem_strdup_printf(pinfo->pool, "[%02u] %s", element->identifier, resource->name);
 	} else {
-		identifier = wmem_strdup_printf(wmem_packet_scope(), "[%02u]", element->identifier);
+		identifier = wmem_strdup_printf(pinfo->pool, "[%02u]", element->identifier);
 	}
 
 	switch ( element->type )
@@ -702,7 +705,7 @@ addElementTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, con
 }
 
 static void
-addValueInterpretations(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, const lwm2m_resource_t *resource)
+addValueInterpretations(packet_info *pinfo, tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, const lwm2m_resource_t *resource)
 {
 	guint valueOffset;
 	if ( element->length_of_value == 0 ) return;
@@ -715,19 +718,19 @@ addValueInterpretations(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *ele
 		case DATA_TYPE_CORELNK:
 		{
 			const guint8 *strval;
-			proto_tree_add_item_ret_string(tlv_tree, *resource->hf_id, tvb, valueOffset, element->length_of_value, ENC_UTF_8, wmem_packet_scope(), &strval);
-			proto_item_append_text(tlv_tree, ": %s", format_text(wmem_packet_scope(), strval, strlen(strval)));
+			proto_tree_add_item_ret_string(tlv_tree, *resource->hf_id, tvb, valueOffset, element->length_of_value, ENC_UTF_8, pinfo->pool, &strval);
+			proto_item_append_text(tlv_tree, ": %s", format_text(pinfo->pool, strval, strlen(strval)));
 			break;
 		}
 		case DATA_TYPE_INTEGER:
 			proto_tree_add_item(tlv_tree, *resource->hf_id, tvb, valueOffset, element->length_of_value, ENC_BIG_ENDIAN);
-			proto_item_append_text(tlv_tree, ": %" G_GINT64_FORMAT, decodeVariableInt(tvb, valueOffset, element->length_of_value));
+			proto_item_append_text(tlv_tree, ": %" PRId64, decodeVariableInt(tvb, valueOffset, element->length_of_value));
 			break;
 		case DATA_TYPE_UNSIGNED_INTEGER:
 		{
 			guint64 value;
 			proto_tree_add_item_ret_uint64(tlv_tree, *resource->hf_id, tvb, valueOffset, element->length_of_value, ENC_BIG_ENDIAN, &value);
-			proto_item_append_text(tlv_tree, ": %" G_GUINT64_FORMAT, value);
+			proto_item_append_text(tlv_tree, ": %" PRIu64, value);
 			break;
 		}
 		case DATA_TYPE_FLOAT:
@@ -751,7 +754,7 @@ addValueInterpretations(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *ele
 			ts.secs = (time_t)decodeVariableInt(tvb, valueOffset, element->length_of_value);
 			ts.nsecs = 0;
 			proto_tree_add_time(tlv_tree, *resource->hf_id, tvb, valueOffset, element->length_of_value, &ts);
-			proto_item_append_text(tlv_tree, ": %s", abs_time_to_str(wmem_packet_scope(), &ts, ABSOLUTE_TIME_LOCAL, FALSE));
+			proto_item_append_text(tlv_tree, ": %s", abs_time_to_str(pinfo->pool, &ts, ABSOLUTE_TIME_LOCAL, FALSE));
 			break;
 		}
 		case DATA_TYPE_OBJLNK:
@@ -764,16 +767,24 @@ addValueInterpretations(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *ele
 		}
 		case DATA_TYPE_OPAQUE:
 		default:
-			proto_tree_add_item(tlv_tree, *resource->hf_id, tvb, valueOffset, element->length_of_value, ENC_BIG_ENDIAN);
-			proto_item_append_text(tlv_tree, ": %s", tvb_bytes_to_str(wmem_packet_scope(), tvb, valueOffset, element->length_of_value));
+		{
+			proto_item *ti = proto_tree_add_item(tlv_tree, *resource->hf_id, tvb, valueOffset, element->length_of_value, ENC_BIG_ENDIAN);
+
+			proto_item_append_text(tlv_tree, ": %s", tvb_bytes_to_str(pinfo->pool, tvb, valueOffset, element->length_of_value));
+
+			if (resource->object_id == 6 && resource->resource_id == 4) {
+				proto_tree *pt = proto_item_add_subtree(ti, ett_lwm2mtlv_location_velocity);
+				dissect_description_of_velocity(tvb, pt, pinfo, valueOffset, element->length_of_value, NULL, 0);
+			}
 			break;
 		}
+		}
 	} else {
-		guint8 *str = tvb_get_string_enc(wmem_packet_scope(), tvb, valueOffset, element->length_of_value, ENC_UTF_8);
+		guint8 *str = tvb_get_string_enc(pinfo->pool, tvb, valueOffset, element->length_of_value, ENC_UTF_8);
 		if (isprint_utf8_string(str, element->length_of_value)) {
-			proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value_string, tvb, valueOffset, element->length_of_value, ENC_UTF_8|ENC_NA);
+			proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value_string, tvb, valueOffset, element->length_of_value, ENC_UTF_8);
 		} else {
-			str = tvb_bytes_to_str(wmem_packet_scope(), tvb, valueOffset, element->length_of_value);
+			str = tvb_bytes_to_str(pinfo->pool, tvb, valueOffset, element->length_of_value);
 		}
 		proto_item_append_text(tlv_tree, ": %s", str);
 
@@ -807,7 +818,7 @@ addValueInterpretations(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *ele
 }
 
 static void
-addValueTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, const char *uri_path, const lwm2m_resource_t *resource)
+addValueTree(packet_info *pinfo, tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, gint object_id, gint resource_id, const lwm2m_resource_t *resource)
 {
 	guint valueOffset = 1 + element->length_of_identifier + element->length_of_length;
 
@@ -818,30 +829,20 @@ addValueTree(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, const
 
 	if ( element->type == RESOURCE || element->type == RESOURCE_INSTANCE ) {
 		proto_tree_add_item(tlv_tree, hf_lwm2mtlv_value, tvb, valueOffset, element->length_of_value, ENC_NA);
-		addValueInterpretations(tvb, tlv_tree, element, resource);
+		addValueInterpretations(pinfo, tvb, tlv_tree, element, resource);
 	} else {
 		tvbuff_t* sub = tvb_new_subset_length(tvb, valueOffset, element->length_of_value);
-		parseArrayOfElements(sub, tlv_tree, uri_path);
+		parseArrayOfElements(pinfo, sub, tlv_tree, object_id, resource_id);
 	}
 }
 
 static void
-addTlvElement(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, const char *uri_path)
+addTlvElement(packet_info *pinfo, tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, gint object_id, gint resource_id)
 {
 	proto_tree *element_tree = NULL;
 	const lwm2m_resource_t *resource = NULL;
 
-	gchar **ids = wmem_strsplit(wmem_packet_scope(), uri_path, "/", 5);
-	if (ids && ids[0] && ids[1] && ids[2] && ids[3]) {
-		/* URI path is defined as:
-		 *  ids[1] = Object ID
-		 *  ids[2] = Object Instance
-		 *  ids[3] = Resource ID
-		 *  ids[4] = Resource Instance
-		 */
-		guint object_id = (guint)strtol(ids[1], NULL, 10);
-		guint resource_id = (guint)strtol(ids[3], NULL, 10);
-
+	if (object_id != -1 && resource_id != -1) {
 		/* First search user configured objects */
 		resource = lwm2m_search_fields(object_id, resource_id, element->length_of_value,
 					       &uat_allocated_fields, lwm2m_uat_resources, num_lwm2m_uat_resources);
@@ -853,9 +854,9 @@ addTlvElement(tvbuff_t *tvb, proto_tree *tlv_tree, lwm2mElement_t *element, cons
 		}
 	}
 
-	element_tree = addElementTree(tvb, tlv_tree, element, resource);
+	element_tree = addElementTree(pinfo, tvb, tlv_tree, element, resource);
 	addTlvHeaderTree(tvb, element_tree, element);
-	addValueTree(tvb, element_tree, element, uri_path, resource);
+	addValueTree(pinfo, tvb, element_tree, element, object_id, resource_id, resource);
 }
 
 static guint64
@@ -903,24 +904,23 @@ static guint parseTLVHeader(tvbuff_t *tvb, lwm2mElement_t *element)
 	return element->totalLength;
 }
 
-static void parseArrayOfElements(tvbuff_t *tvb, proto_tree *tlv_tree, const char *uri_path)
+static void parseArrayOfElements(packet_info *pinfo, tvbuff_t *tvb, proto_tree *tlv_tree, gint object_id, gint resource_id)
 {
 	guint length;
 	guint offset = 0;
 	guint elementLength = 0;
 	guint element_count = 0;
 	lwm2mElement_t element;
-	const char *next_uri_path = NULL;
 
 	length = tvb_reported_length(tvb);
 
 	while ( length > 0 ) {
 		tvbuff_t* sub = tvb_new_subset_length(tvb, offset, length);
 		elementLength = parseTLVHeader(sub, &element);
-		if (uri_path) {
-			next_uri_path = wmem_strdup_printf(wmem_packet_scope(), "%s/%d", uri_path, element.identifier);
+		if (element.type == RESOURCE || element.type == RESOURCE_ARRAY) {
+			resource_id = (gint)element.identifier;
 		}
-		addTlvElement(sub, tlv_tree, &element, next_uri_path);
+		addTlvElement(pinfo, sub, tlv_tree, &element, object_id, resource_id);
 		element_count++;
 
 		length -= elementLength;
@@ -935,29 +935,41 @@ static void parseArrayOfElements(tvbuff_t *tvb, proto_tree *tlv_tree, const char
 }
 
 static int
-dissect_lwm2mtlv(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data)
+dissect_lwm2mtlv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
 	proto_tree* lwm2mtlv_tree;
 	proto_item* lwm2mtlv_item;
 	http_message_info_t *message_info = (http_message_info_t *) data;
-	const char *uri_path = NULL;
+	gint object_id = -1;
+	gint resource_id = -1;
 
 	if (message_info && message_info->media_str && message_info->media_str[0]) {
-		uri_path = message_info->media_str;
+		gchar **ids = wmem_strsplit(pinfo->pool, message_info->media_str, "/", 5);
+
+		/* URI path is defined as:
+		 *  ids[1] = Object ID
+		 *  ids[2] = Object Instance
+		 *  ids[3] = Resource ID
+		 *  ids[4] = Resource Instance
+		 */
+		if (ids && ids[0] && ids[1]) {
+			object_id = (gint)strtol(ids[1], NULL, 10);
+
+			if (ids[2] && ids[3]) {
+				resource_id = (gint)strtol(ids[1], NULL, 10);
+			}
+		}
 	}
 
 	if (tree) { /* we are being asked for details */
 		lwm2mtlv_item = proto_tree_add_item(tree, proto_lwm2mtlv, tvb, 0, -1, ENC_NA);
 		lwm2mtlv_tree = proto_item_add_subtree(lwm2mtlv_item, ett_lwm2mtlv);
 
-		gchar **ids = wmem_strsplit(wmem_packet_scope(), uri_path, "/", 3);
-		if (ids && ids[0] && ids[1]) {
-			/* ids[1] = Object ID */
-			guint object_id = (guint)strtol(ids[1], NULL, 10);
+		if (object_id != -1) {
 			const gchar *object_name = NULL;
 
 			for (guint i = 0; i < num_lwm2m_uat_object_names; i++) {
-				if (object_id == lwm2m_uat_object_names[i].object_id) {
+				if ((guint)object_id == lwm2m_uat_object_names[i].object_id) {
 					object_name = lwm2m_uat_object_names[i].name;
 					break;
 				}
@@ -974,7 +986,7 @@ dissect_lwm2mtlv(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *
 			}
 		}
 
-		parseArrayOfElements(tvb, lwm2mtlv_tree, uri_path);
+		parseArrayOfElements(pinfo, tvb, lwm2mtlv_tree, object_id, resource_id);
 	}
 	return tvb_captured_length(tvb);
 }
@@ -1105,7 +1117,8 @@ void proto_register_lwm2mtlv(void)
 		&ett_lwm2mtlv_resource,
 		&ett_lwm2mtlv_resource_instance,
 		&ett_lwm2mtlv_resource_array,
-		&ett_lwm2mtlv_object_instance
+		&ett_lwm2mtlv_object_instance,
+		&ett_lwm2mtlv_location_velocity
 	};
 
 	static uat_field_t lwm2m_object_name_flds[] = {

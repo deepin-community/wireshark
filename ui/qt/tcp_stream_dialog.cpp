@@ -23,7 +23,7 @@
 #include <ui/qt/utils/tango_colors.h>
 #include <ui/qt/utils/qt_ui_utils.h>
 #include "progress_frame.h"
-#include "wireshark_application.h"
+#include "main_application.h"
 #include "ui/qt/widgets/wireshark_file_dialog.h"
 
 #include <QCursor>
@@ -530,6 +530,13 @@ void TCPStreamDialog::fillGraph(bool reset_axes, bool set_focus)
         sp->graph(i)->data()->clear();
         sp->graph(i)->setVisible(i == 0 ? true : false);
     }
+    // also clear and hide ErrorBars plottables
+    seg_eb_->setVisible(false);
+    seg_eb_->data()->clear();
+    sack_eb_->setVisible(false);
+    sack_eb_->data()->clear();
+    sack2_eb_->setVisible(false);
+    sack2_eb_->data()->clear();
 
     base_graph_->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc, pkt_point_size_));
 
@@ -615,11 +622,11 @@ void TCPStreamDialog::fillGraph(bool reset_axes, bool set_focus)
 
     stream_desc_ = tr("%1 %2 pkts, %3 %4 %5 pkts, %6 ")
             .arg(UTF8_RIGHTWARDS_ARROW)
-            .arg(gchar_free_to_qstring(format_size(pkts_fwd, format_size_unit_none|format_size_prefix_si)))
-            .arg(gchar_free_to_qstring(format_size(bytes_fwd, format_size_unit_bytes|format_size_prefix_si)))
+            .arg(gchar_free_to_qstring(format_size(pkts_fwd, FORMAT_SIZE_UNIT_NONE, FORMAT_SIZE_PREFIX_SI)))
+            .arg(gchar_free_to_qstring(format_size(bytes_fwd, FORMAT_SIZE_UNIT_BYTES, FORMAT_SIZE_PREFIX_SI)))
             .arg(UTF8_LEFTWARDS_ARROW)
-            .arg(gchar_free_to_qstring(format_size(pkts_rev, format_size_unit_none|format_size_prefix_si)))
-            .arg(gchar_free_to_qstring(format_size(bytes_rev, format_size_unit_bytes|format_size_prefix_si)));
+            .arg(gchar_free_to_qstring(format_size(pkts_rev, FORMAT_SIZE_UNIT_NONE, FORMAT_SIZE_PREFIX_SI)))
+            .arg(gchar_free_to_qstring(format_size(bytes_rev, FORMAT_SIZE_UNIT_BYTES, FORMAT_SIZE_PREFIX_SI)));
     mouseMoved(NULL);
     if (reset_axes)
         resetAxes();
@@ -804,9 +811,12 @@ void TCPStreamDialog::fillTcptrace()
     base_graph_->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDot));
 
     seg_graph_->setVisible(true);
+    seg_eb_->setVisible(true);
     ack_graph_->setVisible(true);
     sack_graph_->setVisible(true);
+    sack_eb_->setVisible(true);
     sack2_graph_->setVisible(true);
+    sack2_eb_->setVisible(true);
     rwin_graph_->setVisible(true);
     dup_ack_graph_->setVisible(true);
     zero_win_graph_->setVisible(true);
@@ -871,7 +881,9 @@ void TCPStreamDialog::fillTcptrace()
                 }
             }
             // If ackno is the same as our last one mark it as a duplicate.
-            if (ack.size() > 0 && ack.last() == ackno) {
+            //   (but don't mark window updates as duplicate acks)
+            if (ack.size() > 0 && ack.last() == ackno
+                  && rwin.last() == ackno + seg->th_win) {
                 dup_ack_time.append(ts);
                 dup_ack.append(ackno);
             }
@@ -881,17 +893,17 @@ void TCPStreamDialog::fillTcptrace()
             rwin.append(ackno + seg->th_win);
         }
     }
-    base_graph_->setData(pkt_time, pkt_seqnums);
-    ack_graph_->setData(ackrwin_time, ack);
-    seg_graph_->setData(sb_time, sb_center);
+    base_graph_->setData(pkt_time, pkt_seqnums, true);
+    ack_graph_->setData(ackrwin_time, ack, true);
+    seg_graph_->setData(sb_time, sb_center, true);
     seg_eb_->setData(sb_span);
-    sack_graph_->setData(sack_time, sack_center);
+    sack_graph_->setData(sack_time, sack_center, true);
     sack_eb_->setData(sack_span);
-    sack2_graph_->setData(sack2_time, sack2_center);
+    sack2_graph_->setData(sack2_time, sack2_center, true);
     sack2_eb_->setData(sack2_span);
-    rwin_graph_->setData(ackrwin_time, rwin);
-    dup_ack_graph_->setData(dup_ack_time, dup_ack);
-    zero_win_graph_->setData(zero_win_time, zero_win);
+    rwin_graph_->setData(ackrwin_time, rwin, true);
+    dup_ack_graph_->setData(dup_ack_time, dup_ack, true);
+    zero_win_graph_->setData(zero_win_time, zero_win, true);
 }
 
 // If the current implementation of incorporating SACKs in goodput calc
@@ -1651,7 +1663,11 @@ void TCPStreamDialog::graphClicked(QMouseEvent *event)
     if (event->button() == Qt::RightButton) {
         // XXX We should find some way to get streamPlot to handle a
         // contextMenuEvent instead.
-        ctx_menu_.exec(event->globalPos());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0 ,0)
+        ctx_menu_.popup(event->globalPosition().toPoint());
+#else
+        ctx_menu_.popup(event->globalPos());
+#endif
     } else  if (mouse_drags_) {
         if (sp->axisRect()->rect().contains(event->pos())) {
             sp->setCursor(QCursor(Qt::ClosedHandCursor));
@@ -1827,7 +1843,7 @@ void TCPStreamDialog::transformYRange(const QCPRange &y_range1)
 void TCPStreamDialog::on_buttonBox_accepted()
 {
     QString file_name, extension;
-    QDir path(wsApp->lastOpenDir());
+    QDir path(mainApp->lastOpenDir());
     QString pdf_filter = tr("Portable Document Format (*.pdf)");
     QString png_filter = tr("Portable Network Graphics (*.png)");
     QString bmp_filter = tr("Windows Bitmap (*.bmp)");
@@ -1839,7 +1855,7 @@ void TCPStreamDialog::on_buttonBox_accepted()
             .arg(bmp_filter)
             .arg(jpeg_filter);
 
-    file_name = WiresharkFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save Graph As…")),
+    file_name = WiresharkFileDialog::getSaveFileName(this, mainApp->windowTitleString(tr("Save Graph As…")),
                                              path.canonicalPath(), filter, &extension);
 
     if (file_name.length() > 0) {
@@ -1855,8 +1871,7 @@ void TCPStreamDialog::on_buttonBox_accepted()
         }
         // else error dialog?
         if (save_ok) {
-            path = QDir(file_name);
-            wsApp->setLastOpenDir(path.canonicalPath().toUtf8().constData());
+            mainApp->setLastOpenDirFromFilename(file_name);
         }
     }
 }
@@ -2197,19 +2212,5 @@ void TCPStreamDialog::GraphUpdater::doUpdate()
 
 void TCPStreamDialog::on_buttonBox_helpRequested()
 {
-    wsApp->helpTopicAction(HELP_STATS_TCP_STREAM_GRAPHS_DIALOG);
+    mainApp->helpTopicAction(HELP_STATS_TCP_STREAM_GRAPHS_DIALOG);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
-

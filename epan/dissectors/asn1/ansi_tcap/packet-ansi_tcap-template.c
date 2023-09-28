@@ -40,11 +40,13 @@ static gint ansi_tcap_response_matching_type = ANSI_TCAP_TID_ONLY;
 /* Initialize the protocol and registered fields */
 static int proto_ansi_tcap = -1;
 
+#if 0
 static int hf_ansi_tcapsrt_SessionId = -1;
 static int hf_ansi_tcapsrt_Duplicate = -1;
 static int hf_ansi_tcapsrt_BeginSession = -1;
 static int hf_ansi_tcapsrt_EndSession = -1;
 static int hf_ansi_tcapsrt_SessionTime = -1;
+#endif
 static int hf_ansi_tcap_bit_h = -1;
 static int hf_ansi_tcap_op_family = -1;
 static int hf_ansi_tcap_op_specifier = -1;
@@ -132,7 +134,7 @@ struct ansi_tcap_invokedata_t {
     gint32 OperationCode_national;
 };
 
-static wmem_map_t *TransactionId_table=NULL;
+static wmem_multimap_t *TransactionId_table=NULL;
 
 /* Store Invoke information needed for the corresponding reply */
 static void
@@ -141,8 +143,8 @@ save_invoke_data(packet_info *pinfo, proto_tree *tree _U_, tvbuff_t *tvb _U_){
   gchar *src, *dst;
   char *buf;
 
-  src = address_to_str(wmem_packet_scope(), &(pinfo->src));
-  dst = address_to_str(wmem_packet_scope(), &(pinfo->dst));
+  src = address_to_str(pinfo->pool, &(pinfo->src));
+  dst = address_to_str(pinfo->pool, &(pinfo->dst));
 
   if ((!pinfo->fd->visited)&&(ansi_tcap_private.TransactionID_str)){
 
@@ -150,32 +152,28 @@ save_invoke_data(packet_info *pinfo, proto_tree *tree _U_, tvbuff_t *tvb _U_){
           /* The hash string needs to contain src and dest to distiguish differnt flows */
           switch(ansi_tcap_response_matching_type){
                         case ANSI_TCAP_TID_ONLY:
-                                buf = wmem_strdup(wmem_packet_scope(), ansi_tcap_private.TransactionID_str);
+                                buf = wmem_strdup(pinfo->pool, ansi_tcap_private.TransactionID_str);
                                 break;
                         case ANSI_TCAP_TID_AND_SOURCE:
-                                buf = wmem_strdup_printf(wmem_packet_scope(), "%s%s",ansi_tcap_private.TransactionID_str,src);
+                                buf = wmem_strdup_printf(pinfo->pool, "%s%s",ansi_tcap_private.TransactionID_str,src);
                                 break;
                         case ANSI_TCAP_TID_SOURCE_AND_DEST:
                         default:
-                                buf = wmem_strdup_printf(wmem_packet_scope(), "%s%s%s",ansi_tcap_private.TransactionID_str,src,dst);
+                                buf = wmem_strdup_printf(pinfo->pool, "%s%s%s",ansi_tcap_private.TransactionID_str,src,dst);
                                 break;
                 }
-
-          /* If the entry allready exists don't owervrite it */
-          ansi_tcap_saved_invokedata = (struct ansi_tcap_invokedata_t *)wmem_map_lookup(TransactionId_table,buf);
-          if(ansi_tcap_saved_invokedata)
-                  return;
 
           ansi_tcap_saved_invokedata = wmem_new(wmem_file_scope(), struct ansi_tcap_invokedata_t);
           ansi_tcap_saved_invokedata->OperationCode = ansi_tcap_private.d.OperationCode;
           ansi_tcap_saved_invokedata->OperationCode_national = ansi_tcap_private.d.OperationCode_national;
           ansi_tcap_saved_invokedata->OperationCode_private = ansi_tcap_private.d.OperationCode_private;
 
-          wmem_map_insert(TransactionId_table,
+          wmem_multimap_insert32(TransactionId_table,
                         wmem_strdup(wmem_file_scope(), buf),
+                        pinfo->num,
                         ansi_tcap_saved_invokedata);
           /*
-          g_warning("Tcap Invoke Hash string %s",buf);
+          ws_warning("Tcap Invoke Hash string %s",buf);
           */
   }
 }
@@ -190,27 +188,27 @@ find_saved_invokedata(packet_info *pinfo, proto_tree *tree _U_, tvbuff_t *tvb _U
     return FALSE;
   }
 
-  src = address_to_str(wmem_packet_scope(), &(pinfo->src));
-  dst = address_to_str(wmem_packet_scope(), &(pinfo->dst));
+  src = address_to_str(pinfo->pool, &(pinfo->src));
+  dst = address_to_str(pinfo->pool, &(pinfo->dst));
 
   /* The hash string needs to contain src and dest to distiguish differnt flows */
-  buf = (char *)wmem_alloc(wmem_packet_scope(), MAX_TID_STR_LEN);
+  buf = (char *)wmem_alloc(pinfo->pool, MAX_TID_STR_LEN);
   buf[0] = '\0';
   /* Reverse order to invoke */
   switch(ansi_tcap_response_matching_type){
         case ANSI_TCAP_TID_ONLY:
-                g_snprintf(buf,MAX_TID_STR_LEN,"%s",ansi_tcap_private.TransactionID_str);
+                snprintf(buf,MAX_TID_STR_LEN,"%s",ansi_tcap_private.TransactionID_str);
                 break;
         case ANSI_TCAP_TID_AND_SOURCE:
-                g_snprintf(buf,MAX_TID_STR_LEN,"%s%s",ansi_tcap_private.TransactionID_str,dst);
+                snprintf(buf,MAX_TID_STR_LEN,"%s%s",ansi_tcap_private.TransactionID_str,dst);
                 break;
         case ANSI_TCAP_TID_SOURCE_AND_DEST:
         default:
-                g_snprintf(buf,MAX_TID_STR_LEN,"%s%s%s",ansi_tcap_private.TransactionID_str,dst,src);
+                snprintf(buf,MAX_TID_STR_LEN,"%s%s%s",ansi_tcap_private.TransactionID_str,dst,src);
                 break;
   }
 
-  ansi_tcap_saved_invokedata = (struct ansi_tcap_invokedata_t *)wmem_map_lookup(TransactionId_table, buf);
+  ansi_tcap_saved_invokedata = (struct ansi_tcap_invokedata_t *)wmem_multimap_lookup32_le(TransactionId_table, buf, pinfo->num);
   if(ansi_tcap_saved_invokedata){
           ansi_tcap_private.d.OperationCode                      = ansi_tcap_saved_invokedata->OperationCode;
           ansi_tcap_private.d.OperationCode_national = ansi_tcap_saved_invokedata->OperationCode_national;
@@ -355,7 +353,7 @@ dissect_ansi_tcap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, vo
                  */
                 if ( p_tcap_context && cur_oid && !p_tcap_context->oid_present ) {
                         /* Save the application context and the sub dissector */
-                        g_strlcpy(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid));
+                        (void) g_strlcpy(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid));
                         if ( (subdissector_handle = dissector_get_string_handle(ber_oid_dissector_table, cur_oid)) ) {
                                 p_tcap_context->subdissector_handle=subdissector_handle;
                                 p_tcap_context->oid_present=TRUE;
@@ -389,6 +387,7 @@ proto_register_ansi_tcap(void)
 
 /* Setup list of header fields  See Section 1.6.1 for details*/
     static hf_register_info hf[] = {
+#if 0
         /* Tcap Service Response Time */
         { &hf_ansi_tcapsrt_SessionId,
           { "Session Id",
@@ -420,6 +419,7 @@ proto_register_ansi_tcap(void)
             FT_UINT32, BASE_DEC, NULL, 0x0,
             NULL, HFILL }
         },
+#endif
         { &hf_ansi_tcap_bit_h,
           { "Require Reply", "ansi_tcap.req_rep",
             FT_BOOLEAN, 16, NULL, 0x8000,
@@ -483,5 +483,5 @@ proto_register_ansi_tcap(void)
                                    "Type of matching invoke/response, risk of mismatch if loose matching chosen",
                                    &ansi_tcap_response_matching_type, ansi_tcap_response_matching_type_values, FALSE);
 
-    TransactionId_table = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), wmem_str_hash, g_str_equal);
+    TransactionId_table = wmem_multimap_new_autoreset(wmem_epan_scope(), wmem_file_scope(), wmem_str_hash, g_str_equal);
 }

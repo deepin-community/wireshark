@@ -12,7 +12,7 @@
 #include "sctp_assoc_analyse_dialog.h"
 
 #include <ui/qt/utils/qt_ui_utils.h>
-//#include "wireshark_application.h"
+//#include "main_application.h"
 #include "file.h"
 #include "ui/qt/main_window.h"
 
@@ -116,16 +116,3 @@ void SCTPAllAssocsDialog::on_setFilterButton_clicked()
     QString newFilter = QString("sctp.assoc_index==%1").arg(selected_assoc_id);
     emit filterPackets(newFilter, false);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

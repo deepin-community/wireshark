@@ -181,7 +181,7 @@ isis_dissect_authentication_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *
     case 1:
         if ( length > 0 ) {
             proto_tree_add_bytes_format( tree, hf_auth_bytes, tvb, offset, length,
-                NULL, "clear text (1), password (length %d) = %s", length, tvb_format_text(tvb, offset, length));
+                NULL, "clear text (1), password (length %d) = %s", length, tvb_format_text(pinfo->pool, tvb, offset, length));
         } else {
             proto_tree_add_bytes_format( tree, hf_auth_bytes, tvb, offset, length,
                 NULL, "clear text (1), no clear-text password found!!!");
@@ -190,7 +190,7 @@ isis_dissect_authentication_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *
     case 54:
         if ( length == 16 ) {
             proto_tree_add_bytes_format( tree, hf_auth_bytes, tvb, offset, length,
-                NULL, "hmac-md5 (54), message digest (length %d) = %s", length, tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, length));
+                NULL, "hmac-md5 (54), message digest (length %d) = %s", length, tvb_bytes_to_str(pinfo->pool, tvb, offset, length));
         } else {
             proto_tree_add_bytes_format( tree, hf_auth_bytes, tvb, offset, length,
                 NULL, "hmac-md5 (54), illegal hmac-md5 digest format (must be 16 bytes)");
@@ -204,7 +204,7 @@ isis_dissect_authentication_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *
         if ( algorithm ) {
             proto_tree_add_bytes_format( tree, hf_auth_bytes, tvb, offset, length,
                 NULL, "CRYPTO_AUTH %s (3), message digest (length %d) = %s", algorithm,
-                length, tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, length));
+                length, tvb_bytes_to_str(pinfo->pool, tvb, offset, length));
         } else {
             proto_tree_add_bytes_format( tree, hf_auth_bytes, tvb, offset, length,
                 NULL, "CRYPTO_AUTH (3) illegal message digest format");
@@ -425,33 +425,31 @@ isis_dissect_te_router_id_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *tv
  * Output:
  *    void, but we will add to proto tree if !NULL.
  */
-void
-isis_dissect_nlpid_clv(tvbuff_t *tvb, proto_tree *tree, int hf_nlpid, int offset, int length)
-{
-    gboolean first;
-    proto_item *ti;
 
-    if ( !tree ) return;        /* nothing to do! */
+#define	PLURALIZE(n)	(((n) > 1) ? "s" : "")
+
+void
+isis_dissect_nlpid_clv(tvbuff_t *tvb, proto_tree *tree, int ett_nlpid, int hf_nlpid, int offset, int length)
+{
+    proto_tree *nlpid_tree;
+    proto_item *ti;
+    guint8 nlpid;
 
     if (length <= 0) {
-        proto_tree_add_item(tree, hf_nlpid, tvb, offset, length, ENC_NA);
+        proto_tree_add_subtree_format(tree, tvb, offset, 0, ett_nlpid, NULL, "No NLPIDs");
     } else {
-        first = TRUE;
-        ti = proto_tree_add_bytes_format(tree, hf_nlpid, tvb, offset, length, NULL, "NLPID(s): ");
+        nlpid_tree = proto_tree_add_subtree_format(tree, tvb, offset, length, ett_nlpid, &ti, "NLPID%s: ", PLURALIZE(length));
         while (length-- > 0 ) {
-            if (!first) {
+            nlpid = tvb_get_guint8(tvb, offset);
+            proto_item_append_text(ti, "%s (0x%02x)",
+                   /* NLPID_IEEE_8021AQ conflicts with NLPID_SNDCF. In this context, we want the former. */
+                   (nlpid == NLPID_IEEE_8021AQ ? "IEEE 802.1aq (SPB)" : val_to_str_const(nlpid, nlpid_vals, "Unknown")),
+                   nlpid);
+            if (length) {
                 proto_item_append_text(ti, ", ");
             }
-            proto_item_append_text(ti, "%s (0x%02x)",
-                           /* NLPID_IEEE_8021AQ conflicts with NLPID_SNDCF.
-                        * In this context, we want the former.
-                        */
-                           (tvb_get_guint8(tvb, offset) == NLPID_IEEE_8021AQ
-                        ? "IEEE 802.1aq (SPB)"
-                        : val_to_str_const(tvb_get_guint8(tvb, offset), nlpid_vals, "Unknown")),
-                           tvb_get_guint8(tvb, offset));
+            proto_tree_add_uint(nlpid_tree, hf_nlpid, tvb, offset, 1, nlpid);
             offset++;
-            first = FALSE;
         }
     }
 }

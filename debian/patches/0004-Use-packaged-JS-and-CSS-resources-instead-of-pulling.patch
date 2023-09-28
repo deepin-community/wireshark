@@ -8,10 +8,10 @@ Change-Id: I75aa5c14a9305ccff12cf4d6f751c2f8eb359c0b
  ipmap.html | 20 +++++---------------
  1 file changed, 5 insertions(+), 15 deletions(-)
 
-diff --git a/ipmap.html b/ipmap.html
+diff --git a/resources/share/wireshark/ipmap.html b/resources/share/wireshark/ipmap.html
 index fa8b542..708b84c 100644
---- a/ipmap.html
-+++ b/ipmap.html
+--- a/resources/share/wireshark/ipmap.html
++++ b/resources/share/wireshark/ipmap.html
 @@ -2,15 +2,9 @@
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">

@@ -31,7 +31,7 @@
 #include "ui/simple_dialog.h"
 
 #include <ui/qt/utils/qt_ui_utils.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 
 #include <QTextStream>
 
@@ -106,7 +106,7 @@ QString GsmMapSummaryDialog::summaryToHtml()
         << table_data_tmpl.arg(file_size_to_qstring(summary.file_length))
         << table_row_end;
 
-    QString format_str = wtap_file_type_subtype_string(summary.file_type);
+    QString format_str = wtap_file_type_subtype_description(summary.file_type);
     const char *compression_type_description = wtap_compression_type_description(summary.compression_type);
     if (compression_type_description != NULL) {
         format_str += QString(" (%1)").arg(compression_type_description);
@@ -328,6 +328,8 @@ void GsmMapSummaryDialog::updateWidgets()
 
 extern "C" {
 
+void register_tap_listener_qt_gsm_map_summary(void);
+
 static void
 gsm_map_summary_reset(void *tapdata)
 {
@@ -338,7 +340,7 @@ gsm_map_summary_reset(void *tapdata)
 
 
 static tap_packet_status
-gsm_map_summary_packet(void *tapdata, packet_info *, epan_dissect_t *, const void *gmtr_ptr)
+gsm_map_summary_packet(void *tapdata, packet_info *, epan_dissect_t *, const void *gmtr_ptr, tap_flags_t flags _U_)
 {
     gsm_map_stat_t *gm_stat = (gsm_map_stat_t *)tapdata;
     const gsm_map_tap_rec_t *gm_tap_rec = (const gsm_map_tap_rec_t *)gmtr_ptr;
@@ -381,16 +383,3 @@ register_tap_listener_qt_gsm_map_summary(void)
 }
 
 } // extern "C"
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

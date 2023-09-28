@@ -68,7 +68,7 @@ static dissector_handle_t ipmb_handle;
 
 static void i2c_prompt(packet_info *pinfo _U_, gchar* result)
 {
-	g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Interpret I2C messages as");
+	snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Interpret I2C messages as");
 }
 
 static gboolean
@@ -274,7 +274,7 @@ proto_register_i2c(void)
 	proto_i2c_event = proto_register_protocol_in_name_only("I2C Events", "I2C Events", "i2c_event", proto_i2c, FT_PROTOCOL);
 	proto_i2c_data = proto_register_protocol_in_name_only("I2C Data", "I2C Data", "i2c_data", proto_i2c, FT_PROTOCOL);
 
-	m = prefs_register_protocol(proto_i2c, NULL);
+	m = prefs_register_protocol_obsolete(proto_i2c);
 	prefs_register_obsolete_preference(m, "type");
 
 	subdissector_table = register_decode_as_next_proto(proto_i2c, "i2c.message", "I2C messages dissector", i2c_prompt);

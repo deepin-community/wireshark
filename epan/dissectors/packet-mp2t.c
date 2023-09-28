@@ -22,18 +22,14 @@
 #include <epan/conversation.h>
 #include <epan/expert.h>
 #include <epan/reassemble.h>
-#include <epan/address_types.h>
 #include <epan/proto_data.h>
 #include <epan/exceptions.h>
 #include <epan/show_exception.h>
 #include "packet-l2tp.h"
+#include "packet-mp2t.h"
 
 void proto_register_mp2t(void);
 void proto_reg_handoff_mp2t(void);
-
-/* The MPEG2 TS packet size */
-#define MP2T_PACKET_SIZE 188
-#define MP2T_SYNC_BYTE   0x47
 
 #define MP2T_PID_DOCSIS  0x1FFE
 #define MP2T_PID_NULL    0x1FFF
@@ -153,7 +149,11 @@ static int hf_mp2t_af_e_m_3 = -1;
 static int hf_mp2t_stuff_bytes = -1;
 static int hf_mp2t_pointer = -1;
 
-static int mp2t_no_address_type = -1;
+/* proto data keys. Note that the packet_analysis_data structure is stored
+ * using the layer number, but since that is at wmem_file_scope() while
+ * the stream information is at pinfo->pool, they don't actually clash.
+ */
+#define MP2T_PROTO_DATA_STREAM 1
 
 static const value_string mp2t_sync_byte_vals[] = {
     { MP2T_SYNC_BYTE, "Correct" },
@@ -177,6 +177,22 @@ static const value_string mp2t_pid_vals[] = {
     { 0x000D, "Reserved" },
     { 0x000E, "Reserved" },
     { 0x000F, "Reserved" },
+    { 0x0010, "Network Information or Stuffing Table" },
+    { 0x0011, "Service Description or Bouquet Association or Stuffing Table" },
+    { 0x0012, "Event Information or Stuffing or Content Identifier Table" },
+    { 0x0013, "Running Status or Stuffing Table" },
+    { 0x0014, "Time and Date or Time Offset or Stuffing Table" },
+    { 0x0015, "Network Synchronization" },
+    { 0x0016, "Resolution Authority Record Notification Table" },
+    { 0x0017, "Reserved For Future Use" },
+    { 0x0018, "Reserved For Future Use" },
+    { 0x0019, "Reserved For Future Use" },
+    { 0x001A, "Reserved For Future Use" },
+    { 0x001B, "Reserved For Future Use" },
+    { 0x001C, "Inband Signaling" },
+    { 0x001D, "Measurement" },
+    { 0x001E, "Discontinuity Information Table" },
+    { 0x001F, "Selection Information Table" },
     { 0x1FFE, "DOCSIS Data-over-cable well-known PID" },
     { 0x1FFF, "Null packet" },
     { 0, NULL }
@@ -245,7 +261,7 @@ static const fragment_items mp2t_msg_frag_items = {
 
 /* Data structure used for detecting CC drops
  *
- *  conversation
+ *  conversation + direction
  *    |
  *    +-> mp2t_analysis_data
  *          |
@@ -265,6 +281,34 @@ static const fragment_items mp2t_msg_frag_items = {
  *                            +-> ts_analysis_data
  *                            +-> ts_analysis_data
  */
+
+static wmem_map_t *mp2t_stream_hashtable = NULL;
+
+typedef struct {
+    const conversation_t* conv;
+    gint dir;
+} mp2t_stream_key;
+
+/* Hash functions */
+static gint
+mp2t_stream_equal(gconstpointer v, gconstpointer w)
+{
+    const mp2t_stream_key *v1 = (const mp2t_stream_key *)v;
+    const mp2t_stream_key *v2 = (const mp2t_stream_key *)w;
+    gint result;
+    result = (v1->conv == v2->conv && v1->dir == v2->dir);
+    return result;
+}
+
+static guint
+mp2t_stream_hash(gconstpointer v)
+{
+    const mp2t_stream_key *key = (const mp2t_stream_key *)v;
+    /* Actually getting multiple streams in opposite directions is
+     * quite unlikely, so to optimize don't include it in the hash */
+    guint hash_val = GPOINTER_TO_UINT(key->conv);
+    return hash_val;
+}
 
 typedef struct mp2t_analysis_data {
 
@@ -358,14 +402,17 @@ init_mp2t_conversation_data(void)
 }
 
 static mp2t_analysis_data_t *
-get_mp2t_conversation_data(conversation_t *conv)
+get_mp2t_conversation_data(mp2t_stream_key *key)
 {
+    mp2t_stream_key      *new_key;
     mp2t_analysis_data_t *mp2t_data;
 
-    mp2t_data = (mp2t_analysis_data_t *)conversation_get_proto_data(conv, proto_mp2t);
+    mp2t_data = (mp2t_analysis_data_t *)wmem_map_lookup(mp2t_stream_hashtable, key);
     if (!mp2t_data) {
+        new_key = wmem_new(wmem_file_scope(), mp2t_stream_key);
+        *new_key = *key;
         mp2t_data = init_mp2t_conversation_data();
-        conversation_add_proto_data(conv, proto_mp2t, mp2t_data);
+        wmem_map_insert(mp2t_stream_hashtable, new_key, mp2t_data);
     }
 
     return mp2t_data;
@@ -414,6 +461,78 @@ get_pid_analysis(mp2t_analysis_data_t *mp2t_data, guint32 pid)
 /* Structure to handle packets, spanned across
  * multiple MPEG packets
  */
+
+/* Reassembly functions */
+typedef struct _mp2t_fragment_key {
+    guint32 conv_index; /* Just use the unique index */
+    int     dir;
+    guint32 id;
+} mp2t_fragment_key;
+
+static guint
+mp2t_fragment_hash(gconstpointer k)
+{
+    const mp2t_fragment_key* key = (const mp2t_fragment_key*) k;
+    guint hash_val;
+
+    hash_val = 0;
+
+    /* In most captures there is only one conversation so optimize on
+     * only using the id for the hash. */
+    // hash_val += (key->conv_index << 2) + key->dir;
+
+    hash_val ^= key->id;
+
+    return hash_val;
+}
+
+static gint
+mp2t_fragment_equal(gconstpointer k1, gconstpointer k2)
+{
+    const mp2t_fragment_key* key1 = (const mp2t_fragment_key*) k1;
+    const mp2t_fragment_key* key2 = (const mp2t_fragment_key*) k2;
+
+    /* Compare the id first since it's the most likely to differ */
+    return (key1->id == key2->id) &&
+           (key1->conv_index == key2->conv_index) &&
+           (key1->dir == key2->dir);
+}
+
+/*
+ * Create a fragment key for permanent use; we are only copying ints,
+ * so our temporary keys are the same as permanent ones.
+ */
+static gpointer
+mp2t_fragment_persistent_key(const packet_info *pinfo _U_, const guint32 id, const void *data)
+{
+    mp2t_fragment_key *key = g_slice_new(mp2t_fragment_key);
+    DISSECTOR_ASSERT(data);
+    mp2t_stream_key *stream = (mp2t_stream_key *)data;
+
+    key->conv_index = stream->conv->conv_index;
+    key->dir = stream->dir;
+    key->id = id;
+
+    return (gpointer)key;
+}
+
+static void
+mp2t_fragment_free_persistent_key(gpointer ptr)
+{
+    mp2t_fragment_key *key = (mp2t_fragment_key *)ptr;
+    g_slice_free(mp2t_fragment_key, key);
+}
+
+static const reassembly_table_functions
+mp2t_reassembly_table_functions = {
+    mp2t_fragment_hash,
+    mp2t_fragment_equal,
+    mp2t_fragment_persistent_key,
+    mp2t_fragment_persistent_key,
+    mp2t_fragment_free_persistent_key,
+    mp2t_fragment_free_persistent_key
+};
+
 static reassembly_table mp2t_reassembly_table;
 
 static void
@@ -443,63 +562,94 @@ mp2t_dissect_packet(tvbuff_t *tvb, enum pid_payload_type pload_type,
         call_data_dissector(tvb, pinfo, tree);
 }
 
+/* Determine the length of a payload packet. If there aren't enough
+ * bytes to determine the length, returns -1. This will usually be
+ * called on the first fragment of a packet, but will be called
+ * on the second fragment if it returned -1 previously. (Returning
+ * -1 a second time indicates issues with dropped packets, etc.)
+ */
 static guint
 mp2t_get_packet_length(tvbuff_t *tvb, guint offset, packet_info *pinfo,
             guint32 frag_id, enum pid_payload_type pload_type)
 {
+    mp2t_stream_key *stream;
     fragment_head *frag;
     tvbuff_t      *len_tvb = NULL, *frag_tvb = NULL, *data_tvb = NULL;
     gint           pkt_len = 0;
     guint          remaining_len;
 
-    frag = fragment_get(&mp2t_reassembly_table, pinfo, frag_id, NULL);
-    if (frag)
-        frag = frag->next;
-
-    if (!frag) { /* First frame */
-        remaining_len = tvb_reported_length_remaining(tvb, offset);
-        if ( (pload_type == pid_pload_docsis && remaining_len < 4) ||
-                (pload_type == pid_pload_sect && remaining_len < 3) ||
-                (pload_type == pid_pload_pes && remaining_len < 5) ) {
-            /* Not enough info to determine the size of the encapsulated packet */
-            /* Just add the fragment and we'll check out the length later */
-            return -1;
+    stream = (mp2t_stream_key *)p_get_proto_data(pinfo->pool, pinfo, proto_mp2t, MP2T_PROTO_DATA_STREAM);
+    if (pinfo->fd->visited) {
+        frag = fragment_get_reassembled_id(&mp2t_reassembly_table, pinfo, frag_id);
+        if (frag) {
+            len_tvb = frag->tvb_data;
+            offset = 0;
+        } else {
+            /* Not reassembled on the first pass. There are two possibilities:
+             * 1) An entire packet contained within a TSP, so it never was
+             * put in the table.
+             * 2) Dangling fragments at the end of the capture.
+             */
+            frag = fragment_get(&mp2t_reassembly_table, pinfo, frag_id, stream);
+            if (!frag) {
+                /* This is the entire packet */
+                len_tvb = tvb;
+            } else {
+                /* Dangling packets at the end that failed to reassemble the
+                 * first time around, so don't bother this time
+                 */
+                return -1;
+            }
         }
-
-        len_tvb = tvb;
     } else {
-        /* Create a composite tvb out of the two */
-        frag_tvb = tvb_new_subset_remaining(frag->tvb_data, 0);
-        len_tvb = tvb_new_composite();
-        tvb_composite_append(len_tvb, frag_tvb);
+        frag = fragment_get(&mp2t_reassembly_table, pinfo, frag_id, stream);
+        if (frag)
+            frag = frag->next;
 
-        data_tvb = tvb_new_subset_remaining(tvb, offset);
-        tvb_composite_append(len_tvb, data_tvb);
-        tvb_composite_finalize(len_tvb);
+        if (!frag) { /* First frame */
+            len_tvb = tvb;
+        } else {
+            /* Create a composite tvb out of the two */
+            frag_tvb = tvb_new_subset_remaining(frag->tvb_data, 0);
+            len_tvb = tvb_new_composite();
+            tvb_composite_append(len_tvb, frag_tvb);
 
-        offset = frag->offset;
+            data_tvb = tvb_new_subset_remaining(tvb, offset);
+            tvb_composite_append(len_tvb, data_tvb);
+            tvb_composite_finalize(len_tvb);
+
+            offset = frag->offset;
+        }
     }
 
-    /* Get the next packet's size if possible */
+    /* Get the next packet's size if possible; if not, return -1 */
+    remaining_len = tvb_reported_length_remaining(len_tvb, offset);
+    /* Normally the only time we would not enough info to determine the size
+     * of the encapsulated packet is when the first fragment is at the very end
+     * of a TSP, but prevent exceptions in the case of dropped and OOO frames.
+     */
     switch (pload_type) {
         case pid_pload_docsis:
+            if (remaining_len < 4)
+                return -1;
             pkt_len = tvb_get_ntohs(len_tvb, offset + 2) + 6;
             break;
         case pid_pload_pes:
+            if (remaining_len < 6)
+                return -1;
             pkt_len = tvb_get_ntohs(len_tvb, offset + 4);
             if (pkt_len) /* A size of 0 means size not bounded */
                 pkt_len += 6;
             break;
         case pid_pload_sect:
+            if (remaining_len < 3)
+                return -1;
             pkt_len = (tvb_get_ntohs(len_tvb, offset + 1) & 0xFFF) + 3;
             break;
         default:
             /* Should not happen */
             break;
     }
-
-    if (frag_tvb)
-        tvb_free(frag_tvb);
 
     return pkt_len;
 }
@@ -510,41 +660,72 @@ mp2t_fragment_handle(tvbuff_t *tvb, guint offset, packet_info *pinfo,
         guint frag_offset, guint frag_len,
         gboolean fragment_last, enum pid_payload_type pload_type)
 {
-    /* proto_item *ti; */
-    fragment_head *frag_msg;
-    tvbuff_t      *new_tvb;
-    gboolean       save_fragmented;
-    address        save_src, save_dst;
+    fragment_head   *frag_msg;
+    proto_item      *ti;
+    tvbuff_t        *new_tvb;
+    const char      *save_proto;
+    mp2t_stream_key *stream;
+    gboolean         save_fragmented;
 
     save_fragmented = pinfo->fragmented;
     pinfo->fragmented = TRUE;
-    copy_address_shallow(&save_src, &pinfo->src);
-    copy_address_shallow(&save_dst, &pinfo->dst);
-
     /* It's possible that a fragment in the same packet set an address already
-     * This will change the hash value, we need to make sure it's NULL */
+     * (e.g., with MPE), which is why we use the conversation and direction not
+     * the addresses in the packet_info to reassemble.
+     */
 
-    set_address(&pinfo->src, mp2t_no_address_type, 0, NULL);
-    set_address(&pinfo->dst, mp2t_no_address_type, 0, NULL);
-
+    stream = (mp2t_stream_key *)p_get_proto_data(pinfo->pool, pinfo, proto_mp2t, MP2T_PROTO_DATA_STREAM);
     /* check length; send frame for reassembly */
     frag_msg = fragment_add_check(&mp2t_reassembly_table,
-            tvb, offset, pinfo, frag_id, NULL,
+            tvb, offset, pinfo, frag_id, stream,
             frag_offset,
             frag_len,
             !fragment_last);
 
-    new_tvb = process_reassembled_data(tvb, offset, pinfo,
-            "Reassembled MP2T",
-            frag_msg, &mp2t_msg_frag_items,
-            NULL, tree);
-
-    copy_address_shallow(&pinfo->src, &save_src);
-    copy_address_shallow(&pinfo->dst, &save_dst);
+    /* We only want to call subdissectors on the last fragment.
+     * processed_reassembled_data checks the frame number and layer number,
+     * but when there is more than one TSP in a frame, the fragment at the
+     * end of one TSP and the first fragment of the next have the same layer
+     * number. So use our own information about whether this is the last
+     * fragment to avoid calling subdissectors early and often.
+     */
+    if (fragment_last) {
+        new_tvb = process_reassembled_data(tvb, offset, pinfo,
+                "Reassembled MP2T",
+                frag_msg, &mp2t_msg_frag_items,
+                NULL, tree);
+    } else {
+        new_tvb = NULL;
+        if (frag_msg != NULL) {
+            ti = proto_tree_add_uint(tree, hf_msg_reassembled_in, tvb, 0, 0, frag_msg->reassembled_in);
+            proto_item_set_generated(ti);
+        }
+    }
 
     if (new_tvb) {
-        /* ti = */ proto_tree_add_item(tree, hf_msg_ts_packet_reassembled, tvb, 0, 0, ENC_NA);
-        mp2t_dissect_packet(new_tvb, pload_type, pinfo, tree);
+        proto_tree_add_item(tree, hf_msg_ts_packet_reassembled, tvb, 0, 0, ENC_NA);
+        save_proto = pinfo->current_proto;
+        /*
+         * Dissect the reassembled packet.
+         *
+         * Because there isn't an explicit fragment ID (other than one
+         * we've made ourselves) if frames were dropped or out of order
+         * it's quite likely that a subdissector throws an exception.
+         * However, that doesn't mean we must stop dissecting, since we have
+         * the pointer to where the next upper level packet begins in the
+         * TSP begins. (Also, we want to make sure we increment our fragment
+         * ID and store the packet analysis data, which happens after this
+         * back in the calling function.)
+         */
+        TRY {
+            mp2t_dissect_packet(new_tvb, pload_type, pinfo, tree);
+        }
+        CATCH_NONFATAL_ERRORS {
+            show_exception(tvb, pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
+
+            pinfo->current_proto = save_proto;
+        }
+        ENDTRY;
     } else {
         col_set_str(pinfo->cinfo, COL_INFO, "[MP2T fragment of a reassembled packet]");
     }
@@ -599,6 +780,34 @@ mp2t_fragment_handle(tvbuff_t *tvb, guint offset, packet_info *pinfo,
  * For PES and PSI, see ISO/IEC 13818-1 / ITU-T Rec. H.222.0 (05/2006),
  * section 2.4.3.3 "Semantic definition of fields in Transport Stream packet
  * layer", which says much the same thing.
+ *
+ * When the payload is PES packet data, note that there is no pointer_field;
+ * if the PUSI is 1 then the TS payload "will commence with the first byte
+ * of a PES packet" and "one and only one PES packet starts in this Transport
+ * Stream packet". Furthermore, section 2.4.3.5 "Semantic definition of
+ * fields in adaptation field" mentions that stuffing in an adaptation field
+ * is "the only method of stuffing allowed for Transport Stream packets
+ * carrying PES packets." Thus stuff_bytes is not relevant for MPEG-TS payloads
+ * carrying PES. (It is possible to have stuffing *inside* the PES packet,
+ * as seen in section 2.4.3.6 "PES packet" and 2.4.3.7 "Semantic definition
+ * of fields in PES packet", which is handled in the MPEG PES dissector.)
+ *
+ * For MPEG-TS packets carrying PSI (which includes private data sections), an
+ * alternative stuffing method is allowed. This method involves stuff bytes
+ * at the end of a MPEG-TS packet after the last section contained within
+ * (similar to the stuff_bytes that may appear after a continued section
+ * before the byte referenced by pointer_field). According to Section 2.4.4
+ * "Program specific information", once a packet stuffing byte 0xFF appears,
+ * "all bytes until the end of the Transport Stream packet shall also be
+ * stuffing bytes of value 0xFF." In other words, as section C.3 "The Mapping
+ * of Sections into Transport Stream Packets" elaborates, while multiple
+ * entire sections are allowed within a TS packet, "no gaps between sections
+ * within a Transport Stream packet are allowed by the syntax".
+ *
+ * However, this function is permissive in what it accepts to the extent
+ * possible; it will allow multiple PES packets in the same TS packet and
+ * stuffing bytes to follow PES packets (at least those that indicate their
+ * length) and will allow stuffing bytes between complete PSI sections.
  */
 static void
 mp2t_process_fragmented_payload(tvbuff_t *tvb, gint offset, guint remaining_len, packet_info *pinfo,
@@ -653,11 +862,15 @@ mp2t_process_fragmented_payload(tvbuff_t *tvb, gint offset, guint remaining_len,
         frag_tot_len = pid_analysis->frag_tot_len;
         fragmentation = pid_analysis->fragmentation;
         frag_id = pid_analysis->frag_id;
-        pdata = (packet_analysis_data_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_mp2t, 0);
+        pdata = (packet_analysis_data_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_mp2t, pinfo->curr_layer_num);
         if (!pdata) {
             pdata = wmem_new0(wmem_file_scope(), packet_analysis_data_t);
             pdata->subpacket_table = wmem_tree_new(wmem_file_scope());
-            p_add_proto_data(wmem_file_scope(), pinfo, proto_mp2t, 0, pdata);
+            /* Since the subpacket data is indexed by offset in the tvb,
+             * lacking a fragment id transmitted in the protocol,
+             * we need a different table for each mp2t layer.
+             */
+            p_add_proto_data(wmem_file_scope(), pinfo, proto_mp2t, pinfo->curr_layer_num, pdata);
 
         } else {
             spdata = (subpacket_analysis_data_t *)wmem_tree_lookup32(pdata->subpacket_table, offset);
@@ -674,7 +887,7 @@ mp2t_process_fragmented_payload(tvbuff_t *tvb, gint offset, guint remaining_len,
         }
     } else {
         /* Get saved values */
-        pdata = (packet_analysis_data_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_mp2t, 0);
+        pdata = (packet_analysis_data_t *)p_get_proto_data(wmem_file_scope(), pinfo, proto_mp2t, pinfo->curr_layer_num);
         if (!pdata) {
             /* Occurs for the first packets in the capture which cannot be reassembled */
             return;
@@ -693,13 +906,22 @@ mp2t_process_fragmented_payload(tvbuff_t *tvb, gint offset, guint remaining_len,
     }
 
     if (frag_tot_len == (guint)-1) {
+        /* We couldn't determine the total length of the reassembly from
+         * the first fragment (too short), so get it now that we have the
+         * second fragment.
+         */
         frag_tot_len = mp2t_get_packet_length(tvb, offset, pinfo, frag_id, pid_analysis->pload_type);
 
         if (frag_tot_len == (guint)-1) {
+            /* We still don't have enough to determine the length; this can
+             * only happen with dropped or out of order packets. Bail out.
+             * XXX: This just skips the packet and tries the next one, but
+             * there are probably better ways to handle it, especially if
+             * the PUSI flag is set in this packet.
+             */
             return;
         }
     }
-
 
     /* The beginning of a new packet is present */
     if (pusi_flag) {
@@ -750,7 +972,7 @@ mp2t_process_fragmented_payload(tvbuff_t *tvb, gint offset, guint remaining_len,
         }
 
         while (remaining_len > 0) {
-            /* Don't like subsequent packets overwrite the Info column */
+            /* Don't let subsequent packets overwrite the Info column */
             col_append_str(pinfo->cinfo, COL_INFO, " ");
             col_set_fence(pinfo->cinfo, COL_INFO);
 
@@ -809,7 +1031,19 @@ mp2t_process_fragmented_payload(tvbuff_t *tvb, gint offset, guint remaining_len,
 
     /* There are remaining bytes. Add them to the fragment list */
 
-    if ((frag_tot_len && frag_cur_pos + remaining_len >= frag_tot_len) || (!frag_tot_len && pusi_flag)) {
+    if (frag_tot_len && frag_cur_pos + remaining_len > frag_tot_len) {
+        /* The case where PUSI was 0, a continuing SECT ended, and stuff
+         * bytes follow. */
+        stuff_len = frag_cur_pos + remaining_len - frag_tot_len;
+        mp2t_fragment_handle(tvb, offset, pinfo, tree, frag_id, frag_cur_pos, remaining_len - stuff_len, TRUE, pid_analysis->pload_type);
+        offset += remaining_len - stuff_len;
+        frag_id++;
+        fragmentation = FALSE;
+        frag_cur_pos = 0;
+        frag_tot_len = 0;
+        stuff_tree = proto_tree_add_subtree_format(tree, tvb, offset, stuff_len, ett_stuff, NULL, "Stuffing");
+        proto_tree_add_item(stuff_tree, hf_mp2t_stuff_bytes, tvb, offset, stuff_len, ENC_NA);
+    } else if ((frag_tot_len && frag_cur_pos + remaining_len == frag_tot_len) || (!frag_tot_len && pusi_flag)) {
         mp2t_fragment_handle(tvb, offset, pinfo, tree, frag_id, frag_cur_pos, remaining_len, TRUE, pid_analysis->pload_type);
         frag_id++;
         fragmentation = FALSE;
@@ -821,6 +1055,10 @@ mp2t_process_fragmented_payload(tvbuff_t *tvb, gint offset, guint remaining_len,
         frag_cur_pos += remaining_len;
     }
 
+    /* XXX: Ideally this would be handled with a TRY...FINALLY or
+     * similar, with more care taken to keep things consistent even
+     * with fatal errors in subdissectors.
+     */
 save_state:
     pid_analysis->fragmentation = fragmentation;
     pid_analysis->frag_cur_pos = frag_cur_pos;
@@ -1103,13 +1341,12 @@ dissect_mp2t_adaptation_field(tvbuff_t *tvb, gint offset, proto_tree *tree)
 
 static void
 dissect_tsp(tvbuff_t *tvb, gint offset, packet_info *pinfo,
-        proto_tree *tree, conversation_t *conv)
+        proto_tree *tree, mp2t_analysis_data_t *mp2t_data)
 {
     guint32              header;
     guint                afc;
     gint                 start_offset = offset;
     gint                 payload_len;
-    mp2t_analysis_data_t *mp2t_data;
     pid_analysis_data_t *pid_analysis;
 
     guint32     skips;
@@ -1151,8 +1388,6 @@ dissect_tsp(tvbuff_t *tvb, gint offset, packet_info *pinfo,
     proto_tree_add_item( mp2t_header_tree, hf_mp2t_tsc, tvb, offset, 4, ENC_BIG_ENDIAN);
     afci = proto_tree_add_item( mp2t_header_tree, hf_mp2t_afc, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item( mp2t_header_tree, hf_mp2t_cc, tvb, offset, 4, ENC_BIG_ENDIAN);
-
-    mp2t_data = get_mp2t_conversation_data(conv);
 
     pid_analysis = get_pid_analysis(mp2t_data, pid);
 
@@ -1223,11 +1458,32 @@ dissect_tsp(tvbuff_t *tvb, gint offset, packet_info *pinfo,
 static int
 dissect_mp2t( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_ )
 {
-    volatile guint offset = 0;
-    conversation_t *conv;
-    const char     *saved_proto;
+    volatile guint        offset = 0;
+    conversation_t       *conv;
+    mp2t_stream_key      *stream;
+    mp2t_analysis_data_t *mp2t_data;
+    const char           *saved_proto;
 
     conv = find_or_create_conversation(pinfo);
+    stream = wmem_new(pinfo->pool, mp2t_stream_key);
+    stream->conv = conv;
+    /* Conversations on UDP, etc. are bidirectional, but in the odd case
+     * that we have two MP2T streams in the opposite directions, we have to
+     * separately track their Continuity Counters, manage their fragmentation
+     * status information, etc.
+     */
+    if (addresses_equal(&pinfo->src, conversation_key_addr1(conv->key_ptr))) {
+        stream->dir = P2P_DIR_SENT;
+    } else if (addresses_equal(&pinfo->dst, conversation_key_addr1(conv->key_ptr))) {
+        stream->dir = P2P_DIR_RECV;
+    } else {
+        /* DVB Base Band Frames, or some other endpoint that doesn't set the
+         * address, presumably unidirectional.
+         */
+        stream->dir = P2P_DIR_SENT;
+    }
+
+    p_add_proto_data(pinfo->pool, pinfo, proto_mp2t, MP2T_PROTO_DATA_STREAM, stream);
 
     for (; tvb_reported_length_remaining(tvb, offset) >= MP2T_PACKET_SIZE; offset += MP2T_PACKET_SIZE) {
         /*
@@ -1244,7 +1500,8 @@ dissect_mp2t( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
          */
         saved_proto = pinfo->current_proto;
         TRY {
-            dissect_tsp(tvb, offset, pinfo, tree, conv);
+            mp2t_data = get_mp2t_conversation_data(stream);
+            dissect_tsp(tvb, offset, pinfo, tree, mp2t_data);
         }
         CATCH_NONFATAL_ERRORS {
             show_exception(tvb, pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
@@ -1570,12 +1827,12 @@ proto_register_mp2t(void)
     expert_mp2t = expert_register_protocol(proto_mp2t);
     expert_register_field_array(expert_mp2t, ei, array_length(ei));
 
-    mp2t_no_address_type = address_type_dissector_register("AT_MP2T_NONE", "No MP2T Address", none_addr_to_str, none_addr_str_len, NULL, NULL, none_addr_len, NULL, NULL);
-
     heur_subdissector_list = register_heur_dissector_list("mp2t.pid", proto_mp2t);
     /* Register init of processing of fragmented DEPI packets */
     reassembly_table_register(&mp2t_reassembly_table,
-        &addresses_ports_reassembly_table_functions);
+        &mp2t_reassembly_table_functions);
+
+    mp2t_stream_hashtable = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), mp2t_stream_hash, mp2t_stream_equal);
 }
 
 
@@ -1590,7 +1847,7 @@ proto_reg_handoff_mp2t(void)
     dissector_add_for_decode_as_with_preference("udp.port", mp2t_handle);
     heur_dissector_add("usb.bulk", heur_dissect_mp2t, "MP2T USB bulk endpoint", "mp2t_usb_bulk", proto_mp2t, HEURISTIC_ENABLE);
     dissector_add_uint("wtap_encap", WTAP_ENCAP_MPEG_2_TS, mp2t_handle);
-    dissector_add_uint("l2tp.pw_type", L2TPv3_PROTOCOL_DOCSIS_DMPT, mp2t_handle);
+    dissector_add_uint("l2tp.pw_type", L2TPv3_PW_DOCSIS_DMPT, mp2t_handle);
     dissector_add_string("media_type", "video/mp2t", mp2t_handle);
 
     docsis_handle = find_dissector("docsis");

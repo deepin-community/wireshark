@@ -110,6 +110,10 @@ typedef enum {
  * of whether this is our file type or not. Arbitrary. */
 #define CAMINS_BYTES_TO_CHECK 0x3FFFFFFFU
 
+static int camins_file_type_subtype = -1;
+
+void register_camins(void);
+
 /* Detect a camins file by looking at the blocks that access the 16bit
    size register. The matching blocks to access the upper and lower 8bit
    must be no further than 5 blocks apart.
@@ -148,7 +152,7 @@ static wtap_open_return_val detect_camins_file(FILE_T fh)
         else {
             /* We're not searching for a matching block at the moment.
                If we see a size read/write block of one type, the matching
-               block is the the other type and we can start searching. */
+               block is the other type and we can start searching. */
 
             if (block[1] == TRANS_READ_SIZE_LOW) {
                 search_block = TRANS_READ_SIZE_HIGH;
@@ -332,7 +336,7 @@ create_pseudo_hdr(guint8 *buf, guint8 dat_trans_type, guint16 dat_len,
     else if (dat_trans_type==TRANS_HOST_CAM)
         buf[1] = DVB_CI_PSEUDO_HDR_HOST_TO_CAM;
     else {
-        *err_info = g_strdup_printf("camins: invalid dat_trans_type %u", dat_trans_type);
+        *err_info = ws_strdup_printf("camins: invalid dat_trans_type %u", dat_trans_type);
         return -1;
     }
 
@@ -382,6 +386,7 @@ camins_read_packet(FILE_T fh, wtap_rec *rec, Buffer *buf,
     offset += bytes_read;
 
     rec->rec_type = REC_TYPE_PACKET;
+    rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
     rec->presence_flags = 0; /* we may or may not have a time stamp */
     rec->rec_header.packet_header.pkt_encap = WTAP_ENCAP_DVBCI;
     if (time_us) {
@@ -438,11 +443,11 @@ wtap_open_return_val camins_open(wtap *wth, int *err, gchar **err_info _U_)
 
    /* wth->priv stores a pointer to the global time counter. we update
       it as we go through the file sequentially. */
-   wth->priv = g_malloc0(sizeof(guint64));
+   wth->priv = g_new0(guint64, 1);
 
    wth->subtype_read = camins_read;
    wth->subtype_seek_read = camins_seek_read;
-   wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_CAMINS;
+   wth->file_type_subtype = camins_file_type_subtype;
 
    *err = 0;
 
@@ -457,6 +462,30 @@ wtap_open_return_val camins_open(wtap *wth, int *err, gchar **err_info _U_)
    return WTAP_OPEN_MINE;
 }
 
+static const struct supported_block_type camins_blocks_supported[] = {
+   /*
+    * We support packet blocks, with no comments or other options.
+    */
+   { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info camins_info = {
+   "CAM Inspector file", "camins", "camins", NULL,
+   FALSE, BLOCKS_SUPPORTED(camins_blocks_supported),
+   NULL, NULL, NULL
+};
+
+void register_camins(void)
+{
+   camins_file_type_subtype = wtap_register_file_type_subtype(&camins_info);
+
+   /*
+    * Register name for backwards compatibility with the
+    * wtap_filetypes table in Lua.
+    */
+   wtap_register_backwards_compatibility_lua_name("CAMINS",
+                                                  camins_file_type_subtype);
+}
 
 /*
  * Editor modelines  -  https://www.wireshark.org/tools/modelines.html

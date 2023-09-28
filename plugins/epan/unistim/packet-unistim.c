@@ -32,6 +32,8 @@
 
 void proto_register_unistim(void);
 
+static dissector_handle_t unistim_handle;
+
 static unistim_info_t *uinfo;
 static int unistim_tap = -1;
 
@@ -44,7 +46,7 @@ static gint dissect_audio_switch(proto_tree *msg_tree,packet_info *pinfo,
                                    tvbuff_t *tvb,gint offset,guint msg_len);
 static gint dissect_expansion_switch(proto_tree *msg_tree,
                                    tvbuff_t *tvb,gint offset,guint msg_len);
-static gint dissect_display_switch(proto_tree *msg_tree,
+static gint dissect_display_switch(proto_tree *msg_tree, packet_info *pinfo,
                                    tvbuff_t *tvb,gint offset,guint msg_len);
 static gint dissect_key_indicator_switch(proto_tree *msg_tree,
                                    tvbuff_t *tvb,gint offset,guint msg_len);
@@ -194,7 +196,7 @@ dissect_unistim(tvbuff_t *tvb,packet_info *pinfo,proto_tree *tree,void *data _U_
    proto_tree_add_item(rudpm_tree,hf_unistim_seq_nu,tvb,offset,4,ENC_BIG_ENDIAN);
 
    /* Allocate new mem for queueing */
-   uinfo = wmem_new(wmem_packet_scope(), unistim_info_t);
+   uinfo = wmem_new(pinfo->pool, unistim_info_t);
 
    /* Clear tap struct */
    uinfo->rudp_type = 0;
@@ -415,7 +417,7 @@ dissect_unistim_message(proto_tree *unistim_tree,packet_info *pinfo,tvbuff_t *tv
          break;
       case 0x17:
    /*Display Manager Switch*/
-         offset = dissect_display_switch(msg_tree,tvb,offset,msg_len-2);
+         offset = dissect_display_switch(msg_tree,pinfo,tvb,offset,msg_len-2);
          break;
       case 0x19:
    /*Key Indicator Manager Switch*/
@@ -731,7 +733,7 @@ dissect_broadcast_phone(proto_tree *msg_tree,
 
    /*DONE*/
 static gint
-dissect_display_switch(proto_tree *msg_tree,
+dissect_display_switch(proto_tree *msg_tree, packet_info *pinfo,
                        tvbuff_t *tvb, gint offset,guint msg_len){
    guint clear_mask;
    guint highlight_cmd;
@@ -1057,7 +1059,7 @@ dissect_display_switch(proto_tree *msg_tree,
          /* whatever's left is the message */
          if(msg_len>0){
             /* I'm guessing this will work flakily at best */
-            proto_tree_add_item_ret_string(msg_tree,hf_generic_string,tvb,offset,msg_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &uinfo->string_data);
+            proto_tree_add_item_ret_string(msg_tree,hf_generic_string,tvb,offset,msg_len, ENC_ASCII|ENC_NA, pinfo->pool, &uinfo->string_data);
             offset+=msg_len;
          }
          break;
@@ -2679,8 +2681,8 @@ proto_register_unistim(void){
          BASE_HEX, VALS(network_server_id),0x00,NULL,HFILL}
       },
       { &hf_net_server_ip_address,
-        {"Download Server Address","unistim.download.address",FT_UINT32,
-         BASE_HEX, NULL,0x00,NULL,HFILL}
+        {"Download Server Address","unistim.download.address",FT_IPv4,
+         BASE_NONE, NULL,0x00,NULL,HFILL}
       },
       { &hf_net_server_time_out,
         {"Watchdog Timeout","unistim.watchdog.timeout",FT_UINT16,
@@ -3017,7 +3019,7 @@ proto_register_unistim(void){
          8,NULL,DISPLAY_WRITE_ADDRESS_SOFT_LABEL_FLAG,NULL,HFILL}
       },
       { &hf_display_write_address_softkey_id,
-        {"Soft Key ID","unistim.write.addres.softkey.id",FT_UINT8,
+        {"Soft Key ID","unistim.write.address.softkey.id",FT_UINT8,
          BASE_HEX,NULL,DISPLAY_WRITE_ADDRESS_SOFT_KEY_ID,NULL,HFILL}
       },
       { &hf_display_write_address_char_pos,
@@ -3682,8 +3684,8 @@ proto_register_unistim(void){
          BASE_DEC,NULL,0x00,NULL,HFILL}
       },
       { &hf_audio_nat_ip,
-        {"NAT Listen Address","unistim.nat.listen.address",FT_UINT8,
-         BASE_DEC,NULL,0x00,NULL,HFILL}
+        {"NAT Listen Address","unistim.nat.listen.address",FT_IPv4,
+         BASE_NONE,NULL,0x00,NULL,HFILL}
       },
       { &hf_audio_nat_add_len,
         {"NAT Address Length","unistim.nat.address.len",FT_UINT8,
@@ -3835,6 +3837,7 @@ proto_register_unistim(void){
    expert_module_t* expert_unistim;
 
    proto_unistim=proto_register_protocol("UNISTIM Protocol", "UNISTIM", "unistim");
+   unistim_handle=register_dissector("unistim", dissect_unistim,proto_unistim);
 
    proto_register_subtree_array(ett,array_length(ett));
    proto_register_field_array(proto_unistim,hf,array_length(hf));
@@ -3846,10 +3849,6 @@ proto_register_unistim(void){
 
 void
 proto_reg_handoff_unistim(void) {
-
-   dissector_handle_t unistim_handle;
-
-   unistim_handle=create_dissector_handle(dissect_unistim,proto_unistim);
    dissector_add_for_decode_as_with_preference("udp.port", unistim_handle);
 }
 

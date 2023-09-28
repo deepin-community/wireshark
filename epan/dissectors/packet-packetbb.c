@@ -22,6 +22,8 @@
 void proto_reg_handoff_packetbb(void);
 void proto_register_packetbb(void);
 
+static dissector_handle_t packetbb_handle;
+
 #define PACKET_HEADER_HASSEQNR     0x08
 #define PACKET_HEADER_HASTLV       0x04
 
@@ -100,19 +102,19 @@ enum rfc7181_mpr_bitmask {
 };
 
 /* Message types defined by IANA in RFC5444 */
-const value_string msgheader_type_vals[] = {
+static const value_string msgheader_type_vals[] = {
   { 0, "HELLO (NHDP)"                   },
   { 1, "TC (OLSRv2)"                    },
   { 0, NULL                             }};
 
 /* Packet TLV types defined by IANA in RFC7182 */
-const value_string pkttlv_type_vals[] = {
+static const value_string pkttlv_type_vals[] = {
   { RFC7182_TLV_ICV              , "Integrity Check Value"         },
   { RFC7182_TLV_TIMESTAMP        , "Timestamp"                     },
   { 0                            , NULL                            }};
 
 /* Message TLV types defined by IANA in RFC5497,7181,7182 */
-const value_string msgtlv_type_vals[] = {
+static const value_string msgtlv_type_vals[] = {
   { RFC5497_TLV_INTERVAL_TIME    , "Signaling message interval"    },
   { RFC5497_TLV_VALIDITY_TIME    , "Message validity time"         },
   { RFC7182_TLV_ICV              , "Integrity Check Value"         },
@@ -122,7 +124,7 @@ const value_string msgtlv_type_vals[] = {
   { 0                            , NULL                            }};
 
 /* Address TLV types defined by IANA in RFC5497,6130,7181,7182 */
-const value_string addrtlv_type_vals[] = {
+static const value_string addrtlv_type_vals[] = {
   { RFC5497_TLV_INTERVAL_TIME    , "Signaling message interval"    },
   { RFC5497_TLV_VALIDITY_TIME    , "Message validity time"         },
   { RFC6130_ADDRTLV_LOCAL_IF     , "Local interface status"        },
@@ -137,33 +139,33 @@ const value_string addrtlv_type_vals[] = {
   { 0                            , NULL                            }};
 
 /* Values of LOCALIF TLV of RFC6130 */
-const value_string localif_vals[] = {
+static const value_string localif_vals[] = {
   { 0, "THIS_IF"                        },
   { 1, "OTHER_IF"                       },
   { 0, NULL                             }};
 
 /* Values of LINKSTATUS TLV of RFC6130 */
-const value_string linkstatus_vals[] = {
+static const value_string linkstatus_vals[] = {
   { 0, "LOST"                           },
   { 1, "SYMMETRIC"                      },
   { 2, "HEARD"                          },
   { 0, NULL                             }};
 
 /* Values of OTHERNEIGH TLV of RFC6130 */
-const value_string otherneigh_vals[] = {
+static const value_string otherneigh_vals[] = {
   { 0, "LOST"                           },
   { 1, "SYMMETRIC"                      },
   { 0, NULL                             }};
 
 /* Values of MPR TLV of RFC7181 */
-const value_string mpr_vals[] = {
+static const value_string mpr_vals[] = {
   { 1, "FLOODING"                       },
   { 2, "ROUTING"                        },
   { 3, "FLOOD_ROUTE"                    },
   { 0, NULL                             }};
 
 /* Values of NBRADDRTYPE TLV of RFC7181 */
-const value_string nbraddrtype_vals[] = {
+static const value_string nbraddrtype_vals[] = {
   { 1, "ORIGINATOR"                     },
   { 2, "ROUTABLE"                       },
   { 3, "ROUTABLE_ORIG"                  },
@@ -704,7 +706,7 @@ static int dissect_pbb_addressblock(tvbuff_t *tvb, packet_info *pinfo, proto_tre
       case 3:
         addrValue_item = proto_tree_add_bytes_format_value(addr_tree, hf_packetbb_addr_value[addressType],
             tvb, mid_index, block_index + block_length - mid_index, NULL,
-            "%s", bytes_to_str(wmem_packet_scope(), addr, head_length + midSize));
+            "%s", bytes_to_str(pinfo->pool, addr, head_length + midSize));
         break;
       default:
         break;
@@ -960,9 +962,6 @@ static int dissect_packetbb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 }
 
 void proto_reg_handoff_packetbb(void) {
-  dissector_handle_t packetbb_handle;
-
-  packetbb_handle = create_dissector_handle(dissect_packetbb, proto_packetbb);
   dissector_add_uint_with_preference("udp.port", PACKETBB_PORT, packetbb_handle);
 }
 
@@ -1394,6 +1393,7 @@ void proto_register_packetbb(void) {
 
   /* name, short name, abbrev */
   proto_packetbb = proto_register_protocol("PacketBB Protocol", "PacketBB", "packetbb");
+  packetbb_handle = register_dissector("packetbb", dissect_packetbb, proto_packetbb);
 
   /* Required function calls to register the header fields and subtrees used */
   proto_register_field_array(proto_packetbb, hf, array_length(hf));

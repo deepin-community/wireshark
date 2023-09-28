@@ -1,4 +1,4 @@
-/* packet_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -33,14 +33,17 @@ public:
     explicit PacketDialog(QWidget &parent, CaptureFile &cf, frame_data *fdata);
     ~PacketDialog();
 
+protected:
+    void captureFileClosing();
+
 signals:
     void showProtocolPreferences(const QString module_name);
     void editProtocolPreference(struct preference *pref, struct pref_module *module);
 
 private slots:
     void on_buttonBox_helpRequested();
+    void viewVisibilityStateChanged(int);
 
-    void captureFileClosing();
     void setHintText(FieldInformation *);
 
 private:
@@ -55,16 +58,3 @@ private:
 };
 
 #endif // PACKET_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

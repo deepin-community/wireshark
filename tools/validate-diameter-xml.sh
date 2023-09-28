@@ -25,15 +25,18 @@ then
 	exit 0
 fi
 
+src_dir="$(dirname "$0")/.."
+diameter_dir="$src_dir/resources/protocols/diameter"
+
 # Ideally this would work regardless of our cwd
-if [ ! -r diameter/dictionary.xml ]
+if [ ! -r "$diameter_dir/dictionary.xml" ]
 then
-	echo "Couldn't find diameter/dictionary.xml" 1>&2
+	echo "Couldn't find $diameter_dir/dictionary.xml" 1>&2
 	exit 1
 fi
-if [ ! -r diameter/dictionary.dtd ]
+if [ ! -r "$diameter_dir/dictionary.dtd" ]
 then
-	echo "Couldn't find diameter/dictionary.dtd" 1>&2
+	echo "Couldn't find $diameter_dir/dictionary.dtd" 1>&2
 	exit 1
 fi
 
@@ -49,10 +52,26 @@ trap 'rm -rf "$tmpdir"' EXIT
 #   2) (but) we do want to use xmllint to find problems
 #   3) (and) users see the AVP names.  Showing them "TGPP" instead of "3GPP"
 #      is annoying enough to warrant this extra work.
-cp diameter/dictionary.dtd "$tmpdir" || exit 1
-for f in diameter/*.xml
+
+# Declare and populate associative exceptions array
+declare -A exceptions=(
+        ["3GPP"]="TGPP"
+        ["5QI"]="FiveQI"
+)
+
+# Loop through the exceptions, building the sed options
+sedopts=
+for e in ${!exceptions[@]}; do
+        sedopts="${sedopts}s/name=\"$e/name=\"${exceptions[$e]}/;"
+done
+
+# Delete the last character, i.e., the trailing semicolon
+sedopts=${sedopts%?}
+
+cp "$diameter_dir/dictionary.dtd" "$tmpdir" || exit 1
+for f in "$diameter_dir"/*.xml
 do
-	sed 's/name="3GPP/name="TGPP/g' "$f" > "$tmpdir/${f##*/}" || exit 1
+        sed "${sedopts}" "$f" > "$tmpdir/${f##*/}" || exit 1
 done
 
 xmllint --noout --noent --postvalid "$tmpdir/dictionary.xml" &&

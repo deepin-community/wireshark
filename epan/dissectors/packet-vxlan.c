@@ -4,7 +4,7 @@
  * RFC 7348 plus draft-smith-vxlan-group-policy-01
  *
  * (c) Copyright 2016, Sumit Kumar Jha <sjha3@ncsu.edu>
- * Support for VXLAN GPE (https://www.ietf.org/id/draft-ietf-nvo3-vxlan-gpe-02.txt)
+ * Support for VXLAN GPE (https://datatracker.ietf.org/doc/html/draft-ietf-nvo3-vxlan-gpe-02)
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -50,8 +50,8 @@ static int ett_vxlan_flags = -1;
 
 static int * const flags_fields[] = {
         &hf_vxlan_flag_g,
-        &hf_vxlan_flag_d,
         &hf_vxlan_flag_i,
+        &hf_vxlan_flag_d,
         &hf_vxlan_flag_a,
         &hf_vxlan_flags_reserved,
         NULL
@@ -226,31 +226,31 @@ proto_register_vxlan(void)
         },
         { &hf_vxlan_gbp,
           { "Group Policy ID", "vxlan.gbp",
-            FT_UINT16, BASE_DEC, NULL, 0x00,
+            FT_UINT16, BASE_DEC, NULL, 0x0,
             NULL, HFILL
           },
         },
         { &hf_vxlan_vni,
           { "VXLAN Network Identifier (VNI)", "vxlan.vni",
-            FT_UINT24, BASE_DEC, NULL, 0x00,
+            FT_UINT24, BASE_DEC, NULL, 0x0,
             NULL, HFILL
           },
         },
         { &hf_vxlan_reserved_8,
           { "Reserved", "vxlan.reserved8",
-            FT_UINT8, BASE_DEC, NULL, 0x00,
+            FT_UINT8, BASE_DEC, NULL, 0x0,
             NULL, HFILL
           },
         },
         { &hf_vxlan_gpe_reserved_16,
           { "Reserved", "vxlan.reserved_16",
-            FT_UINT16, BASE_DEC, NULL, 0x0000,
+            FT_UINT16, BASE_DEC, NULL, 0x0,
             NULL, HFILL
           },
         },
         { &hf_vxlan_next_proto,
           { "Next Protocol", "vxlan.next_proto",
-            FT_UINT8, BASE_DEC, VALS(vxlan_next_protocols), 0x00,
+            FT_UINT8, BASE_DEC, VALS(vxlan_next_protocols), 0x0,
             NULL, HFILL
           },
         },

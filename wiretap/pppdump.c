@@ -14,6 +14,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include <wsutil/ws_assert.h>
+
 /*
 pppdump records
 Daniel Thompson (STMicroelectronics) <daniel.thompson@st.com>
@@ -87,6 +89,10 @@ static gboolean pppdump_read(wtap *wth, wtap_rec *rec, Buffer *buf,
 	int *err, gchar **err_info, gint64 *data_offset);
 static gboolean pppdump_seek_read(wtap *wth, gint64 seek_off,
 	wtap_rec *rec, Buffer *buf, int *err, gchar **err_info);
+
+static int pppdump_file_type_subtype = -1;
+
+void register_pppdump(void);
 
 /*
  * Information saved about a packet, during the initial sequential pass
@@ -269,7 +275,7 @@ pppdump_open(wtap *wth, int *err, gchar **err_info)
 	if (file_seek(wth->fh, 5, SEEK_SET, err) == -1)
 		return WTAP_OPEN_ERROR;
 
-	state = (pppdump_t *)g_malloc(sizeof(pppdump_t));
+	state = g_new(pppdump_t, 1);
 	wth->priv = (void *)state;
 	state->timestamp = pntoh32(&buffer[1]);
 	state->tenths = 0;
@@ -278,7 +284,7 @@ pppdump_open(wtap *wth, int *err, gchar **err_info)
 
 	state->offset = 5;
 	wth->file_encap = WTAP_ENCAP_PPP_WITH_PHDR;
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_PPPDUMP;
+	wth->file_type_subtype = pppdump_file_type_subtype;
 
 	wth->snapshot_length = PPPD_BUF_SIZE; /* just guessing */
 	wth->subtype_read = pppdump_read;
@@ -308,12 +314,13 @@ pppdump_open(wtap *wth, int *err, gchar **err_info)
 	return WTAP_OPEN_MINE;
 }
 
-/* Set part of the struct wtap_pkthdr. */
+/* Set part of the struct wtap_rec. */
 static void
 pppdump_set_phdr(wtap_rec *rec, int num_bytes,
     direction_enum direction)
 {
 	rec->rec_type = REC_TYPE_PACKET;
+	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 	rec->rec_header.packet_header.len = num_bytes;
 	rec->rec_header.packet_header.caplen = num_bytes;
 	rec->rec_header.packet_header.pkt_encap	= WTAP_ENCAP_PPP_WITH_PHDR;
@@ -426,7 +433,7 @@ process_data(pppdump_t *state, FILE_T fh, pkt_t *pkt, int n, guint8 *pd,
 
 					if (num_written > PPPD_BUF_SIZE) {
 						*err = WTAP_ERR_BAD_FILE;
-						*err_info = g_strdup_printf("pppdump: File has %u-byte packet, bigger than maximum of %u",
+						*err_info = ws_strdup_printf("pppdump: File has %u-byte packet, bigger than maximum of %u",
 						    num_written, PPPD_BUF_SIZE);
 						return -1;
 					}
@@ -453,7 +460,7 @@ process_data(pppdump_t *state, FILE_T fh, pkt_t *pkt, int n, guint8 *pd,
 						pid->offset = pkt->id_offset;
 						pid->num_bytes_to_skip =
 						    pkt->sd_offset - pkt->id_offset - 3;
-						g_assert(pid->num_bytes_to_skip >= 0);
+						ws_assert(pid->num_bytes_to_skip >= 0);
 					}
 
 					num_bytes--;
@@ -521,7 +528,7 @@ process_data(pppdump_t *state, FILE_T fh, pkt_t *pkt, int n, guint8 *pd,
 
 				if (pkt->cnt >= PPPD_BUF_SIZE) {
 					*err = WTAP_ERR_BAD_FILE;
-					*err_info = g_strdup_printf("pppdump: File has %u-byte packet, bigger than maximum of %u",
+					*err_info = ws_strdup_printf("pppdump: File has %u-byte packet, bigger than maximum of %u",
 					    pkt->cnt - 1, PPPD_BUF_SIZE);
 					return -1;
 				}
@@ -553,7 +560,7 @@ collate(pppdump_t* state, FILE_T fh, int *err, gchar **err_info, guint8 *pd,
 	 * sequential processing.
 	 */
 	if (state->num_bytes > 0) {
-		g_assert(num_bytes_to_skip == 0);
+		ws_assert(num_bytes_to_skip == 0);
 		pkt = state->pkt;
 		num_written = process_data(state, fh, pkt, state->num_bytes,
 		    pd, err, err_info, pid);
@@ -627,7 +634,7 @@ collate(pppdump_t* state, FILE_T fh, int *err, gchar **err_info, guint8 *pd,
 				if (n == 0)
 					continue;
 
-				g_assert(num_bytes_to_skip < n);
+				ws_assert(num_bytes_to_skip < n);
 				while (num_bytes_to_skip) {
 					if (file_getc(fh) == EOF)
 						goto done;
@@ -691,7 +698,7 @@ collate(pppdump_t* state, FILE_T fh, int *err, gchar **err_info, guint8 *pd,
 			default:
 				/* XXX - bad file */
 				*err = WTAP_ERR_BAD_FILE;
-				*err_info = g_strdup_printf("pppdump: bad ID byte 0x%02x", id);
+				*err_info = ws_strdup_printf("pppdump: bad ID byte 0x%02x", id);
 				return FALSE;
 		}
 
@@ -790,6 +797,31 @@ pppdump_close(wtap *wth)
 		}
 		g_ptr_array_free(state->pids, TRUE);
 	}
+}
+
+static const struct supported_block_type pppdump_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info pppdump_info = {
+	"pppd log (pppdump format)", "pppd", NULL, NULL,
+	FALSE, BLOCKS_SUPPORTED(pppdump_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_pppdump(void)
+{
+	pppdump_file_type_subtype = wtap_register_file_type_subtype(&pppdump_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("PPPDUMP",
+	    pppdump_file_type_subtype);
 }
 
 /*

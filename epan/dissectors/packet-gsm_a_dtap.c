@@ -118,7 +118,7 @@ void proto_reg_handoff_gsm_a_dtap(void);
 
 /* PROTOTYPES/FORWARDS */
 
-const value_string gsm_a_dtap_msg_gcc_strings[] = {
+static const value_string gsm_a_dtap_msg_gcc_strings[] = {
     { 0x31, "Immediate Setup" },
     { 0x32, "Setup" },
     { 0x33, "Connect" },
@@ -131,7 +131,7 @@ const value_string gsm_a_dtap_msg_gcc_strings[] = {
     { 0, NULL }
 };
 
-const value_string gsm_a_dtap_msg_bcc_strings[] = {
+static const value_string gsm_a_dtap_msg_bcc_strings[] = {
     { 0x31, "Immediate Setup" },
     { 0x32, "Setup" },
     { 0x33, "Connect" },
@@ -890,8 +890,8 @@ static const value_string gsm_a_dtap_number_of_spare_bits_vals[] = {
     { 0, NULL }
 };
 
-const true_false_string tfs_add_ci = { "The MS should add the letters for the Country's Initials and a separator (e.g. a space) to the text string",
-                                       "The MS should not add the letters for the Country's Initials to the text string" };
+static const true_false_string tfs_add_ci = { "The MS should add the letters for the Country's Initials and a separator (e.g. a space) to the text string",
+                                              "The MS should not add the letters for the Country's Initials to the text string" };
 
 static const value_string gsm_a_dtap_coding_scheme_vals[] = {
     { 0, "Cell Broadcast data coding scheme, GSM default alphabet, language unspecified, defined in 3GPP TS 23.038"},
@@ -1083,7 +1083,7 @@ de_time_zone_time(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint
     tv.nsecs = 0;
 
     proto_tree_add_time_format_value(tree, hf_gsm_a_dtap_time_zone_time, tvb, curr_offset, 6,
-                                     &tv, "%s", abs_time_to_str(wmem_packet_scope(), &tv, ABSOLUTE_TIME_LOCAL, FALSE));
+                                     &tv, "%s", abs_time_to_str(pinfo->pool, &tv, ABSOLUTE_TIME_LOCAL, FALSE));
     curr_offset += 6;
 
     /* 3GPP TS 23.040 version 6.6.0 Release 6
@@ -1207,7 +1207,7 @@ de_emerg_num_list(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 o
         curr_offset++;
         en_len--;
 
-        item = proto_tree_add_item_ret_display_string(subtree, hf_gsm_a_dtap_emergency_bcd_num, tvb, curr_offset, en_len, ENC_BCD_DIGITS_0_9, wmem_packet_scope(), &digit_str);
+        item = proto_tree_add_item_ret_display_string(subtree, hf_gsm_a_dtap_emergency_bcd_num, tvb, curr_offset, en_len, ENC_BCD_DIGITS_0_9, pinfo->pool, &digit_str);
 
         /* Check for values that aren't digits; they get mapped to '?' */
         if(strchr(digit_str,'?')){
@@ -1417,12 +1417,15 @@ static const value_string gsm_a_dtap_rate_adaption_vals[] = {
 
 static const value_string gsm_a_dtap_signal_access_protocol_vals[] = {
     { 0x0,  "Reserved" },
-    { 0x1,  "Rate adaptation according to ITU-T Rec. V.110 and ITU-T Rec. X.30" },
-    { 0x2,  "Flag stuffing according to ITU-T Rec. X.31" },
-    { 0x3,  "Other rate adaption (see octet 5a)" },
-    { 0x4,  "No rate adaption" },
-    { 0x5,  "Rate adaptation according to ITU-T Rec. V.110 and ITU-T Rec. X.30" },
-    { 0x6,  "Flag stuffing according to ITU-T Rec. X.31" },
+    /* 3GPP TS 24.008 (version 16.6.0), Table 10.5.101c defines only one value.
+     * All other values are reserved (were allocated in earlier phases of the protocol). */
+    { 0x1,  "According to ITU-T Rec. Q.920 and ITU-T Rec. Q.930" },
+    /* Below are values from GSM 04.08 (version 5.3.0, July 1996). */
+    { 0x2,  "Reserved (old meaning: X.21)" },
+    { 0x3,  "Reserved (old meaning: X.28 - dedicated PAD, individual NUI)" },
+    { 0x4,  "Reserved (old meaning: X.28 - dedicated PAD, universal NUI)" },
+    { 0x5,  "Reserved (old meaning: X.28 - non dedicated PAD)" },
+    { 0x6,  "Reserved (old meaning: X.32)" },
     { 0x7,  "Reserved" },
     { 0, NULL }
 };
@@ -1695,7 +1698,7 @@ de_bearer_cap(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offse
     proto_tree_add_item(subtree, hf_gsm_a_dtap_itc, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
 
     if (add_string)
-        g_snprintf(add_string, string_len, " - (%s)", str);
+        snprintf(add_string, string_len, " - (%s)", str);
 
     curr_offset++;
 
@@ -2064,17 +2067,17 @@ de_bearer_cap_uplink(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
 /*
  * [9] 10.5.4.5a Call Control Capabilities
  */
-const true_false_string gsm_a_dtap_mcat_value = {
+static const true_false_string gsm_a_dtap_mcat_value = {
     "The mobile station supports Multimedia CAT during the alerting phase of a mobile originated multimedia call establishment",
     "The mobile station does not support Multimedia CAT"
 };
 
-const true_false_string gsm_a_dtap_enicm_value = {
+static const true_false_string gsm_a_dtap_enicm_value = {
     "The mobile station supports the Enhanced Network-initiated In-Call Modification procedure",
     "The mobile station does not support the Enhanced Network-initiated In-Call Modification procedure"
 };
 
-const true_false_string gsm_a_dtap_dtmf_value = {
+static const true_false_string gsm_a_dtap_dtmf_value = {
     "the mobile station supports DTMF as specified in subclause 5.5.7 of TS 24.008",
     "reserved for earlier versions of the protocol"
 };
@@ -2222,7 +2225,7 @@ const value_string gsm_a_dtap_numbering_plan_id_values[] = {
     { 0, NULL }
 };
 
-const value_string gsm_a_dtap_present_ind_values[] = {
+static const value_string gsm_a_dtap_present_ind_values[] = {
     { 0x00, "Presentation allowed" },
     { 0x01, "Presentation restricted" },
     { 0x02, "Number not available due to interworking" },
@@ -2230,7 +2233,7 @@ const value_string gsm_a_dtap_present_ind_values[] = {
     { 0, NULL }
 };
 
-const value_string gsm_a_dtap_screening_ind_values[] = {
+static const value_string gsm_a_dtap_screening_ind_values[] = {
     { 0x00, "User-provided, not screened" },
     { 0x01, "User-provided, verified and passed" },
     { 0x02, "User-provided, verified and failed" },
@@ -2267,7 +2270,7 @@ de_bcd_num(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, 
 
     num_string_len = len - (curr_offset - offset);
 
-    item = proto_tree_add_item_ret_display_string(tree, header_field, tvb, curr_offset, num_string_len, ENC_KEYPAD_ABC_TBCD, wmem_packet_scope(), extracted_address);
+    item = proto_tree_add_item_ret_display_string(tree, header_field, tvb, curr_offset, num_string_len, ENC_KEYPAD_ABC_TBCD, pinfo->pool, extracted_address);
 
     /* Check for an end mark, which gets mapped to '?' */
     if(strchr(*extracted_address,'?')){
@@ -2280,13 +2283,13 @@ de_bcd_num(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, 
 /*
  * Helper function for sub address decoding
  */
-const value_string gsm_a_dtap_type_of_sub_addr_values[] = {
+static const value_string gsm_a_dtap_type_of_sub_addr_values[] = {
     { 0x00, "NSAP (ITU-T Rec. X.213/ISO 8348 AD2)" },
     { 0x02, "User specified" },
     { 0, NULL }
 };
 
-const value_string gsm_a_dtap_odd_even_ind_values[] = {
+static const value_string gsm_a_dtap_odd_even_ind_values[] = {
     { 0x00, "even number of address signals" },
     { 0x01, "odd number of address signals" },
     { 0, NULL }
@@ -2325,8 +2328,8 @@ de_sub_addr(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset,
         if (afi == 0x50)
         {
             ia5_string_len = len - (curr_offset - offset);
-            ia5_string = (guint8 *)tvb_memdup(wmem_packet_scope(), tvb, curr_offset, ia5_string_len);
-            *extracted_address = (gchar *)wmem_alloc(wmem_packet_scope(), ia5_string_len + 1);
+            ia5_string = (guint8 *)tvb_memdup(pinfo->pool, tvb, curr_offset, ia5_string_len);
+            *extracted_address = (gchar *)wmem_alloc(pinfo->pool, ia5_string_len + 1);
 
             invalid_ia5_char = FALSE;
             for(i = 0; i < ia5_string_len; i++)
@@ -2372,7 +2375,7 @@ de_cld_party_bcd_num(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
         }
 
         if (add_string)
-            g_snprintf(add_string, string_len, " - (%s)", extr_addr);
+            snprintf(add_string, string_len, " - (%s)", extr_addr);
     }
 
     return (len);
@@ -2389,7 +2392,7 @@ de_cld_party_sub_addr(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint
     de_sub_addr(tvb, tree, pinfo, offset, len, &extr_addr);
 
     if (extr_addr && add_string)
-        g_snprintf(add_string, string_len, " - (%s)", extr_addr);
+        snprintf(add_string, string_len, " - (%s)", extr_addr);
 
     return (len);
 }
@@ -2405,7 +2408,7 @@ de_clg_party_bcd_num(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     de_bcd_num(tvb, tree, pinfo, offset, len, hf_gsm_a_dtap_clg_party_bcd_num, &extr_addr);
 
     if (extr_addr && add_string)
-        g_snprintf(add_string, string_len, " - (%s)", extr_addr);
+        snprintf(add_string, string_len, " - (%s)", extr_addr);
 
     return (len);
 }
@@ -2421,7 +2424,7 @@ de_clg_party_sub_addr(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint
     de_sub_addr(tvb, tree, pinfo, offset, len, &extr_addr);
 
     if (extr_addr && add_string)
-        g_snprintf(add_string, string_len, " - (%s)", extr_addr);
+        snprintf(add_string, string_len, " - (%s)", extr_addr);
 
     return (len);
 }
@@ -2557,7 +2560,7 @@ de_cause(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, gu
     curr_offset++;
 
     if (add_string)
-        g_snprintf(add_string, string_len, " - (%u) %s", cause, str);
+        snprintf(add_string, string_len, " - (%u) %s", cause, str);
 
     NO_MORE_DATA_CHECK(len);
 
@@ -2616,7 +2619,7 @@ de_conn_num(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset,
     de_bcd_num(tvb, tree, pinfo, offset, len, hf_gsm_a_dtap_conn_num, &extr_addr);
 
     if (extr_addr && add_string)
-        g_snprintf(add_string, string_len, " - (%s)", extr_addr);
+        snprintf(add_string, string_len, " - (%s)", extr_addr);
 
     return (len);
 }
@@ -2632,7 +2635,7 @@ de_conn_sub_addr(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 of
     de_sub_addr(tvb, tree, pinfo, offset, len, &extr_addr);
 
     if (extr_addr && add_string)
-        g_snprintf(add_string, string_len, " - (%s)", extr_addr);
+        snprintf(add_string, string_len, " - (%s)", extr_addr);
 
     return (len);
 }
@@ -2722,7 +2725,7 @@ de_keypad_facility(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 
     curr_offset++;
 
     if (add_string)
-        g_snprintf(add_string, string_len, " - %c", keypad_char);
+        snprintf(add_string, string_len, " - %c", keypad_char);
 
     /* no length check possible */
 
@@ -2869,7 +2872,7 @@ de_red_party_bcd_num(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint3
     de_bcd_num(tvb, tree, pinfo, offset, len, hf_gsm_a_dtap_red_party_bcd_num, &extr_addr);
 
     if (extr_addr && add_string)
-        g_snprintf(add_string, string_len, " - (%s)", extr_addr);
+        snprintf(add_string, string_len, " - (%s)", extr_addr);
 
     return (len);
 }
@@ -2885,7 +2888,7 @@ de_red_party_sub_addr(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint
     de_sub_addr(tvb, tree, pinfo, offset, len, &extr_addr);
 
     if (extr_addr && add_string)
-        g_snprintf(add_string, string_len, " - (%s)", extr_addr);
+        snprintf(add_string, string_len, " - (%s)", extr_addr);
 
     return (len);
 }
@@ -3088,7 +3091,7 @@ de_alert_pat(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset
 /*
  * 10.5.4.27 Allowed actions $(CCBS)$
  */
-const true_false_string gsm_a_ccbs_activation_value = {
+static const true_false_string gsm_a_ccbs_activation_value = {
     "Activation of CCBS possible",
     "Activation of CCBS not possible"
 };
@@ -3126,14 +3129,14 @@ de_stream_id(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset
             "No Bearer (%u)", oct);
 
         if (add_string)
-            g_snprintf(add_string, string_len, " - (No Bearer)");
+            snprintf(add_string, string_len, " - (No Bearer)");
     }
     else
     {
         proto_tree_add_item(tree, hf_gsm_a_dtap_stream_identifier, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
 
         if (add_string)
-            g_snprintf(add_string, string_len, " - (%u)", oct);
+            snprintf(add_string, string_len, " - (%u)", oct);
     }
 
     curr_offset++;
@@ -3194,7 +3197,7 @@ de_ca_of_no_cli(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 off
     curr_offset++;
 
     if (add_string)
-        g_snprintf(add_string, string_len, " - (%s)", val_to_str_const(oct, gsm_a_cause_of_no_cli_values, "Unavailable"));
+        snprintf(add_string, string_len, " - (%s)", val_to_str_const(oct, gsm_a_cause_of_no_cli_values, "Unavailable"));
 
     EXTRANEOUS_DATA_CHECK(len, curr_offset - offset, pinfo, &ei_gsm_a_dtap_extraneous_data);
 
@@ -3412,7 +3415,7 @@ de_cp_cause(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 off
     curr_offset++;
 
     if (add_string)
-        g_snprintf(add_string, string_len, " - (%u) %s", oct, str);
+        snprintf(add_string, string_len, " - (%u) %s", oct, str);
 
     /* no length check possible */
 
@@ -3959,7 +3962,7 @@ de_tp_epc_ellipsoid_point_with_alt(tvbuff_t *tvb, proto_tree *tree, packet_info 
     curr_offset += 3;
     longitude = tvb_get_ntoh24(tvb, curr_offset);
     proto_tree_add_int_format(tree, hf_gsm_a_dtap_epc_degrees_longitude, tvb, curr_offset, 3, longitude,
-                              "%s = %s: %d", decode_bits_in_field(curr_offset<<3, 24, longitude),
+                              "%s = %s: %d", decode_bits_in_field(pinfo->pool, curr_offset<<3, 24, longitude, ENC_BIG_ENDIAN),
                               proto_registrar_get_name(hf_gsm_a_dtap_epc_degrees_longitude), longitude-8388608);
     curr_offset += 3;
     proto_tree_add_bits_item(tree, hf_gsm_a_dtap_epc_altitude_dir, tvb, curr_offset<<3, 1, ENC_BIG_ENDIAN);
@@ -7858,7 +7861,7 @@ proto_register_gsm_a_dtap(void)
         },
         { &hf_gsm_a_dtap_text_string,
           { "Text String", "gsm_a.dtap.text_string",
-            FT_STRING, STR_UNICODE, NULL, 0x0,
+            FT_STRING, BASE_NONE, NULL, 0x0,
             NULL, HFILL }
         },
         { &hf_gsm_a_dtap_time_zone_time,
@@ -8383,7 +8386,7 @@ proto_register_gsm_a_dtap(void)
         },
         { &hf_gsm_a_dtap_ue_received_rlc_sdu_counter_value,
           { "UE received RLC SDU counter value", "gsm_a_dtap.ue_received_rlc_sdu_counter_value",
-          FT_UINT8, BASE_DEC, NULL, 0x0,
+          FT_UINT32, BASE_DEC, NULL, 0x0,
           NULL, HFILL }
         },
         { &hf_gsm_a_dtap_num_lb_entities,
@@ -8499,6 +8502,7 @@ void
 proto_reg_handoff_gsm_a_dtap(void)
 {
     dissector_add_uint("bssap.pdu_type", BSSAP_PDU_TYPE_DTAP, dtap_handle);
+    dissector_add_uint("bssap_le.pdu_type", BSSAP_PDU_TYPE_DTAP, dtap_handle);
     dissector_add_uint("ranap.nas_pdu", BSSAP_PDU_TYPE_DTAP, dtap_handle);
     dissector_add_uint("llcgprs.sapi", 1 , dtap_handle); /* GPRS Mobility Management */
     dissector_add_uint("llcgprs.sapi", 7 , dtap_handle); /* SMS */

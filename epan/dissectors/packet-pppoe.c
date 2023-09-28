@@ -179,9 +179,10 @@ static gboolean global_pppoe_show_tags_and_lengths = FALSE;
 #define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_DATA_LINK_ATM 0x00
 #define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_DATA_LINK_ETH 0x01
 
-#define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_NA               0x00
-#define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_UNTAGGED_ETH     0x01
-#define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_SINLE_TAGGED_ETH 0x02
+#define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_NA                0x00
+#define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_UNTAGGED_ETH      0x01
+#define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_SINGLE_TAGGED_ETH 0x02
+#define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_DOUBLE_TAGGED_ETH 0x03
 
 #define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_2_NA                             0x00
 #define PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_2_PPPOA_LLC                      0x01
@@ -269,10 +270,11 @@ static const value_string vspec_tag_dslf_access_loop_encap_data_link_vals[] = {
 };
 
 static const value_string vspec_tag_dslf_access_loop_encap_encap_1_vals[] = {
-	{PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_NA,               "NA"                    },
-	{PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_UNTAGGED_ETH,     "Untagged Ethernet"     },
-	{PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_SINLE_TAGGED_ETH, "Single-tagged Ethernet"},
-	{0,                                                     NULL                               }
+	{PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_NA,                "NA"                    },
+	{PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_UNTAGGED_ETH,      "Untagged Ethernet"     },
+	{PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_SINGLE_TAGGED_ETH, "Single-tagged Ethernet"},
+	{PPPOE_TAG_VSPEC_DSLF_ACCESS_LOOP_ENCAP_ENCAPS_1_DOUBLE_TAGGED_ETH, "Double-tagged Ethernet"},
+	{0,                                                     NULL                                }
 };
 
 static const value_string vspec_tag_dslf_access_loop_encap_encap_2_vals[] = {
@@ -413,7 +415,7 @@ dissect_pppoe_subtags_dslf(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, pr
 							proto_tree_add_item(pppoe_tree, hf_pppoed_tag_length_8, tvb, tagstart+1, 1, ENC_BIG_ENDIAN);
 						}
 						proto_tree_add_item(pppoe_tree, hf_pppoed_tag_unknown_data, tvb,
-								tagstart+1, poe_tag_length, ENC_NA);
+								tagstart+2, poe_tag_length, ENC_NA);
 					}
 			}
 
@@ -467,14 +469,14 @@ dissect_pppoe_tags(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tr
 					if (poe_tag_length > 0)
 					{
 						proto_tree_add_item(pppoe_tree, hf_pppoed_tag_service_name, tvb,
-						                    tagstart+4, poe_tag_length, ENC_ASCII|ENC_NA);
+						                    tagstart+4, poe_tag_length, ENC_ASCII);
 					}
 					break;
 				case PPPOE_TAG_AC_NAME:
 					{
 					const guint8* str;
 					proto_tree_add_item_ret_string(pppoe_tree, hf_pppoed_tag_ac_name, tvb,
-					                    tagstart+4, poe_tag_length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &str);
+					                    tagstart+4, poe_tag_length, ENC_ASCII|ENC_NA, pinfo->pool, &str);
 					/* Show AC-Name in info column */
 					col_append_fstr(pinfo->cinfo, COL_INFO, " AC-Name='%s'", str);
 					}
@@ -633,15 +635,15 @@ dissect_pppoe_tags(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tr
 				   strings. */
 				case PPPOE_TAG_SVC_ERR:
 					proto_tree_add_item(pppoe_tree, hf_pppoed_tag_service_name_error, tvb,
-					                    tagstart+4, poe_tag_length, ENC_ASCII|ENC_NA);
+					                    tagstart+4, poe_tag_length, ENC_ASCII);
 					break;
 				case PPPOE_TAG_AC_ERR:
 					proto_tree_add_item(pppoe_tree, hf_pppoed_tag_ac_system_error, tvb,
-					                    tagstart+4, poe_tag_length, ENC_ASCII|ENC_NA);
+					                    tagstart+4, poe_tag_length, ENC_ASCII);
 					break;
 				case PPPOE_TAG_GENERIC_ERR:
 					proto_tree_add_item(pppoe_tree, hf_pppoed_tag_generic_error, tvb,
-					                    tagstart+4, poe_tag_length, ENC_ASCII|ENC_NA);
+					                    tagstart+4, poe_tag_length, ENC_ASCII);
 					break;
 
 				/* Get out if see end-of-list tag */
@@ -743,12 +745,12 @@ void proto_register_pppoed(void)
 			}
 		},
 		{ &hf_pppoed_tag_service_name,
-			{ "Service-Name", "pppoed.tags.service_name", FT_STRING, STR_ASCII,
+			{ "Service-Name", "pppoed.tags.service_name", FT_STRING, BASE_NONE,
 				 NULL, 0x0, NULL, HFILL
 			}
 		},
 		{ &hf_pppoed_tag_ac_name,
-			{ "AC-Name", "pppoed.tags.ac_name", FT_STRING, STR_ASCII,
+			{ "AC-Name", "pppoed.tags.ac_name", FT_STRING, BASE_NONE,
 				 NULL, 0x0, NULL, HFILL
 			}
 		},
@@ -783,12 +785,12 @@ void proto_register_pppoed(void)
 			}
 		},
 		{ &hf_pppoed_tag_vspec_circuit_id,
-		        { "Circuit ID", "pppoed.tags.circuit_id", FT_STRING, STR_ASCII,
+		        { "Circuit ID", "pppoed.tags.circuit_id", FT_STRING, BASE_NONE,
 		                 NULL, 0x0, NULL, HFILL
 		        }
 		},
 		{ &hf_pppoed_tag_vspec_remote_id,
-		        { "Remote ID", "pppoed.tags.remote_id", FT_STRING, STR_ASCII,
+		        { "Remote ID", "pppoed.tags.remote_id", FT_STRING, BASE_NONE,
 		                 NULL, 0x0, NULL, HFILL
 		        }
 		},
@@ -878,7 +880,7 @@ void proto_register_pppoed(void)
 			}
 		},
 		{ &hf_pppoed_tag_vspec_access_loop_encap_encap_2,
-			{ "Encaps 1", "pppoed.tags.access_loop_encap.encap_2", FT_UINT8, BASE_HEX,
+			{ "Encaps 2", "pppoed.tags.access_loop_encap.encap_2", FT_UINT8, BASE_HEX,
 				 VALS(vspec_tag_dslf_access_loop_encap_encap_2_vals), 0x0, NULL, HFILL
 			}
 		},
@@ -978,17 +980,17 @@ void proto_register_pppoed(void)
 			}
 		},
 		{ &hf_pppoed_tag_service_name_error,
-			{ "Service-Name-Error", "pppoed.tags.service_name_error", FT_STRING, STR_ASCII,
+			{ "Service-Name-Error", "pppoed.tags.service_name_error", FT_STRING, BASE_NONE,
 				 NULL, 0x0, NULL, HFILL
 			}
 		},
 		{ &hf_pppoed_tag_ac_system_error,
-			{ "AC-System-Error", "pppoed.tags.ac_system_error", FT_STRING, STR_ASCII,
+			{ "AC-System-Error", "pppoed.tags.ac_system_error", FT_STRING, BASE_NONE,
 				 NULL, 0x0, NULL, HFILL
 			}
 		},
 		{ &hf_pppoed_tag_generic_error,
-			{ "Generic-Error", "pppoed.tags.generic_error", FT_STRING, STR_ASCII,
+			{ "Generic-Error", "pppoed.tags.generic_error", FT_STRING, BASE_NONE,
 				 NULL, 0x0, NULL, HFILL
 			}
 		}
@@ -1146,9 +1148,9 @@ static int dissect_pppoes(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
 		cp_code = tvb_get_ntohs(tvb, 6);
 		/*
 		 * The session payload length expressly does not include pad bytes
-		 *  when LCP or IPCP are present, so avoid the spurious error message
+		 * when LCP or IPCP or IPv6CP are present, so avoid the spurious error message
 		 */
-		if ((cp_code != PPP_LCP) && (cp_code != PPP_IPCP) &&
+		if ((cp_code != PPP_LCP) && (cp_code != PPP_IPCP) && (cp_code != PPP_IPV6CP) &&
 			(reported_payload_length != actual_payload_length) &&
 			((reported_payload_length + 4) != actual_payload_length)) {
 			proto_item_append_text(ti, " [incorrect, should be %u]",

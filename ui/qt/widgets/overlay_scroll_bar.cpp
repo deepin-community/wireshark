@@ -99,7 +99,7 @@ int OverlayScrollBar::sliderPosition()
     return child_sb_.sliderPosition();
 }
 
-void OverlayScrollBar::setNearOverlayImage(QImage &overlay_image, int packet_count, int start_pos, int end_pos, QList<int> positions)
+void OverlayScrollBar::setNearOverlayImage(QImage& overlay_image, int packet_count, int start_pos, int end_pos, QList<int> positions, int rowHeight)
 {
     int old_width = packet_map_img_.width();
     packet_map_img_ = overlay_image;
@@ -107,6 +107,7 @@ void OverlayScrollBar::setNearOverlayImage(QImage &overlay_image, int packet_cou
     start_pos_ = start_pos;
     end_pos_ = end_pos;
     positions_ = positions;
+    row_height_ = rowHeight > devicePixelRatio() ? rowHeight : devicePixelRatio();
 
     if (old_width != packet_map_img_.width()) {
         qreal dp_ratio = devicePixelRatio();
@@ -144,6 +145,9 @@ void OverlayScrollBar::resizeEvent(QResizeEvent *event)
 
     child_sb_.move(packet_map_width_, 0);
     child_sb_.resize(child_sb_.sizeHint().width(), height());
+#ifdef Q_OS_MAC
+    child_sb_.setPageStep(height());
+#endif
 }
 
 void OverlayScrollBar::paintEvent(QPaintEvent *event)
@@ -172,17 +176,12 @@ void OverlayScrollBar::paintEvent(QPaintEvent *event)
         {
             foreach (int selected_pos_, positions_)
             {
-                if (selected_pos_ >= 0 && selected_pos_ < packet_map_img_.height()) {
+                int pmiHeight = packet_map_img_.height();
+                if (selected_pos_ >= 0 && selected_pos_ < pmiHeight) {
                     pm_painter.save();
-                    int no_pos = near_dest.height() * selected_pos_ / packet_map_img_.height();
-                    int height = dp_ratio;
-                    if ((selected_pos_ + 1) < packet_map_img_.height())
-                    {
-                        int nx_pos =  near_dest.height() * ( selected_pos_ + 1 ) / packet_map_img_.height();
-                        height = (nx_pos - no_pos + 1) > dp_ratio ? nx_pos - no_pos + 1 : dp_ratio;
-                    }
+                    int no_pos = near_dest.height() * selected_pos_ / pmiHeight;
                     pm_painter.setBrush(palette().highlight().color());
-                    pm_painter.drawRect(0, no_pos, pm_size.width(), height);
+                    pm_painter.drawRect(0, no_pos, pm_size.width(), row_height_);
                     pm_painter.restore();
                 }
             }
@@ -242,22 +241,14 @@ void OverlayScrollBar::mouseReleaseEvent(QMouseEvent *event)
     if (pm_r.contains(event->pos()) && geometry().height() > 0 && packet_count_ > 0 && pageStep() > 0) {
         double map_ratio = double(end_pos_ - start_pos_) / geometry().height();
         int clicked_packet = (event->pos().y() * map_ratio) + start_pos_;
-        double packet_to_sb_value = double(maximum() - minimum()) / packet_count_;
+        /* The first packet is at minimum(). The last packet is at
+         * maximum() + pageStep(). (maximum() corresponds to the first
+         * packet shown when the scrollbar at at the maximum position.)
+         * https://doc.qt.io/qt-6/qscrollbar.html#details
+         */
+        double packet_to_sb_value = double(maximum() + pageStep() - minimum()) / packet_count_;
         int top_pad = pageStep() / 4; // Land near, but not at, the top.
 
-        setValue((clicked_packet * packet_to_sb_value) + top_pad);
+        setValue((clicked_packet * packet_to_sb_value) - top_pad);
     }
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

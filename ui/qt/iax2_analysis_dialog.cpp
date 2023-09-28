@@ -36,7 +36,7 @@
 #include <ui/qt/utils/color_utils.h>
 #include <ui/qt/utils/qt_ui_utils.h>
 #include <ui/qt/utils/stock_icon.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 #include "ui/qt/widgets/wireshark_file_dialog.h"
 
 /*
@@ -305,6 +305,7 @@ Iax2AnalysisDialog::Iax2AnalysisDialog(QWidget &parent, CaptureFile &cf) :
     }
 
     if (!cap_file_.capFile() || !cap_file_.capFile()->current_frame) {
+        dfilter_free(sfcode);
         err_str_ = tr("Please select an IAX2 packet.");
         save_payload_error_ = TAP_IAX2_NO_PACKET_SELECTED;
         updateWidgets();
@@ -391,8 +392,6 @@ Iax2AnalysisDialog::Iax2AnalysisDialog(QWidget &parent, CaptureFile &cf) :
             this, SLOT(updateWidgets()));
     connect(ui->reverseTreeWidget, SIGNAL(itemSelectionChanged()),
             this, SLOT(updateWidgets()));
-    connect(&cap_file_, SIGNAL(captureEvent(CaptureEvent)),
-            this, SLOT(captureEvent(CaptureEvent)));
     updateWidgets();
 
     registerTapListener("IAX2", this, Q_NULLPTR, 0, tapReset, tapPacket, tapDraw);
@@ -408,15 +407,6 @@ Iax2AnalysisDialog::~Iax2AnalysisDialog()
 //    remove_tap_listener_rtpstream(&tapinfo);
     delete fwd_tempfile_;
     delete rev_tempfile_;
-}
-
-void Iax2AnalysisDialog::captureEvent(CaptureEvent e)
-{
-    if ((e.captureContext() == CaptureEvent::File) &&
-            (e.eventType() == CaptureEvent::Closing))
-    {
-        updateWidgets();
-    }
 }
 
 void Iax2AnalysisDialog::updateWidgets()
@@ -562,7 +552,7 @@ void Iax2AnalysisDialog::on_actionSaveGraph_triggered()
     ui->tabWidget->setCurrentWidget(ui->graphTab);
 
     QString file_name, extension;
-    QDir path(wsApp->lastOpenDir());
+    QDir path(mainApp->lastOpenDir());
     QString pdf_filter = tr("Portable Document Format (*.pdf)");
     QString png_filter = tr("Portable Network Graphics (*.png)");
     QString bmp_filter = tr("Windows Bitmap (*.bmp)");
@@ -578,7 +568,7 @@ void Iax2AnalysisDialog::on_actionSaveGraph_triggered()
     if (!file_closed_) {
         save_file += QString("/%1").arg(cap_file_.fileBaseName());
     }
-    file_name = WiresharkFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save Graph As…")),
+    file_name = WiresharkFileDialog::getSaveFileName(this, mainApp->windowTitleString(tr("Save Graph As…")),
                                              save_file, filter, &extension);
 
     if (!file_name.isEmpty()) {
@@ -597,15 +587,14 @@ void Iax2AnalysisDialog::on_actionSaveGraph_triggered()
 //        ui->streamGraph->legend->setVisible(false);
         // else error dialog?
         if (save_ok) {
-            path = QDir(file_name);
-            wsApp->setLastOpenDir(path.canonicalPath().toUtf8().constData());
+            mainApp->setLastOpenDirFromFilename(file_name);
         }
     }
 }
 
 void Iax2AnalysisDialog::on_buttonBox_helpRequested()
 {
-    wsApp->helpTopicAction(HELP_IAX2_ANALYSIS_DIALOG);
+    mainApp->helpTopicAction(HELP_IAX2_ANALYSIS_DIALOG);
 }
 
 void Iax2AnalysisDialog::tapReset(void *tapinfoptr)
@@ -616,7 +605,7 @@ void Iax2AnalysisDialog::tapReset(void *tapinfoptr)
     iax2_analysis_dialog->resetStatistics();
 }
 
-tap_packet_status Iax2AnalysisDialog::tapPacket(void *tapinfoptr, packet_info *pinfo, struct epan_dissect *, const void *iax2info_ptr)
+tap_packet_status Iax2AnalysisDialog::tapPacket(void *tapinfoptr, packet_info *pinfo, struct epan_dissect *, const void *iax2info_ptr, tap_flags_t)
 {
     Iax2AnalysisDialog *iax2_analysis_dialog = dynamic_cast<Iax2AnalysisDialog *>((Iax2AnalysisDialog*)tapinfoptr);
     if (!iax2_analysis_dialog) return TAP_PACKET_DONT_REDRAW;
@@ -889,7 +878,7 @@ void Iax2AnalysisDialog::saveAudio(Iax2AnalysisDialog::StreamDirection direction
     }
     QString sel_filter;
     QString file_path = WiresharkFileDialog::getSaveFileName(
-                this, caption, wsApp->lastOpenDir().absoluteFilePath("Saved RTP Audio.au"),
+                this, caption, mainApp->lastOpenDir().absoluteFilePath("Saved RTP Audio.au"),
                 ext_filter, &sel_filter);
 
     if (file_path.isEmpty()) return;
@@ -1119,7 +1108,7 @@ void Iax2AnalysisDialog::saveAudio(Iax2AnalysisDialog::StreamDirection direction
         }
         }
 
-        int chunk_size = 65536;
+        qsizetype chunk_size = 65536;
         /* XXX how do you just copy the file? */
         while (chunk_size > 0) {
             if (stop_flag)
@@ -1159,7 +1148,7 @@ void Iax2AnalysisDialog::saveCsv(Iax2AnalysisDialog::StreamDirection direction)
     }
 
     QString file_path = WiresharkFileDialog::getSaveFileName(
-                this, caption, wsApp->lastOpenDir().absoluteFilePath("RTP Packet Data.csv"),
+                this, caption, mainApp->lastOpenDir().absoluteFilePath("RTP Packet Data.csv"),
                 tr("Comma-separated values (*.csv)"));
 
     if (file_path.isEmpty()) return;
@@ -1178,7 +1167,7 @@ void Iax2AnalysisDialog::saveCsv(Iax2AnalysisDialog::StreamDirection direction)
             foreach (QVariant v, ra_ti->rowData()) {
                 if (!v.isValid()) {
                     values << "\"\"";
-                } else if ((int) v.type() == (int) QMetaType::QString) {
+                } else if (v.userType() == QMetaType::QString) {
                     values << QString("\"%1\"").arg(v.toString());
                 } else {
                     values << v.toString();
@@ -1202,7 +1191,7 @@ void Iax2AnalysisDialog::saveCsv(Iax2AnalysisDialog::StreamDirection direction)
             foreach (QVariant v, ra_ti->rowData()) {
                 if (!v.isValid()) {
                     values << "\"\"";
-                } else if (v.type() == QVariant::String) {
+                } else if (v.userType() == QMetaType::QString) {
                     values << QString("\"%1\"").arg(v.toString());
                 } else {
                     values << v.toString();
@@ -1237,7 +1226,11 @@ void Iax2AnalysisDialog::graphClicked(QMouseEvent *event)
 {
     updateWidgets();
     if (event->button() == Qt::RightButton) {
-        graph_ctx_menu_.exec(event->globalPos());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0 ,0)
+        graph_ctx_menu_.popup(event->globalPosition().toPoint());
+#else
+        graph_ctx_menu_.popup(event->globalPos());
+#endif
     }
 }
 
@@ -1249,16 +1242,3 @@ void Iax2AnalysisDialog::showStreamMenu(QPoint pos)
     updateWidgets();
     stream_ctx_menu_.popup(cur_tree->viewport()->mapToGlobal(pos));
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

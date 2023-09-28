@@ -11,7 +11,10 @@ add_definitions(-DPLUGIN_DIR=\"${CMAKE_INSTALL_PREFIX}/${PLUGIN_INSTALL_LIBDIR}\
 add_definitions(-DEXTCAP_DIR=\"${CMAKE_INSTALL_PREFIX}/${EXTCAP_INSTALL_LIBDIR}\")
 add_definitions(-DDATA_DIR=\"${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}\")
 
+add_subdirectory(wmem)
+
 set(WSUTIL_PUBLIC_HEADERS
+	802_11-utils.h
 	adler32.h
 	base32.h
 	bits_count_ones.h
@@ -20,7 +23,6 @@ set(WSUTIL_PUBLIC_HEADERS
 	buffer.h
 	codecs.h
 	color.h
-	copyright_info.h
 	cpu_info.h
 	crash_info.h
 	crc5.h
@@ -35,8 +37,9 @@ set(WSUTIL_PUBLIC_HEADERS
 	curve25519.h
 	eax.h
 	epochs.h
+	exported_pdu_tlvs.h
+	feature_list.h
 	filesystem.h
-	frequency-utils.h
 	g711.h
 	inet_addr.h
 	inet_ipv4.h
@@ -50,10 +53,10 @@ set(WSUTIL_PUBLIC_HEADERS
 	os_version_info.h
 	pint.h
 	please_report_bug.h
-	plugins.h
 	pow2.h
 	privileges.h
 	processes.h
+	regex.h
 	report_message.h
 	sign_ext.h
 	sober128.h
@@ -63,25 +66,32 @@ set(WSUTIL_PUBLIC_HEADERS
 	strtoi.h
 	tempfile.h
 	time_util.h
+	to_str.h
 	type_util.h
 	unicode-utils.h
 	utf8_entities.h
+	ws_assert.h
 	ws_cpuid.h
+	glib-compat.h
+	ws_getopt.h
 	ws_mempbrk.h
 	ws_mempbrk_int.h
 	ws_pipe.h
-	ws_printf.h
+	ws_roundup.h
+	ws_return.h
+	wsgcrypt.h
 	wsjson.h
+	wslog.h
 	xtea.h
 )
 
 set(WSUTIL_COMMON_FILES
+	802_11-utils.c
 	adler32.c
 	base32.c
 	bitswap.c
 	buffer.c
 	codecs.c
-	copyright_info.c
 	crash_info.c
 	crc10.c
 	crc16.c
@@ -95,8 +105,8 @@ set(WSUTIL_COMMON_FILES
 	curve25519.c
 	dot11decrypt_wep.c
 	eax.c
+	feature_list.c
 	filesystem.c
-	frequency-utils.c
 	g711.c
 	inet_addr.c
 	interface.c
@@ -108,6 +118,7 @@ set(WSUTIL_COMMON_FILES
 	os_version_info.c
 	please_report_bug.c
 	privileges.c
+	regex.c
 	rsa.c
 	sober128.c
 	socket.c
@@ -117,12 +128,15 @@ set(WSUTIL_COMMON_FILES
 	report_message.c
 	tempfile.c
 	time_util.c
+	to_str.c
 	type_util.c
 	unicode-utils.c
+	ws_getopt.c
 	ws_mempbrk.c
 	ws_pipe.c
 	wsgcrypt.c
 	wsjson.c
+	wslog.c
 	xtea.c
 )
 
@@ -210,10 +224,6 @@ if(HAVE_SSE4_2)
 	list(APPEND WSUTIL_FILES ws_mempbrk_sse42.c)
 endif()
 
-if(NOT HAVE_GETOPT_LONG)
-	list(APPEND WSUTIL_FILES getopt_long.c)
-endif()
-
 if(NOT HAVE_STRPTIME)
 	list(APPEND WSUTIL_FILES strptime.c)
 endif()
@@ -243,38 +253,45 @@ endif()
 
 add_library(wsutil
 	${WSUTIL_FILES}
-	${CMAKE_BINARY_DIR}/image/libwsutil.rc
+	$<TARGET_OBJECTS:wmem>
+	${CMAKE_BINARY_DIR}/resources/libwsutil.rc
 )
 
 set_target_properties(wsutil PROPERTIES
 	PREFIX "lib"
 	COMPILE_DEFINITIONS "WS_BUILD_DLL"
 	LINK_FLAGS "${WS_LINK_FLAGS}"
-	VERSION "12.0.0" SOVERSION 12
+	VERSION "14.0.0" SOVERSION 14
 	FOLDER "DLLs"
 	INSTALL_RPATH "${LIBRARY_INSTALL_RPATH}"
 )
+if(MSVC)
+	set_target_properties(wsutil PROPERTIES LINK_FLAGS_DEBUG "${WS_MSVC_DEBUG_LINK_FLAGS}")
+endif()
 
 target_link_libraries(wsutil
+	# *Lots* of our targets that link with wsutil also link with
+	# GLib and GModule. Mark them PUBLIC so that dependent targets
+	# don't have to link them directly.
 	PUBLIC
-	${CMAKE_DL_LIBS}
-	${APPLE_CORE_FOUNDATION_LIBRARY}
-	${GMODULE2_LIBRARIES}
-	${GLIB2_LIBRARIES}
-	${GCRYPT_LIBRARIES}
-	${WIN_WS2_32_LIBRARY}
-	${GNUTLS_LIBRARIES}
-	${M_LIBRARIES}
+		${GLIB2_LIBRARIES}
+		${GMODULE2_LIBRARIES}
+	PRIVATE
+		${APPLE_CORE_FOUNDATION_LIBRARY}
+		${CMAKE_DL_LIBS}
+		${GCRYPT_LIBRARIES}
+		${GNUTLS_LIBRARIES}
+		${PCRE2_LIBRARIES}
+		${M_LIBRARIES}
+		${WIN_IPHLPAPI_LIBRARY}
+		${WIN_WS2_32_LIBRARY}
 )
 
-if(WIN32)
-	target_link_libraries(wsutil PRIVATE "iphlpapi.lib" "ws2_32.lib")
-endif(WIN32)
-
-target_include_directories(wsutil SYSTEM
-	PUBLIC
+target_include_directories(wsutil
+	SYSTEM PRIVATE
 		${GCRYPT_INCLUDE_DIRS}
 		${GNUTLS_INCLUDE_DIRS}
+		${PCRE2_INCLUDE_DIRS}
 )
 
 install(TARGETS wsutil
@@ -282,6 +299,17 @@ install(TARGETS wsutil
 	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+add_executable(test_wsutil EXCLUDE_FROM_ALL
+	test_wsutil.c
+)
+
+target_link_libraries(test_wsutil ${GLIB2_LIBRARIES} wsutil)
+
+set_target_properties(test_wsutil PROPERTIES
+	FOLDER "Tests"
+	EXCLUDE_FROM_DEFAULT_BUILD True
 )
 
 install(FILES ${WSUTIL_PUBLIC_HEADERS}
@@ -292,10 +320,17 @@ CHECKAPI(
 	NAME
 	  wsutil
 	SWITCHES
-	  --group termoutput:2 --summary-group termoutput
 	SOURCES
 	  ${WSUTIL_COMMON_FILES}
 )
+
+if(ABI_DUMPER_EXECUTABLE)
+	get_target_property(_soversion wsutil VERSION)
+	add_custom_target(wsutil-abi-dump
+		COMMAND abi-dumper $<TARGET_FILE:wsutil> -o ${CMAKE_BINARY_DIR}/wsutil-abi-${_soversion}.dump -lver ${_soversion}
+		DEPENDS wsutil
+	)
+endif()
 
 set_source_files_properties(jsmn.c PROPERTIES COMPILE_DEFINITIONS "JSMN_STRICT")
 

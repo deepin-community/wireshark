@@ -1,4 +1,5 @@
-/* interface_tree_model.h
+/** @file
+ *
  * Model for the interface data for display in the interface frame
  *
  * Wireshark - Network traffic analyzer
@@ -40,6 +41,7 @@ enum InterfaceTreeColumns
     IFTREE_COL_PROMISCUOUSMODE,
     IFTREE_COL_TYPE,
     IFTREE_COL_STATS,
+    IFTREE_COL_ACTIVE,
     IFTREE_COL_SNAPLEN,
 #ifdef CAN_SET_CAPTURE_BUFFER_SIZE
     IFTREE_COL_BUFFERLEN,
@@ -55,6 +57,7 @@ enum InterfaceTreeColumns
 class InterfaceTreeModel : public QAbstractTableModel
 {
     Q_OBJECT
+
 public:
     InterfaceTreeModel(QObject *parent);
     ~InterfaceTreeModel();
@@ -82,14 +85,12 @@ public:
     static const QString DefaultNumericValue;
 
 public slots:
-    void getPoints(int idx, PointList *pts);
-
-protected slots:
     void interfaceListChanged();
 
 private:
     QVariant toolTipForInterface(int idx) const;
     QMap<QString, PointList> points;
+    QMap<QString, bool> active;
 
 #ifdef HAVE_LIBPCAP
     if_stat_cache_t *stat_cache_;
@@ -97,16 +98,3 @@ private:
 };
 
 #endif // INTERFACE_TREE_MODEL_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

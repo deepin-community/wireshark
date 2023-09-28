@@ -14,7 +14,8 @@
 
 #include "config.h"
 
-#include <epan/wmem/wmem.h>
+#include <wiretap/wtap_opttypes.h>
+#include <epan/wmem_scopes.h>
 
 /* WSLUA_MODULE Dumper Saving Capture Files
 
@@ -179,7 +180,7 @@ static const char* cross_plat_fname(const char* fname) {
     static char fname_clean[256];
     char* f;
 
-    g_strlcpy(fname_clean,fname,255);
+    (void) g_strlcpy(fname_clean,fname,255);
     fname_clean[255] = '\0';
 
     for(f = fname_clean; *f; f++) {
@@ -210,7 +211,7 @@ WSLUA_CONSTRUCTOR Dumper_new(lua_State* L) {
 #define WSLUA_OPTARG_Dumper_new_ENCAP 3 /* The encapsulation to be used in the file to be created - a number entry from the `wtap_encaps` table in `init.lua`. */
     Dumper d;
     const char* fname = luaL_checkstring(L,WSLUA_ARG_Dumper_new_FILENAME);
-    int filetype = (int)luaL_optinteger(L,WSLUA_OPTARG_Dumper_new_FILETYPE,WTAP_FILE_TYPE_SUBTYPE_PCAP);
+    int filetype = (int)luaL_optinteger(L,WSLUA_OPTARG_Dumper_new_FILETYPE,wtap_pcap_file_type_subtype());
     int encap  = (int)luaL_optinteger(L,WSLUA_OPTARG_Dumper_new_ENCAP,WTAP_ENCAP_ETHERNET);
     int err = 0;
     gchar *err_info = NULL;
@@ -231,23 +232,23 @@ WSLUA_CONSTRUCTOR Dumper_new(lua_State* L) {
 
         case WTAP_ERR_CANT_WRITE_TO_PIPE:
             luaL_error(L,"The file \"%s\" is a pipe, and %s capture files can't be written to a pipe",
-                       filename, wtap_file_type_subtype_string(filetype));
+                       filename, wtap_file_type_subtype_description(filetype));
             break;
 
         case WTAP_ERR_UNWRITABLE_FILE_TYPE:
             luaL_error(L,"Files of file type %s cannot be written",
-                       wtap_file_type_subtype_string(filetype));
+                       wtap_file_type_subtype_description(filetype));
             break;
 
         case WTAP_ERR_UNWRITABLE_ENCAP:
             luaL_error(L,"Files of file type %s don't support encapsulation %s",
-                       wtap_file_type_subtype_string(filetype),
+                       wtap_file_type_subtype_description(filetype),
                        wtap_encap_name(encap));
             break;
 
         case WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED:
             luaL_error(L,"Files of file type %s don't support per-packet encapsulation",
-                       wtap_file_type_subtype_string(filetype));
+                       wtap_file_type_subtype_description(filetype));
             break;
 
         case WTAP_ERR_CANT_OPEN:
@@ -262,7 +263,7 @@ WSLUA_CONSTRUCTOR Dumper_new(lua_State* L) {
 
         case WTAP_ERR_COMPRESSION_NOT_SUPPORTED:
             luaL_error(L,"Files of file type %s cannot be written as a compressed file",
-                       wtap_file_type_subtype_string(filetype));
+                       wtap_file_type_subtype_description(filetype));
             break;
 
         case WTAP_ERR_INTERNAL:
@@ -301,7 +302,7 @@ WSLUA_METHOD Dumper_close(lua_State* L) {
 
     g_hash_table_remove(dumper_encaps,*dp);
 
-    if (!wtap_dump_close(*dp, &err, &err_info)) {
+    if (!wtap_dump_close(*dp, NULL, &err, &err_info)) {
         if (err_info != NULL) {
             luaL_error(L,"error closing: %s (%s)",
                        wtap_strerror(err), err_info);
@@ -342,7 +343,7 @@ WSLUA_METHOD Dumper_dump(lua_State* L) {
      */
 #define WSLUA_ARG_Dumper_dump_TIMESTAMP 2 /* The absolute timestamp the packet will have. */
 #define WSLUA_ARG_Dumper_dump_PSEUDOHEADER 3 /* The `PseudoHeader` to use. */
-#define WSLUA_ARG_Dumper_dump_BYTEARRAY 4 /* the data to be saved */
+#define WSLUA_ARG_Dumper_dump_BYTEARRAY 4 /* The data to be saved */
 
     Dumper d = checkDumper(L,1);
     PseudoHeader ph;
@@ -384,8 +385,8 @@ WSLUA_METHOD Dumper_dump(lua_State* L) {
         rec.rec_header.packet_header.pseudo_header = *ph->wph;
     }
 
-    /* TODO: Can we get access to pinfo->pkt_comment here somehow? We
-     * should be copying it to pkthdr.opt_comment if we can. */
+    /* TODO: Can we get access to pinfo->rec->block here somehow? We
+     * should be copying it to pkthdr.pkt_block if we can. */
 
     if (! wtap_dump(d, &rec, ba->data, &err, &err_info)) {
         switch (err) {
@@ -414,7 +415,7 @@ WSLUA_METHOD Dumper_new_for_current(lua_State* L) {
 #define WSLUA_OPTARG_Dumper_new_for_current_FILETYPE 2 /* The file type. Defaults to pcap. */
     Dumper d;
     const char* fname = luaL_checkstring(L,1);
-    int filetype = (int)luaL_optinteger(L,WSLUA_OPTARG_Dumper_new_for_current_FILETYPE,WTAP_FILE_TYPE_SUBTYPE_PCAP);
+    int filetype = (int)luaL_optinteger(L,WSLUA_OPTARG_Dumper_new_for_current_FILETYPE,wtap_pcap_file_type_subtype());
     int encap;
     int err = 0;
     gchar *err_info = NULL;
@@ -444,23 +445,23 @@ WSLUA_METHOD Dumper_new_for_current(lua_State* L) {
 
         case WTAP_ERR_CANT_WRITE_TO_PIPE:
             luaL_error(L,"The file \"%s\" is a pipe, and %s capture files can't be written to a pipe",
-                       filename, wtap_file_type_subtype_string(filetype));
+                       filename, wtap_file_type_subtype_description(filetype));
             break;
 
         case WTAP_ERR_UNWRITABLE_FILE_TYPE:
             luaL_error(L,"Files of file type %s cannot be written",
-                       wtap_file_type_subtype_string(filetype));
+                       wtap_file_type_subtype_description(filetype));
             break;
 
         case WTAP_ERR_UNWRITABLE_ENCAP:
             luaL_error(L,"Files of file type %s don't support encapsulation %s",
-                       wtap_file_type_subtype_string(filetype),
+                       wtap_file_type_subtype_description(filetype),
                        wtap_encap_name(encap));
             break;
 
         case WTAP_ERR_ENCAP_PER_PACKET_UNSUPPORTED:
             luaL_error(L,"Files of file type %s don't support per-packet encapsulation",
-                       wtap_file_type_subtype_string(filetype));
+                       wtap_file_type_subtype_description(filetype));
             break;
 
         case WTAP_ERR_CANT_OPEN:
@@ -475,7 +476,7 @@ WSLUA_METHOD Dumper_new_for_current(lua_State* L) {
 
         case WTAP_ERR_COMPRESSION_NOT_SUPPORTED:
             luaL_error(L,"Files of file type %s cannot be written as a compressed file",
-                       wtap_file_type_subtype_string(filetype));
+                       wtap_file_type_subtype_description(filetype));
             break;
 
         case WTAP_ERR_INTERNAL:
@@ -539,18 +540,18 @@ WSLUA_METHOD Dumper_dump_current(lua_State* L) {
     rec.rec_header.packet_header.pseudo_header = *lua_pinfo->pseudo_header;
 
     /*
-     * wtap_dump does not modify rec.opt_comment, so it should be possible to
-     * pass epan_get_user_comment() or lua_pinfo->rec->opt_comment directly.
+     * wtap_dump does not modify rec.block, so it should be possible to
+     * pass epan_get_modified_block() or lua_pinfo->rec->block directly.
      * Temporarily duplicating the memory should not hurt though.
      */
-    if (lua_pinfo->fd->has_user_comment) {
-        rec.opt_comment = wmem_strdup(wmem_packet_scope(), epan_get_user_comment(lua_pinfo->epan, lua_pinfo->fd));
-        rec.has_comment_changed = TRUE;
-    } else if (lua_pinfo->fd->has_phdr_comment) {
-        rec.opt_comment = wmem_strdup(wmem_packet_scope(), lua_pinfo->rec->opt_comment);
+    if (lua_pinfo->fd->has_modified_block) {
+        rec.block = epan_get_modified_block(lua_pinfo->epan, lua_pinfo->fd);
+        rec.block_was_modified = TRUE;
+    } else {
+        rec.block = lua_pinfo->rec->block;
     }
 
-    data = (const guchar *)tvb_memdup(wmem_packet_scope(),tvb,0,rec.rec_header.packet_header.caplen);
+    data = (const guchar *)tvb_memdup(lua_pinfo->pool,tvb,0,rec.rec_header.packet_header.caplen);
 
     if (! wtap_dump(d, &rec, data, &err, &err_info)) {
         switch (err) {
@@ -584,7 +585,7 @@ static int Dumper__gc(lua_State* L) {
 
     g_hash_table_remove(dumper_encaps,*dp);
 
-    if (!wtap_dump_close(*dp, &err, &err_info)) {
+    if (!wtap_dump_close(*dp, NULL, &err, &err_info)) {
         if (err_info != NULL) {
             luaL_error(L,"error closing: %s (%s)",
                        wtap_strerror(err), err_info);

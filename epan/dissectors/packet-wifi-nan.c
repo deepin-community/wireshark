@@ -646,8 +646,8 @@ static const value_string ndl_setup_reason[] = {
 
 static const value_string unaligned_sch_ulw_type[] = {
     { 0, "Followed by a Band ID field" },
-    { 1, "Followed by a Channel Entry field without Auxilliary Channel" },
-    { 2, "Followed by a Channel Entry field with Auxilliary Channel" },
+    { 1, "Followed by a Channel Entry field without Auxiliary Channel" },
+    { 2, "Followed by a Channel Entry field with Auxiliary Channel" },
     { 3, "Reserved" },
     { 0, NULL }
 };
@@ -1223,7 +1223,7 @@ static void
 dissect_attr_country_code(proto_tree* attr_tree, tvbuff_t* tvb, gint offset)
 {
     guint sub_offset = offset + 3;
-    proto_tree_add_item(attr_tree, hf_nan_attr_country_code, tvb, sub_offset, 2, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(attr_tree, hf_nan_attr_country_code, tvb, sub_offset, 2, ENC_ASCII);
 }
 
 static void
@@ -1554,12 +1554,12 @@ dissect_attr_availability(proto_tree* attr_tree, tvbuff_t* tvb, gint offset, gui
 
         guint64 entries_type, non_contiguous_bw, num_entries;
         proto_tree_add_bits_ret_val(entries_tree, hf_nan_attr_availability_entry_entries_type, tvb,
-            offset * 8 + 7, 1, &entries_type, ENC_LITTLE_ENDIAN);
+            offset * 8, 1, &entries_type, ENC_LITTLE_ENDIAN);
         proto_tree_add_bits_ret_val(entries_tree,
-            hf_nan_attr_availability_entry_entries_non_contiguous_bw, tvb, offset * 8 + 6, 1,
+            hf_nan_attr_availability_entry_entries_non_contiguous_bw, tvb, offset * 8 + 1, 1,
             &non_contiguous_bw, ENC_LITTLE_ENDIAN);
         proto_tree_add_bits_ret_val(entries_tree, hf_nan_attr_availability_entry_entries_num_entries,
-            tvb, offset * 8, 4, &num_entries, ENC_LITTLE_ENDIAN);
+            tvb, offset * 8 + 4, 4, &num_entries, ENC_LITTLE_ENDIAN);
 
         offset += 1;
         for (guint8 i = 0; i < num_entries; i++)
@@ -1583,7 +1583,7 @@ dissect_attr_availability(proto_tree* attr_tree, tvbuff_t* tvb, gint offset, gui
                 proto_tree_add_item(op_class_tree, hf_nan_attr_availability_entry_entries_start_freq, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                 proto_tree_add_item(op_class_tree, hf_nan_attr_availability_entry_entries_bandwidth, tvb, offset, 1, ENC_LITTLE_ENDIAN);
                 wmem_strbuf_t* str;
-                str = wmem_strbuf_new(wmem_packet_scope(), "");
+                str = wmem_strbuf_new(pinfo->pool, "");
                 for(unsigned i_bitmap = 0; i_bitmap < 16; ++i_bitmap)
                 {
                     if (bitmap & (1u << i_bitmap))
@@ -3150,7 +3150,7 @@ proto_register_nan(void)
              {
              "Condensed Country String",
              "nan.country_code",
-             FT_STRINGZ, STR_ASCII, NULL, 0x0, NULL, HFILL
+             FT_STRINGZ, BASE_NONE, NULL, 0x0, NULL, HFILL
              }
         },
         { &hf_nan_attr_ranging_protocol,
@@ -3638,7 +3638,7 @@ proto_register_nan(void)
         },
         { &hf_nan_attr_availability_entry_entries_aux_channel_bitmap,
             {
-            "Auxilliary Channel Bitmap",
+            "Auxiliary Channel Bitmap",
             "nan.availability.entry.entries.channel.aux_bitmap",
             FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL
             }
@@ -3647,7 +3647,7 @@ proto_register_nan(void)
             {
             "Channel Bitmap - Channel Set",
             "nan.ava.chan.set",
-            FT_STRING, STR_ASCII, NULL, 0x00, NULL, HFILL
+            FT_STRING, BASE_NONE, NULL, 0x00, NULL, HFILL
             }
         },
         { &hf_nan_attr_availability_entry_entries_start_freq,
@@ -3988,7 +3988,7 @@ proto_register_nan(void)
         },
         { &hf_nan_attr_ranging_setup_ftm_format_bw,
              {
-             "FTM Format and Bandwith",
+             "FTM Format and Bandwidth",
              "nan.ranging_setup.ftm.format_bw",
              FT_UINT24, BASE_HEX_DEC, NULL, 0x1F8000, NULL, HFILL
              }

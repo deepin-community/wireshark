@@ -1,4 +1,4 @@
-/* rtd_table.h
+/** @file
  * GUI independent helper routines common to all Response Time Delay (RTD) taps.
  * Based on srt_table.h
  *
@@ -15,7 +15,7 @@
 #include "tap.h"
 #include "timestats.h"
 #include "value_string.h"
-#include "wmem/wmem.h"
+#include <epan/wmem_scopes.h>
 
 #ifdef __cplusplus
 extern "C" {

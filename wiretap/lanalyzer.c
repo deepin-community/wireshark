@@ -12,7 +12,6 @@
 #include "wtap-int.h"
 #include "file_wrappers.h"
 #include "lanalyzer.h"
-#include "pcapng.h"
 
 /* The LANalyzer format is documented (at least in part) in Novell document
    TID022037, which can be found at, among other places:
@@ -265,6 +264,10 @@ static gboolean lanalyzer_seek_read(wtap *wth, gint64 seek_off,
 static gboolean lanalyzer_dump_finish(wtap_dumper *wdh, int *err,
     gchar **err_info);
 
+static int lanalyzer_file_type_subtype = -1;
+
+void register_lanalyzer(void);
+
 wtap_open_return_val lanalyzer_open(wtap *wth, int *err, gchar **err_info)
 {
       LA_RecordHeader rec_header;
@@ -352,13 +355,13 @@ wtap_open_return_val lanalyzer_open(wtap *wth, int *err, gchar **err_info)
             record_type = pletoh16(rec_header.record_type);
             record_length = pletoh16(rec_header.record_length);
 
-            /*g_message("Record 0x%04X Length %d", record_type, record_length);*/
+            /*ws_message("Record 0x%04X Length %d", record_type, record_length);*/
             switch (record_type) {
                   /* Trace Summary Record */
             case RT_Summary:
                   if (record_length < sizeof summary) {
                         *err = WTAP_ERR_BAD_FILE;
-                        *err_info = g_strdup_printf("lanalyzer: summary record length %u is too short",
+                        *err_info = ws_strdup_printf("lanalyzer: summary record length %u is too short",
                                                     record_length);
                         return WTAP_OPEN_ERROR;
                   }
@@ -375,7 +378,7 @@ wtap_open_return_val lanalyzer_open(wtap *wth, int *err, gchar **err_info)
                   cr_day = summary[0];
                   cr_month = summary[1];
                   cr_year = pletoh16(&summary[2]);
-                  /*g_message("Day %d Month %d Year %d (%04X)", cr_day, cr_month,
+                  /*ws_message("Day %d Month %d Year %d (%04X)", cr_day, cr_month,
                     cr_year, cr_year);*/
 
                   /* Get capture start time. I learned how to do
@@ -389,7 +392,7 @@ wtap_open_return_val lanalyzer_open(wtap *wth, int *err, gchar **err_info)
                   tm.tm_sec = 0;
                   tm.tm_isdst = -1;
                   start = mktime(&tm);
-                  /*g_message("Day %d Month %d Year %d", tm.tm_mday,
+                  /*ws_message("Day %d Month %d Year %d", tm.tm_mday,
                     tm.tm_mon, tm.tm_year);*/
                   mxslc = pletoh16(&summary[30]);
 
@@ -403,14 +406,14 @@ wtap_open_return_val lanalyzer_open(wtap *wth, int *err, gchar **err_info)
                         break;
                   default:
                         *err = WTAP_ERR_UNSUPPORTED;
-                        *err_info = g_strdup_printf("lanalyzer: board type %u unknown",
+                        *err_info = ws_strdup_printf("lanalyzer: board type %u unknown",
                                                     board_type);
                         return WTAP_OPEN_ERROR;
                   }
 
                   if (found_summary) {
                         *err = WTAP_ERR_BAD_FILE;
-                        *err_info = g_strdup_printf("lanalyzer: file has more than one summary record");
+                        *err_info = ws_strdup_printf("lanalyzer: file has more than one summary record");
                         return WTAP_OPEN_ERROR;
                   }
                   found_summary = TRUE;
@@ -445,15 +448,15 @@ wtap_open_return_val lanalyzer_open(wtap *wth, int *err, gchar **err_info)
 done:
       if (!found_summary) {
             *err = WTAP_ERR_BAD_FILE;
-            *err_info = g_strdup_printf("lanalyzer: file has no summary record");
+            *err_info = ws_strdup_printf("lanalyzer: file has no summary record");
             return WTAP_OPEN_ERROR;
       }
 
       /* If we made it this far, then the file is a readable LANAlyzer file.
        * Let's get some info from it. Note that we get wth->snapshot_length
        * from a record later in the file. */
-      wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_LANALYZER;
-      lanalyzer = (lanalyzer_t *)g_malloc(sizeof(lanalyzer_t));
+      wth->file_type_subtype = lanalyzer_file_type_subtype;
+      lanalyzer = g_new(lanalyzer_t, 1);
       lanalyzer->start = start;
       wth->priv = (void *)lanalyzer;
       wth->subtype_read = lanalyzer_read;
@@ -503,7 +506,7 @@ static gboolean lanalyzer_read_trace_record(wtap *wth, FILE_T fh,
        * after a Trace Packet Data Record, mark it as an error. */
       if (record_type != RT_PacketData) {
             *err = WTAP_ERR_BAD_FILE;
-            *err_info = g_strdup_printf("lanalyzer: record type %u seen after trace summary record",
+            *err_info = ws_strdup_printf("lanalyzer: record type %u seen after trace summary record",
                                         record_type);
             return FALSE;
       }
@@ -514,7 +517,7 @@ static gboolean lanalyzer_read_trace_record(wtap *wth, FILE_T fh,
              * descriptor.
              */
             *err = WTAP_ERR_BAD_FILE;
-            *err_info = g_strdup_printf("lanalyzer: file has a %u-byte record, too small to have even a packet descriptor",
+            *err_info = ws_strdup_printf("lanalyzer: file has a %u-byte record, too small to have even a packet descriptor",
                                         record_length);
             return FALSE;
       }
@@ -533,7 +536,7 @@ static gboolean lanalyzer_read_trace_record(wtap *wth, FILE_T fh,
        */
 
       /*
-       * OK, is the frame data size greater than than what's left of the
+       * OK, is the frame data size greater than what's left of the
        * record?
        */
       if (packet_size > record_data_size) {
@@ -546,6 +549,7 @@ static gboolean lanalyzer_read_trace_record(wtap *wth, FILE_T fh,
       }
 
       rec->rec_type = REC_TYPE_PACKET;
+      rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
       rec->presence_flags = WTAP_HAS_TS|WTAP_HAS_CAP_LEN;
 
       time_low = pletoh16(&descriptor[8]);
@@ -768,7 +772,7 @@ static gboolean lanalyzer_dump(wtap_dumper *wdh,
  * Returns 0 if we could write the specified encapsulation type,
  * an error indication otherwise.
  *---------------------------------------------------*/
-int lanalyzer_dump_can_write_encap(int encap)
+static int lanalyzer_dump_can_write_encap(int encap)
 {
       /* Per-packet encapsulations aren't supported. */
       if (encap == WTAP_ENCAP_PER_PACKET)
@@ -787,7 +791,7 @@ int lanalyzer_dump_can_write_encap(int encap)
  * Returns TRUE on success, FALSE on failure; sets "*err" to an
  * error code on failure
  *---------------------------------------------------*/
-gboolean lanalyzer_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
+static gboolean lanalyzer_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
 {
       int   jump;
       void  *tmp;
@@ -958,6 +962,31 @@ static gboolean lanalyzer_dump_finish(wtap_dumper *wdh, int *err,
 {
       lanalyzer_dump_header(wdh,err);
       return *err ? FALSE : TRUE;
+}
+
+static const struct supported_block_type lanalyzer_blocks_supported[] = {
+      /*
+       * We support packet blocks, with no comments or other options.
+       */
+      { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info lanalyzer_info = {
+      "Novell LANalyzer","lanalyzer", "tr1", NULL,
+      TRUE, BLOCKS_SUPPORTED(lanalyzer_blocks_supported),
+      lanalyzer_dump_can_write_encap, lanalyzer_dump_open, NULL
+};
+
+void register_lanalyzer(void)
+{
+      lanalyzer_file_type_subtype = wtap_register_file_type_subtype(&lanalyzer_info);
+
+      /*
+       * Register name for backwards compatibility with the
+       * wtap_filetypes table in Lua.
+       */
+      wtap_register_backwards_compatibility_lua_name("LANALYZER",
+                                                     lanalyzer_file_type_subtype);
 }
 
 /*

@@ -1,4 +1,4 @@
-/* packet_comment_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -23,7 +23,7 @@ class PacketCommentDialog : public GeometryStateDialog
     Q_OBJECT
 
 public:
-    explicit PacketCommentDialog(guint32 frame, QWidget *parent = 0, QString comment = QString());
+    explicit PacketCommentDialog(bool isEdit, QWidget *parent = 0, QString comment = QString());
     ~PacketCommentDialog();
     QString text();
 

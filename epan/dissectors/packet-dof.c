@@ -180,9 +180,6 @@
 #include <ctype.h>
 
 #include <wsutil/wsgcrypt.h>
-#if GCRYPT_VERSION_NUMBER >= 0x010600 /* 1.6.0 */
-#define LIBGCRYPT_OK
-#endif
 
 #include <epan/packet.h>
 #include <epan/proto.h>
@@ -1938,7 +1935,6 @@ static const value_string sgmp_opcode_strings[] = {
 #if 0 /* TODO not used yet */
 static gboolean sgmp_validate_session_key(sgmp_packet_data *cmd_data, guint8 *confirmation, guint8 *kek, guint8 *key)
 {
-#ifdef LIBGCRYPT_OK
     gcry_mac_hd_t hmac;
     gcry_error_t result;
 
@@ -1952,9 +1948,6 @@ static gboolean sgmp_validate_session_key(sgmp_packet_data *cmd_data, guint8 *co
     gcry_mac_write(hmac, key, 32);
     result = gcry_mac_verify(hmac, confirmation, sizeof(confirmation));
     return result == 0;
-#else
-    return FALSE;
-#endif
 }
 #endif
 
@@ -5724,17 +5717,17 @@ static int dissect_dof_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
         } */
 
         /* Register the source address as being DPS for the sender UDP port. */
-        conversation = find_conversation(pinfo->fd->num, &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype), pinfo->srcport, pinfo->destport, NO_ADDR_B | NO_PORT_B);
+        conversation = find_conversation(pinfo->fd->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), pinfo->srcport, pinfo->destport, NO_ADDR_B | NO_PORT_B);
         if (!conversation)
         {
-            conversation = conversation_new(pinfo->fd->num, &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype), pinfo->srcport, pinfo->destport, NO_ADDR_B | NO_PORT_B);
+            conversation = conversation_new(pinfo->fd->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), pinfo->srcport, pinfo->destport, NO_ADDR2 | NO_PORT2);
             conversation_set_dissector(conversation, dof_udp_handle);
         }
 
         /* Find or create the conversation for this transport session. For UDP, the transport session is determined entirely by the
          * server port. This assumes that the first packet seen is from a client to the server.
          */
-        conversation = find_conversation(pinfo->fd->num, &pinfo->dst, &pinfo->src, ENDPOINT_UDP, pinfo->destport, pinfo->srcport, NO_ADDR_B | NO_PORT_B);
+        conversation = find_conversation(pinfo->fd->num, &pinfo->dst, &pinfo->src, CONVERSATION_UDP, pinfo->destport, pinfo->srcport, NO_ADDR_B | NO_PORT_B);
         if (conversation)
         {
             /* TODO: Determine if this is valid or not. */
@@ -5743,7 +5736,7 @@ static int dissect_dof_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
         }
 
         if (!conversation)
-            conversation = conversation_new(pinfo->fd->num, &pinfo->dst, &pinfo->src, ENDPOINT_UDP, pinfo->destport, pinfo->srcport, NO_ADDR2 | NO_PORT2 | CONVERSATION_TEMPLATE);
+            conversation = conversation_new(pinfo->fd->num, &pinfo->dst, &pinfo->src, CONVERSATION_UDP, pinfo->destport, pinfo->srcport, NO_ADDR2 | NO_PORT2 | CONVERSATION_TEMPLATE);
 
         transport_session = (udp_session_data *)conversation_get_proto_data(conversation, proto_2008_1_dof_udp);
         if (transport_session == NULL)
@@ -8179,20 +8172,20 @@ static int dissect_oap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
         guint8 no_of_bits = 5;
         guint8 i;
         guint8 bit = 3;
-        g_strlcpy(str, "...", 20);
+        (void) g_strlcpy(str, "...", 20);
 
         /* read the bits for the int */
         for (i = 0; i < no_of_bits; i++)
         {
             if (bit && (!(bit % 4)))
-                g_strlcat(str, " ", 20);
+                (void) g_strlcat(str, " ", 20);
 
             bit++;
 
             if (opcode & mask)
-                g_strlcat(str, "1", 20);
+                (void) g_strlcat(str, "1", 20);
             else
-                g_strlcat(str, "0", 20);
+                (void) g_strlcat(str, "0", 20);
 
             mask = mask >> 1;
         }
@@ -9103,7 +9096,6 @@ static int dissect_sgmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
     return offset;
 }
 
-#ifdef LIBGCRYPT_OK
 static gboolean validate_session_key(tep_rekey_data *rekey, guint S_length, guint8 *S, guint8 *confirmation, guint8 *key)
 {
     guint8 pad[16];
@@ -9125,12 +9117,6 @@ static gboolean validate_session_key(tep_rekey_data *rekey, guint S_length, guin
     result = gcry_mac_verify(hmac, confirmation, 32);
     return result == 0;
 }
-#else
-static gboolean validate_session_key(tep_rekey_data *rekey _U_, guint S_length _U_, guint8 *S _U_, guint8 *confirmation _U_, guint8 *key _U_)
-{
-   return FALSE;
-}
-#endif
 
 static int dissect_tep_dsp(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
 {
@@ -9460,8 +9446,7 @@ static int dissect_tep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
         /* Add a field to show the session key that has been learned. */
         if (rekey_data->key_data && rekey_data->key_data->session_key && tep_tree)
         {
-            const gchar *SID = bytestring_to_str(NULL, rekey_data->key_data->session_key, 32, ':');
-            ti = proto_tree_add_bytes_format_value(tree, hf_tep_session_key, tvb, 0, 0, rekey_data->key_data->session_key, "%s", SID);
+            ti = proto_tree_add_bytes_with_length(tree, hf_tep_session_key, tvb, 0, 0, rekey_data->key_data->session_key, 32);
             proto_item_set_generated(ti);
         }
 
@@ -11314,13 +11299,9 @@ static void dof_register_dpp_2(void)
     {
         { &ei_dpp2_dof_10_flags_zero, { "dof.dpp.v2.flags_zero", PI_UNDECODED, PI_ERROR, "DPS-10: Reserved flag bits must be zero.", EXPFILL } },
         { &ei_dpp_default_flags, { "dof.dpp.v2.flags_included", PI_COMMENTS_GROUP, PI_NOTE, "Default flag value is included explicitly.", EXPFILL } },
-        { &ei_dpp_explicit_sender_sid_included, { "dof.dpp.v2.sender_sid_included", PI_COMMENT, PI_NOTE, "Explicit SID could be optimized, same as sender.", EXPFILL } },
-        { &ei_dpp_explicit_receiver_sid_included, { "dof.dpp.v2.receiver_sid_included", PI_COMMENT, PI_NOTE, "Explicit SID could be optimized, same as receiver.", EXPFILL } },
-#ifdef LIBGCRYPT_OK
+        { &ei_dpp_explicit_sender_sid_included, { "dof.dpp.v2.sender_sid_included", PI_PROTOCOL, PI_NOTE, "Explicit SID could be optimized, same as sender.", EXPFILL } },
+        { &ei_dpp_explicit_receiver_sid_included, { "dof.dpp.v2.receiver_sid_included", PI_PROTOCOL, PI_NOTE, "Explicit SID could be optimized, same as receiver.", EXPFILL } },
         { &ei_dpp_no_security_context, { "dof.dpp.v2.no_context", PI_UNDECODED, PI_WARN, "No security context to enable packet decryption.", EXPFILL } },
-#else
-        { &ei_dpp_no_security_context, { "dof.dpp.v2.no_context", PI_UNDECODED, PI_WARN, "This version of wireshark was built without DOF decryption capability", EXPFILL } },
-#endif
     };
 
     static gint *sett[] =
@@ -11823,8 +11804,8 @@ static void dof_oap_handoff(void)
 
 /* SGMP Registration Support */
 
-void dof_register_sgmp_130(void);
-void dof_reg_handoff_sgmp_130(void);
+static void dof_register_sgmp_130(void);
+static void dof_reg_handoff_sgmp_130(void);
 
 static void dof_sgmp_reset(void)
 {
@@ -11834,7 +11815,7 @@ static void dof_sgmp_cleanup(void)
 {
 }
 
-void dof_register_sgmp_130(void)
+static void dof_register_sgmp_130(void)
 {
     static hf_register_info hf[] =
     {
@@ -11897,7 +11878,7 @@ void dof_register_sgmp_130(void)
 /**
  * The registration hand-off routine
  */
-void dof_reg_handoff_sgmp_130(void)
+static void dof_reg_handoff_sgmp_130(void)
 {
     dissector_handle_t sgmp_handle = create_dissector_handle(dissect_sgmp, proto_sgmp);
 
@@ -11989,7 +11970,7 @@ static void dof_register_tep_128(void)
             { "Initial State", "dof.2008.4.tep1.2.2.1.initial_state", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL } },
 
         { &hf_tep_session_key,
-            { "Session Key", "dof.session_key", FT_BYTES, BASE_NONE, NULL, 0x00, NULL, HFILL } },
+            { "Session Key", "dof.session_key", FT_BYTES, SEP_COLON, NULL, 0x00, NULL, HFILL } },
     };
 
     static gint *ett[] =

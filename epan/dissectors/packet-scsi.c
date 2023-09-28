@@ -67,7 +67,7 @@
  */
 #include "config.h"
 
-#include <stdio.h>
+#include <stdio.h>      /* for sscanf() */
 #include <epan/packet.h>
 #include <epan/to_str.h>
 #include <epan/prefs.h>
@@ -965,7 +965,7 @@ scsistat_init(struct register_srt* srt, GArray* srt_array)
 }
 
 static tap_packet_status
-scsistat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv)
+scsistat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv, tap_flags_t flags _U_)
 {
     guint i = 0;
     srt_stat_table *scsi_srt_table;
@@ -2743,7 +2743,7 @@ const value_string scsi_status_val[] = {
 };
 
 
-const value_string scsi_wb_mode_val[] = {
+static const value_string scsi_wb_mode_val[] = {
     {0x0, "Write combined header and data"},
     {0x1, "Vendor specific"},
     {0x2, "Write data"},
@@ -2758,7 +2758,7 @@ const value_string scsi_wb_mode_val[] = {
     {0, NULL},
 };
 
-const value_string scsi_senddiag_st_code_val[] = {
+static const value_string scsi_senddiag_st_code_val[] = {
     {0, ""},
     {0x1, "Start short self-test in background"},
     {0x2, "Start extended self-test in background"},
@@ -2770,7 +2770,7 @@ const value_string scsi_senddiag_st_code_val[] = {
     {0, NULL},
 };
 
-const true_false_string scsi_senddiag_pf_val = {
+static const true_false_string scsi_senddiag_pf_val = {
     "Standard Page Format",
     "Vendor-specific Page Format",
 };
@@ -2784,7 +2784,7 @@ typedef struct _cmdset_t {
     scsi_cdb_table_t   *cdb_table;
 } cmdset_t;
 
-static cmdset_t *get_cmdset_data(itlq_nexus_t *itlq, itl_nexus_t *itl);
+static cmdset_t *get_cmdset_data(wmem_allocator_t *pool, itlq_nexus_t *itlq, itl_nexus_t *itl);
 
 static void
 dissect_naa_designator(proto_tree *tree, tvbuff_t *tvb, guint offset, guint len)
@@ -2910,7 +2910,7 @@ dissect_scsi_evpd(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
                     }
                     if (codeset == CODESET_ASCII) {
                         if (identifier_type == DEVID_TYPE_VEND_ID_VEND_SPEC_ID) {
-                            proto_tree_add_item(des_tree, hf_scsi_inq_vendor_id, tvb, offset, 8, ENC_ASCII|ENC_NA);
+                            proto_tree_add_item(des_tree, hf_scsi_inq_vendor_id, tvb, offset, 8, ENC_ASCII);
                             proto_tree_add_item(des_tree, hf_scsi_inq_evpd_devid_identifier_str, tvb, offset + 8, idlen - 8, ENC_NA|ENC_ASCII);
                         } else {
                             proto_tree_add_item(des_tree, hf_scsi_inq_evpd_devid_identifier_str, tvb, offset, idlen, ENC_NA|ENC_ASCII);
@@ -3362,15 +3362,15 @@ dissect_spc_inquiry(tvbuff_t *tvb_a, packet_info *pinfo,
         try_offset = dissect_spc_inq_reladrflags(try_tvb, try_offset, tree, version);
 
         /* vendor id */
-        proto_tree_add_item(tree, hf_scsi_inq_vendor_id, try_tvb, try_offset, 8, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_scsi_inq_vendor_id, try_tvb, try_offset, 8, ENC_ASCII);
         try_offset+=8;
 
         /* product id */
-        proto_tree_add_item(tree, hf_scsi_inq_product_id, try_tvb, try_offset, 16, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_scsi_inq_product_id, try_tvb, try_offset, 16, ENC_ASCII);
         try_offset+=16;
 
         /* product revision level */
-        proto_tree_add_item(tree, hf_scsi_inq_product_rev, try_tvb, try_offset, 4, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_scsi_inq_product_rev, try_tvb, try_offset, 4, ENC_ASCII);
         try_offset+=4;
 
         /* vendor specific, 20 bytes */
@@ -5312,13 +5312,13 @@ dissect_spc_reportluns(tvbuff_t *tvb_a, packet_info *pinfo _U_,
     }
 }
 
-const value_string mpi_action_vals[] = {
+static const value_string mpi_action_vals[] = {
     {MPI_MANAGEMENT_PROTOCOL_IN           , "Management Protocol In"},
     {MPI_REPORT_SUPPORTED_OPERATION_CODES , "Report Supported Opcodes"},
     {0, NULL}
 };
 
-const value_string report_opcodes_options_vals[] = {
+static const value_string report_opcodes_options_vals[] = {
     {0, "Report ALL opcodes"},
     {1, "Report ONE opcode, NO service action"},
     {2, "Report ONE opcode, WITH service action"},
@@ -5384,7 +5384,7 @@ dissect_spc_mgmt_protocol_in(tvbuff_t *tvb_a, packet_info *pinfo _U_,
             return;
         }
 
-        csdata = get_cmdset_data(cdata->itlq, cdata->itl);
+        csdata = get_cmdset_data(pinfo->pool, cdata->itlq, cdata->itl);
 
         it = proto_tree_add_uint(tree, hf_scsi_mpi_service_action, tvb_a, 0, 0, cdata->itlq->flags & 0x7f);
         proto_item_set_generated(it);
@@ -5761,13 +5761,13 @@ dissect_scsi_rsp(tvbuff_t *tvb, packet_info *pinfo,
     cmdset_t         *csdata;
     scsi_task_data_t *cdata;
 
-    cdata = wmem_new(wmem_packet_scope(), scsi_task_data_t);
+    cdata = wmem_new(pinfo->pool, scsi_task_data_t);
     cdata->itl = itl;
     cdata->itlq = itlq;
     cdata->type = SCSI_PDU_TYPE_RSP;
     tap_queue_packet(scsi_tap, pinfo, cdata);
 
-    csdata = get_cmdset_data(itlq, itl);   /* will g_assert if itlq is null */
+    csdata = get_cmdset_data(pinfo->pool, itlq, itl);
 
     /* Nothing really to do here, just print some stuff passed to us
      */
@@ -5821,7 +5821,7 @@ dissect_scsi_snsinfo(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     const char       *old_proto;
     scsi_task_data_t *cdata;
 
-    cdata = wmem_new(wmem_packet_scope(), scsi_task_data_t);
+    cdata = wmem_new(pinfo->pool, scsi_task_data_t);
     cdata->itl = itl;
     cdata->itlq = itlq;
     cdata->type = SCSI_PDU_TYPE_SNS;
@@ -6140,7 +6140,7 @@ dissect_scsi_cdb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     opcode = tvb_get_guint8(tvb, offset);
     itlq->scsi_opcode = opcode;
-    csdata = get_cmdset_data(itlq, itl);
+    csdata = get_cmdset_data(pinfo->pool, itlq, itl);
 
 #if 0 /* XXX: devtype never actually used ?? */
     if (devtype_arg != SCSI_DEV_UNKNOWN) {
@@ -6166,7 +6166,7 @@ dissect_scsi_cdb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     /* make sure no one will overwrite this in the info column */
     col_set_fence(pinfo->cinfo, COL_INFO);
 
-    cdata = wmem_new(wmem_packet_scope(), scsi_task_data_t);
+    cdata = wmem_new(pinfo->pool, scsi_task_data_t);
     cdata->itl = itl;
     cdata->itlq = itlq;
     cdata->type = SCSI_PDU_TYPE_CDB;
@@ -6247,13 +6247,13 @@ dissect_scsi_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
 
     payload_len = tvb_reported_length(tvb);
-    cdata = wmem_new(wmem_packet_scope(), scsi_task_data_t);
+    cdata = wmem_new(pinfo->pool, scsi_task_data_t);
     cdata->itl = itl;
     cdata->itlq = itlq;
     cdata->type = SCSI_PDU_TYPE_CDB;
     tap_queue_packet(scsi_tap, pinfo, cdata);
 
-    csdata = get_cmdset_data(itlq, itl);
+    csdata = get_cmdset_data(pinfo->pool, itlq, itl);
 
     old_proto = pinfo->current_proto;
     pinfo->current_proto="SCSI";
@@ -6425,7 +6425,7 @@ end_of_payload:
 }
 
 static cmdset_t *
-get_cmdset_data(itlq_nexus_t *itlq, itl_nexus_t *itl)
+get_cmdset_data(wmem_allocator_t *pool, itlq_nexus_t *itlq, itl_nexus_t *itl)
 {
     cmdset_t *csdata;
     guint8    cmdset;
@@ -6444,7 +6444,7 @@ get_cmdset_data(itlq_nexus_t *itlq, itl_nexus_t *itl)
         cmdset = scsi_def_devtype;
     }
 
-    csdata = wmem_new(wmem_packet_scope(), cmdset_t);
+    csdata = wmem_new(pool, cmdset_t);
 
     switch(cmdset&SCSI_CMDSET_MASK) {
     case SCSI_DEV_SBC:
@@ -6663,7 +6663,7 @@ proto_register_scsi(void)
         { &hf_scsi_inq_rmb,
           {"Removable", "scsi.inquiry.removable", FT_BOOLEAN, 8,
            TFS(&scsi_removable_val), 0x80, NULL, HFILL}},
-        { & hf_scsi_inq_version,
+        { &hf_scsi_inq_version,
           {"Version", "scsi.inquiry.version", FT_UINT8, BASE_HEX,
            VALS(scsi_inquiry_vers_val), 0x0, NULL, HFILL}},
         { &hf_scsi_inq_reladrflags,
@@ -6865,7 +6865,7 @@ proto_register_scsi(void)
           {"Buffer Offset", "scsi.spc.wb.bufoff", FT_UINT24, BASE_HEX, NULL,
            0x0, NULL, HFILL}},
         { &hf_scsi_paramlen24,
-          {"Parameter List Length", "scsi.cdb.paramlen24", FT_UINT24, BASE_HEX,
+          {"Parameter List Length", "scsi.cdb.paramlen24", FT_UINT24, BASE_DEC_HEX,
            NULL, 0x0, NULL, HFILL}},
         { &hf_scsi_senddiag_st_code,
           {"Self-Test Code", "scsi.spc.senddiag.code", FT_UINT8, BASE_HEX,
@@ -7239,7 +7239,7 @@ proto_register_scsi(void)
           { "Address Mode", "scsi.lun.address_mode", FT_UINT8, BASE_HEX,
           VALS(scsi_lun_address_mode_vals), 0xc0, "Addressing mode for the LUN", HFILL }},
         { &hf_scsi_extended_add_method_len,
-          { "Extended Address Method Length", "scsi.lun.extended_address_method.len", FT_UINT8, BASE_HEX,
+          { "Extended Address Method Length", "scsi.lun.extended_address_method.len", FT_UINT8, BASE_DEC_HEX,
           NULL, 0x30, "Extended Address Method Specific Field", HFILL }},
         { &hf_scsi_extended_add_method,
           { "Extended Address Method", "scsi.lun.extended_address_method", FT_UINT8, BASE_HEX,

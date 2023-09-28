@@ -5909,7 +5909,7 @@ def produce_code():
 #include <epan/packet.h>
 #include <epan/dfilter/dfilter.h>
 #include <epan/exceptions.h>
-#include <ftypes/ftypes-int.h>
+#include <ftypes/ftypes.h>
 #include <epan/to_str.h>
 #include <epan/conversation.h>
 #include <epan/ptvcursor.h>
@@ -6515,6 +6515,7 @@ static expert_field ei_ncp_effective_rights = EI_INIT;
 static expert_field ei_ncp_server = EI_INIT;
 static expert_field ei_ncp_invalid_offset = EI_INIT;
 static expert_field ei_ncp_address_type = EI_INIT;
+static expert_field ei_ncp_value_too_large = EI_INIT;
 """)
 
     # Look at all packet types in the packets collection, and cull information
@@ -8503,7 +8504,7 @@ proto_register_ncp2222(void)
     { "Subject", "ncp.nds_acl_subject", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 
     { &hf_nds_acl_privileges,
-    { "Subject", "ncp.nds_acl_subject", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+    { "Subject", "ncp.nds_acl_privileges", FT_UINT32, BASE_HEX, NULL, 0x0, NULL, HFILL }},
 
 """)
     # Print the registration code for the hf variables
@@ -8544,6 +8545,7 @@ proto_register_ncp2222(void)
         { &ei_ncp_no_request_record_found, { "ncp.no_request_record_found", PI_SEQUENCE, PI_NOTE, "No request record found.", EXPFILL }},
         { &ei_ncp_invalid_offset, { "ncp.invalid_offset", PI_MALFORMED, PI_ERROR, "Invalid offset", EXPFILL }},
         { &ei_ncp_address_type, { "ncp.address_type.unknown", PI_PROTOCOL, PI_WARN, "Unknown Address Type", EXPFILL }},
+        { &ei_ncp_value_too_large, { "ncp.value_too_large", PI_MALFORMED, PI_ERROR, "Length value goes past the end of the packet", EXPFILL }},
     };
 
     expert_module_t* expert_ncp;

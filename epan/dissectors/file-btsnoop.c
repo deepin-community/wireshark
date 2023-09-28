@@ -15,7 +15,7 @@
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 
 #include <wiretap/wtap.h>
 
@@ -341,7 +341,7 @@ proto_register_btsnoop(void)
 
     static ei_register_info ei[] = {
         { &ei_malformed_frame,       { "btsnoop.malformed_frame", PI_PROTOCOL, PI_WARN, "Malformed Frame", EXPFILL }},
-        { &ei_not_implemented_yet,   { "btsnoop.not_implemented_yet", PI_PROTOCOL, PI_UNDECODED, "Not implemented yet", EXPFILL }},
+        { &ei_not_implemented_yet,   { "btsnoop.not_implemented_yet", PI_PROTOCOL, PI_WARN, "Not implemented yet", EXPFILL }},
         { &ei_unknown_data,          { "btsnoop.unknown_data", PI_PROTOCOL, PI_WARN, "Unknown data", EXPFILL }},
     };
 

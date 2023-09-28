@@ -130,8 +130,8 @@ dissect_mactelnet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
     col_set_str(pinfo->cinfo, COL_PROTOCOL, PROTO_TAG_MACTELNET);
 
     col_add_fstr(pinfo->cinfo, COL_INFO, "%s > %s Direction: %s Type: %s",
-                    tvb_ether_to_str(tvb, 2),
-                    tvb_ether_to_str(tvb, 8),
+                    tvb_ether_to_str(pinfo->pool, tvb, 2),
+                    tvb_ether_to_str(pinfo->pool, tvb, 8),
                     ((foundclient >= 0) || (type == 4) ? "Client->Server" : "Server->Client" ),
                     val_to_str(type, packettypenames, "Unknown Type:0x%02x")
         );
@@ -224,11 +224,11 @@ dissect_mactelnet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
                             break;
 
                         case 3: /* Username */
-                            proto_tree_add_item(mactelnet_control_tree, hf_mactelnet_control_username, tvb, offset, datalength, ENC_ASCII|ENC_NA);
+                            proto_tree_add_item(mactelnet_control_tree, hf_mactelnet_control_username, tvb, offset, datalength, ENC_ASCII);
                             break;
 
                         case 4: /* Terminal type */
-                            proto_tree_add_item(mactelnet_control_tree, hf_mactelnet_control_terminal, tvb, offset, datalength, ENC_ASCII|ENC_NA);
+                            proto_tree_add_item(mactelnet_control_tree, hf_mactelnet_control_terminal, tvb, offset, datalength, ENC_ASCII);
                             break;
 
                         case 5: /* Terminal width */

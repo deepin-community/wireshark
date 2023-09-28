@@ -1,5 +1,5 @@
 /* packet-nordic_ble.c
- * Routines for Nordic BLE sniffer dissection
+ * Routines for nRF Sniffer for Bluetooth LE dissection
  *
  * Copyright (c) 2016-2018 Nordic Semiconductor.
  *
@@ -10,7 +10,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-/* Nordic BLE Sniffer packet format: BoardID + Header + Payload
+/* nRF Sniffer for Bluetooth LE packet format: BoardID + Header + Payload
  *
  *  +--------+--------+--------+--------+--------+--------+--------+--------+
  *  |                           BoardID  (1 byte)                           |
@@ -257,12 +257,6 @@ static const true_false_string direction_tfs =
 {
     "Master -> Slave",
     "Slave -> Master"
-};
-
-static const true_false_string ok_incorrect =
-{
-    "OK",
-    "Incorrect"
 };
 
 static const value_string le_phys[] =
@@ -679,7 +673,7 @@ static gint
 dissect_packet(tvbuff_t *tvb, gint offset, packet_info *pinfo, proto_tree *tree, nordic_ble_context_t *nordic_ble_context, btle_context_t *context)
 {
     gint32 rssi;
-    guint32 channel;
+    guint32 channel, event_counter;
 
     if (nordic_ble_context->protover == 0) {
         // Event packet length is fixed for the legacy version
@@ -702,8 +696,11 @@ dissect_packet(tvbuff_t *tvb, gint offset, packet_info *pinfo, proto_tree *tree,
     proto_tree_add_int(tree, hf_nordic_ble_rssi, tvb, offset, 1, rssi);
     offset += 1;
 
-    proto_tree_add_item(tree, hf_nordic_ble_event_counter, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf_nordic_ble_event_counter, tvb, offset, 2, ENC_LITTLE_ENDIAN, &event_counter);
     offset += 2;
+
+    context->event_counter = event_counter;
+    context->event_counter_valid = 1;
 
     if (nordic_ble_context->protover < 3) {
         offset = dissect_ble_delta_time(tvb, offset, pinfo, tree, nordic_ble_context);
@@ -757,7 +754,7 @@ dissect_nordic_ble(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     gint               offset;
     gboolean           bad_length = FALSE;
 
-    context = wmem_new0(wmem_packet_scope(), btle_context_t);
+    context = wmem_new0(pinfo->pool, btle_context_t);
 
     offset = dissect_header(tvb, pinfo, tree, context, &bad_length);
     payload_tvb = tvb_new_subset_length_caplen(tvb, offset, -1, tvb_captured_length(tvb) - offset);
@@ -839,7 +836,7 @@ proto_register_nordic_ble(void)
         },
         { &hf_nordic_ble_crcok,
             { "CRC", "nordic_ble.crcok",
-                FT_BOOLEAN, 8, TFS(&ok_incorrect), 0x01,
+                FT_BOOLEAN, 8, TFS(&tfs_ok_error), 0x01,
                 "Cyclic Redundancy Check state", HFILL }
         },
         { &hf_nordic_ble_direction,
@@ -869,7 +866,7 @@ proto_register_nordic_ble(void)
         },
         { &hf_nordic_ble_micok,
             { "MIC", "nordic_ble.micok",
-                FT_BOOLEAN, 8, TFS(&ok_incorrect), 0x08,
+                FT_BOOLEAN, 8, TFS(&tfs_ok_error), 0x08,
                 "Message Integrity Check state", HFILL }
         },
         { &hf_nordic_ble_mic_not_relevant,
@@ -893,7 +890,7 @@ proto_register_nordic_ble(void)
                 "Reserved for Future Use", HFILL }
         },
         { &hf_nordic_ble_channel,
-            { "Channel", "nordic_ble.channel",
+            { "Channel Index", "nordic_ble.channel",
                 FT_UINT8, BASE_DEC, NULL, 0x0,
                 NULL, HFILL }
         },
@@ -946,7 +943,7 @@ proto_register_nordic_ble(void)
 
     packet_time_context_tree = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());
 
-    proto_nordic_ble = proto_register_protocol("Nordic BLE Sniffer", "NORDIC_BLE", "nordic_ble");
+    proto_nordic_ble = proto_register_protocol("nRF Sniffer for Bluetooth LE", "NORDIC_BLE", "nordic_ble");
 
     register_dissector("nordic_ble", dissect_nordic_ble, proto_nordic_ble);
 

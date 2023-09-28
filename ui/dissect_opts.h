@@ -1,4 +1,5 @@
-/* dissect_opts.h
+/** @file
+ *
  * Dissection options (parameters that affect dissection)
  *
  * Wireshark - Network traffic analyzer
@@ -37,10 +38,10 @@ extern "C" {
  * Options for dissecting common to all dissecting programs.
  */
 #define LONGOPT_DISSECT_COMMON \
-    {"disable-protocol", required_argument, NULL, LONGOPT_DISABLE_PROTOCOL }, \
-    {"enable-heuristic", required_argument, NULL, LONGOPT_ENABLE_HEURISTIC }, \
-    {"disable-heuristic", required_argument, NULL, LONGOPT_DISABLE_HEURISTIC }, \
-    {"enable-protocol", required_argument, NULL, LONGOPT_ENABLE_PROTOCOL }, \
+    {"disable-protocol", ws_required_argument, NULL, LONGOPT_DISABLE_PROTOCOL }, \
+    {"enable-heuristic", ws_required_argument, NULL, LONGOPT_ENABLE_HEURISTIC }, \
+    {"disable-heuristic", ws_required_argument, NULL, LONGOPT_DISABLE_HEURISTIC }, \
+    {"enable-protocol", ws_required_argument, NULL, LONGOPT_ENABLE_PROTOCOL }, \
 
 #define OPTSTRING_DISSECT_COMMON \
     "d:K:nN:t:u:"
@@ -83,16 +84,3 @@ setup_enabled_and_disabled_protocols(void);
 #endif /* __cplusplus */
 
 #endif /* dissect_opts.h */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

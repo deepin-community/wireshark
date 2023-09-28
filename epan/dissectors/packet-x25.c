@@ -382,7 +382,7 @@ static const value_string x25_clear_diag_vals[] = {
     { 0, NULL}
 };
 
-value_string_ext x25_clear_diag_vals_ext = VALUE_STRING_EXT_INIT(x25_clear_diag_vals);
+static value_string_ext x25_clear_diag_vals_ext = VALUE_STRING_EXT_INIT(x25_clear_diag_vals);
 
 static const value_string x25_registration_code_vals[] = {
     { 0x03, "Invalid facility request" },
@@ -535,7 +535,7 @@ x25_hash_add_proto_start(guint16 vc, guint32 frame, dissector_handle_t dissect)
     /*
      * Is there already a circuit with this VC number?
      */
-    conv = find_conversation_by_id(frame, ENDPOINT_X25, vc, 0);
+    conv = find_conversation_by_id(frame, CONVERSATION_X25, vc);
     if (conv != NULL) {
         /*
          * Yes - close it, as we're creating a new one.
@@ -546,7 +546,7 @@ x25_hash_add_proto_start(guint16 vc, guint32 frame, dissector_handle_t dissect)
     /*
      * Set up a new circuit.
      */
-    conv = conversation_new_by_id(frame, ENDPOINT_X25, vc, 0);
+    conv = conversation_new_by_id(frame, CONVERSATION_X25, vc);
 
     /*
      * Set its dissector.
@@ -562,7 +562,7 @@ x25_hash_add_proto_end(guint16 vc, guint32 frame)
     /*
      * Try to find the circuit.
      */
-    conv = find_conversation_by_id(frame, ENDPOINT_X25, vc, 0);
+    conv = find_conversation_by_id(frame, CONVERSATION_X25, vc);
 
     /*
      * If we succeeded, close it.
@@ -615,10 +615,10 @@ static const range_string restart_code_rvals[] = {
 };
 
 static char *
-dte_address_util(tvbuff_t *tvb, int offset, guint8 len)
+dte_address_util(wmem_allocator_t *pool, tvbuff_t *tvb, int offset, guint8 len)
 {
     int i;
-    char *tmpbuf = (char *)wmem_alloc(wmem_packet_scope(), 258);
+    char *tmpbuf = (char *)wmem_alloc(pool, 258);
 
     for (i = 0; (i<len)&&(i<256); i++) {
         if (i % 2 == 0) {
@@ -835,7 +835,7 @@ dump_facilities(proto_tree *tree, int *offset, tvbuff_t *tvb, packet_info *pinfo
                     }
                     byte3 = tvb_get_guint8(tvb, *offset+3);
                     proto_tree_add_uint(facility_tree, hf_x25_facility_call_transfer_num_semi_octets, tvb, *offset+4, 1, byte3);
-                    tmpbuf = dte_address_util(tvb, *offset + 4, byte3);
+                    tmpbuf = dte_address_util(pinfo->pool, tvb, *offset + 4, byte3);
 
                     proto_tree_add_string(facility_tree, hf_x25_dte_address, tvb, *offset+4, byte1 - 2, tmpbuf);
                 }
@@ -863,7 +863,7 @@ dump_facilities(proto_tree *tree, int *offset, tvbuff_t *tvb, packet_info *pinfo
                     }
                     byte2 = tvb_get_guint8(tvb, *offset+2) & 0x3F;
                     proto_tree_add_uint(facility_tree, hf_x25_facility_calling_addr_ext_num_semi_octets, tvb, *offset+2, 1, byte2);
-                    tmpbuf = dte_address_util(tvb, *offset + 3, byte2);
+                    tmpbuf = dte_address_util(pinfo->pool, tvb, *offset + 3, byte2);
                     proto_tree_add_string(facility_tree, hf_x25_dte_address, tvb, *offset+3, byte1 - 1, tmpbuf);
                 }
                 break;
@@ -883,7 +883,7 @@ dump_facilities(proto_tree *tree, int *offset, tvbuff_t *tvb, packet_info *pinfo
                     }
                     byte2 = tvb_get_guint8(tvb, *offset+2) & 0x3F;
                     proto_tree_add_uint(facility_tree, hf_x25_facility_called_addr_ext_num_semi_octets, tvb, *offset+2, 1, byte2);
-                    tmpbuf = dte_address_util(tvb, *offset+3, byte2);
+                    tmpbuf = dte_address_util(pinfo->pool, tvb, *offset+3, byte2);
 
                     proto_tree_add_string(facility_tree, hf_x25_dte_address, tvb, *offset+3, byte1 - 1, tmpbuf);
                 }
@@ -916,7 +916,7 @@ dump_facilities(proto_tree *tree, int *offset, tvbuff_t *tvb, packet_info *pinfo
                                             byte2, "unknown");
                     byte3 = tvb_get_guint8(tvb, *offset+3);
                     proto_tree_add_uint(facility_tree, hf_x25_facility_call_deflect_num_semi_octets, tvb, *offset+3, 1, byte3);
-                    tmpbuf = dte_address_util(tvb, *offset+4, byte3);
+                    tmpbuf = dte_address_util(pinfo->pool, tvb, *offset+4, byte3);
 
                     proto_tree_add_string(facility_tree, hf_x25_alternative_dte_address, tvb, *offset+4, byte1 - 2, tmpbuf);
                 }
@@ -964,8 +964,8 @@ x25_ntoa(proto_tree *tree, int *offset, tvbuff_t *tvb,
     guint8 byte;
     int localoffset;
 
-    addr1=(char *)wmem_alloc(wmem_packet_scope(), 16);
-    addr2=(char *)wmem_alloc(wmem_packet_scope(), 16);
+    addr1=(char *)wmem_alloc(pinfo->pool, 16);
+    addr2=(char *)wmem_alloc(pinfo->pool, 16);
 
     byte = tvb_get_guint8(tvb, *offset);
     len1 = (byte >> 0) & 0x0F;
@@ -1035,8 +1035,8 @@ x25_toa(proto_tree *tree, int *offset, tvbuff_t *tvb,
     guint8 byte;
     int localoffset;
 
-    addr1=(char *)wmem_alloc(wmem_packet_scope(), 256);
-    addr2=(char *)wmem_alloc(wmem_packet_scope(), 256);
+    addr1=(char *)wmem_alloc(pinfo->pool, 256);
+    addr2=(char *)wmem_alloc(pinfo->pool, 256);
 
     len1 = tvb_get_guint8(tvb, *offset);
     proto_tree_add_item(tree, hf_x25_called_address_length, tvb, *offset, 1, ENC_NA);
@@ -1229,7 +1229,7 @@ dissect_x25_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     modulo = ((bytes0_1 & 0x2000) ? 128 : 8);
     vc     = (int)(bytes0_1 & 0x0FFF);
 
-    conversation_create_endpoint_by_id(pinfo, ENDPOINT_X25, vc, 0);
+    conversation_set_elements_by_id(pinfo, CONVERSATION_X25, vc);
 
     if (bytes0_1 & X25_ABIT) toa = TRUE;
     else toa = FALSE;
@@ -1923,7 +1923,7 @@ dissect_x25_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       next_tvb = tvb_new_subset_remaining(tvb, localoffset);
 
     /* See if there's already a dissector for this circuit. */
-    if (try_conversation_dissector_by_id(ENDPOINT_X25, vc, next_tvb, pinfo,
+    if (try_conversation_dissector_by_id(CONVERSATION_X25, vc, next_tvb, pinfo,
                               tree, &q_bit_set)) {
                 return; /* found it and dissected it */
     }
@@ -1940,9 +1940,9 @@ dissect_x25_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     if (payload_check_data){
     /* If the Call Req. has not been captured, let's look at the first
        two bytes of the payload to see if this looks like COTP. */
-    if (tvb_get_guint8(tvb, localoffset) == tvb_reported_length(next_tvb)-1) {
+    if (tvb_get_guint8(next_tvb, 0) == tvb_reported_length(next_tvb)-1) {
       /* First byte contains the length of the remaining buffer */
-      if ((tvb_get_guint8(tvb, localoffset+1) & 0x0F) == 0) {
+      if ((tvb_get_guint8(next_tvb, 1) & 0x0F) == 0) {
         /* Second byte contains a valid COTP TPDU */
         if (!pinfo->fd->visited)
             x25_hash_add_proto_start(vc, pinfo->num, ositp_handle);
@@ -1953,7 +1953,7 @@ dissect_x25_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
     /* Then let's look at the first byte of the payload to see if this
        looks like IP or CLNP. */
-    switch (tvb_get_guint8(tvb, localoffset)) {
+    switch (tvb_get_guint8(next_tvb, 0)) {
 
     case 0x45:
         /* Looks like an IP header */
@@ -2054,8 +2054,8 @@ proto_register_x25(void)
           { "From the called DTE", "x25.facility.throughput.called_dte", FT_UINT8, BASE_DEC, VALS(x25_facilities_classA_throughput_vals), 0xF0,
             "Facility Throughput called DTE", HFILL }},
         { &hf_x25_throughput_called_dte,
-          { "From the calling DTE", "x25.facility.throughput.called_dte", FT_UINT8, BASE_DEC, VALS(x25_facilities_classA_throughput_vals), 0x0F,
-            "Facility Throughput called DTE", HFILL }},
+          { "From the calling DTE", "x25.facility.throughput.calling_dte", FT_UINT8, BASE_DEC, VALS(x25_facilities_classA_throughput_vals), 0x0F,
+            "Facility Throughput calling DTE", HFILL }},
         { &hf_x25_facility_classA_cug,
           { "Closed user group", "x25.facility.cug", FT_UINT8, BASE_HEX, NULL, 0,
             "Facility Closed user group", HFILL }},

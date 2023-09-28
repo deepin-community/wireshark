@@ -26,7 +26,7 @@
 
 #include <wsutil/utf8_entities.h>
 #include <ui/qt/utils/qt_ui_utils.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 #include "simple_dialog.h"
 #include "ui/qt/widgets/wireshark_file_dialog.h"
 
@@ -206,13 +206,15 @@ void LteRlcGraphDialog::findChannel(bool may_fail)
     // Rescan for channel data.
     rlc_graph_segment_list_free(&graph_);
     if (!rlc_graph_segment_list_get(cap_file_.capFile(), &graph_, graph_.channelSet,
-                                    &err_string) &&
-        !may_fail) {
-
-        // Pop up an error box to report error.
-        simple_error_message_box("%s", err_string);
-        g_free(err_string);
-        return;
+                                    &err_string)) {
+        if (may_fail) {
+            g_free(err_string);
+        } else {
+            // Pop up an error box to report error.
+            simple_error_message_box("%s", err_string);
+            g_free(err_string);
+            return;
+        }
     }
 
     // Reconnect mouse move signal.
@@ -539,7 +541,11 @@ void LteRlcGraphDialog::graphClicked(QMouseEvent *event)
     if (event->button() == Qt::RightButton) {
         // XXX We should find some way to get rlcPlot to handle a
         // contextMenuEvent instead.
-        ctx_menu_->exec(event->globalPos());
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0 ,0)
+        ctx_menu_->popup(event->globalPosition().toPoint());
+#else
+        ctx_menu_->popup(event->globalPos());
+#endif
     } else  if (mouse_drags_) {
         if (rp->axisRect()->rect().contains(event->pos())) {
             rp->setCursor(QCursor(Qt::ClosedHandCursor));
@@ -844,7 +850,7 @@ void LteRlcGraphDialog::on_otherDirectionButton_clicked()
 void LteRlcGraphDialog::on_buttonBox_accepted()
 {
     QString file_name, extension;
-    QDir path(wsApp->lastOpenDir());
+    QDir path(mainApp->lastOpenDir());
     QString pdf_filter = tr("Portable Document Format (*.pdf)");
     QString png_filter = tr("Portable Network Graphics (*.png)");
     QString bmp_filter = tr("Windows Bitmap (*.bmp)");
@@ -856,7 +862,7 @@ void LteRlcGraphDialog::on_buttonBox_accepted()
             .arg(bmp_filter)
             .arg(jpeg_filter);
 
-    file_name = WiresharkFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save Graph As…")),
+    file_name = WiresharkFileDialog::getSaveFileName(this, mainApp->windowTitleString(tr("Save Graph As…")),
                                              path.canonicalPath(), filter, &extension);
 
     if (file_name.length() > 0) {
@@ -872,8 +878,7 @@ void LteRlcGraphDialog::on_buttonBox_accepted()
         }
         // else error dialog?
         if (save_ok) {
-            path = QDir(file_name);
-            wsApp->setLastOpenDir(path.canonicalPath().toUtf8().constData());
+            mainApp->setLastOpenDirFromFilename(file_name);
         }
     }
 }
@@ -881,16 +886,3 @@ void LteRlcGraphDialog::on_buttonBox_accepted()
 
 // No need to register tap listeners here.  This is done
 // in calls to the common functions in ui/tap-rlc-graph.c
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

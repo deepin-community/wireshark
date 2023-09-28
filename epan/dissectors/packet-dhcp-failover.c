@@ -346,7 +346,14 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 	offset += 1;
 
 	poffset = tvb_get_guint8(tvb, offset);
-	if (poffset < DHCPFO_FL_HDR_LEN) {
+	if (poffset == 8) {
+		bogus_poffset = FALSE;
+		proto_tree_add_uint_format_value(dhcpfo_tree,
+			hf_dhcpfo_poffset, tvb, offset, 1, poffset,
+			"%u (as per Draft, now treated as being %u)",
+			poffset, DHCPFO_FL_HDR_LEN);
+		poffset = DHCPFO_FL_HDR_LEN;
+	} else if (poffset < DHCPFO_FL_HDR_LEN) {
 		bogus_poffset = TRUE;
 		if (tree) {
 			proto_tree_add_uint_format_value(dhcpfo_tree,
@@ -381,7 +388,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 		timex.nsecs = 0;
 		proto_tree_add_time_format_value(dhcpfo_tree, hf_dhcpfo_time, tvb,
 		    offset, 4, &timex, "%s",
-		    abs_time_secs_to_str(wmem_packet_scope(), timex.secs, ABSOLUTE_TIME_LOCAL, TRUE));
+		    abs_time_secs_to_str(pinfo->pool, timex.secs, ABSOLUTE_TIME_LOCAL, TRUE));
 	}
 	offset += 4;
 
@@ -395,9 +402,6 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 
 	if (bogus_poffset)
 		return offset;	/* payload offset was bogus */
-
-	if (!tree)
-		return tvb_reported_length(tvb);
 
 	/* if there are any additional header bytes */
 	if (poffset != offset) {
@@ -458,7 +462,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 				expert_add_info_format(pinfo, oi, &ei_dhcpfo_bad_length, "assigned ip address is not 4 bytes long");
 				break;
 			}
-			proto_item_append_text(oi, ", %s ", tvb_ip_to_str(tvb, offset));
+			proto_item_append_text(oi, ", %s ", tvb_ip_to_str(pinfo->pool, tvb, offset));
 
 			proto_tree_add_item(option_tree,
 			    hf_dhcpfo_assigned_ip_address, tvb,	offset,
@@ -500,7 +504,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			 */
 			proto_tree_add_item_ret_string(option_tree,
 			    hf_dhcpfo_client_identifier, tvb, offset,
-			    option_length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &identifier);
+			    option_length, ENC_ASCII|ENC_NA, pinfo->pool, &identifier);
 
 			proto_item_append_text(oi,", \"%s\"", identifier);
 			}
@@ -526,7 +530,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 
 		case DHCP_FO_PD_FTDDNS:
 			proto_tree_add_item(option_tree, hf_dhcpfo_ftddns, tvb,
-			    offset, option_length, ENC_ASCII|ENC_NA);
+			    offset, option_length, ENC_ASCII);
 			break;
 
 		case DHCP_FO_PD_REJECT_REASON:
@@ -548,12 +552,12 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 
 		case DHCP_FO_PD_RELATIONSHIP_NAME:
 			proto_tree_add_item(option_tree, hf_dhcpfo_relationship_name, tvb,
-			    offset, option_length, ENC_ASCII|ENC_NA);
+			    offset, option_length, ENC_ASCII);
 			break;
 
 		case DHCP_FO_PD_MESSAGE:
 			proto_tree_add_item(option_tree, hf_dhcpfo_message, tvb,
-			    offset, option_length, ENC_ASCII|ENC_NA);
+			    offset, option_length, ENC_ASCII);
 			break;
 
 		case DHCP_FO_PD_MCLT:
@@ -570,9 +574,9 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 		case DHCP_FO_PD_VENDOR_CLASS:
 			proto_tree_add_item_ret_string(option_tree,
 			    hf_dhcpfo_vendor_class, tvb, offset,
-			    option_length, ENC_ASCII, wmem_packet_scope(), &vendor_class_str);
+			    option_length, ENC_ASCII, pinfo->pool, &vendor_class_str);
 			proto_item_append_text(oi,", \"%s\"",
-			    format_text(wmem_packet_scope(), vendor_class_str, option_length));
+			    format_text(pinfo->pool, vendor_class_str, option_length));
 			break;
 
 		case DHCP_FO_PD_LEASE_EXPIRATION_TIME:
@@ -583,7 +587,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			lease_expiration_time =
 			    tvb_get_ntohl(tvb, offset);
 			lease_expiration_time_str =
-			    abs_time_secs_to_str(wmem_packet_scope(), lease_expiration_time, ABSOLUTE_TIME_LOCAL, TRUE);
+			    abs_time_secs_to_str(pinfo->pool, lease_expiration_time, ABSOLUTE_TIME_LOCAL, TRUE);
 
 			proto_item_append_text(oi, ", %s",
 			    lease_expiration_time_str);
@@ -605,7 +609,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			    tvb_get_ntohl(tvb, offset);
 
 			potential_expiration_time_str =
-			    abs_time_secs_to_str(wmem_packet_scope(), potential_expiration_time, ABSOLUTE_TIME_LOCAL, TRUE);
+			    abs_time_secs_to_str(pinfo->pool, potential_expiration_time, ABSOLUTE_TIME_LOCAL, TRUE);
 
 			proto_item_append_text(oi, ", %s",
 			    potential_expiration_time_str);
@@ -626,7 +630,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			client_last_transaction_time =
 			    tvb_get_ntohl(tvb, offset);
 			client_last_transaction_time_str =
-			    abs_time_secs_to_str(wmem_packet_scope(), client_last_transaction_time, ABSOLUTE_TIME_LOCAL, TRUE);
+			    abs_time_secs_to_str(pinfo->pool, client_last_transaction_time, ABSOLUTE_TIME_LOCAL, TRUE);
 
 			proto_item_append_text(oi, ", %s",
 			    client_last_transaction_time_str);
@@ -636,7 +640,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			    offset, option_length,
 			    client_last_transaction_time,
 			    "%s",
-			    abs_time_secs_to_str(wmem_packet_scope(), client_last_transaction_time, ABSOLUTE_TIME_LOCAL, TRUE));
+			    abs_time_secs_to_str(pinfo->pool, client_last_transaction_time, ABSOLUTE_TIME_LOCAL, TRUE));
 			break;
 
 		case DHCP_FO_PD_START_TIME_OF_STATE:
@@ -647,7 +651,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			start_time_of_state =
 			    tvb_get_ntohl(tvb, offset);
 			start_time_of_state_str =
-			    abs_time_secs_to_str(wmem_packet_scope(), start_time_of_state, ABSOLUTE_TIME_LOCAL, TRUE);
+			    abs_time_secs_to_str(pinfo->pool, start_time_of_state, ABSOLUTE_TIME_LOCAL, TRUE);
 
 			proto_item_append_text(oi, ", %s",
 			    start_time_of_state_str);
@@ -657,7 +661,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 			    offset, option_length,
 			    start_time_of_state,
 			    "%s",
-			    abs_time_secs_to_str(wmem_packet_scope(), start_time_of_state, ABSOLUTE_TIME_LOCAL, TRUE));
+			    abs_time_secs_to_str(pinfo->pool, start_time_of_state, ABSOLUTE_TIME_LOCAL, TRUE));
 			break;
 
 		case DHCP_FO_PD_SERVERSTATE:
@@ -762,7 +766,7 @@ dissect_dhcpfo_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* da
 
 			proto_tree_add_item(option_tree,
 			    hf_dhcpfo_message_digest, tvb, offset+1,
-			    option_length-1, ENC_ASCII|ENC_NA);
+			    option_length-1, ENC_ASCII);
 			break;
 
 		case DHCP_FO_PD_PROTOCOL_VERSION:

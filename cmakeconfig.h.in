@@ -10,11 +10,14 @@
 
 #define VERSION_EXTRA "$ENV{WIRESHARK_VERSION_EXTRA}"
 
-/* Version number of package */
-#define VERSION "${CPACK_PACKAGE_VERSION}${VERSION_EXTRA}"
+/* Version number of Wireshark and associated utilities */
+#define VERSION "${PROJECT_VERSION}${VERSION_EXTRA}"
 #define VERSION_MAJOR ${PROJECT_MAJOR_VERSION}
 #define VERSION_MINOR ${PROJECT_MINOR_VERSION}
 #define VERSION_MICRO ${PROJECT_PATCH_VERSION}
+
+/* Version number of Logray and associated utilities */
+#define LOG_VERSION "${LOG_PROJECT_VERSION}${VERSION_EXTRA}"
 
 #define PLUGIN_PATH_ID "${PLUGIN_PATH_ID}"
 #define VERSION_FLAVOR "${VERSION_FLAVOR}"
@@ -34,17 +37,14 @@
 /* Enable AirPcap */
 #cmakedefine HAVE_AIRPCAP 1
 
-/* Define to 1 if you have the <alloca.h> header file. */
-#cmakedefine HAVE_ALLOCA_H 1
-
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #cmakedefine HAVE_ARPA_INET_H 1
 
 /* Define to 1 if you have the `clock_gettime` function. */
 #cmakedefine HAVE_CLOCK_GETTIME 1
 
-/* Define to 1 if you have the <fcntl.h> header file. */
-#cmakedefine HAVE_FCNTL_H 1
+/* Define to 1 if you have the `timespec_get` function. */
+#cmakedefine HAVE_TIMESPEC_GET 1
 
 /* Define to use the MaxMind DB library */
 #cmakedefine HAVE_MAXMINDDB 1
@@ -67,18 +67,6 @@
 /* Define if you have the 'dlget' function. */
 #cmakedefine HAVE_DLGET 1
 
-/* Define if you have the 'getexecname' function. */
-#cmakedefine HAVE_GETEXECNAME 1
-
-/* Define if you have the 'floorl' function. */
-#cmakedefine HAVE_FLOORL 1
-
-/* Define to 1 if you have the getopt_long function. */
-#cmakedefine HAVE_GETOPT_LONG 1
-
-/* Define to 1 if you have the <getopt.h> header file. */
-#cmakedefine HAVE_GETOPT_H 1
-
 /* Define to 1 if you have the <grp.h> header file. */
 #cmakedefine HAVE_GRP_H 1
 
@@ -91,6 +79,12 @@
 /* Define to 1 if you have the `krb5_c_fx_cf2_simple' function. */
 #cmakedefine HAVE_KRB5_C_FX_CF2_SIMPLE 1
 
+/* Define to 1 if you have the `decode_krb5_enc_tkt_part' function. */
+#cmakedefine HAVE_DECODE_KRB5_ENC_TKT_PART 1
+
+/* Define to 1 if you have the `encode_krb5_enc_tkt_part' function. */
+#cmakedefine HAVE_ENCODE_KRB5_ENC_TKT_PART 1
+
 /* Define to 1 if you have the `inflatePrime' function. */
 #cmakedefine HAVE_INFLATEPRIME 1
 
@@ -99,6 +93,9 @@
 
 /* Define to use kerberos */
 #cmakedefine HAVE_KERBEROS 1
+
+/* Define to use PCRE2 library */
+#define HAVE_PCRE2 1
 
 /* Define to use nghttp2 */
 #cmakedefine HAVE_NGHTTP2 1
@@ -129,6 +126,9 @@
 
 /* Define to 1 if you have the `smi' library (-lsmi). */
 #cmakedefine HAVE_LIBSMI 1
+
+/* Define to 1 if libsmi exports a version string (and that symbol is visible). */
+#cmakedefine HAVE_SMI_VERSION_STRING 1
 
 /* Define to use zlib library */
 #cmakedefine HAVE_ZLIB 1
@@ -165,9 +165,6 @@
 
 /* Define to use MIT kerberos */
 #cmakedefine HAVE_MIT_KERBEROS 1
-
-/* Define to 1 if you have the `mkstemps' function. */
-#cmakedefine HAVE_MKSTEMPS 1
 
 /* Define to 1 if you have the <netdb.h> header file. */
 #cmakedefine HAVE_NETDB_H 1
@@ -223,12 +220,6 @@
 /* Define to 1 if you have the <pwd.h> header file. */
 #cmakedefine HAVE_PWD_H 1
 
-/* Define to 1 if you have the optreset variable */
-#cmakedefine HAVE_OPTRESET 1
-
-/* Define if sa_len field exists in struct sockaddr */
-#cmakedefine HAVE_STRUCT_SOCKADDR_SA_LEN 1
-
 /* Define to 1 if you want to playing SBC by standalone BlueZ SBC library */
 #cmakedefine HAVE_SBC 1
 
@@ -262,11 +253,20 @@
 /* Define if you have the 'strptime' function. */
 #cmakedefine HAVE_STRPTIME 1
 
+/* Define if you have the 'memmem' function. */
+#cmakedefine HAVE_MEMMEM 1
+
+/* Define if you have the 'strcasestr' function. */
+#cmakedefine HAVE_STRCASESTR 1
+
+/* Define if you have the 'strerrorname_np' function. */
+#cmakedefine HAVE_STRERRORNAME_NP 1
+
+/* Define if you have the 'vasprintf' function. */
+#cmakedefine HAVE_VASPRINTF 1
+
 /* Define to 1 if `st_birthtime' is a member of `struct stat'. */
 #cmakedefine HAVE_STRUCT_STAT_ST_BIRTHTIME 1
-
-/* Define if st_flags field exists in struct stat */
-#cmakedefine HAVE_STRUCT_STAT_ST_FLAGS 1
 
 /* Define if st_blksize field exists in struct stat */
 #cmakedefine HAVE_STRUCT_STAT_ST_BLKSIZE 1
@@ -274,14 +274,8 @@
 /* Define to 1 if `__st_birthtime' is a member of `struct stat'. */
 #cmakedefine HAVE_STRUCT_STAT___ST_BIRTHTIME 1
 
-/* Define to 1 if you have the <sys/ioctl.h> header file. */
-#cmakedefine HAVE_SYS_IOCTL_H 1
-
 /* Define to 1 if you have the <sys/socket.h> header file. */
 #cmakedefine HAVE_SYS_SOCKET_H 1
-
-/* Define to 1 if you have the <sys/sockio.h> header file. */
-#cmakedefine HAVE_SYS_SOCKIO_H 1
 
 /* Define to 1 if you have the <sys/time.h> header file. */
 #cmakedefine HAVE_SYS_TIME_H 1
@@ -301,29 +295,8 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #cmakedefine HAVE_UNISTD_H 1
 
-/* Name of package */
-#cmakedefine PACKAGE
-
-/* Define to the address where bug reports for this package should be sent. */
-#cmakedefine PACKAGE_BUGREPORT
-
-/* Define to the full name of this package. */
-#cmakedefine PACKAGE_NAME
-
-/* Define to the full name and version of this package. */
-#cmakedefine PACKAGE_STRING
-
-/* Define to the one symbol short name of this package. */
-#cmakedefine PACKAGE_TARNAME
-
-/* Define to the version of this package. */
-#cmakedefine PACKAGE_VERSION
-
 /* Define if we have QtMultimedia */
-#define QT_MULTIMEDIA_LIB 1
-
-/* Define if we have QtMacExtras */
-#cmakedefine QT_MACEXTRAS_LIB 1
+#cmakedefine QT_MULTIMEDIA_LIB 1
 
 /* Build androiddump with libpcap instead of wireshark stuff */
 #cmakedefine ANDROIDDUMP_USE_LIBPCAP 1
@@ -333,52 +306,30 @@
 /* Note: not use in the code */
 #cmakedefine YYTEXT_POINTER
 
+/* Define to 1 if the 'ssize_t' type exists. */
+#cmakedefine HAVE_SSIZE_T 1
+
+#if defined(_MSC_VER)
+#  define strncasecmp strnicmp
+#  define popen       _popen
+#  define pclose      _pclose
+#endif
+
 #if defined(_WIN32)
-   /*
-    * Make sure everyone is using the same API and that it's sufficient
-    * for our needs.
-    * This should match the following:
-    * - The <compatibility><application> section in image\wireshark.exe.manifest.in
-    * - The GetWindowsVersion parts of packaging\nsis\wireshark.nsi
-    * - The VersionNT parts of packaging\wix\Prerequisites.wxi
-    */
-#  if defined(NTDDI_VERSION)
-#    error NTDDI_VERSION already defined.
-#  endif
-#  define NTDDI_VERSION NTDDI_WIN7
-#  if defined(_WIN32_WINNT)
-#    error _WIN32_WINNT already defined.
-#  endif
-#  define _WIN32_WINNT _WIN32_WINNT_WIN7
-
-   /* WpdPack/INclude/pcap/pcap.h checks for "#if defined(WIN32)" */
-#  ifndef WIN32
-#    define WIN32	1
-#  endif
-
-#  if !defined(QT_VERSION) || !defined(_SSIZE_T_DEFINED)
-   typedef int ssize_t;
-#  endif
-
    /*
     * Flex (v 2.5.35) uses this symbol to "exclude" unistd.h
     */
 #  define YY_NO_UNISTD_H
 
-#  define strncasecmp strnicmp
-#  define popen       _popen
-#  define pclose      _pclose
-
 #  ifndef __STDC__
 #    define __STDC__ 0
 #  endif
-   /* Use Unicode in Windows runtime functions. */
-#  define UNICODE 1
-#  define _UNICODE 1
-
-#  define NEED_STRPTIME_H 1
 #endif
 
-#include <ws_diag_control.h>
+#ifdef HAVE_PCRE2
+#define PCRE2_CODE_UNIT_WIDTH  8
+#endif
+
+#include <ws_log_defs.h>
 
 #endif /* __CONFIG_H__ */

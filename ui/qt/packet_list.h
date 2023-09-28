@@ -1,4 +1,4 @@
-/* packet_list.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -71,9 +71,11 @@ public:
     bool contextMenuActive();
     QString getFilterFromRowAndColumn(QModelIndex idx);
     void resetColorized();
-    QString packetComment();
-    void setPacketComment(QString new_comment);
+    QString getPacketComment(guint c_number);
+    void addPacketComment(QString new_comment);
+    void setPacketComment(guint c_number, QString new_comment);
     QString allPacketComments();
+    void deleteCommentsFromPackets();
     void deleteAllPacketComments();
     void setVerticalAutoScroll(bool enabled = true);
     void setCaptureInProgress(bool in_progress = false) { capture_in_progress_ = in_progress; tail_at_end_ = in_progress; }
@@ -89,6 +91,8 @@ public:
 
     QString createSummaryText(QModelIndex idx, SummaryCopyType type);
     QString createHeaderSummaryText(SummaryCopyType type);
+
+    void resizeAllColumns(bool onlyTimeFormatted = false);
 
 protected:
 
@@ -134,7 +138,8 @@ private:
     bool rows_inserted_;
     bool columns_changed_;
     bool set_column_visibility_;
-    QModelIndexList frozen_rows_;
+    QModelIndex frozen_current_row_;
+    QModelIndexList frozen_selected_rows_;
     QVector<int> selection_history_;
     int cur_history_;
     bool in_history_;
@@ -198,16 +203,3 @@ private slots:
 };
 
 #endif // PACKET_LIST_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

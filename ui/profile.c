@@ -24,6 +24,7 @@
 #include "ui/recent.h"
 
 #include <wsutil/file_util.h>
+#include <wsutil/ws_assert.h>
 
 static GList *current_profiles = NULL;
 static GList *edited_profiles = NULL;
@@ -45,7 +46,7 @@ add_profile_entry(GList *fl, const char *profilename, const char *reference, int
 {
     profile_def *profile;
 
-    profile = (profile_def *) g_malloc0(sizeof(profile_def));
+    profile = g_new0(profile_def, 1);
     profile->name = g_strdup(profilename);
     profile->reference = g_strdup(reference);
     profile->status = status;
@@ -113,7 +114,7 @@ gchar *apply_profile_changes(void)
         profile1 = (profile_def *) fl1->data;
         g_strstrip(profile1->name);
         if ((err_msg = profile_name_is_valid(profile1->name)) != NULL) {
-            gchar *message = g_strdup_printf("%s\nProfiles unchanged.", err_msg);
+            gchar *message = ws_strdup_printf("%s\nProfiles unchanged.", err_msg);
             g_free(err_msg);
             return message;
         }
@@ -130,7 +131,7 @@ gchar *apply_profile_changes(void)
         g_strstrip(profile1->name);
         if (profile1->status == PROF_STAT_COPY) {
             if (create_persconffile_profile(profile1->name, &pf_dir_path) == -1) {
-                err_msg = g_strdup_printf("Can't create directory\n\"%s\":\n%s.",
+                err_msg = ws_strdup_printf("Can't create directory\n\"%s\":\n%s.",
                         pf_dir_path, g_strerror(errno));
 
                 g_free(pf_dir_path);
@@ -268,7 +269,7 @@ empty_profile_list(gboolean edit_list)
             *flpp = remove_profile_entry(*flpp, g_list_first(*flpp));
         }
 
-        g_assert(g_list_length(*flpp) == 0);
+        ws_assert(g_list_length(*flpp) == 0);
         if ( ! edited_profiles )
             edited_profiles = NULL;
     }
@@ -279,7 +280,7 @@ empty_profile_list(gboolean edit_list)
         *flpp = remove_profile_entry(*flpp, g_list_first(*flpp));
     }
 
-    g_assert(g_list_length(*flpp) == 0);
+    ws_assert(g_list_length(*flpp) == 0);
     if ( ! current_profiles )
         current_profiles = NULL;
 }
@@ -327,7 +328,7 @@ init_profile_list(void)
     if ((dir = ws_dir_open(profiles_dir, 0, NULL)) != NULL) {
         while ((file = ws_dir_read_name(dir)) != NULL) {
             name = ws_dir_get_name(file);
-            filename = g_strdup_printf ("%s%s%s", profiles_dir, G_DIR_SEPARATOR_S, name);
+            filename = ws_strdup_printf ("%s%s%s", profiles_dir, G_DIR_SEPARATOR_S, name);
 
             if (test_for_directory(filename) == EISDIR) {
                 local_profiles = g_list_prepend(local_profiles, g_strdup(name));
@@ -350,7 +351,7 @@ init_profile_list(void)
     if ((dir = ws_dir_open(profiles_dir, 0, NULL)) != NULL) {
         while ((file = ws_dir_read_name(dir)) != NULL) {
             name = ws_dir_get_name(file);
-            filename = g_strdup_printf ("%s%s%s", profiles_dir, G_DIR_SEPARATOR_S, name);
+            filename = ws_strdup_printf ("%s%s%s", profiles_dir, G_DIR_SEPARATOR_S, name);
 
             if (test_for_directory(filename) == EISDIR) {
                 global_profiles = g_list_prepend(global_profiles, g_strdup(name));
@@ -394,18 +395,18 @@ profile_name_is_valid(const gchar *name)
         invalid = TRUE;
     }
     if (invalid) {
-        reason = g_strdup_printf("start or end with period (.), or contain any of the following characters:\n"
+        reason = ws_strdup_printf("start or end with period (.), or contain any of the following characters:\n"
                 "   \\ / : * ? \" &lt; &gt; |");
     }
 #else
     if (strchr(name, '/')) {
         /* Invalid character in directory */
-        reason = g_strdup_printf("contain the '/' character.");
+        reason = ws_strdup_printf("contain the '/' character.");
     }
 #endif
 
     if (reason) {
-        message = g_strdup_printf("A profile name cannot %s", reason);
+        message = ws_strdup_printf("A profile name cannot %s", reason);
         g_free(reason);
         return message;
     }
@@ -430,16 +431,3 @@ gboolean delete_current_profile(void) {
     }
     return FALSE;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

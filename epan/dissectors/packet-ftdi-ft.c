@@ -981,7 +981,7 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
             }
             else
             {
-                fd_head = fragment_get_reassembled(&ftdi_reassembly_table, desegment_data->first_frame);
+                fd_head = fragment_get_reassembled_id(&ftdi_reassembly_table, pinfo, desegment_data->first_frame);
                 payload_tvb = process_reassembled_data(tvb, 0, pinfo, "Reassembled", fd_head,
                                                        &ftdi_frag_items, NULL, ftdi_tree);
             }
@@ -989,7 +989,7 @@ dissect_serial_payload(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, prot
             if (next_desegment_data)
             {
                 fragment_head *next_head;
-                next_head = fragment_get_reassembled(&ftdi_reassembly_table, next_desegment_data->first_frame);
+                next_head = fragment_get_reassembled_id(&ftdi_reassembly_table, pinfo, next_desegment_data->first_frame);
                 process_reassembled_data(tvb, 0, pinfo, "Reassembled", next_head, &ftdi_frag_items, NULL, ftdi_tree);
             }
 
@@ -1511,12 +1511,12 @@ proto_register_ftdi_ft(void)
             NULL, HFILL }
         },
         { &hf_setup_hindex_baud_high,
-          { "Baud High", "ftdi-ft.hIndex.b0",
+          { "Baud High", "ftdi-ft.baud_high.b0",
             FT_UINT8, BASE_HEX, NULL, (1 << 0),
             NULL, HFILL }
         },
         { &hf_setup_hindex_baud_clock_divide,
-          { "Baud Clock Divide off", "ftdi-ft.hIndex.b1",
+          { "Baud Clock Divide off", "ftdi-ft.baud_clock_divide.b1",
             FT_BOOLEAN, 8, NULL, (1 << 1),
             "When active 120 MHz is max frequency instead of 48 MHz", HFILL }
         },

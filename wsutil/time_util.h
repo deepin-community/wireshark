@@ -1,4 +1,4 @@
-/* time_util.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -10,16 +10,27 @@
 #ifndef __TIME_UTIL_H__
 #define __TIME_UTIL_H__
 
-#include "ws_symbol_export.h"
-
+#include <wireshark.h>
 #include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
+/** Converts a broken down date representation, relative to UTC,
+ * to a timestamp
+ */
 WS_DLL_PUBLIC
 time_t mktime_utc(struct tm *tm);
+
+/** Validate the values in a time_t.
+ * Currently checks tm_year, tm_mon, tm_mday, tm_hour, tm_min, and tm_sec;
+ * disregards tm_wday, tm_yday, and tm_isdst.
+ *
+ * @param tm The struct tm to validate.
+ */
+WS_DLL_PUBLIC
+gboolean tm_is_valid(struct tm *tm);
 
 /** Fetch the process CPU time.
  *
@@ -50,6 +61,15 @@ void log_resource_usage(gboolean reset_delta, const char *format, ...);
  */
 WS_DLL_PUBLIC
 guint64 create_timestamp(void);
+
+WS_DLL_PUBLIC
+struct timespec *ws_clock_get_realtime(struct timespec *ts);
+
+/*
+ * Portability wrapper around strptime().
+ */
+WS_DLL_PUBLIC
+char *ws_strptime(const char *s, const char *format, struct tm *tm);
 
 #ifdef __cplusplus
 }

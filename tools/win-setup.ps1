@@ -11,17 +11,8 @@
 
 #requires -version 2
 
-# Makefile.nmake + win-setup.sh does:
-# - verify_tools: Checks required executables. CMake does this.
-# - clean_setup: Removes current and past lib dirs.
-# - process_libs: calls libverify or download for each lib.
-
 # To do:
-# - Make this the source of truth. Keep the list of libs here.
-# - Download everything unconditionally, at least initially.
-
-# Bugs:
-# - Unzipping from the shell seems to be slower than Cygwin's unzip or 7zip.
+# - Use Expand-Archive instead of `cmake -E tar`? That requires PS >= 5.0
 
 <#
 .SYNOPSIS
@@ -33,34 +24,43 @@ Wireshark.
 
 .PARAMETER Destination
 Specifies the destination directory for the text files. The path must
-contain the pattern "wireshark-*-libs-3.4".
+contain the pattern "wireshark-*-libs-4.0".
 
 .PARAMETER Platform
-Target platform. One of "win64" or "win32".
+Target platform. Must be "win64".
+
+.PARAMETER CMakeExecutable
+Specifies the path to the CMake executable, which is used to extract archives.
 
 .INPUTS
 -Destination Destination directory.
 -Platform Target platform.
+-CMakeExecutable Path to CMake.
 
 .OUTPUTS
 A set of libraries required to compile Wireshark on Windows, along with
 their compressed archives.
-A date stamp (current-tag.txt)
+A manifest file (library-manifest.xml)
 
 .EXAMPLE
-C:\PS> .\tools\win-setup.ps1 -Destination C:\wireshark-win64-libs-3.4 -Platform win64
+C:\PS> .\tools\win-setup.ps1 -Destination C:\wireshark-master-64-libs-4.0 -Platform win64
 #>
 
 Param(
     [Parameter(Mandatory=$true, Position=0)]
-    [ValidateScript({$_ -like "*\wireshark-*-libs-3.4"})]
+    [ValidateScript({$_ -like "*[/\]wireshark-*-libs-4.0"})]
     [String]
     $Destination,
 
     [Parameter(Mandatory=$true, Position=1)]
-    [ValidateSet("win32", "win64")]
+    [ValidateSet("win64")]
     [String]
-    $Platform
+    $Platform,
+
+    [Parameter(Mandatory=$false, Position=3)]
+    [ValidateScript({$_ | Test-Path -Type leaf })]
+    [String]
+    $CMakeExecutable = "CMake"
 )
 
 # Variables
@@ -69,106 +69,64 @@ Param(
 # trouble instead of trying to catch exceptions everywhere.
 $ErrorActionPreference = "Stop"
 
-$Win64CurrentTag = "2021-05-29-3.4"
-$Win32CurrentTag = "2021-05-29-3.4"
-
 # Archive file / SHA256
 $Win64Archives = @{
-    "AirPcap_Devpack_4_1_0_1622.zip" = "09d637f28a79b1d2ecb09f35436271a90c0f69bd0a1ee82b803abaaf63c18a69";
-    "bcg729-1.0.4-win64ws.zip" = "9a095fda4c39860d96f0c568830faa6651cd17635f68e27aa6de46c689aa0ee2";
-    "brotli-1.0.2-4-win64ws.zip" = "f60636764f0e2539ad86d37826e90445a346291f8d046bd4f5c998301f200195";
-    "c-ares-1.15.0-win64ws.zip" = "3c4bfbbcbfe5e792660cb79769fc2a1996fa9938ec595247f611e7c59b1a62da";
-    "gnutls-3.6.3-1-win64ws.zip" = "994ac2578e7b4ca01e589ab2598927d53f7370bc3ff679f3006b0e6bb7a06df4";
-    "krb5-1.17-1-win64ws.zip" = "1f4a7ab86ae331ea9e58c9776a60def81ae9fe622882b2e8da2ad6ce6f6fb1d8";
-    "libgcrypt-1.8.3-win64ws.zip" = "53b1c636cb89de308ca4ea01b4990cf1deca7f6c2446189c7ff6e971137ffd76";
-    "libilbc-2.0.2-3-win64ws.zip" = "d7baeb98627c405bd7c3e41d6b07c4ea4f0f5db88436e566148320afd10cbb66";
-    "libpcap-1.9.1-1-win64ws.zip" = "5713acad1b095b0351c3b05d7c8e51351af91ae19c306bb1aa985b69c5af7f16";
-    "libsmi-svn-40773-win64ws.zip" = "571fcee71d741bf847c3247d4c2e1c42388ca6a9feebe08fc0d4ce053571d15d";
-    "libssh-0.7.3-1-win64ws.zip" = "3a81b9f4a914a46f15243bbb13b6919ef1c20d4bf502c47646caeccff2cbd75c";
-    "lua-5.2.4-unicode-win64-vc14.zip" = "e8968d2c7871ce1ea82cbd29ac1b3a2c59d3dec25e483c5e12de85df66f5d928";
-    "lz4-1.8.3-win64ws.zip" = "2634ed7c132f50e8cf6dc25e9f1b6f2a3b3e4980b812cada7ef42b20fc1fba17";
-    "MaxMindDB-1.3.2-win64ws.zip" = "9025c43e9b21ff0bfbaf206b8ed96e2920ef1434107f789e4c7c0c1d8b508952";
-    "minizip-1.2.11-4-win64ws.zip" = "dd6bf24e2d946465ad19aa4f8c38e0db91da6585887935de68011982cd6fb2cb";
-    "nghttp2-1.39.2-win64ws.zip" = "a53f4074bffd919539d90c8d0cde2ea6a10a383f14e38b706e7e70e55476e6bf";
-    "opus-1.3.1-3-win64ws.zip" = "1f7a55a6d2d7215dffa4a43bca8ca05024bd4ba1ac3d0d0c405fd38b09cc2205";
-    "sbc-1.3-1-win64ws.zip" = "08cef6898c421277a6582ef3225d8820f74a037cbd5b6e673a4d8f4593ce80a1";
-    "snappy-1.1.3-1-win64ws.zip" = "692a15e70f2cdeca621988a46e936d3651e7feb5176981f2656a5e913c394bcc";
-    "spandsp-0.0.6-2-win64ws.zip" = "2eb8278633037f60f44815ea1606486ab5dcdf3bddc500b20c9fe356856236b2";
-    "vcpkg-export-20190318-win64ws.zip" = "72c2c43594b0581de2bc86517870a561cc40df294662502536b2a6c06cace87e";
-    "WinSparkle-0.5.7.zip" = "56d396ef0c4e8b0589ea74134e484376ca6459d972cd1ab1da6b9624d82e6d04";
-    "zstd-1.4.0-win64ws.zip" = "154199227bdfdfa608972bcdcea38e20768937085e5a59a8fa06c72d07b00d6b";
-}
-
-$Win32Archives = @{
-    "AirPcap_Devpack_4_1_0_1622.zip" = "09d637f28a79b1d2ecb09f35436271a90c0f69bd0a1ee82b803abaaf63c18a69";
-    "bcg729-1.0.4-win32ws.zip" = "b785ec78dec6bca8252130eb884bfa28c1140001dd7369a535579176de9e4271";
-    "brotli-1.0.2-4-win32ws.zip" = "193a9b35e42a73f77dabe2c99c57173d7f2bb215118c1cd027a6cf522cc3dc14";
-    "c-ares-1.15.0-win32ws.zip" = "ddcdbdcc6c526496ed2083010fd913fb8a565ab726c86dfc57f30e65522f332d";
-    "gnutls-3.6.3-1-win32ws.zip" = "42d8313ffb888f525d6c39330c39bcc2182e68ee8433a09dd85e1f1e1474f592";
-    "krb5-1.17-1-win32ws.zip" = "f90cac08355ccfe624652d3e05f8e2e077b8830382315d4ea0a6fa52af08260b";
-    "libgcrypt-1.8.3-win32ws.zip" = "409b72f2809019050cca91b9e670047c50a0752ff52999089178da54ef926393";
-    "libilbc-2.0.2-3-win32ws.zip" = "b87967b5e46cd96d178bc3b3dbba5a75c069ef28ab8a86838c9d004690703997";
-    "libpcap-1.9.1-1-win32ws.zip" = "431d8a6bac7a5e80ff8c7f1fc99388fb17c9555589b368577dc8c9d2f4499275";
-    "libsmi-svn-40773-win32ws.zip" = "44bc81edfeb8948322ca365fc632e419383907c305cc922e6b74fdbb13827958";
-    "libssh-0.7.3-1-win32ws.zip" = "b02f0d318175194ac538a24c9c9fc280a0ecad69fb3afd4945c106b4b7c4fa6f";
-    "lua-5.2.4-unicode-win32-vc14.zip" = "ca2368a83f623674178e9441f71fb791e3c0b46f208e3dac28c6ac735f034bff";
-    "lz4-1.8.3-win32ws.zip" = "6f77128f901d480ee0b82ab4fe5956e0f02fdcb2198d6d349e0b2fa1ac77c805";
-    "MaxMindDB-1.3.2-win32ws.zip" = "5c8b4bf3092da8fad6edb005a5283c6a74b7e115a50da010953eed77d33c11b7";
-    "minizip-1.2.11-4-win32ws.zip" = "41e113930902c2519c4644e8307a0cc51c5855e001e1e69768c48deb376142d0";
-    "nghttp2-1.39.2-win32ws.zip" = "b511260befc210c1d6d0e920e5f5c47b9e6a21baee6e9874ef12a92093abd245";
-    "opus-1.3.1-3-win32ws.zip" = "9700b14c8945fcfed2188b806a2ee7e8628922c22569a4c5183075f3dc133177";
-    "sbc-1.3-1-win32ws.zip" = "ad37825e9ace4b849a5442c08f1ed7e30634e6b774bba4307fb86f35f82e71ba";
-    "snappy-1.1.3-1-win32ws.zip" = "2508ef7c5d27655c356d7b86a00ac887fc178eab5df63595b8793953dae5c379";
-    "spandsp-0.0.6-2-win32ws.zip" = "31a4b5ca228c719ab4190e1b46801f1483efb8756f1e33d10ecc915244612fca";
-    "vcpkg-export-20190318-win32ws.zip" = "5f9eb78b1ea9e6762c2a4104e0126f1f5453919dc9df66fef2b1e0be8d8c5829";
-    "WinSparkle-0.5.7.zip" = "56d396ef0c4e8b0589ea74134e484376ca6459d972cd1ab1da6b9624d82e6d04";
-    "zstd-1.4.0-win32ws.zip" = "9141716d4d749e67dad40d4aab6bbb3206085bf68e5acb03baf1e5667aa0b6f5";
+    "AirPcap/AirPcap_Devpack_4_1_0_1622.zip" = "09d637f28a79b1d2ecb09f35436271a90c0f69bd0a1ee82b803abaaf63c18a69";
+    "bcg729/bcg729-1.0.4-win64ws.zip" = "9a095fda4c39860d96f0c568830faa6651cd17635f68e27aa6de46c689aa0ee2";
+    "brotli/brotli-1.0.9-1-win64ws.zip" = "3f8d24aec8668201994327ff8d8542fe507d1d468a500a1aec50d0415f695aab";
+    "c-ares/c-ares-1.18.1-1-win64ws.zip" = "61183970996150e2eb137dfa7f5842ffa6e0eec2819634d5bdadc84013f8411d";
+    "gnutls/gnutls-3.6.3-1-win64ws.zip" = "994ac2578e7b4ca01e589ab2598927d53f7370bc3ff679f3006b0e6bb7a06df4";
+    "krb5/krb5-1.17-1-win64ws.zip" = "1f4a7ab86ae331ea9e58c9776a60def81ae9fe622882b2e8da2ad6ce6f6fb1d8";
+    "libgcrypt/libgcrypt-1.10.1-2-win64ws.zip" = "61e1157f7623ef70e39ddf3aa6689ca581dc2ed14461515f149f83f11d0fb0a5";
+    "libilbc/libilbc-2.0.2-3-win64ws.zip" = "d7baeb98627c405bd7c3e41d6b07c4ea4f0f5db88436e566148320afd10cbb66";
+    "libmaxminddb/libmaxminddb-1.4.3-1-win64ws.zip" = "ee89944a19ab6e1c873bdecb9fc6205d317c41e6da6ec1d30bc892fddfd143da";
+    "libpcap/libpcap-1.10.1-1-win64ws.zip" = "59f8e0e90a3ab5671df561266ed2b02870a6f8f3a895b80c9db19fea9a12ffb2";
+    "libsmi/libsmi-svn-40773-win64ws.zip" = "571fcee71d741bf847c3247d4c2e1c42388ca6a9feebe08fc0d4ce053571d15d";
+    "libssh/libssh-0.9.5-win64ws.zip" = "3226fcb89969a77643bd2bca7a1ff6b5a79261b680a09a6bfedb3d40f7a187e3";
+    "lua/lua-5.2.4-unicode-win64-vc14.zip" = "e8968d2c7871ce1ea82cbd29ac1b3a2c59d3dec25e483c5e12de85df66f5d928";
+    "lz4/lz4-1.9.3-1-win64ws.zip" = "7129515893ffdc439f4ffe9673c4bc43f9042e910bb2607e68dde6b99a1ab058";
+    "minizip/minizip-1.2.11-4-win64ws.zip" = "dd6bf24e2d946465ad19aa4f8c38e0db91da6585887935de68011982cd6fb2cb";
+    "nghttp2/nghttp2-1.46.0-1-win64ws.zip" = "5769f1efc218faec3b59eba4f83b44f86bf6fa381d80ceb0d8882e796fa54b23";
+    "opus/opus-1.3.1-3-win64ws.zip" = "1f7a55a6d2d7215dffa4a43bca8ca05024bd4ba1ac3d0d0c405fd38b09cc2205";
+    "pcre2/pcre2-10.40-1-win64ws.zip" = "17eee615990b23bc859a862c19f5ac10c61776587603bc452285abe073a0fad9";
+    "sbc/sbc-1.3-1-win64ws.zip" = "08cef6898c421277a6582ef3225d8820f74a037cbd5b6e673a4d8f4593ce80a1";
+    "snappy/snappy-1.1.9-1-win64ws.zip" = "fa907724be019bcc55d27ebe88257ba8898b5c38b719099b8164ac78600d81cc";
+    "spandsp/spandsp-0.0.6-2-win64ws.zip" = "2eb8278633037f60f44815ea1606486ab5dcdf3bddc500b20c9fe356856236b2";
+    "vcpkg-export/vcpkg-export-20220726-1-win64ws.zip" = "b1eaa8124802532fa8d30789219906f90fb80908844e4458327b3f73995a44b0";
+    "WinSparkle/WinSparkle-0.8.0-4-gb320893.zip" = "3ae42326bcd34594bc21b1e7948863a839ee76e87d9f4cf6b59b9d9f9a083881";
+    "zstd/zstd-1.5.2-1-win64ws.zip" = "d920afe636951cfcf144824d9c075d1f2c13387f4739152fe185fd9c09fc58f2";
 }
 
 # Subdirectory to extract an archive to
 $ArchivesSubDirectory = @{
-    "AirPcap_Devpack_4_1_0_1622.zip" = "AirPcap_Devpack_4_1_0_1622";
+    "AirPcap/AirPcap_Devpack_4_1_0_1622.zip" = "AirPcap_Devpack_4_1_0_1622";
 }
 
 # Plain file downloads
 
-$Win32Files = @{
-    "npcap-1.31.exe" = "d6ad41e38e240b19a1db57e3ceb21ac3c7fa4d970ee6f446a0ac10fdc4bf9ec5";
-    "USBPcapSetup-1.5.4.0.exe" = "87a7edf9bbbcf07b5f4373d9a192a6770d2ff3add7aa1e276e82e38582ccb622";
-}
-
 $Win64Files = @{
-    "npcap-1.31.exe" = "d6ad41e38e240b19a1db57e3ceb21ac3c7fa4d970ee6f446a0ac10fdc4bf9ec5";
-    "USBPcapSetup-1.5.4.0.exe" = "87a7edf9bbbcf07b5f4373d9a192a6770d2ff3add7aa1e276e82e38582ccb622";
+    "Npcap/npcap-1.71.exe" = "5ccb61296c48e3f8cd20db738784bd7bf0daf8fce630f89892678b6dda4e533c";
+    "USBPcap/USBPcapSetup-1.5.4.0.exe" = "87a7edf9bbbcf07b5f4373d9a192a6770d2ff3add7aa1e276e82e38582ccb622";
 }
 
 $Archives = $Win64Archives;
 $Files = $Win64Files;
-$CurrentTag = $Win64CurrentTag;
-
-if ($Platform -eq "win32") {
-    $Archives = $Win32Archives;
-    $Files = $Win32Files;
-    $CurrentTag = $Win32CurrentTag;
-}
+$CurrentManifest = $Archives + $Files
 
 $CleanupItems = @(
     "bcg729-1.0.4-win??ws"
-    "brotli-1.0.2-4-win??ws"
+    "brotli-1.0.*-win??ws"
     "c-ares-1.9.1-1-win??ws"
     "c-ares-1.1*-win??ws"
     "gnutls-3.?.*-*-win??ws"
-    "glib2-2.*-win??ws"
-    "gtk2"
-    "gtk3"
-    "json-glib-1.0.2-*-win??ws"
-    "kfw-3-2-2*"
     "krb5-*-win??ws"
     "libgcrypt-*-win??ws"
     "libilbc-2.0.2-3-win??ws"
+    "libmaxminddb-1.4.3-1-win??ws"
+    "libpcap-1.9.1-1-win??ws"
     "libsmi-0.4.8"
     "libsmi-svn-40773-win??ws"
-    "libssh-0.7.?-win??ws"
+    "libssh-0.*-win??ws"
     "libxml2-*-win??ws"
     "lua5.1.4"
     "lua5.2.?"
@@ -179,34 +137,28 @@ $CleanupItems = @(
     "minizip-*-win??ws"
     "nghttp2-*-win??ws"
     "opus-1.3.1-?-win??ws"
-    "portaudio_v19"
-    "portaudio_v19_2"
+    "pcre2-*-win??ws"
     "sbc-1.3-win??ws"
-    "snappy-1.1.3-win??ws"
+    "snappy-1.1.*-win??ws"
     "spandsp-0.0.6-win??ws"
-    "upx301w"
-    "upx303w"
     "user-guide"
     "vcpkg-export-*-win??ws"
-    "zlib-1.2.5"
-    "zlib-1.2.8"
-    "zlib-1.2.*-ws"
     "zstd-*-win??ws"
     "AirPcap_Devpack_4_1_0_1622"
-    "GeoIP-1.*-win??ws"
     "WinSparkle-0.3-44-g2c8d9d3-win??ws"
     "WinSparkle-0.5.?"
-    "WpdPack"
     "current-tag.txt"
+    "library-manifest.xml"
 )
 
-[Uri] $DownloadPrefix = "https://anonsvn.wireshark.org/wireshark-$($Platform)-libs/tags/$($CurrentTag)/packages"
-$Global:SevenZip = "7-zip-not-found"
+# The dev-libs site repository is at
+# https://gitlab.com/wireshark/wireshark-development-libraries
+[Uri] $DownloadPrefix = "https://dev-libs.wireshark.org/windows/packages"
 $proxy = $null
 
 # Functions
 
-# Verifies the contents of a file against a SHA256 checksum.
+# Verifies the contents of a file against a SHA256 hash.
 # Returns success (0) if the file exists and verifies.
 # Returns error (1) if the file does not exist.
 # Returns error (2) if the integrity check fails (an error is also printed).
@@ -225,7 +177,7 @@ function VerifyIntegrity($filename, $hash) {
         $hexHash = ([System.BitConverter]::ToString($binaryHash) -Replace "-").ToLower()
         $hash = $hash.ToLower()
         if ($hexHash -ne $hash) {
-            Write-Warning "$($filename): computed checksum $hexHash did NOT match $hash"
+            Write-Warning "$($filename): computed file hash $hexHash did NOT match $hash"
             return 2
         }
         return 0
@@ -235,14 +187,14 @@ function VerifyIntegrity($filename, $hash) {
 }
 
 # Downloads a file and checks its integrity. If a corrupt file already exists,
-# it is removed and re-downloaded. Succeeds only if the SHA256 checksum matches.
-function DownloadFile($fileName, $checksum, [Uri] $fileUrl = $null) {
+# it is removed and re-downloaded. Succeeds only if the SHA256 hash matches.
+function DownloadFile($fileName, $fileHash, [Uri] $fileUrl = $null) {
     if ([string]::IsNullOrEmpty($fileUrl)) {
         $fileUrl = "$DownloadPrefix/$fileName"
     }
-    $destinationFile = "$Destination\$fileName"
+    $destinationFile = "$Destination\" + [string](Split-Path -Leaf $fileName)
     if (Test-Path $destinationFile -PathType 'Leaf') {
-        if ((VerifyIntegrity $destinationFile $checksum) -ne 0) {
+        if ((VerifyIntegrity $destinationFile $fileHash) -ne 0) {
             Write-Output "$fileName is corrupt, removing and retrying download."
             Remove-Item $destinationFile
         } else {
@@ -261,88 +213,29 @@ function DownloadFile($fileName, $checksum, [Uri] $fileUrl = $null) {
     $webClient.proxy = $Script:proxy
     $webClient.DownloadFile($fileUrl, "$destinationFile")
     Write-Output "Verifying $destinationFile"
-    if ((VerifyIntegrity $destinationFile $checksum) -ne 0) {
+    if ((VerifyIntegrity $destinationFile $fileHash) -ne 0) {
         Write-Output "Download is corrupted, aborting!"
         exit 1
     }
 }
 
-# Find 7-Zip, downloading it if necessary.
-# If we ever add NuGet support we might be able to use
-# https://github.com/thoemmi/7Zip4Powershell
-function Bootstrap7Zip() {
-    $searchExes = @("7z.exe", "7za.exe")
-    $binDir = "$Destination\bin"
-
-    # First, check $env:Path.
-    foreach ($exe in $searchExes) {
-        if (Get-Command $exe -ErrorAction SilentlyContinue)  {
-            $Global:SevenZip = "$exe"
-            Write-Output "Found 7-zip on the path"
-            return
-        }
-    }
-
-    # Next, look in a few likely places.
-    $searchDirs = @(
-        "${env:ProgramFiles}\7-Zip"
-        "${env:ProgramFiles(x86)}\7-Zip"
-        "${env:ProgramW6432}\7-Zip"
-        "${env:ChocolateyInstall}\bin"
-        "${env:ChocolateyInstall}\tools"
-        "$binDir"
-    )
-
-    foreach ($dir in $searchDirs) {
-        if ($dir -ne $null -and (Test-Path $dir -PathType 'Container')) {
-            foreach ($exe in $searchExes) {
-                if (Test-Path "$dir\$exe" -PathType 'Leaf') {
-                    $Global:SevenZip = "$dir\$exe"
-                    Write-Output "Found 7-zip at $dir\$exe"
-                    return
-                }
-            }
-        }
-    }
-
-    # Finally, download a copy from anonsvn.
-    if ( -not (Test-Path $binDir -PathType 'Container') ) {
-        New-Item -ItemType 'Container' "$binDir" > $null
-    }
-
-    Write-Output "Unable to find 7-zip, retrieving from anonsvn into $binDir\7za.exe"
-    [Uri] $bbUrl = "https://anonsvn.wireshark.org/wireshark-win32-libs/trunk/bin/7za.exe"
-    $checksum = "77613cca716edf68b9d5bab951463ed7fade5bc0ec465b36190a76299c50f117"
-    DownloadFile "bin\7za.exe" "$checksum" "$bbUrl"
-
-    $Global:SevenZip = "$binDir\7za.exe"
-}
-
-function DownloadArchive($fileName, $checksum, $subDir) {
-    DownloadFile $fileName $checksum
-    # $shell = New-Object -com shell.application
-    $archiveFile = "$Destination\$fileName"
+function DownloadArchive($fileName, $fileHash, $subDir) {
+    DownloadFile $fileName $fileHash
+    $archiveFile = "$Destination\" + [string](Split-Path -Leaf $fileName)
     $archiveDir = "$Destination\$subDir"
     if ($subDir -and -not (Test-Path $archiveDir -PathType 'Container')) {
         New-Item -ItemType Directory -Path $archiveDir > $null
     }
-    if (Test-Path 'env:WIRESHARK_DO_NOT_USE_7ZIP') {
-        # Display a progress bar while extracting and overwriting existing files.
-        Expand-Archive $archiveFile $archiveDir -Force -ErrorVariable $expandError
-        if ($expandError) {
-            exit 1
-        }
-        return
-    }
 
     $activity = "Extracting into $($archiveDir)"
-    Write-Progress -Activity "$activity" -Status "Running 7z x $archiveFile ..."
-    & "$SevenZip" x "-o$archiveDir" -y "$archiveFile" 2>&1 |
-        Set-Variable -Name SevenZOut
-    $bbStatus = $LASTEXITCODE
+    Write-Progress -Activity "$activity" -Status "Extracting $archiveFile using CMake ..."
+    Push-Location "$archiveDir"
+    & "$CMakeExecutable" -E tar xf "$archiveFile" 2>&1 | Set-Variable -Name CMakeOut
+    $cmStatus = $LASTEXITCODE
+    Pop-Location
     Write-Progress -Activity "$activity" -Status "Done" -Completed
-    if ($bbStatus -gt 0) {
-        Write-Output $SevenZOut
+    if ($cmStatus -gt 0) {
+        Write-Output $CMakeOut
         exit 1
     }
 }
@@ -360,15 +253,18 @@ $Destination = $(Get-Item -Path ".\")
 Write-Output "Working in $Destination"
 
 # Check our last known state
-$destinationTag = "INVALID"
-$tagFile = "current_tag.txt"
-if ((Test-Path $tagFile -PathType 'Leaf') -and -not ($Force)) {
-    $destinationTag = Get-Content $tagFile
+$destinationManifest = @{ "INVALID" = "INVALID" }
+$manifestFile = "library-manifest.xml"
+if ((Test-Path $manifestFile -PathType 'Leaf') -and -not ($Force)) {
+    $destinationManifest = Import-Clixml $manifestFile
 }
 
-if ($destinationTag -ne $CurrentTag) {
-    Write-Output "Tag $CurrentTag not found. Refreshing."
-    Bootstrap7Zip
+function ManifestList($manifestHash) {
+    $manifestHash.keys | Sort | ForEach-Object { "$_ : $($manifestHash[$_])" }
+}
+
+if (Compare-Object -ReferenceObject (ManifestList($destinationManifest)) -DifferenceObject (ManifestList($CurrentManifest))) {
+    Write-Output "Current library manifest not found. Refreshing."
     $activity = "Removing directories"
     foreach ($oldItem in $CleanupItems) {
         if (Test-Path $oldItem) {
@@ -378,7 +274,7 @@ if ($destinationTag -ne $CurrentTag) {
     }
     Write-Progress -Activity "$activity" -Status "Done" -Completed
 } else {
-    Write-Output "Tag $CurrentTag found. Skipping."
+    Write-Output "Current library manifest found. Skipping download."
     exit 0
 }
 
@@ -394,4 +290,4 @@ foreach ($item in $Archives.GetEnumerator() | Sort-Object -property key) {
 }
 
 # Save our last known state
-Set-Content -Path $tagFile -Value "$CurrentTag"
+$CurrentManifest | Export-Clixml -Path $manifestFile -Encoding utf8

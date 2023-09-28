@@ -450,7 +450,8 @@ static int hf_aim_rendezvous_extended_data_message_text = -1;
 
 static int hf_aim_messaging_plugin = -1;
 static int hf_aim_icbm_client_err_length = -1;
-static int hf_aim_messaging_unknown = -1;
+static int hf_aim_messaging_unknown_uint8 = -1;
+static int hf_aim_messaging_unknown_uint16 = -1;
 static int hf_aim_icbm_client_err_downcounter = -1;
 static int hf_aim_messaging_unknown_data = -1;
 static int hf_aim_messaging_plugin_specific_data = -1;
@@ -577,13 +578,13 @@ static const aim_family
 }
 
 static int
-aim_get_buddyname( guint8 **name, tvbuff_t *tvb, int offset)
+aim_get_buddyname(wmem_allocator_t *pool, guint8 **name, tvbuff_t *tvb, int offset)
 {
 	guint8 buddyname_length;
 
 	buddyname_length = tvb_get_guint8(tvb, offset);
 
-	*name = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 1, buddyname_length, ENC_UTF_8|ENC_NA);
+	*name = tvb_get_string_enc(pool, tvb, offset + 1, buddyname_length, ENC_UTF_8|ENC_NA);
 
 	return buddyname_length;
 }
@@ -852,9 +853,9 @@ dissect_aim_buddyname(tvbuff_t *tvb, packet_info *pinfo _U_, int offset,
 	{
 		buddy_tree = proto_tree_add_subtree_format(tree, tvb, offset-1, 1+buddyname_length,
 					 ett_aim_buddyname, NULL, "Buddy: %s",
-					 tvb_format_text(tvb, offset, buddyname_length));
+					 tvb_format_text(pinfo->pool, tvb, offset, buddyname_length));
 		proto_tree_add_item(buddy_tree, hf_aim_buddyname_len, tvb, offset-1, 1, ENC_BIG_ENDIAN);
-		proto_tree_add_item(buddy_tree, hf_aim_buddyname, tvb, offset, buddyname_length, ENC_UTF_8|ENC_NA);
+		proto_tree_add_item(buddy_tree, hf_aim_buddyname, tvb, offset, buddyname_length, ENC_UTF_8);
 	}
 
 	return offset+buddyname_length;
@@ -1179,14 +1180,14 @@ dissect_aim_tlv_value_dcinfo(proto_item *ti, guint16 valueid _U_, tvbuff_t *tvb,
 }
 
 static int
-dissect_aim_tlv_value_string (proto_item *ti, guint16 valueid _U_, tvbuff_t *tvb, packet_info *pinfo _U_)
+dissect_aim_tlv_value_string (proto_item *ti, guint16 valueid _U_, tvbuff_t *tvb, packet_info *pinfo)
 {
 	guint8 *buf;
 	gint string_len;
 
 	string_len = tvb_reported_length(tvb);
-	buf = tvb_get_string_enc(wmem_packet_scope(), tvb, 0, string_len, ENC_UTF_8|ENC_NA);
-	proto_item_set_text(ti, "Value: %s", format_text(wmem_packet_scope(), buf, string_len));
+	buf = tvb_get_string_enc(pinfo->pool, tvb, 0, string_len, ENC_UTF_8|ENC_NA);
+	proto_item_set_text(ti, "Value: %s", format_text(pinfo->pool, buf, string_len));
 
 	return string_len;
 }
@@ -1234,7 +1235,7 @@ dissect_aim_tlv_value_uint16 (proto_item *ti, guint16 valueid _U_, tvbuff_t *tvb
 static int
 dissect_aim_tlv_value_ipv4 (proto_item *ti, guint16 valueid _U_, tvbuff_t *tvb, packet_info *pinfo _U_)
 {
-	proto_item_set_text(ti, "Value: %s", tvb_ip_to_str(tvb, 0));
+	proto_item_set_text(ti, "Value: %s", tvb_ip_to_str(pinfo->pool, tvb, 0));
 	return 4;
 }
 
@@ -1303,11 +1304,11 @@ dissect_aim_tlv_value_messageblock (proto_item *ti, guint16 valueid _U_, tvbuff_
 		offset += 2;
 
 		/* The actual message */
-		buf = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, blocklen - 4, ENC_ASCII|ENC_NA);
+		buf = tvb_get_string_enc(pinfo->pool, tvb, offset, blocklen - 4, ENC_ASCII|ENC_NA);
 		proto_item_append_text(ti, "Message: %s ",
-				    format_text(wmem_packet_scope(), buf, blocklen - 4));
+				    format_text(pinfo->pool, buf, blocklen - 4));
 		proto_tree_add_item(entry, hf_aim_messageblock_message, tvb,
-				    offset, blocklen-4, ENC_ASCII|ENC_NA);
+				    offset, blocklen-4, ENC_ASCII);
 
 		offset += blocklen-4;
 	}
@@ -1866,11 +1867,11 @@ static int dissect_aim_buddylist_oncoming(tvbuff_t *tvb, packet_info *pinfo, pro
 {
 	guint8 *buddyname;
 	int    offset           = 0;
-	int    buddyname_length = aim_get_buddyname( &buddyname, tvb, offset );
+	int    buddyname_length = aim_get_buddyname( pinfo->pool, &buddyname, tvb, offset );
 
 	col_set_str(pinfo->cinfo, COL_INFO, "Oncoming Buddy");
 	col_append_fstr(pinfo->cinfo, COL_INFO, ": %s",
-					format_text(wmem_packet_scope(), buddyname, buddyname_length));
+					format_text(pinfo->pool, buddyname, buddyname_length));
 
 	offset += dissect_aim_buddyname(tvb, pinfo, offset, buddy_tree);
 
@@ -1889,11 +1890,11 @@ static int dissect_aim_buddylist_offgoing(tvbuff_t *tvb, packet_info *pinfo, pro
 
 	guint8 *buddyname;
 	int    offset           = 0;
-	int    buddyname_length = aim_get_buddyname( &buddyname, tvb, offset );
+	int    buddyname_length = aim_get_buddyname( pinfo->pool, &buddyname, tvb, offset );
 
 	col_set_str(pinfo->cinfo, COL_INFO, "Offgoing Buddy");
 	col_append_fstr(pinfo->cinfo, COL_INFO, ": %s",
-					format_text(wmem_packet_scope(), buddyname, buddyname_length));
+					format_text(pinfo->pool, buddyname, buddyname_length));
 
 	offset += dissect_aim_buddyname(tvb, pinfo, offset, buddy_tree);
 
@@ -1967,8 +1968,8 @@ static int dissect_aim_chat_outgoing_msg(tvbuff_t *tvb, packet_info *pinfo, prot
 	guchar *msg;
 	int buddyname_length;
 
-	msg=(guchar *)wmem_alloc(wmem_packet_scope(), 1000);
-	buddyname_length = aim_get_buddyname( &buddyname, tvb, 30 );
+	msg=(guchar *)wmem_alloc(pinfo->pool, 1000);
+	buddyname_length = aim_get_buddyname( pinfo->pool, &buddyname, tvb, 30 );
 
 	/* channel message from client */
 	aim_get_message( msg, tvb, 40 + buddyname_length, tvb_reported_length(tvb)
@@ -1987,8 +1988,8 @@ static int dissect_aim_chat_incoming_msg(tvbuff_t *tvb, packet_info *pinfo, prot
 	/* channel message to client */
 	int buddyname_length;
 
-	msg=(guchar *)wmem_alloc(wmem_packet_scope(), 1000);
-	buddyname_length = aim_get_buddyname( &buddyname, tvb, 30 );
+	msg=(guchar *)wmem_alloc(pinfo->pool, 1000);
+	buddyname_length = aim_get_buddyname( pinfo->pool, &buddyname, tvb, 30 );
 
 	aim_get_message( msg, tvb, 36 + buddyname_length, tvb_reported_length(tvb)
 					 - 36 - buddyname_length );
@@ -2417,7 +2418,7 @@ aim_generic_family( gchar *result, guint32 famnum )
 {
 	const aim_family *family = aim_get_family(famnum);
 
-	g_snprintf( result, ITEM_LABEL_LENGTH, "%s (0x%x)", family?family->name:"Unknown", famnum);
+	snprintf( result, ITEM_LABEL_LENGTH, "%s (0x%x)", family?family->name:"Unknown", famnum);
 }
 
 static const aim_subtype aim_fnac_family_generic[] = {
@@ -2714,7 +2715,7 @@ static int dissect_aim_snac_location_request_user_information(tvbuff_t *tvb, pac
 	offset += 1;
 
 	/* Buddy name */
-	proto_tree_add_item(tree, hf_aim_location_buddyname, tvb, offset, buddyname_length, ENC_UTF_8|ENC_NA);
+	proto_tree_add_item(tree, hf_aim_location_buddyname, tvb, offset, buddyname_length, ENC_UTF_8);
 	offset += buddyname_length;
 
 	return offset;
@@ -2731,7 +2732,7 @@ static int dissect_aim_snac_location_user_information(tvbuff_t *tvb, packet_info
 	offset += 1;
 
 	/* Buddy name */
-	proto_tree_add_item(tree, hf_aim_location_buddyname, tvb, offset, buddyname_length, ENC_UTF_8|ENC_NA);
+	proto_tree_add_item(tree, hf_aim_location_buddyname, tvb, offset, buddyname_length, ENC_UTF_8);
 	offset += buddyname_length;
 
 	/* Warning level */
@@ -3017,9 +3018,9 @@ dissect_aim_msg_outgoing(tvbuff_t *tvb, packet_info *pinfo, proto_tree *msg_tree
 	offset += 2;
 
 	/* Add the outgoing username to the info column */
-	buddyname_length = aim_get_buddyname(&buddyname, tvb, offset);
+	buddyname_length = aim_get_buddyname(pinfo->pool, &buddyname, tvb, offset);
 	col_append_fstr(pinfo->cinfo, COL_INFO, " to: %s",
-			format_text(wmem_packet_scope(), buddyname, buddyname_length));
+			format_text(pinfo->pool, buddyname, buddyname_length));
 
 	offset = dissect_aim_buddyname(tvb, pinfo, offset, msg_tree);
 
@@ -3179,7 +3180,7 @@ dissect_aim_rendezvous_extended_message(tvbuff_t *tvb, proto_tree *msg_tree)
 	proto_tree_add_item(msg_tree, hf_aim_rendezvous_extended_data_message_priority_code, tvb, offset, 2, ENC_BIG_ENDIAN); offset+=2;
 	text_length = tvb_get_letohs(tvb, offset);
 	proto_tree_add_item_ret_uint(msg_tree, hf_aim_rendezvous_extended_data_message_text_length, tvb, offset, 2, ENC_BIG_ENDIAN, &text_length); offset+=2;
-	proto_tree_add_item(msg_tree, hf_aim_rendezvous_extended_data_message_text, tvb, offset, text_length, ENC_ASCII|ENC_NA); /* offset+=text_length; */
+	proto_tree_add_item(msg_tree, hf_aim_rendezvous_extended_data_message_text, tvb, offset, text_length, ENC_ASCII); /* offset+=text_length; */
 
 	offset = tvb_reported_length(tvb);
 
@@ -3217,9 +3218,9 @@ dissect_aim_tlv_value_extended_data(proto_tree *entry, guint16 valueid _U_, tvbu
 	proto_tree_add_item(entry, hf_aim_icbm_client_err_protocol_version, tvb, offset, 2, ENC_BIG_ENDIAN); offset+=2;
 
 	offset = dissect_aim_plugin(entry, tvb, offset, &plugin_uuid);
-	proto_tree_add_item(entry, hf_aim_messaging_unknown, tvb, offset, 2, ENC_LITTLE_ENDIAN); offset += 2;
+	proto_tree_add_item(entry, hf_aim_messaging_unknown_uint16, tvb, offset, 2, ENC_LITTLE_ENDIAN); offset += 2;
 	proto_tree_add_item(entry, hf_aim_icbm_client_err_client_caps_flags, tvb, offset, 4, ENC_BIG_ENDIAN); offset+=4;
-	proto_tree_add_item(entry, hf_aim_messaging_unknown, tvb, offset, 1, ENC_NA);	offset += 1;
+	proto_tree_add_item(entry, hf_aim_messaging_unknown_uint8, tvb, offset, 1, ENC_NA);	offset += 1;
 	proto_tree_add_item(entry, hf_aim_icbm_client_err_downcounter, tvb, offset, 2, ENC_LITTLE_ENDIAN); /* offset += 2;*/
 
 	offset = start_offset + length;
@@ -3387,10 +3388,10 @@ static int dissect_aim_snac_signon_signon(tvbuff_t *tvb, packet_info *pinfo,
 	offset += 1;
 
 	/* Buddy Name */
-	buddyname_length = aim_get_buddyname( &buddyname, tvb, offset );
+	buddyname_length = aim_get_buddyname( pinfo->pool, &buddyname, tvb, offset );
 
 	col_append_fstr(pinfo->cinfo, COL_INFO, " Username: %s",
-			format_text(wmem_packet_scope(), buddyname, buddyname_length));
+			format_text(pinfo->pool, buddyname, buddyname_length));
 
 	if(tree) {
 		offset+=dissect_aim_buddyname(tvb, pinfo, offset, tree);
@@ -3412,7 +3413,7 @@ static int dissect_aim_snac_signon_signon_reply(tvbuff_t *tvb,
 	offset += 2;
 
 	/* Challenge */
-	proto_tree_add_item(tree, hf_aim_signon_challenge, tvb, offset, challenge_length, ENC_UTF_8|ENC_NA);
+	proto_tree_add_item(tree, hf_aim_signon_challenge, tvb, offset, challenge_length, ENC_UTF_8);
 	offset += challenge_length;
 	return offset;
 }
@@ -3491,7 +3492,7 @@ static int dissect_ssi_item(tvbuff_t *tvb, packet_info *pinfo, int offset, proto
 
 	/* Buddy Name */
 	if (buddyname_length > 0) {
-		proto_tree_add_item(ssi_entry, hf_aim_fnac_subtype_ssi_buddyname, tvb, offset, buddyname_length, ENC_UTF_8|ENC_NA);
+		proto_tree_add_item(ssi_entry, hf_aim_fnac_subtype_ssi_buddyname, tvb, offset, buddyname_length, ENC_UTF_8);
 		offset += buddyname_length;
 	}
 
@@ -3607,7 +3608,7 @@ static int dissect_aim_snac_ssi_auth_request(tvbuff_t *tvb, packet_info *pinfo _
 
 	/* show buddy name */
 	if (buddyname_length > 0) {
-		proto_tree_add_item(tree, hf_aim_fnac_subtype_ssi_buddyname, tvb, offset, buddyname_length, ENC_UTF_8|ENC_NA);
+		proto_tree_add_item(tree, hf_aim_fnac_subtype_ssi_buddyname, tvb, offset, buddyname_length, ENC_UTF_8);
 		offset += buddyname_length;
 	}
 	/* get reason message length (2 bytes) */
@@ -3617,7 +3618,7 @@ static int dissect_aim_snac_ssi_auth_request(tvbuff_t *tvb, packet_info *pinfo _
 
 	/* show reason message if present */
 	if (reason_length > 0) {
-		proto_tree_add_item(tree, hf_aim_fnac_subtype_ssi_reason_str, tvb, offset, reason_length, ENC_UTF_8|ENC_NA);
+		proto_tree_add_item(tree, hf_aim_fnac_subtype_ssi_reason_str, tvb, offset, reason_length, ENC_UTF_8);
 		offset += reason_length;
 	}
 
@@ -3641,7 +3642,7 @@ static int dissect_aim_snac_ssi_auth_reply(tvbuff_t *tvb, packet_info *pinfo _U_
 
 	/* show buddy name */
 	if (buddyname_length > 0) {
-		proto_tree_add_item(tree, hf_aim_fnac_subtype_ssi_buddyname, tvb, offset, buddyname_length, ENC_UTF_8|ENC_NA);
+		proto_tree_add_item(tree, hf_aim_fnac_subtype_ssi_buddyname, tvb, offset, buddyname_length, ENC_UTF_8);
 		offset += buddyname_length;
 	}
 
@@ -3656,7 +3657,7 @@ static int dissect_aim_snac_ssi_auth_reply(tvbuff_t *tvb, packet_info *pinfo _U_
 
 	/* show reason message if present */
 	if (reason_length > 0) {
-		proto_tree_add_item(tree, hf_aim_fnac_subtype_ssi_reason_str, tvb, offset, reason_length, ENC_UTF_8|ENC_NA);
+		proto_tree_add_item(tree, hf_aim_fnac_subtype_ssi_reason_str, tvb, offset, reason_length, ENC_UTF_8);
 		offset += reason_length;
 	}
 
@@ -3808,7 +3809,7 @@ static const aim_subtype aim_fnac_family_translate[] = {
  ***********************************************************************************************************/
 static int dissect_aim_userlookup_search(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *lookup_tree)
 {
-	proto_tree_add_item(lookup_tree, hf_aim_userlookup_email, tvb, 0, tvb_reported_length(tvb), ENC_UTF_8|ENC_NA);
+	proto_tree_add_item(lookup_tree, hf_aim_userlookup_email, tvb, 0, tvb_reported_length(tvb), ENC_UTF_8);
 	return tvb_reported_length(tvb);
 }
 
@@ -4147,7 +4148,7 @@ proto_register_aim(void)
 		    { "New warning level", "aim_generic.evil.new_warn_level", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_generic_idle_time,
-		    { "Idle time (seconds)", "aim_generic.idle_time", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL },
+		    { "Idle time (seconds)", "aim_generic.idle_time", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL },
 		},
 		{ &hf_generic_client_ver_req_offset,
 		    { "Client Verification Request Offset", "aim_generic.client_verification.offset", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL },
@@ -4328,7 +4329,8 @@ proto_register_aim(void)
 		/* Generated from convert_proto_tree_add_text.pl */
 		{ &hf_aim_messaging_plugin, { "Plugin", "aim_messaging.plugin", FT_GUID, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 		{ &hf_aim_icbm_client_err_length, { "Length", "aim_messaging.clienterr.length", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
-		{ &hf_aim_messaging_unknown, { "Unknown", "aim_messaging.unknown", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+		{ &hf_aim_messaging_unknown_uint8, { "Unknown", "aim_messaging.unknown_uint8", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
+		{ &hf_aim_messaging_unknown_uint16, { "Unknown", "aim_messaging.unknown_uint16", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 		{ &hf_aim_icbm_client_err_downcounter, { "Downcounter?", "aim_messaging.clienterr.downcounter", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 		{ &hf_aim_messaging_unknown_data, { "Unknown", "aim_messaging.unknown_bytes", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
 		{ &hf_aim_messaging_plugin_specific_data, { "Plugin-specific data", "aim_messaging.plugin_specific_data", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},

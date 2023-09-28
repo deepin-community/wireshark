@@ -19,6 +19,7 @@
 #include <epan/expert.h>
 #include <epan/ipproto.h>
 #include <epan/addr_resolv.h>
+#include <wsutil/ws_roundup.h>
 
 void proto_register_openflow_v6(void);
 void proto_reg_handoff_openflow_v6(void);
@@ -1118,16 +1119,22 @@ dissect_openflow_v6_oxs(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 static int
 dissect_openflow_stats_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
+    proto_item *ti;
     guint32 stats_length;
     int oxs_end;
     guint32 padding;
 
     proto_tree_add_item(tree, hf_openflow_v6_stats_reserved, tvb, offset, 2, ENC_NA);
 
-    proto_tree_add_item_ret_uint(tree, hf_openflow_v6_stats_length, tvb, offset+2, 2, ENC_BIG_ENDIAN, &stats_length);
+    ti = proto_tree_add_item_ret_uint(tree, hf_openflow_v6_stats_length, tvb, offset+2, 2, ENC_BIG_ENDIAN, &stats_length);
 
     oxs_end = offset + stats_length;
     offset+=4;
+
+    if (stats_length < 4) {
+        expert_add_info(pinfo, ti, &ei_openflow_v6_length_too_short);
+        return offset;
+    }
 
     while (offset < oxs_end) {
         offset = dissect_openflow_v6_oxs(tvb, pinfo, tree, offset, oxs_end - offset);
@@ -1138,7 +1145,7 @@ dissect_openflow_stats_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tre
         offset = oxs_end;
     }
 
-    padding = ((stats_length + 7) & ~7) - stats_length;
+    padding = WS_ROUNDUP_8(stats_length) - stats_length;
     if (padding) {
         proto_tree_add_item(tree, hf_openflow_v6_stats_pad, tvb, oxs_end, padding, ENC_NA);
         offset += padding;
@@ -2863,7 +2870,7 @@ dissect_openflow_port_desc_prop_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
         while(offset < fields_end) {
             offset = dissect_openflow_oxm_v6(tvb, pinfo, prop_tree, offset, length);
         }
-        offset+=((prop_length + 7) & ~7) - prop_length;
+        offset+=WS_ROUNDUP_8(prop_length) - prop_length;
         break;
 
     case OFPPDPT_RECIRCULATE:
@@ -2872,7 +2879,7 @@ dissect_openflow_port_desc_prop_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
             proto_tree_add_item(tree, hf_openflow_v6_port_desc_prop_recirculate_port_no, tvb, offset, 4, ENC_BIG_ENDIAN);
             offset += 4;
         }
-        offset+=((prop_length + 7) & ~7) - prop_length;
+        offset+=WS_ROUNDUP_8(prop_length) - prop_length;
         break;
 
     case OFPPDPT_EXPERIMENTER:
@@ -2947,7 +2954,7 @@ dissect_openflow_port_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 
     /* uint8_t hw_addr[OFP_ETH_ALEN]; */
     proto_tree_add_item(port_tree, hf_openflow_v6_port_hw_addr, tvb, offset, OFP_ETH_ALEN, ENC_NA);
-    proto_item_append_text(port_tree, ": %s", tvb_ether_to_str(tvb, offset));
+    proto_item_append_text(port_tree, ": %s", tvb_ether_to_str(pinfo->pool, tvb, offset));
     offset+=OFP_ETH_ALEN;
 
     /* uint8_t pad2[2]; */
@@ -2955,9 +2962,9 @@ dissect_openflow_port_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
     offset+=2;
 
     /* char name[OFP_MAX_PORT_NAME_LEN]; Null-terminated */
-    proto_tree_add_item(port_tree, hf_openflow_v6_port_name, tvb, offset, OFP_MAX_PORT_NAME_LEN, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(port_tree, hf_openflow_v6_port_name, tvb, offset, OFP_MAX_PORT_NAME_LEN, ENC_ASCII);
 
-    proto_item_append_text(port_tree, " (%s)", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, OFP_ETH_ALEN, ENC_ASCII));
+    proto_item_append_text(port_tree, " (%s)", tvb_get_string_enc(pinfo->pool, tvb, offset, OFP_ETH_ALEN, ENC_ASCII));
     offset+=OFP_MAX_PORT_NAME_LEN;
 
     /* uint32_t config; */
@@ -4019,7 +4026,7 @@ dissect_openflow_table_features_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
     offset+=5;
 
     /* char name[OFP_MAX_TABLE_NAME_LEN]; */
-    proto_tree_add_item(feat_tree, hf_openflow_v6_table_features_name, tvb, offset, OFP_MAX_TABLE_NAME_LEN, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(feat_tree, hf_openflow_v6_table_features_name, tvb, offset, OFP_MAX_TABLE_NAME_LEN, ENC_ASCII);
     offset+=OFP_MAX_TABLE_NAME_LEN;
 
     /* uint64_t metadata_match; */
@@ -4480,23 +4487,23 @@ static void
 dissect_openflow_switch_description_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset, guint16 length _U_)
 {
     /* char mfr_desc[DESC_STR_LEN]; */
-    proto_tree_add_item(tree, hf_openflow_v6_switch_description_mfr_desc, tvb, offset, DESC_STR_LEN, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_openflow_v6_switch_description_mfr_desc, tvb, offset, DESC_STR_LEN, ENC_ASCII);
     offset+=DESC_STR_LEN;
 
     /* char hw_desc[DESC_STR_LEN]; */
-    proto_tree_add_item(tree, hf_openflow_v6_switch_description_hw_desc, tvb, offset, DESC_STR_LEN, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_openflow_v6_switch_description_hw_desc, tvb, offset, DESC_STR_LEN, ENC_ASCII);
     offset+=DESC_STR_LEN;
 
     /* char sw_desc[DESC_STR_LEN]; */
-    proto_tree_add_item(tree, hf_openflow_v6_switch_description_sw_desc, tvb, offset, DESC_STR_LEN, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_openflow_v6_switch_description_sw_desc, tvb, offset, DESC_STR_LEN, ENC_ASCII);
     offset+=DESC_STR_LEN;
 
     /* char serial_num[SERIAL_NUM_LEN]; */
-    proto_tree_add_item(tree, hf_openflow_v6_switch_description_serial_num, tvb, offset, SERIAL_NUM_LEN, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_openflow_v6_switch_description_serial_num, tvb, offset, SERIAL_NUM_LEN, ENC_ASCII);
     offset+=SERIAL_NUM_LEN;
 
     /* char dp_desc[DESC_STR_LEN]; */
-    proto_tree_add_item(tree, hf_openflow_v6_switch_description_dp_desc, tvb, offset, DESC_STR_LEN, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_openflow_v6_switch_description_dp_desc, tvb, offset, DESC_STR_LEN, ENC_ASCII);
     /*offset+=DESC_STR_LEN;*/
 }
 
@@ -4553,7 +4560,7 @@ dissect_openflow_flow_desc_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree 
     offset+=2;
 
     /* uint16_t importance; */
-    proto_tree_add_item(desc_tree, hf_openflow_v6_flow_desc_importance, tvb, offset, 4, ENC_BIG_ENDIAN);
+    proto_tree_add_item(desc_tree, hf_openflow_v6_flow_desc_importance, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset+=2;
 
     /* uint64_t cookie; */
@@ -5554,6 +5561,11 @@ dissect_openflow_queue_desc_prop_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto
         break;
 
     case OFPQDPT_EXPERIMENTER:
+        if (prop_len <= 16) {
+            expert_add_info(pinfo, ti, &ei_openflow_v6_length_too_short);
+            offset = length;
+            break;
+        }
         /* uint32_t experimenter; */
         proto_tree_add_item(prop_tree, hf_openflow_v6_queue_desc_prop_experimenter_experimenter, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset+=4;
@@ -5569,6 +5581,11 @@ dissect_openflow_queue_desc_prop_v6(tvbuff_t *tvb, packet_info *pinfo _U_, proto
         break;
 
     default:
+        if (prop_len <= 8) {
+            expert_add_info(pinfo, ti, &ei_openflow_v6_length_too_short);
+            offset = length;
+            break;
+        }
         proto_tree_add_expert_format(prop_tree, pinfo, &ei_openflow_v6_queue_desc_prop_undecoded,
                                      tvb, offset, prop_len - 8, "Unknown queue property body.");
         offset+=prop_len-8;
@@ -5664,7 +5681,7 @@ dissect_openflow_controller_status_prop_v6(tvbuff_t *tvb, packet_info *pinfo _U_
     switch (prop_type) {
     case OFPCSPT_URI:
         /* uint8_t uri[0]; */
-        proto_tree_add_item(tree, hf_openflow_v6_controller_status_prop_uri, tvb, offset, prop_length - 4, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_openflow_v6_controller_status_prop_uri, tvb, offset, prop_length - 4, ENC_ASCII);
         offset += body_end;
         break;
     case OFPCSPT_EXPERIMENTER:
@@ -10109,7 +10126,7 @@ proto_register_openflow_v6(void)
         },
         { &hf_openflow_v6_metermod_command,
             { "Command", "openflow_v6.metermod.command",
-               FT_UINT8, BASE_DEC, VALS(openflow_v6_metermod_command_values), 0x0,
+               FT_UINT16, BASE_DEC, VALS(openflow_v6_metermod_command_values), 0x0,
                NULL, HFILL }
         },
         { &hf_openflow_v6_metermod_flags,
@@ -10179,7 +10196,7 @@ proto_register_openflow_v6(void)
         },
         { &hf_openflow_v6_bundle_control_type,
             { "Type", "openflow_v6.bundle_control.type",
-               FT_UINT8, BASE_HEX, VALS(openflow_v6_bundle_control_type_values), 0x0,
+               FT_UINT16, BASE_HEX, VALS(openflow_v6_bundle_control_type_values), 0x0,
                NULL, HFILL }
         },
         { &hf_openflow_v6_bundle_control_flags,

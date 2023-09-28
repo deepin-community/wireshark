@@ -14,15 +14,15 @@
 
 #include <glib.h>
 
-#include <capchild/capture_session.h>
-#include <capchild/capture_sync.h>
+#include <capture/capture_session.h>
+#include <capture/capture_sync.h>
 
-#include <caputils/ws80211_utils.h>
+#include <capture/ws80211_utils.h>
 
 #include "ui/ws_ui_util.h"
 #include <wsutil/utf8_entities.h>
-#include <wsutil/frequency-utils.h>
-#include "wireshark_application.h"
+#include <wsutil/802_11-utils.h>
+#include "main_application.h"
 
 #include <QProcess>
 #include <QAbstractItemView>
@@ -71,7 +71,7 @@ WirelessFrame::WirelessFrame(QWidget *parent) :
     ui->fcsFilterFrame->setVisible(ws80211_has_fcs_filter());
 
     updateInterfaceList();
-    connect(wsApp, &WiresharkApplication::localInterfaceEvent,
+    connect(mainApp, &MainApplication::localInterfaceEvent,
             this, &WirelessFrame::handleInterfaceEvent);
 }
 
@@ -346,7 +346,7 @@ void WirelessFrame::setInterfaceInfo()
     }
 
     if (!err_str.isEmpty()) {
-        wsApp->pushStatus(WiresharkApplication::TemporaryStatus, err_str);
+        mainApp->pushStatus(MainApplication::TemporaryStatus, err_str);
     }
 
     getInterfaceInfo();
@@ -391,16 +391,3 @@ void WirelessFrame::on_fcsComboBox_activated(int)
 {
     setInterfaceInfo();
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

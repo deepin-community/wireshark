@@ -9,12 +9,6 @@
 
 ADD_CUSTOM_CMAKE_INCLUDE()
 
-
-include_directories(
-	${CMAKE_CURRENT_BINARY_DIR}
-	${CMAKE_CURRENT_SOURCE_DIR}
-)
-
 set(CRYPT_HEADER_FILES
 	dot11decrypt_debug.h
 	dot11decrypt_int.h
@@ -30,20 +24,14 @@ set(CRYPT_HEADER_FILES
 set(CRYPT_FILES
 	dot11decrypt.c
 	dot11decrypt_tkip.c
+	dot11decrypt_util.c
 	${CUSTOM_CRYPT_SRC}
 )
 
-if (GCRYPT_VERSION VERSION_LESS 1.6.0)
-	list(APPEND CRYPT_FILES
-		dot11decrypt_ccmp_compat.c
-	)
-else()
-	list(APPEND CRYPT_FILES
-		dot11decrypt_ccmp.c
-		dot11decrypt_util.c
-		dot11decrypt_gcmp.c
-	)
-endif()
+list(APPEND CRYPT_FILES
+	dot11decrypt_ccmp.c
+	dot11decrypt_gcmp.c
+)
 
 source_group(crypt FILES ${CRYPT_FILES})
 
@@ -60,6 +48,14 @@ add_library(crypt OBJECT
 	${CRYPT_FILES}
 )
 
+target_include_directories(crypt
+	SYSTEM PRIVATE
+		${GCRYPT_INCLUDE_DIRS}
+	PRIVATE
+		${CMAKE_CURRENT_BINARY_DIR}
+		${CMAKE_CURRENT_SOURCE_DIR}
+)
+
 set_target_properties(crypt PROPERTIES
 	FOLDER "Libs/epan/crypt"
 	COMPILE_DEFINITIONS "WS_BUILD_DLL"
@@ -69,7 +65,6 @@ CHECKAPI(
 	NAME
 	  crypt
 	SWITCHES
-	  -g termoutput
 	SOURCES
 	  ${CRYPT_FILES}
 )

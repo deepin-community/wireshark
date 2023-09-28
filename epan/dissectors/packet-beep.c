@@ -16,7 +16,6 @@
 
 #include "config.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <epan/packet.h>
 #include <epan/prefs.h>
@@ -24,7 +23,7 @@
 #include <epan/expert.h>
 #include <epan/proto_data.h>
 #if defined(DEBUG_BEEP_HASH)
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
+#include <epan/ws_printf.h>
 #endif
 
 #define TCP_PORT_BEEP 10288 /* Don't think this is IANA registered */
@@ -32,7 +31,7 @@
 void proto_register_beep(void);
 void proto_reg_handoff_beep(void);
 
-static guint global_beep_tcp_port = TCP_PORT_BEEP;
+static range_t *global_beep_tcp_ports = NULL;
 static int global_beep_strict_term = TRUE;
 
 static int proto_beep = -1;
@@ -278,7 +277,7 @@ check_term(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree)
   }
 
   proto_tree_add_expert_format(tree, pinfo, &ei_beep_invalid_terminator, tvb,
-                                offset, 1, "Terminator: %s", tvb_format_text(tvb, offset, 2));
+                                offset, 1, "Terminator: %s", tvb_format_text(pinfo->pool, tvb, offset, 2));
   return -1;
 }
 
@@ -357,14 +356,14 @@ dissect_beep_mime_header(tvbuff_t *tvb, packet_info *pinfo, int offset,
 }
 
 static int
-dissect_beep_int(tvbuff_t *tvb, int offset,
+dissect_beep_int(tvbuff_t *tvb, packet_info *pinfo, int offset,
                     proto_tree *tree, int hf, int *val, int *hfa[])
 {
   proto_item  *hidden_item;
   int ival, ind = 0;
   unsigned int len = num_len(tvb, offset);
 
-  ival = (int)strtol(tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII), NULL, 10);
+  ival = (int)strtol(tvb_get_string_enc(pinfo->pool, tvb, offset, len, ENC_ASCII), NULL, 10);
   proto_tree_add_uint(tree, hf, tvb, offset, len, ival);
 
   while (hfa[ind]) {
@@ -388,7 +387,7 @@ set_mime_hdr_flags(int more, struct beep_request_val *request_val,
 
   if (!request_val) return; /* Nothing to do ??? */
 
-  if (pinfo->destport == global_beep_tcp_port) { /* Going to the server ... client */
+  if (value_is_in_range(global_beep_tcp_ports, pinfo->destport)) { /* Going to the server ... client */
 
     if (request_val->c_mime_hdr) {
 
@@ -478,11 +477,11 @@ dissect_beep_tree(tvbuff_t *tvb, int offset, packet_info *pinfo,
     offset += 4;
 
     /* Get the channel */
-    offset += dissect_beep_int(tvb, offset, hdr, hf_beep_channel, &channel, req_chan_hfa);
+    offset += dissect_beep_int(tvb, pinfo, offset, hdr, hf_beep_channel, &channel, req_chan_hfa);
     offset += 1; /* Skip the space */
 
     /* Dissect the message number */
-    offset += dissect_beep_int(tvb, offset, hdr, hf_beep_msgno, &msgno, req_msgno_hfa);
+    offset += dissect_beep_int(tvb, pinfo, offset, hdr, hf_beep_msgno, &msgno, req_msgno_hfa);
     offset += 1; /* skip the space */
 
     /* Insert the more elements ... */
@@ -504,10 +503,10 @@ dissect_beep_tree(tvbuff_t *tvb, int offset, packet_info *pinfo,
     offset += 2; /* Skip the flag and the space ... */
 
     /* now for the seqno */
-    offset += dissect_beep_int(tvb, offset, hdr, hf_beep_seqno, &seqno, req_seqno_hfa);
+    offset += dissect_beep_int(tvb, pinfo, offset, hdr, hf_beep_seqno, &seqno, req_seqno_hfa);
     offset += 1; /* skip the space */
 
-    offset += dissect_beep_int(tvb, offset, hdr, hf_beep_size, &size, req_size_hfa);
+    offset += dissect_beep_int(tvb, pinfo, offset, hdr, hf_beep_size, &size, req_size_hfa);
     if (request_val)   /* FIXME, is this the right order ... */
       request_val -> size = size;  /* Stash this away */
     else if (beep_frame_data) {
@@ -519,7 +518,7 @@ dissect_beep_tree(tvbuff_t *tvb, int offset, packet_info *pinfo,
     if (is_ANS) { /* We need to put in the ansno */
         offset += 1; /* skip the space */
         /* Dissect the message number */
-        offset += dissect_beep_int(tvb, offset, hdr, hf_beep_ansno, &ansno, req_ansno_hfa);
+        offset += dissect_beep_int(tvb, pinfo, offset, hdr, hf_beep_ansno, &ansno, req_ansno_hfa);
     }
 
     if ((cc = check_term(tvb, pinfo, offset, hdr)) <= 0) {
@@ -590,19 +589,19 @@ dissect_beep_tree(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
     offset += 1;
 
-    offset += dissect_beep_int(tvb, offset, tree, hf_beep_channel, &channel, seq_chan_hfa);
+    offset += dissect_beep_int(tvb, pinfo, offset, tree, hf_beep_channel, &channel, seq_chan_hfa);
 
     /* Check the space: FIXME */
 
     offset += 1;
 
-    offset += dissect_beep_int(tvb, offset, tree, hf_beep_ackno, &ackno, seq_ackno_hfa);
+    offset += dissect_beep_int(tvb, pinfo, offset, tree, hf_beep_ackno, &ackno, seq_ackno_hfa);
 
     /* Check the space: FIXME */
 
     offset += 1;
 
-    offset += dissect_beep_int(tvb, offset, tree, hf_beep_window, &window, seq_window_hfa);
+    offset += dissect_beep_int(tvb, pinfo, offset, tree, hf_beep_window, &window, seq_window_hfa);
 
     if ((cc = check_term(tvb, pinfo, offset, tree)) <= 0) {
 
@@ -760,9 +759,7 @@ dissect_beep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
         new_request_key = wmem_new(wmem_file_scope(), struct beep_request_key);
         new_request_key->conversation = conversation->conv_index;
 
-        request_val = wmem_new(wmem_file_scope(), struct beep_request_val);
-        request_val->processed = 0;
-        request_val->size = 0;
+        request_val = wmem_new0(wmem_file_scope(), struct beep_request_val);
 
         wmem_map_insert(beep_request_hash, new_request_key, request_val);
 
@@ -776,7 +773,7 @@ dissect_beep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
    * of the packet, so it won't throw an exception.
    */
   if (tvb_reported_length_remaining(tvb, offset) > 0)
-    col_add_str(pinfo->cinfo, COL_INFO, tvb_format_text(tvb, offset, tvb_reported_length_remaining(tvb, offset)));
+    col_add_str(pinfo->cinfo, COL_INFO, tvb_format_text(pinfo->pool, tvb, offset, tvb_reported_length_remaining(tvb, offset)));
 
   /* Here, we parse the message so we can retrieve the info we need, which
    * is that there is some payload left from a previous segment on the
@@ -869,7 +866,7 @@ static void
 apply_beep_prefs(void)
 {
   /* Beep uses the port preference to determine client/server */
-  global_beep_tcp_port = prefs_get_uint_value("beep", "tcp.port");
+  global_beep_tcp_ports = prefs_get_range_value("beep", "tcp.port");
 }
 
 /* Register all the bits needed with the filtering engine */

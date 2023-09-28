@@ -43,6 +43,7 @@
 void proto_register_icmp(void);
 void proto_reg_handoff_icmp(void);
 
+static heur_dissector_list_t icmp_heur_subdissector_list;
 static int icmp_tap = -1;
 
 /* Conversation related data */
@@ -133,6 +134,7 @@ static int hf_icmp_ext_data = -1;
 static int hf_icmp_int_info_ifindex = -1;
 static int hf_icmp_int_info_ipaddr = -1;
 static int hf_icmp_int_info_name = -1;
+static int hf_icmp_int_info_mtu_present = -1;
 static int hf_icmp_int_info_mtu = -1;
 static int hf_icmp_int_info_index = -1;
 static int hf_icmp_int_info_afi = -1;
@@ -437,7 +439,7 @@ static const value_string interface_role_str[] = {
 /* whenever a ICMP packet is seen by the tap listener */
 /* Add a new frame into the graph */
 static tap_packet_status
-icmp_seq_analysis_packet( void *ptr, packet_info *pinfo, epan_dissect_t *edt _U_, const void *dummy _U_)
+icmp_seq_analysis_packet( void *ptr, packet_info *pinfo, epan_dissect_t *edt _U_, const void *dummy _U_, tap_flags_t flags _U_)
 {
 	seq_analysis_info_t *sainfo = (seq_analysis_info_t *) ptr;
 	seq_analysis_item_t *sai = sequence_analysis_create_sai_with_addresses(pinfo, sainfo);
@@ -478,13 +480,13 @@ static conversation_t *_find_or_create_conversation(packet_info * pinfo)
 
 	/* Have we seen this conversation before? */
 	conv =
-	    find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype),
+	    find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype),
 			      0, 0, 0);
 	if (conv == NULL) {
 		/* No, this is a new conversation. */
 		conv =
 		    conversation_new(pinfo->num, &pinfo->src,
-				     &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype), 0, 0, 0);
+				     &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), 0, 0, 0);
 	}
 	return conv;
 }
@@ -767,6 +769,7 @@ dissect_interface_information_object(tvbuff_t * tvb, gint offset,
 	guint8 if_index_flag;
 	guint8 ipaddr_flag;
 	guint8 name_flag;
+	guint8 mtu_flag;
 	guint16 afi;
 	guint8 int_name_length = 0;
 
@@ -790,6 +793,7 @@ dissect_interface_information_object(tvbuff_t * tvb, gint offset,
 	if_index_flag = (c_type & INT_INFO_IFINDEX) >> 3;
 	ipaddr_flag = (c_type & INT_INFO_IPADDR) >> 2;
 	name_flag = (c_type & INT_INFO_NAME) >> 1;
+	mtu_flag = (c_type & INT_INFO_MTU) >> 0;
 
 	{
 		static int * const c_type_fields[] = {
@@ -798,7 +802,7 @@ dissect_interface_information_object(tvbuff_t * tvb, gint offset,
 			&hf_icmp_int_info_ifindex,
 			&hf_icmp_int_info_ipaddr,
 			&hf_icmp_int_info_name,
-			&hf_icmp_int_info_mtu,
+			&hf_icmp_int_info_mtu_present,
 			NULL
 		};
 		proto_tree_add_bitmask(ext_object_tree, tvb, offset + 3,
@@ -826,7 +830,7 @@ dissect_interface_information_object(tvbuff_t * tvb, gint offset,
 		 * if afi = 2, IPv6 address, 2 bytes afi, 2 bytes rsvd, 16 bytes IP addr
 		 */
 		int_ipaddr_object_tree = proto_tree_add_subtree(ext_object_tree, tvb, offset,
-					 afi == 1 ? 8 : 10, ett_icmp_interface_ipaddr, NULL,
+					 afi == 1 ? 8 : 20, ett_icmp_interface_ipaddr, NULL,
 					 "IP Address Sub-Object");
 
 		proto_tree_add_uint(int_ipaddr_object_tree,
@@ -862,10 +866,16 @@ dissect_interface_information_object(tvbuff_t * tvb, gint offset,
 						 "Interface Name Sub-Object");
 
 			proto_tree_add_item(int_name_object_tree, hf_icmp_int_info_name_length, tvb, offset, 1, ENC_BIG_ENDIAN);
+			offset += 1;
 		}
-		if (obj_end_offset >= offset + 1 + int_name_length) {
-			proto_tree_add_item(int_name_object_tree, hf_icmp_int_info_name_string, tvb, offset + 1, int_name_length, ENC_ASCII|ENC_NA);
+		if (obj_end_offset >= offset + int_name_length) {
+			proto_tree_add_item(int_name_object_tree, hf_icmp_int_info_name_string, tvb, offset, int_name_length - 1, ENC_ASCII);
+			offset += int_name_length - 1;
 		}
+	}
+	/* MTU Sub Object */
+	if (mtu_flag) {
+		proto_tree_add_item(ext_object_tree, hf_icmp_int_info_mtu, tvb, offset, 4, ENC_NA);
 	}
 
 
@@ -905,7 +915,7 @@ dissect_interface_identification_object(tvbuff_t * tvb, gint offset,
 
 	switch(c_type) {
 		case ICMP_EXT_ECHO_IDENT_NAME:
-			proto_tree_add_item(ext_object_tree, hf_icmp_int_ident_name_string, tvb, offset, obj_length - 4, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(ext_object_tree, hf_icmp_int_ident_name_string, tvb, offset, obj_length - 4, ENC_ASCII);
 			break;
 		case ICMP_EXT_ECHO_IDENT_INDEX:
 			proto_tree_add_item(ext_object_tree, hf_icmp_int_ident_index, tvb, offset, 4, ENC_NA);
@@ -1220,7 +1230,7 @@ static icmp_transaction_t *transaction_end(packet_info * pinfo,
 
 	conversation =
 	    find_conversation(pinfo->num, &pinfo->src, &pinfo->dst,
-			      conversation_pt_to_endpoint_type(pinfo->ptype), 0, 0, 0);
+			      conversation_pt_to_conversation_type(pinfo->ptype), 0, 0, 0);
 	if (conversation == NULL) {
 		return NULL;
 	}
@@ -1546,7 +1556,7 @@ dissect_icmp(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* data)
 		proto_tree_add_item_ret_uint(icmp_tree, hf_icmp_num_addrs, tvb, 4, 1, ENC_BIG_ENDIAN, &num_addrs);
 		proto_tree_add_item_ret_uint(icmp_tree, hf_icmp_addr_entry_size, tvb, 5, 1, ENC_BIG_ENDIAN, &addr_entry_size);
 		ti = proto_tree_add_item(icmp_tree, hf_icmp_lifetime, tvb, 6, 2, ENC_BIG_ENDIAN);
-		proto_item_append_text(ti, " (%s)", signed_time_secs_to_str(wmem_packet_scope(), tvb_get_ntohs(tvb, 6)));
+		proto_item_append_text(ti, " (%s)", signed_time_secs_to_str(pinfo->pool, tvb_get_ntohs(tvb, 6)));
 		break;
 
 	case ICMP_PARAMPROB:
@@ -1661,7 +1671,8 @@ dissect_icmp(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* data)
 		if ((tvb_reported_length(tvb) > 8 + 128)
 		    && (tvb_get_ntohs(tvb, 8 + 2) <= 128
 			|| favor_icmp_mpls_ext)) {
-			tvbuff_t * extension_tvb = tvb_new_subset_remaining(tvb, 8 + 128);
+			int ext_offset = (icmp_original_dgram_length ? icmp_original_dgram_length * 4 : 128) + 8;
+			tvbuff_t * extension_tvb = tvb_new_subset_remaining(tvb, ext_offset);
 			dissect_icmp_extension(extension_tvb, pinfo, icmp_tree, NULL);
 		}
 		break;
@@ -1747,8 +1758,11 @@ dissect_icmp(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* data)
 								8 + 8),
 				       pinfo, icmp_tree);
 		} else {
-			call_data_dissector(tvb_new_subset_remaining(tvb, 8),
-				       pinfo, icmp_tree);
+			heur_dtbl_entry_t *hdtbl_entry;
+			next_tvb = tvb_new_subset_remaining(tvb, 8);
+			if (!dissector_try_heuristic(icmp_heur_subdissector_list, next_tvb, pinfo, tree, &hdtbl_entry, NULL)) {
+				call_data_dissector(next_tvb, pinfo, icmp_tree);
+			}
 		}
 		break;
 
@@ -1780,13 +1794,13 @@ dissect_icmp(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* data)
 
 			orig_ts = get_best_guess_mstimeofday(tvb, 8, frame_ts);
 			ti = proto_tree_add_item(icmp_tree, hf_icmp_originate_timestamp, tvb, 8, 4, ENC_BIG_ENDIAN);
-			proto_item_append_text(ti, " (%s after midnight UTC)", signed_time_msecs_to_str(wmem_packet_scope(), orig_ts));
+			proto_item_append_text(ti, " (%s after midnight UTC)", signed_time_msecs_to_str(pinfo->pool, orig_ts));
 
 			ti = proto_tree_add_item(icmp_tree, hf_icmp_receive_timestamp, tvb, 12, 4, ENC_BIG_ENDIAN);
-			proto_item_append_text(ti, " (%s after midnight UTC)", signed_time_msecs_to_str(wmem_packet_scope(), get_best_guess_mstimeofday(tvb, 12, frame_ts)));
+			proto_item_append_text(ti, " (%s after midnight UTC)", signed_time_msecs_to_str(pinfo->pool, get_best_guess_mstimeofday(tvb, 12, frame_ts)));
 
 			ti = proto_tree_add_item(icmp_tree, hf_icmp_transmit_timestamp, tvb, 16, 4, ENC_BIG_ENDIAN);
-			proto_item_append_text(ti, " (%s after midnight UTC)", signed_time_msecs_to_str(wmem_packet_scope(), get_best_guess_mstimeofday(tvb, 16, frame_ts)));
+			proto_item_append_text(ti, " (%s after midnight UTC)", signed_time_msecs_to_str(pinfo->pool, get_best_guess_mstimeofday(tvb, 16, frame_ts)));
 
 		}
 		break;
@@ -1855,7 +1869,7 @@ void proto_register_icmp(void)
 		  "Identifier (big endian representation)", HFILL}},
 
 		{&hf_icmp_ident_le,
-		 {"Identifier (LE)", "icmp.ident", FT_UINT16, BASE_DEC_HEX,
+		 {"Identifier (LE)", "icmp.ident_le", FT_UINT16, BASE_DEC_HEX,
 		  NULL, 0x0,
 		  "Identifier (little endian representation)", HFILL}},
 
@@ -2073,7 +2087,7 @@ void proto_register_icmp(void)
 
 		{&hf_icmp_mpls_label,
 		 {"Label", "icmp.mpls.label", FT_UINT24, BASE_DEC, NULL,
-		  0x00fffff0,
+		  0xfffff0,
 		  NULL, HFILL}},
 
 		{&hf_icmp_mpls_exp,
@@ -2168,8 +2182,8 @@ void proto_register_icmp(void)
 		  INT_INFO_NAME,
 		  NULL,
 		  HFILL}},
-		{&hf_icmp_int_info_mtu,
-		 {"MTU", "icmp.int_info.mtu", FT_BOOLEAN, 8, TFS(&tfs_present_not_present),
+		{&hf_icmp_int_info_mtu_present,
+		 {"MTU", "icmp.int_info.mtu_present", FT_BOOLEAN, 8, TFS(&tfs_present_not_present),
 		  INT_INFO_MTU,
 		  NULL, HFILL}},
 		{&hf_icmp_int_info_index,
@@ -2202,6 +2216,12 @@ void proto_register_icmp(void)
 		 {"Name", "icmp.int_info.name", FT_STRING, BASE_NONE, NULL,
 		  0x0,
 		  NULL, HFILL}},
+		{&hf_icmp_int_info_mtu,
+		 {"Maximum Transmission Unit", "icmp.int_info.mtu",
+		  FT_UINT32, BASE_DEC,
+		  NULL, 0x0,
+		  NULL, HFILL}},
+
 
 		{&hf_icmp_ext_echo_seq_num,
 		 {"Sequence Number", "icmp.ext.echo.seq", FT_UINT8,
@@ -2310,6 +2330,7 @@ void proto_register_icmp(void)
 
 	register_seq_analysis("icmp", "ICMP Flows", proto_icmp, NULL, TL_REQUIRES_COLUMNS, icmp_seq_analysis_packet);
 	icmp_handle = register_dissector("icmp", dissect_icmp, proto_icmp);
+	icmp_heur_subdissector_list = register_heur_dissector_list("icmp", proto_icmp);
 	register_dissector("icmp_extension", dissect_icmp_extension, proto_icmp);
 	icmp_tap = register_tap("icmp");
 }

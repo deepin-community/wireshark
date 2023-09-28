@@ -422,11 +422,11 @@ void h245_set_h223_add_lc_handle( h223_add_lc_handle_t handle )
 	h223_add_lc_handle = handle;
 }
 
-static const gchar *gen_olc_key(guint16 lc_num, address *dst_addr, address *src_addr)
+static const gchar *gen_olc_key(guint16 lc_num, address *dst_addr, address *src_addr, wmem_allocator_t *scope)
 {
-  return wmem_strdup_printf(wmem_packet_scope(), "%s/%s/%u",
-          address_to_str(wmem_packet_scope(), dst_addr),
-          address_to_str(wmem_packet_scope(), src_addr),
+  return wmem_strdup_printf(scope, "%s/%s/%u",
+          address_to_str(scope, dst_addr),
+          address_to_str(scope, src_addr),
           lc_num);
 }
 
@@ -466,7 +466,7 @@ static void h245_setup_channels(packet_info *pinfo, channel_info_t *upcoming_cha
 		dummy_srtp_info = wmem_new0(wmem_file_scope(), struct srtp_info);
 	}
 
-	/* DEBUG 	g_warning("h245_setup_channels media_addr.addr.type %u port %u",upcoming_channel_lcl->media_addr.addr.type, upcoming_channel_lcl->media_addr.port );
+	/* DEBUG 	ws_warning("h245_setup_channels media_addr.addr.type %u port %u",upcoming_channel_lcl->media_addr.addr.type, upcoming_channel_lcl->media_addr.port );
 	*/
 	if (upcoming_channel_lcl->media_addr.addr.type!=AT_NONE && upcoming_channel_lcl->media_addr.port!=0) {
 		srtp_add_address(pinfo, PT_UDP, &upcoming_channel_lcl->media_addr.addr,
@@ -1700,7 +1700,7 @@ static int hf_h245_excessiveError = -1;           /* T_excessiveError */
 static int hf_h245_differential = -1;             /* SET_SIZE_1_65535_OF_DialingInformationNumber */
 static int hf_h245_differential_item = -1;        /* DialingInformationNumber */
 static int hf_h245_infoNotAvailable = -1;         /* INTEGER_1_65535 */
-static int hf_h245_networkAddressNum = -1;        /* NumericString_SIZE_0_40 */
+static int hf_h245_din_networkAddress = -1;       /* NumericString_SIZE_0_40 */
 static int hf_h245_subAddress = -1;               /* IA5String_SIZE_1_40 */
 static int hf_h245_networkType = -1;              /* SET_SIZE_1_255_OF_DialingInformationNetworkType */
 static int hf_h245_networkType_item = -1;         /* DialingInformationNetworkType */
@@ -2416,7 +2416,7 @@ static gint ett_h245_MobileMultilinkReconfigurationIndication = -1;
 static int dissect_h245_MultimediaSystemControlMessage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_);
 static void reset_h245_pi(void *dummy _U_)
 {
-	h245_pi = NULL; /* Make sure we don't leave wmem_packet_scoped() memory lying around */
+	h245_pi = NULL; /* Make sure we don't leave pinfo->pool memory lying around */
 }
 
 
@@ -3603,7 +3603,7 @@ dissect_h245_CapabilityIdentifier(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t 
                                  NULL);
 
 #line 682 "./asn1/h245/h245.cnf"
-  gef_ctx_update_key(gef_ctx_get(actx->private_data));
+  gef_ctx_update_key(actx->pinfo->pool, gef_ctx_get(actx->private_data));
   gefx = gef_ctx_get(actx->private_data);
   if (gefx) {
     ti = proto_tree_add_string(tree, hf_h245_debug_dissector_try_string, tvb, offset>>3, 0, gefx->key);
@@ -3637,7 +3637,7 @@ dissect_h245_T_standard(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_,
                                                             0U, 127U, &value_int, FALSE);
 
   gefx = gef_ctx_get(actx->private_data);
-  if (gefx) gefx->id = wmem_strdup_printf(wmem_packet_scope(), "%d", value_int);
+  if (gefx) gefx->id = wmem_strdup_printf(actx->pinfo->pool, "%d", value_int);
 
 
   return offset;
@@ -3671,7 +3671,7 @@ dissect_h245_ParameterIdentifier(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *
                                  NULL);
 
 #line 713 "./asn1/h245/h245.cnf"
-  gef_ctx_update_key(gef_ctx_get(actx->private_data));
+  gef_ctx_update_key(actx->pinfo->pool, gef_ctx_get(actx->private_data));
   gefx = gef_ctx_get(actx->private_data);
   if (gefx) {
     ti = proto_tree_add_string(tree, hf_h245_debug_dissector_try_string, tvb, offset>>3, 0, gefx->key);
@@ -3935,7 +3935,7 @@ dissect_h245_T_collapsing_item(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *ac
   gef_ctx_t *parent_gefx;
 
   parent_gefx = gef_ctx_get(actx->private_data);
-  actx->private_data = gef_ctx_alloc(parent_gefx, "collapsing");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, parent_gefx, "collapsing");
 
   offset = dissect_h245_GenericParameter(tvb, offset, actx, tree, hf_index);
 
@@ -3966,7 +3966,7 @@ dissect_h245_T_nonCollapsing_item(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t 
   gef_ctx_t *parent_gefx;
 
   parent_gefx = gef_ctx_get(actx->private_data);
-  actx->private_data = gef_ctx_alloc(parent_gefx, "nonCollapsing");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, parent_gefx, "nonCollapsing");
 
   offset = dissect_h245_GenericParameter(tvb, offset, actx, tree, hf_index);
 
@@ -4000,7 +4000,7 @@ dissect_h245_T_nonCollapsingRaw(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *a
   proto_item* ti;
 
   parent_gefx = gef_ctx_get(actx->private_data);
-  actx->private_data = gef_ctx_alloc(parent_gefx, "nonCollapsingRaw");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, parent_gefx, "nonCollapsingRaw");
   offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
                                        NO_BOUND, NO_BOUND, FALSE, &value_tvb);
 
@@ -4031,7 +4031,7 @@ static int
 dissect_h245_GenericCapability(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
 #line 626 "./asn1/h245/h245.cnf"
   void *priv_data = actx->private_data;
-  actx->private_data = gef_ctx_alloc(NULL, "GenericCapability");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, NULL, "GenericCapability");
 
   offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
                                    ett_h245_GenericCapability, GenericCapability_sequence);
@@ -6653,13 +6653,13 @@ dissect_h245_T_subMessageIdentifier(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_
                                                             0U, 127U, &subMessageIdentifier, FALSE);
 
   if (gefx) {
-    gefx->subid = wmem_strdup_printf(wmem_packet_scope(), "%u", subMessageIdentifier);
-    gef_ctx_update_key(gef_ctx_get(actx->private_data));
+    gefx->subid = wmem_strdup_printf(actx->pinfo->pool, "%u", subMessageIdentifier);
+    gef_ctx_update_key(actx->pinfo->pool, gef_ctx_get(actx->private_data));
   }
   if (hf_index == hf_h245_subMessageIdentifier_standard)
   {
     col_append_str(actx->pinfo->cinfo, COL_INFO, val_to_str(subMessageIdentifier, h245_h239subMessageIdentifier_vals, "<unknown>") );
-    g_snprintf(h245_pi->frame_label, 50, "%s", val_to_str(subMessageIdentifier, h245_h239subMessageIdentifier_vals, "<unknown>"));
+    snprintf(h245_pi->frame_label, 50, "%s", val_to_str(subMessageIdentifier, h245_h239subMessageIdentifier_vals, "<unknown>"));
   }
 
 
@@ -6674,7 +6674,7 @@ dissect_h245_T_messageContent_item(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t
   gef_ctx_t *parent_gefx;
 
   parent_gefx = gef_ctx_get(actx->private_data);
-  actx->private_data = gef_ctx_alloc(parent_gefx, NULL);
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, parent_gefx, NULL);
 
   offset = dissect_h245_GenericParameter(tvb, offset, actx, tree, hf_index);
 
@@ -6714,7 +6714,7 @@ dissect_h245_GenericMessage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx 
   /* check if not inherited from GenericInformation */
   gefx = gef_ctx_get(actx->private_data);
   if (!gefx) {
-    gefx = gef_ctx_alloc(NULL, "GenericMessage");
+    gefx = gef_ctx_alloc(actx->pinfo->pool, NULL, "GenericMessage");
     actx->private_data = gefx;
   }
 
@@ -6733,7 +6733,7 @@ static int
 dissect_h245_GenericInformation(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
 #line 618 "./asn1/h245/h245.cnf"
   void *priv_data = actx->private_data;
-  actx->private_data = gef_ctx_alloc(NULL, "GenericInformation");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, NULL, "GenericInformation");
 
   offset = dissect_h245_GenericMessage(tvb, offset, actx, tree, hf_index);
 
@@ -8458,7 +8458,7 @@ dissect_h245_T_forwardLogicalChannelParameters(tvbuff_t *tvb _U_, int offset _U_
 	h223_lc_params_temp->subdissector = data_handle;
 
   if (upcoming_channel && codec_type) {
-    g_strlcpy(upcoming_channel->data_type_str, codec_type, sizeof(upcoming_channel->data_type_str));
+    (void) g_strlcpy(upcoming_channel->data_type_str, codec_type, sizeof(upcoming_channel->data_type_str));
   }
   upcoming_channel = NULL;
 
@@ -8527,7 +8527,7 @@ dissect_h245_OLC_reverseLogicalChannelParameters(tvbuff_t *tvb _U_, int offset _
 
 
   if (upcoming_channel && codec_type) {
-    g_strlcpy(upcoming_channel->data_type_str, codec_type, sizeof(upcoming_channel->data_type_str));
+    (void) g_strlcpy(upcoming_channel->data_type_str, codec_type, sizeof(upcoming_channel->data_type_str));
   }
   upcoming_channel = NULL;
 
@@ -8707,7 +8707,7 @@ static int
 dissect_h245_EncryptionSync(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
 #line 670 "./asn1/h245/h245.cnf"
   void *priv_data = actx->private_data;
-  actx->private_data = gef_ctx_alloc(NULL, "EncryptionSync");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, NULL, "EncryptionSync");
 
   offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
                                    ett_h245_EncryptionSync, EncryptionSync_sequence);
@@ -8757,7 +8757,7 @@ dissect_h245_OpenLogicalChannel(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *a
       h245_setup_channels(actx->pinfo, &upcoming_olc->rev_lc);
     } else {
       wmem_map_insert(h245_pending_olc_reqs,
-        wmem_strdup(wmem_file_scope(), gen_olc_key(upcoming_olc->fwd_lc_num, &actx->pinfo->dst, &actx->pinfo->src)),
+        wmem_strdup(wmem_file_scope(), gen_olc_key(upcoming_olc->fwd_lc_num, &actx->pinfo->dst, &actx->pinfo->src, actx->pinfo->pool)),
         upcoming_olc);
     }
   }
@@ -10480,7 +10480,7 @@ dissect_h245_SET_SIZE_1_255_OF_DialingInformationNetworkType(tvbuff_t *tvb _U_, 
 
 
 static const per_sequence_t DialingInformationNumber_sequence[] = {
-  { &hf_h245_networkAddressNum, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_h245_NumericString_SIZE_0_40 },
+  { &hf_h245_din_networkAddress, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_h245_NumericString_SIZE_0_40 },
   { &hf_h245_subAddress     , ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_h245_IA5String_SIZE_1_40 },
   { &hf_h245_networkType    , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_h245_SET_SIZE_1_255_OF_DialingInformationNetworkType },
   { NULL, 0, 0, NULL }
@@ -10730,17 +10730,17 @@ dissect_h245_RequestMessage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx 
 
     if (strlen(h245_pi->frame_label) == 0)
     {
-      g_snprintf(h245_pi->frame_label, 50, "%s", val_to_str(value, h245_RequestMessage_short_vals, "UKN"));
+      snprintf(h245_pi->frame_label, 50, "%s", val_to_str(value, h245_RequestMessage_short_vals, "UKN"));
 
       /* if it is OLC or RM*/
       if ((codec_type != NULL) && (( value == RequestMessage_openLogicalChannel) || ( value == RequestMessage_requestMode)))
       {
-        g_strlcat(h245_pi->frame_label, " (", 50);
-        g_strlcat(h245_pi->frame_label, codec_type, 50);
-        g_strlcat(h245_pi->frame_label, ")", 50);
+        (void) g_strlcat(h245_pi->frame_label, " (", 50);
+        (void) g_strlcat(h245_pi->frame_label, codec_type, 50);
+        (void) g_strlcat(h245_pi->frame_label, ")", 50);
       }
     }
-    g_strlcat(h245_pi->comment, val_to_str(value, h245_RequestMessage_vals, "<unknown>"), 50);
+    (void) g_strlcat(h245_pi->comment, val_to_str(value, h245_RequestMessage_vals, "<unknown>"), 50);
 
 
   return offset;
@@ -11081,7 +11081,7 @@ dissect_h245_OpenLogicalChannelAck(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t
   const gchar *olc_key;
   olc_info_t *olc_req;
 
-  upcoming_olc = (!actx->pinfo->fd->visited) ? wmem_new0(wmem_packet_scope(), olc_info_t) : NULL;
+  upcoming_olc = (!actx->pinfo->fd->visited) ? wmem_new0(actx->pinfo->pool, olc_info_t) : NULL;
 
   h223_fw_lc_num = 0;
   h223_rev_lc_num = 0;
@@ -11112,7 +11112,7 @@ dissect_h245_OpenLogicalChannelAck(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t
   actx->pinfo->p2p_dir = p2p_dir;
 
   if (upcoming_olc) {
-    olc_key = gen_olc_key(upcoming_olc->fwd_lc_num, &actx->pinfo->src, &actx->pinfo->dst);
+    olc_key = gen_olc_key(upcoming_olc->fwd_lc_num, &actx->pinfo->src, &actx->pinfo->dst, actx->pinfo->pool);
     olc_req = (olc_info_t *)wmem_map_lookup(h245_pending_olc_reqs, olc_key);
     if (olc_req) {
       update_unicast_addr(&olc_req->fwd_lc.media_addr, &upcoming_olc->fwd_lc.media_addr);
@@ -12354,9 +12354,9 @@ dissect_h245_ResponseMessage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx
 	if (h245_pi != NULL){
 		/* Add to packet info */
 		if ( strlen(h245_pi->frame_label) == 0 ){
-		   g_snprintf(h245_pi->frame_label, 50, "%s", val_to_str(value, h245_ResponseMessage_short_vals, "UKN"));
+		   snprintf(h245_pi->frame_label, 50, "%s", val_to_str(value, h245_ResponseMessage_short_vals, "UKN"));
 		}
-		g_strlcat(h245_pi->comment, val_to_str(value, h245_ResponseMessage_vals, "<unknown>"), 50);
+		(void) g_strlcat(h245_pi->comment, val_to_str(value, h245_ResponseMessage_vals, "<unknown>"), 50);
 	}
 
 
@@ -13386,9 +13386,9 @@ dissect_h245_CommandMessage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx 
     /* Add to packet info */
     if (h245_pi != NULL){
       if ( strlen(h245_pi->frame_label) == 0 ){
-        g_snprintf(h245_pi->frame_label, 50, "%s", val_to_str(value, h245_CommandMessage_short_vals, "UKN"));
+        snprintf(h245_pi->frame_label, 50, "%s", val_to_str(value, h245_CommandMessage_short_vals, "UKN"));
       }
-	  g_strlcat(h245_pi->comment, val_to_str(value, h245_CommandMessage_vals, "<unknown>"), 50);
+	  (void) g_strlcat(h245_pi->comment, val_to_str(value, h245_CommandMessage_vals, "<unknown>"), 50);
     }
 
 
@@ -14447,9 +14447,9 @@ dissect_h245_IndicationMessage(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *ac
     /* Add to packet info */
     if (h245_pi  !=NULL){
       if ( strlen(h245_pi->frame_label) == 0 ){
-	    g_snprintf(h245_pi->frame_label, 50, "%s", val_to_str(value, h245_IndicationMessage_short_vals, "UKN"));
+	    snprintf(h245_pi->frame_label, 50, "%s", val_to_str(value, h245_IndicationMessage_short_vals, "UKN"));
 	  }
-      g_strlcat(h245_pi->comment, val_to_str(value, h245_IndicationMessage_vals, "<unknown>"), 50);
+      (void) g_strlcat(h245_pi->comment, val_to_str(value, h245_IndicationMessage_vals, "<unknown>"), 50);
 
     }
 
@@ -14533,7 +14533,7 @@ dissect_h245_h245(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, vo
 	/* assume that whilst there is more tvb data, there are more h245 commands */
 	while ( tvb_reported_length_remaining( tvb, offset>>3 )>0 ){
 		CLEANUP_PUSH(reset_h245_pi, NULL);
-		h245_pi=wmem_new(wmem_packet_scope(), h245_packet_info);
+		h245_pi=wmem_new(pinfo->pool, h245_packet_info);
 		init_h245_packet_info(h245_pi);
 		asn1_ctx_init(&asn1_ctx, ASN1_ENC_PER, TRUE, pinfo);
 		offset = dissect_h245_MultimediaSystemControlMessage(tvb, offset, &asn1_ctx, tr, hf_h245_pdu_type);
@@ -14559,7 +14559,7 @@ dissect_h245_FastStart_OLC(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tr
 	  h245_pi->msg_type = H245_OpenLogChn;
 
   if (codec_str && codec_type){
-        g_strlcpy(codec_str, codec_type, 50);
+        (void) g_strlcpy(codec_str, codec_type, 50);
   }
 
 }
@@ -15427,7 +15427,7 @@ void proto_register_h245(void) {
         FT_BOOLEAN, BASE_NONE, NULL, 0,
         "BOOLEAN", HFILL }},
     { &hf_h245_h223AnnexADoubleFlagFlag,
-      { "h223AnnexADoubleFlag", "h245.h223AnnexADoubleFlag",
+      { "h223AnnexADoubleFlag", "h245.h223AnnexADoubleFlagFlag",
         FT_BOOLEAN, BASE_NONE, NULL, 0,
         "BOOLEAN", HFILL }},
     { &hf_h245_h223AnnexB,
@@ -16591,7 +16591,7 @@ void proto_register_h245(void) {
         FT_BOOLEAN, BASE_NONE, NULL, 0,
         "BOOLEAN", HFILL }},
     { &hf_h245_pictureNumberBoolean,
-      { "pictureNumber", "h245.pictureNumber",
+      { "pictureNumber", "h245.pictureNumberBoolean",
         FT_BOOLEAN, BASE_NONE, NULL, 0,
         "BOOLEAN", HFILL }},
     { &hf_h245_spareReferencePictures,
@@ -17307,7 +17307,7 @@ void proto_register_h245(void) {
         FT_UINT32, BASE_DEC, VALS(DataProtocolCapability_vals), 0,
         "DataProtocolCapability", HFILL }},
     { &hf_h245_standardOid,
-      { "standard", "h245.standard",
+      { "standard", "h245.standardOid",
         FT_OID, BASE_NONE, NULL, 0,
         "T_standardOid", HFILL }},
     { &hf_h245_h221NonStandard,
@@ -18067,7 +18067,7 @@ void proto_register_h245(void) {
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
     { &hf_h245_ip4_network,
-      { "network", "h245.network",
+      { "network", "h245.ip4_network",
         FT_IPv4, BASE_NONE, NULL, 0,
         "Ipv4_network", HFILL }},
     { &hf_h245_tsapIdentifier,
@@ -18087,7 +18087,7 @@ void proto_register_h245(void) {
         FT_BYTES, BASE_NONE, NULL, 0,
         "OCTET_STRING_SIZE_4", HFILL }},
     { &hf_h245_ipx_tsapIdentifier,
-      { "tsapIdentifier", "h245.tsapIdentifier",
+      { "tsapIdentifier", "h245.ipx.tsapIdentifier",
         FT_BYTES, BASE_NONE, NULL, 0,
         "OCTET_STRING_SIZE_2", HFILL }},
     { &hf_h245_iP6Address,
@@ -18095,11 +18095,11 @@ void proto_register_h245(void) {
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
     { &hf_h245_ip6_network,
-      { "network", "h245.network",
+      { "network", "h245.ip6_network",
         FT_IPv6, BASE_NONE, NULL, 0,
         "T_ip6_network", HFILL }},
     { &hf_h245_ipv6_tsapIdentifier,
-      { "tsapIdentifier", "h245.tsapIdentifier",
+      { "tsapIdentifier", "h245.ipv6.tsapIdentifier",
         FT_UINT32, BASE_DEC, NULL, 0,
         "T_ipv6_tsapIdentifier", HFILL }},
     { &hf_h245_netBios,
@@ -18127,7 +18127,7 @@ void proto_register_h245(void) {
         FT_BYTES, BASE_NONE, NULL, 0,
         "OCTET_STRING_SIZE_4", HFILL }},
     { &hf_h245_iPSrcRoute_tsapIdentifier,
-      { "tsapIdentifier", "h245.tsapIdentifier",
+      { "tsapIdentifier", "h245.iPSrcRoute.tsapIdentifier",
         FT_UINT32, BASE_DEC, NULL, 0,
         "INTEGER_0_65535", HFILL }},
     { &hf_h245_route,
@@ -18147,27 +18147,27 @@ void proto_register_h245(void) {
         FT_NONE, BASE_NONE, NULL, 0,
         "NonStandardParameter", HFILL }},
     { &hf_h245_mIPAddress,
-      { "iPAddress", "h245.iPAddress_element",
+      { "iPAddress", "h245.mIPAddress_element",
         FT_NONE, BASE_NONE, NULL, 0,
         "MIPAddress", HFILL }},
     { &hf_h245_mip4_network,
-      { "network", "h245.network",
+      { "network", "h245.mip4_network",
         FT_IPv4, BASE_NONE, NULL, 0,
         "OCTET_STRING_SIZE_4", HFILL }},
     { &hf_h245_multicast_tsapIdentifier,
-      { "tsapIdentifier", "h245.tsapIdentifier",
+      { "tsapIdentifier", "h245.multicast.tsapIdentifier",
         FT_UINT32, BASE_DEC, NULL, 0,
         "INTEGER_0_65535", HFILL }},
     { &hf_h245_mIP6Address,
-      { "iP6Address", "h245.iP6Address_element",
+      { "iP6Address", "h245.mIP6Address_element",
         FT_NONE, BASE_NONE, NULL, 0,
         "MIP6Address", HFILL }},
     { &hf_h245_mip6_network,
-      { "network", "h245.network",
+      { "network", "h245.mip6_network",
         FT_IPv6, BASE_NONE, NULL, 0,
         "OCTET_STRING_SIZE_16", HFILL }},
     { &hf_h245_multicast_IPv6_tsapIdentifier,
-      { "tsapIdentifier", "h245.tsapIdentifier",
+      { "tsapIdentifier", "h245.multicast_IPv6.tsapIdentifier",
         FT_UINT32, BASE_DEC, NULL, 0,
         "INTEGER_0_65535", HFILL }},
     { &hf_h245_synchFlag,
@@ -19099,7 +19099,7 @@ void proto_register_h245(void) {
         FT_OID, BASE_NONE, NULL, 0,
         "OBJECT_IDENTIFIER", HFILL }},
     { &hf_h245_criteriaValue,
-      { "value", "h245.value",
+      { "value", "h245.criteriaValue",
         FT_BYTES, BASE_NONE, NULL, 0,
         "OCTET_STRING_SIZE_1_65535", HFILL }},
     { &hf_h245_mcuNumber,
@@ -19366,8 +19366,8 @@ void proto_register_h245(void) {
       { "infoNotAvailable", "h245.infoNotAvailable",
         FT_UINT32, BASE_DEC, NULL, 0,
         "INTEGER_1_65535", HFILL }},
-    { &hf_h245_networkAddressNum,
-      { "networkAddress", "h245.networkAddress",
+    { &hf_h245_din_networkAddress,
+      { "networkAddress", "h245.din_networkAddress",
         FT_STRING, BASE_NONE, NULL, 0,
         "NumericString_SIZE_0_40", HFILL }},
     { &hf_h245_subAddress,
@@ -19427,7 +19427,7 @@ void proto_register_h245(void) {
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
     { &hf_h245_multiplexCapabilityBool,
-      { "multiplexCapability", "h245.multiplexCapability",
+      { "multiplexCapability", "h245.multiplexCapabilityBool",
         FT_BOOLEAN, BASE_NONE, NULL, 0,
         "BOOLEAN", HFILL }},
     { &hf_h245_capabilityTableEntryNumbers,
@@ -20813,6 +20813,6 @@ static void init_h245_packet_info(h245_packet_info *pi)
 
         pi->msg_type = H245_OTHER;
 		pi->frame_label[0] = '\0';
-		g_snprintf(pi->comment, sizeof(pi->comment), "H245 ");
+		snprintf(pi->comment, sizeof(pi->comment), "H245 ");
 }
 

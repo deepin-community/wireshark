@@ -46,18 +46,13 @@ operating system. This is the case for Windows XP, which is supported by
 Wireshark 1.10 and earlier. In other cases the standard package for
 Wireshark might simply be old. This is the case for Solaris and HP-UX.
 
-NOTE: The Makefile depends on GNU "make"; it doesn't appear to
-work with the "make" that comes with Solaris 7 nor the BSD "make".
+Python 3 is needed to build Wireshark. AsciiDoctor is required to build
+the documentation, including the man pages. Perl and flex are required
+to generate some of the source code.
 
-Both Perl and Python are needed, the former for building the man pages.
-
-If you decide to modify the yacc grammar or lex scanner, then
-you need "flex" - it cannot be built with vanilla "lex" -
-and either "bison" or the Berkeley "yacc". Your flex
-version must be 2.5.1 or greater. Check this with `flex -V`.
-
-You must therefore install Perl, Python, GNU "make", "flex", and either "bison"
-or Berkeley "yacc" on systems that lack them.
+You must therefore install Python 3, AsciiDoctor, and GNU "flex" (vanilla
+"lex" won't work) on systems that lack them. You might need to install
+Perl as well.
 
 Full installation instructions can be found in the INSTALL file and in the
 Developer's Guide at https://www.wireshark.org/docs/wsdg_html_chunked/
@@ -89,10 +84,15 @@ Wireshark can read packets from a number of different file types.  See
 the Wireshark man page or the Wireshark User's Guide for a list of
 supported file formats.
 
-Wireshark can transparently read gzipped versions of any of those files if
-zlib was available when Wireshark was compiled.  CMake will automatically
-use zlib if it is found on your system.  You can disable zlib support by
-running `cmake -DENABLE_ZLIB=OFF`.
+Wireshark can transparently read compressed versions of any of those files if
+the required compression library was available when Wireshark was compiled.
+Currently supported compression formats are:
+
+- GZIP
+- ZSTD
+- LZ4
+
+You can disable zlib support by running `cmake -DENABLE_ZLIB=OFF`.
 
 Although Wireshark can read AIX iptrace files, the documentation on
 AIX's iptrace packet-trace command is sparse.  The `iptrace` command
@@ -209,6 +209,36 @@ The core dump file may be named "wireshark.core" rather than "core" on
 some platforms (e.g., BSD systems).  If you got a core dump with
 TShark rather than Wireshark, use "tshark" as the first argument to
 the debugger; the core dump may be named "tshark.core".
+
+License
+-------
+
+Wireshark is distributed under the GNU GPLv2. See the file COPYING for
+the full text of the license. When in doubt the full text is the legally
+binding part. These notes are just to make it easier for people that are not
+familiar with the GPLv2.
+
+There are no restrictions on its use. There are restrictions on its distribution
+in source or binary form.
+
+Most parts of Wireshark are covered by a "GPL version 2 or later" license.
+Some files are covered by different licenses that are compatible with
+the GPLv2.
+
+As a notable exception, some utilities distributed with the Wireshark source are
+covered by other licenses that are not themselves directly compatible with the
+GPLv2. This is OK, as only the tools themselves are licensed this way, the
+output of the tools is not considered a derived work, and so can be safely
+licensed for Wireshark's use. An incomplete selection of these tools includes:
+ - the pidl utility (tools/pidl) is licensed under the GPLv3+.
+
+Parts of Wireshark can be built and distributed as libraries. These
+parts are still covered by the GPL, and NOT by the Lesser General Public
+License or any other license.
+
+If you integrate all or part of Wireshark into your own application, then
+that application must be released under a license compatible with the GPL.
+
 
 Disclaimer
 ----------

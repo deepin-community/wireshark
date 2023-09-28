@@ -1,4 +1,4 @@
-/* wireshark_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -94,9 +94,9 @@ protected:
      */
     bool registerTapListener(const char *tap_name, void *tap_data,
                         const char *filter, guint flags,
-                        void (*tap_reset)(void *tapdata),
-                        tap_packet_status (*tap_packet)(void *tapdata, struct _packet_info *pinfo, struct epan_dissect *edt, const void *data),
-                        void (*tap_draw)(void *tap_data));
+                        tap_reset_cb tap_reset,
+                        tap_packet_cb tap_packet,
+                        tap_draw_cb tap_draw);
 
     /**
      * @brief Remove all tap listeners registered via registerTapListener.
@@ -117,10 +117,19 @@ protected:
 
     /**
      * @brief Called when the capture file is about to close. This can be
-     * used to enable or disable widgets according to the state of
-     * file_closed_.
+     * used to disconnect taps and similar actions.
+     * updateWidgets() is called at the end.
+     * To enable/disable widgets captureFileClosed() is more suitable.
      */
     virtual void captureFileClosing();
+
+    /**
+     * @brief Called when the capture file was closed. This can be
+     * used to enable or disable widgets according to the state of
+     * file_closed_.
+     * updateWidgets() is called at the end.
+     */
+    virtual void captureFileClosed();
 
 protected slots:
     void captureEvent(CaptureEvent);
@@ -137,16 +146,3 @@ private slots:
 };
 
 #endif // WIRESHARK_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

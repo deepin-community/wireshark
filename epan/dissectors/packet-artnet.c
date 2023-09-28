@@ -1553,7 +1553,7 @@ static const value_string artnet_oem_code_vals[] = {
   { 0xFFFF, "Artistic Licence Engineering Ltd: OemGlobal" },
   { 0,      NULL }
 };
-value_string_ext artnet_oem_code_vals_ext = VALUE_STRING_EXT_INIT(artnet_oem_code_vals);
+static value_string_ext artnet_oem_code_vals_ext = VALUE_STRING_EXT_INIT(artnet_oem_code_vals);
 
 static const value_string artnet_esta_man_vals[] = {
   { 0x0000, "ESTA/PLASA" },
@@ -1630,7 +1630,7 @@ static const value_string artnet_esta_man_vals[] = {
   { 0x00B6, "DiGidot Technologies BV" },
   { 0x00B7, "Bron Elektronik AG" },
   { 0x00B8, "Shenzhen Singba Light Technology Co., Ltd." },
-  { 0x00B9, "Guangzhou Baiyun District Sanjie Eletronic Stage Lighting Audio Equipment Factory" },
+  { 0x00B9, "Guangzhou Baiyun District Sanjie Electronic Stage Lighting Audio Equipment Factory" },
   { 0x00BA, "LiteGear Inc." },
   { 0x00BB, "Digital Lighting Engineering & Design, LLC" },
   { 0x00BC, "Ambion GmbH (Ambrain)" },
@@ -2627,7 +2627,7 @@ static const value_string artnet_esta_man_vals[] = {
 
   { 0,      NULL }
 };
-value_string_ext artnet_esta_man_vals_ext = VALUE_STRING_EXT_INIT(artnet_esta_man_vals);
+static value_string_ext artnet_esta_man_vals_ext = VALUE_STRING_EXT_INIT(artnet_esta_man_vals);
 
 static const value_string artnet_indicator_state_vals[] = {
   { 0x00, "unknown" },
@@ -3368,15 +3368,15 @@ dissect_artnet_poll_reply(tvbuff_t *tvb, guint offset, proto_tree *tree)
   offset += 2;
 
   proto_tree_add_item(tree, hf_artnet_poll_reply_short_name,
-                      tvb, offset, 18, ENC_ASCII|ENC_NA);
+                      tvb, offset, 18, ENC_ASCII);
   offset += 18;
 
   proto_tree_add_item(tree, hf_artnet_poll_reply_long_name,
-                      tvb, offset, 64, ENC_ASCII|ENC_NA);
+                      tvb, offset, 64, ENC_ASCII);
   offset += 64;
 
   proto_tree_add_item(tree, hf_artnet_poll_reply_node_report,
-                      tvb, offset, 64, ENC_ASCII|ENC_NA);
+                      tvb, offset, 64, ENC_ASCII);
   offset += 64;
 
 
@@ -3673,11 +3673,11 @@ dissect_artnet_address(tvbuff_t *tvb, guint offset, proto_tree *tree) {
   offset += 1;
 
   proto_tree_add_item(tree, hf_artnet_address_short_name,
-                      tvb, offset, 18, ENC_ASCII|ENC_NA);
+                      tvb, offset, 18, ENC_ASCII);
   offset += 18;
 
   proto_tree_add_item(tree, hf_artnet_address_long_name,
-                      tvb, offset, 64, ENC_ASCII|ENC_NA);
+                      tvb, offset, 64, ENC_ASCII);
   offset += 64;
 
   hi = proto_tree_add_item(tree,
@@ -3823,7 +3823,7 @@ dissect_artnet_video_setup(tvbuff_t *tvb, guint offset, proto_tree *tree ) {
   offset += 1;
 
   proto_tree_add_item(tree, hf_artnet_video_setup_win_font_name,
-                      tvb, offset, 64, ENC_ASCII|ENC_NA);
+                      tvb, offset, 64, ENC_ASCII);
   offset += 64;
 
   size = last_font * font_height;
@@ -4307,7 +4307,7 @@ dissect_artnet_diag_data(tvbuff_t *tvb, guint offset, proto_tree *tree)
   offset+=2;
 
   proto_tree_add_item(tree, hf_artnet_diag_data_data, tvb,
-                      offset, length, ENC_ASCII|ENC_NA);
+                      offset, length, ENC_ASCII);
   offset += length;
 
   return offset;
@@ -4425,11 +4425,11 @@ dissect_artnet_directory_reply(tvbuff_t *tvb, guint offset, proto_tree *tree)
   offset += 2;
 
   proto_tree_add_item(tree, hf_artnet_directory_reply_name, tvb,
-                      offset, 16, ENC_ASCII|ENC_NA);
+                      offset, 16, ENC_ASCII);
   offset += 16;
 
   proto_tree_add_item(tree, hf_artnet_directory_reply_desc, tvb,
-                      offset, 64, ENC_ASCII|ENC_NA);
+                      offset, 64, ENC_ASCII);
   offset += 64;
 
   proto_tree_add_item(tree, hf_artnet_directory_reply_length, tvb,
@@ -4478,7 +4478,7 @@ dissect_artnet_file_tn_master(tvbuff_t *tvb, guint offset, proto_tree *tree)
   offset += 4;
 
   proto_tree_add_item(tree, hf_artnet_file_tn_master_name, tvb,
-                      offset, 14, ENC_ASCII|ENC_NA);
+                      offset, 14, ENC_ASCII);
   offset += 14;
 
   proto_tree_add_checksum(tree, tvb, offset, hf_artnet_file_tn_master_checksum, -1, NULL, NULL, 0, ENC_BIG_ENDIAN, PROTO_CHECKSUM_NO_FLAGS);
@@ -4528,7 +4528,7 @@ dissect_artnet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _
   artnet_header_tree = proto_item_add_subtree(hi, ett_artnet);
 
   proto_tree_add_item_ret_string(artnet_header_tree, hf_artnet_header_id,
-                        tvb, offset, 8, ENC_ASCII|ENC_NA, wmem_packet_scope(), &header);
+                        tvb, offset, 8, ENC_ASCII|ENC_NA, pinfo->pool, &header);
   col_append_str(pinfo->cinfo, COL_INFO, header);
   offset += 8;
 
@@ -5511,7 +5511,7 @@ proto_register_artnet(void) {
     { &hf_artnet_poll_reply_good_input_dmx_text,
       { "DMX text packets supported",
         "artnet.poll_reply.good_input_dmx_text",
-        FT_UINT8, BASE_HEX, NULL, 0x010,
+        FT_UINT8, BASE_HEX, NULL, 0x10,
         NULL, HFILL }},
 
     { &hf_artnet_poll_reply_good_input_dmx_sip,

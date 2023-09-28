@@ -33,6 +33,8 @@
 #include "packet-ff.h"
 #include "packet-tcp.h"
 
+#define FDA_MSG_HDR_LENGTH  12
+
 void proto_register_ff(void);
 void proto_reg_handoff_ff(void);
 
@@ -1463,10 +1465,10 @@ static const value_string names_pad_len[] = {
 
 static const value_string names_proto[] = {
     { 0x00, "Unused"},
-    { PROTOCOL_FDA, "FDA Session Management" },
-    { PROTOCOL_SM, "SM" },
-    { PROTOCOL_FMS, "FMS" },
-    { PROTOCOL_LAN, "LAN Redundancy" },
+    { 0x01, "FDA Session Management" },
+    { 0x02, "SM" },
+    { 0x03, "FMS" },
+    { 0x04, "LAN Redundancy" },
     { 0, NULL }
 };
 
@@ -1503,8 +1505,9 @@ static const value_string names_query_type[] = {
 
 
 static const value_string names_smk_state[] = {
-    { 0x02, "NO_TAG" },         /* 0000 0010 */
-    { 0x04, "OPERATIONAL" }, /* 0000 0100 */
+    /* Bits 2-8 */
+    { 0x01, "NO_TAG" },         /* 0000 0010 */
+    { 0x02, "OPERATIONAL" },    /* 0000 0100 */
     { 0, NULL }
 };
 
@@ -1525,15 +1528,17 @@ static const value_string names_dev_type[] = {
 
 
 static const value_string names_dev_redundancy_role[] = {
-    { 0x04, "Primary" }, /* 0000 0100 */
-    { 0x08, "Secondary" }, /* 0000 1000 */
+    /* Bits 3 & 4*/
+    { 0x00, "Non-redundant" },  /* 0000 0000 */
+    { 0x01, "Primary" },        /* 0000 0100 */
+    { 0x02, "Secondary" },      /* 0000 1000 */
     { 0, NULL }
 };
 
 
 
 static const value_string names_assigned_redundant_dev_type[] = {
-    { 0x00, "Type D-1 Device" }, /* 0000 0000 */
+    { 0x00, "Non-redundant" }, /* 0000 0000 */
     { 0x01, "Type D-2 Device" }, /* 0000 0001 */
     { 0x02, "Type D-3 Device" }, /* 0000 0010 */
     { 0, NULL }
@@ -1542,9 +1547,10 @@ static const value_string names_assigned_redundant_dev_type[] = {
 
 
 static const value_string names_type_d2_dev_redundancy_role[] = {
-    { 0x00, "Not used" },               /* 0000 0000 */
-    { 0x04, "Type D-2 Device Primary" }, /* 0000 0100 */
-    { 0x08, "Type D-2 Device Secondary" }, /* 0000 1000 */
+    /* Bits 3 & 4*/
+    { 0x00, "Non-redundant" },              /* 0000 0000 */
+    { 0x01, "Type D-2 Device Primary" },    /* 0000 0100 */
+    { 0x02, "Type D-2 Device Secondary" },  /* 0000 1000 */
     { 0, NULL }
 };
 
@@ -1936,7 +1942,7 @@ dissect_ff_msg_fda_open_sess_req(tvbuff_t *tvb, gint offset,
     length -= 4;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fda_open_sess_req_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_fda_open_sess_req_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -2001,7 +2007,7 @@ dissect_ff_msg_fda_open_sess_rsp(tvbuff_t *tvb, gint offset,
     length -= 4;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fda_open_sess_rsp_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_fda_open_sess_rsp_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -2053,7 +2059,7 @@ dissect_ff_msg_fda_open_sess_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fda_open_sess_err_additional_desc, tvb, offset, 16, ENC_ASCII|ENC_NA);
+        hf_ff_fda_open_sess_err_additional_desc, tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -2156,7 +2162,7 @@ dissect_ff_msg_fda_idle_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fda_idle_err_additional_desc, tvb, offset, 16, ENC_ASCII|ENC_NA);
+        hf_ff_fda_idle_err_additional_desc, tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -2201,12 +2207,12 @@ dissect_ff_msg_sm_find_tag_query_req(tvbuff_t *tvb, gint offset,
     length -= 4;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_find_tag_query_req_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_find_tag_query_req_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_find_tag_query_req_vfd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_find_tag_query_req_vfd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -2321,12 +2327,12 @@ dissect_ff_msg_sm_find_tag_reply_req(tvbuff_t *tvb, gint offset,
     length -= 4;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_find_tag_reply_req_dev_id, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_find_tag_reply_req_dev_id, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_find_tag_reply_req_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_find_tag_reply_req_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -2646,12 +2652,12 @@ dissect_ff_msg_sm_id_rsp(tvbuff_t *tvb, gint offset,
     length -= 16;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_id_rsp_dev_id, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_id_rsp_dev_id, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_id_rsp_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_id_rsp_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -2749,7 +2755,7 @@ dissect_ff_msg_sm_id_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_id_err_additional_desc, tvb, offset, 16, ENC_ASCII|ENC_NA);
+        hf_ff_sm_id_err_additional_desc, tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -2780,12 +2786,12 @@ dissect_ff_msg_sm_clear_addr_req(tvbuff_t *tvb, gint offset,
         ett_ff_sm_id_err, NULL, "SM Clear Address Request");
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_clear_addr_req_dev_id, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_clear_addr_req_dev_id, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_clear_addr_req_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_clear_addr_req_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -2871,7 +2877,7 @@ dissect_ff_msg_sm_clear_addr_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_clear_addr_err_additional_desc, tvb, offset, 16, ENC_ASCII|ENC_NA);
+        hf_ff_sm_clear_addr_err_additional_desc, tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -2952,12 +2958,12 @@ dissect_ff_msg_sm_set_assign_info_req(tvbuff_t *tvb, gint offset,
         ett_ff_sm_set_assign_info_req, NULL, "SM Set Assignment Info Request");
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_set_assign_info_req_dev_id, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_set_assign_info_req_dev_id, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_set_assign_info_req_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_set_assign_info_req_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -3095,7 +3101,7 @@ dissect_ff_msg_sm_set_assign_info_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_set_assign_info_err_additional_desc, tvb, offset, 16, ENC_ASCII|ENC_NA);
+        hf_ff_sm_set_assign_info_err_additional_desc, tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -3126,12 +3132,12 @@ dissect_ff_msg_sm_clear_assign_info_req(tvbuff_t *tvb, gint offset,
         ett_ff_sm_clear_assign_info_req, NULL, "SM Clear Assignment Info Request");
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_clear_assign_info_req_dev_id, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_clear_assign_info_req_dev_id, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_clear_assign_info_req_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_clear_assign_info_req_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -3209,7 +3215,7 @@ dissect_ff_msg_sm_clear_assign_info_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_clear_assign_info_err_additional_desc, tvb, offset, 16, ENC_ASCII|ENC_NA);
+        hf_ff_sm_clear_assign_info_err_additional_desc, tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -3485,12 +3491,12 @@ dissect_ff_msg_sm_dev_annunc_req(tvbuff_t *tvb, gint offset,
     length -= 16;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_dev_annunc_req_dev_id, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_dev_annunc_req_dev_id, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_sm_dev_annunc_req_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_sm_dev_annunc_req_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -3594,7 +3600,7 @@ dissect_ff_msg_fms_init_req(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fms_init_req_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_fms_init_req_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -3680,7 +3686,7 @@ dissect_ff_msg_fms_init_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fms_init_err_additional_desc, tvb, offset, 16, ENC_ASCII|ENC_NA);
+        hf_ff_fms_init_err_additional_desc, tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -3844,7 +3850,7 @@ dissect_ff_msg_fms_status_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fms_status_err_additional_desc, tvb, offset, 16, ENC_ASCII|ENC_NA);
+        hf_ff_fms_status_err_additional_desc, tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -3946,17 +3952,17 @@ dissect_ff_msg_fms_id_rsp(tvbuff_t *tvb, gint offset,
         ett_ff_fms_id_rsp, NULL, "FMS Identify Response");
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fms_id_rsp_vendor_name, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_fms_id_rsp_vendor_name, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fms_id_rsp_model_name, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_fms_id_rsp_model_name, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_fms_id_rsp_revision, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_fms_id_rsp_revision, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -4007,7 +4013,7 @@ dissect_ff_msg_fms_id_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_id_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -4142,7 +4148,7 @@ dissect_ff_msg_fms_get_od_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_get_od_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -4254,7 +4260,7 @@ dissect_ff_msg_fms_init_put_od_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_init_put_od_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -4362,7 +4368,7 @@ dissect_ff_msg_fms_put_od_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_put_od_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -4472,7 +4478,7 @@ dissect_ff_msg_fms_terminate_put_od_err(tvbuff_t *tvb, gint offset,
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_terminate_put_od_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -4587,7 +4593,7 @@ dissect_ff_msg_fms_generic_init_download_sequence_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_gen_init_download_seq_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -4709,7 +4715,7 @@ dissect_ff_msg_fms_generic_download_segment_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_gen_download_seg_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -4835,7 +4841,7 @@ dissect_ff_msg_fms_generic_terminate_download_sequence_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_gen_terminate_download_seq_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -4948,7 +4954,7 @@ dissect_ff_msg_fms_init_download_sequence_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_init_download_seq_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -5066,7 +5072,7 @@ dissect_ff_msg_fms_download_segment_err(tvbuff_t *tvb, gint offset,
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_download_seg_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -5190,7 +5196,7 @@ dissect_ff_msg_fms_terminate_download_sequence_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_terminate_download_seq_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -5301,7 +5307,7 @@ dissect_ff_msg_fms_init_upload_seq_err(
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_init_upload_seq_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -5419,7 +5425,7 @@ dissect_ff_msg_fms_upload_segment_err(tvbuff_t *tvb, gint offset,
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_upload_seg_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -5533,7 +5539,7 @@ dissect_ff_msg_fms_terminate_upload_seq_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_terminate_upload_seq_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -5572,7 +5578,7 @@ dissect_ff_msg_fms_req_dom_download_req(
     if (length) {
         proto_tree_add_item(sub_tree,
             hf_ff_fms_req_dom_download_req_additional_info,
-            tvb, offset, length, ENC_ASCII|ENC_NA);
+            tvb, offset, length, ENC_ASCII);
     }
 }
 
@@ -5648,7 +5654,7 @@ dissect_ff_msg_fms_req_dom_download_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_req_dom_download_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -5687,7 +5693,7 @@ dissect_ff_msg_fms_req_dom_upload_req(
     if (length) {
         proto_tree_add_item(sub_tree,
             hf_ff_fms_req_dom_upload_req_additional_info,
-            tvb, offset, length, ENC_ASCII|ENC_NA);
+            tvb, offset, length, ENC_ASCII);
     }
 }
 
@@ -5762,7 +5768,7 @@ dissect_ff_msg_fms_req_dom_upload_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_req_dom_upload_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -5920,7 +5926,7 @@ dissect_ff_msg_fms_create_pi_err(tvbuff_t *tvb, gint offset,
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_create_pi_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -6029,7 +6035,7 @@ dissect_ff_msg_fms_del_pi_err(tvbuff_t *tvb, gint offset,
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_del_pi_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -6144,7 +6150,7 @@ dissect_ff_msg_fms_start_pi_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_start_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -6259,7 +6265,7 @@ dissect_ff_msg_fms_stop_pi_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_stop_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -6374,7 +6380,7 @@ dissect_ff_msg_fms_resume_pi_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_resume_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -6489,7 +6495,7 @@ dissect_ff_msg_fms_reset_pi_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_reset_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -6595,7 +6601,7 @@ dissect_ff_msg_fms_kill_pi_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_kill_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -6698,7 +6704,7 @@ dissect_ff_msg_fms_read_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_read_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -6811,7 +6817,7 @@ dissect_ff_msg_fms_read_subindex_err(tvbuff_t *tvb, gint offset,
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_read_with_subidx_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -6917,7 +6923,7 @@ dissect_ff_msg_fms_write_err(tvbuff_t *tvb, gint offset,
     length -= 2;
 
     proto_tree_add_item(sub_tree, hf_ff_fms_write_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -7032,7 +7038,7 @@ dissect_ff_msg_fms_write_subindex_err(tvbuff_t *tvb, gint offset,
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_write_with_subidx_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -7179,7 +7185,7 @@ dissect_ff_msg_fms_def_variable_list_err(tvbuff_t *tvb, gint offset,
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_def_variable_list_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -7289,7 +7295,7 @@ dissect_ff_msg_fms_del_variable_list_err(tvbuff_t *tvb, gint offset,
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_del_variable_list_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -7590,7 +7596,7 @@ dissect_ff_msg_fms_alter_alter_ev_condition_monitoring_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_alter_ev_condition_monitoring_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -7709,7 +7715,7 @@ dissect_ff_msg_fms_ack_ev_notification_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_fms_ack_ev_notification_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -7925,7 +7931,7 @@ dissect_ff_msg_lr_get_info_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_lr_get_info_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -8250,7 +8256,7 @@ dissect_ff_msg_lr_put_info_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_lr_put_info_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -8435,7 +8441,7 @@ dissect_ff_msg_lr_get_statistics_err(
 
     proto_tree_add_item(sub_tree,
         hf_ff_lr_get_statistics_err_additional_desc,
-        tvb, offset, 16, ENC_ASCII|ENC_NA);
+        tvb, offset, 16, ENC_ASCII);
     offset += 16;
     length -= 16;
 
@@ -8626,7 +8632,7 @@ dissect_ff_msg_diagnostic_msg_req(
     length -= 4;
 
     proto_tree_add_item(sub_tree,
-        hf_ff_lr_diagnostic_msg_req_pd_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        hf_ff_lr_diagnostic_msg_req_pd_tag, tvb, offset, 32, ENC_ASCII);
     offset += 32;
     length -= 32;
 
@@ -10938,7 +10944,7 @@ dissect_ff_msg_hdr(tvbuff_t *tvb,
     proto_item_set_hidden(hidden_item);
 
     sub_tree = proto_tree_add_subtree(tree,
-        tvb, offset, 12, ett_ff_fda_msg_hdr, NULL, "FDA Message Header");
+        tvb, offset, FDA_MSG_HDR_LENGTH, ett_ff_fda_msg_hdr, NULL, "FDA Message Header");
 
     /* FDA Message Version */
     proto_tree_add_item(sub_tree,
@@ -11022,8 +11028,8 @@ dissect_ff(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
      * Header
      */
     dissect_ff_msg_hdr(tvb, sub_tree, ProtocolAndType, Service);
-    offset += 12;
-    length -= 12;
+    offset += FDA_MSG_HDR_LENGTH;
+    length -= FDA_MSG_HDR_LENGTH;
 
     /*
      * Service-Specific Parameters + User Data (optional)
@@ -11038,10 +11044,10 @@ dissect_ff(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
     if (trailer_len) {
         dissect_ff_msg_trailer(tvb,
             offset, trailer_len, sub_tree, Options);
-        /*offset += trailer_len;*/
+        offset += trailer_len;
     }
 
-    return tvb_captured_length(tvb);
+    return offset;
 }
 
 
@@ -11073,7 +11079,7 @@ dissect_ff_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
  */
 
     tcp_dissect_pdus(tvb, pinfo, tree, ff_desegment,
-        12, get_ff_pdu_len, dissect_ff, data);
+        FDA_MSG_HDR_LENGTH, get_ff_pdu_len, dissect_ff, data);
 
     return tvb_reported_length(tvb);
 }
@@ -11083,21 +11089,29 @@ dissect_ff_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 static int
 dissect_ff_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
-    guint32 length;
+    gint offset = 0;
 
-    /* Make sure at least the header is there */
-    if (tvb_captured_length(tvb) < 12)
-        return 0;
+    while (tvb_reported_length_remaining(tvb, offset) > FDA_MSG_HDR_LENGTH)
+    {
+        tvbuff_t *pdu_tvb;
+        gint length;
 
-    length = tvb_get_ntohl(tvb, 8);
+        /* Make sure at least the header is there */
+        if (tvb_captured_length_remaining(tvb, offset) < FDA_MSG_HDR_LENGTH)
+            break;
 
-    /* Make sure the length field is valid */
-    if ((length > tvb_reported_length(tvb)) ||
-        (length < 12))
-        return 0;
+        length = get_ff_pdu_len(pinfo, tvb, offset, data);
 
-    dissect_ff(tvb, pinfo, tree, data);
-    return tvb_reported_length(tvb);
+        /* Make sure the length field is valid */
+        if ((length > tvb_reported_length_remaining(tvb, offset)) ||
+            (length < FDA_MSG_HDR_LENGTH))
+            break;
+
+        pdu_tvb = tvb_new_subset_length(tvb, offset, length);
+        offset += dissect_ff(pdu_tvb, pinfo, tree, data);
+    }
+
+    return offset;
 }
 
 

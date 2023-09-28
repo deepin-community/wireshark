@@ -69,7 +69,7 @@ get_stats_for_preview(wtap *wth, ws_file_preview_stats *stats,
         case REC_TYPE_FT_SPECIFIC_EVENT:
         case REC_TYPE_FT_SPECIFIC_REPORT:
         case REC_TYPE_SYSCALL:
-        case REC_TYPE_SYSTEMD_JOURNAL:
+        case REC_TYPE_SYSTEMD_JOURNAL_EXPORT:
             data_records++;
             break;
         }
@@ -83,6 +83,7 @@ get_stats_for_preview(wtap *wth, ws_file_preview_stats *stats,
                 break;
             }
         }
+        wtap_rec_reset(&rec);
     }
 
     stats->have_times = have_times;
@@ -100,16 +101,3 @@ get_stats_for_preview(wtap *wth, ws_file_preview_stats *stats,
     }
     return timed_out ? PREVIEW_TIMED_OUT : PREVIEW_SUCCEEDED;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -53,12 +53,21 @@ typedef struct ieee80211_tagged_field_data
   proto_item* item_tag_length;
 } ieee80211_tagged_field_data_t;
 
-
 int add_tagged_field(packet_info *pinfo, proto_tree *tree,
                             tvbuff_t *tvb, int offset, int ftype,
                             const guint8 *valid_element_ids,
                             guint valid_element_ids_count,
                             association_sanity_check_t *association_sanity_check);
+
+int add_tagged_field_with_validation(packet_info *pinfo, proto_tree *tree,
+                                      tvbuff_t *tvb, int offset, int ftype,
+                                      const guint8 *element_ids,
+                                      guint element_ids_count,
+                                      gboolean elements_ids_assume_invalid,
+                                      const guint8 *ext_element_ids,
+                                      guint ext_element_ids_count,
+                                      gboolean ext_element_ids_assume_invalid,
+                                      association_sanity_check_t *association_sanity_check);
 
 int dissect_wifi_dpp_config_proto(packet_info *pinfo, proto_tree *query,
                                   tvbuff_t *tvb, int offset);
@@ -88,15 +97,22 @@ gboolean is_broadcast_bssid(const address *bssid);
  */
 #define FCF_PROT_VERSION(x)  ((x) & 0x3)
 
+#define PV0 0x0
+#define PV1 0x1
+#define PC2 0x2
+#define PV3 0x3
+
 /*
  * Extract the frame type from the frame control field.
  */
 #define FCF_FRAME_TYPE(x)    (((x) & 0xC) >> 2)
+#define FCF_PV1_TYPE(x)      (((x) >> 2) & 0x7)
 
 /*
  * Extract the frame subtype from the frame control field.
  */
 #define FCF_FRAME_SUBTYPE(x) (((x) & 0xF0) >> 4)
+#define FCF_PV1_SUBTYPE(x)   (((x) >> 5) & 0x7)
 
 /*
  * Extract the control frame extension from the frame control field.
@@ -200,6 +216,7 @@ gboolean is_broadcast_bssid(const address *bssid);
  * 0x160 - 0x16A are for control frame extension where type = 1 and subtype =6.
  */
 #define CTRL_TRIGGER           0x12  /* HE Trigger                     */
+#define CTRL_TACK              0x13  /* S1G TWT Ack                    */
 #define CTRL_BEAMFORM_RPT_POLL 0x14  /* Beamforming Report             */
 #define CTRL_VHT_NDP_ANNC      0x15  /* VHT NDP Announcement           */
 #define CTRL_POLL              0x162  /* Poll                          */
@@ -246,6 +263,37 @@ gboolean is_broadcast_bssid(const address *bssid);
  */
 #define EXTENSION_DMG_BEACON         0x30  /* Extension DMG beacon */
 #define EXTENSION_S1G_BEACON         0x31  /* Extension S1G beacon */
+
+/*
+ * PV1 frame types
+ */
+#define PV1_QOS_DATA_1MAC            0x00  /* QoS data, one SID, one MAC     */
+#define PV1_MANAGEMENT               0x01  /* PV1 Management frame           */
+#define PV1_CONTROL                  0x02  /* PV1 Control frame              */
+#define PV1_QOS_DATA_2MAC            0x03  /* QoS data, two MAC addresses    */
+
+/*
+ * PV1 frame subtypes
+ */
+#define PV1_CONTROL_STACK             0x00   /* Control STACK */
+#define PV1_CONTROL_BAT               0x01   /* Control BAT   */
+
+#define PV1_MANAGEMENT_ACTION         0x00
+#define PV1_MANAGEMENT_ACTION_NO_ACK  0x01
+#define PV1_MANAGEMENT_PROBE_RESPONSE 0x02
+#define PV1_MANAGEMENT_RESOURCE_ALLOC 0x03
+
+/*
+ * PV1 SID constants
+ */
+#define SID_AID_MASK                  0x1FFF
+#define SID_A3_PRESENT                0x2000
+#define SID_A4_PRESENT                0x4000
+#define SID_A_MSDU                    0x8000
+
+#define TBTT_INFO(x)          (((x) & 0x3) >> 0)
+#define TBTT_INFO_COUNT(x)    (((x) & (0xf<<4)) >> 4)
+#define TBTT_INFO_LENGTH(x)   (((x) & (0xff<<8)) >> 8)
 
 typedef struct _wlan_stats {
   guint8 channel;
@@ -299,6 +347,10 @@ typedef struct anqp_info_dissector_data {
 #define WFA_SUBTYPE_DPP                        26
 #define WFA_SUBTYPE_IEEE1905_MULTI_AP          27 /* ox1B */
 #define WFA_SUBTYPE_OWE_TRANSITION_MODE        28
+#define WFA_SUBTYPE_QOS_MGMT                   33 /* 0x21 */
+
+/* WFA Public Action Types */
+#define WFA_SUBTYPE_ACTION_QOS_MGMT          0x1A
 
 /* WFA vendor specific ANQP subtypes */
 #define WFA_ANQP_SUBTYPE_HS20                  17
@@ -469,14 +521,17 @@ typedef struct anqp_info_dissector_data {
 #define TAG_QUIET_PERIOD_RES         177  /* IEEE Std 802.11ad */
 #define TAG_ECAPC_POLICY             182  /* IEEE Std 802.11ad */
 #define TAG_CLUSTER_TIME_OFFSET      183  /* IEEE Std 802.11ad */
+#define TAG_INTRA_ACCESS_CAT_PRIO    184
+#define TAG_SCS_DESCRIPTOR           185  /* IEEE Std 802.11   */
 #define TAG_ANTENNA_SECTOR_ID        190  /* IEEE Std 802.11ad */
 #define TAG_VHT_CAPABILITY           191  /* IEEE Std 802.11ac/D3.1 */
 #define TAG_VHT_OPERATION            192  /* IEEE Std 802.11ac/D3.1 */
 #define TAG_EXT_BSS_LOAD             193  /* IEEE Std 802.11ac */
 #define TAG_WIDE_BW_CHANNEL_SWITCH   194  /* IEEE Std 802.11ac */
-#define TAG_VHT_TX_PWR_ENVELOPE      195  /* IEEE Std 802.11ac/D5.0 */
+#define TAG_TX_PWR_ENVELOPE          195  /* IEEE Std 802.11-2020 */
 #define TAG_CHANNEL_SWITCH_WRAPPER   196  /* IEEE Std 802.11ac */
 #define TAG_OPERATING_MODE_NOTIFICATION 199  /* IEEE Std 802.11ac */
+#define TAG_REDUCED_NEIGHBOR_REPORT  201
 #define TAG_FINE_TIME_MEASUREMENT_PARAM 206  /* IEEE Std 802.11-REVmd/D2.0 */
 #define TAG_S1G_OPEN_LOOP_LINK_MARGIN_INDEX 207 /* IEEE Std 802.11ah */
 #define TAG_RPS                      208  /* IEEE Stf 802.11ah */
@@ -518,6 +573,10 @@ extern const value_string ie_tag_num_vals[];
 guint
 add_ff_action(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset,
               association_sanity_check_t *association_sanity_check );
+
+guint
+add_ff_action_public_fields(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
+                            int offset, guint8 code);
 
 /*
  * Editor modelines

@@ -1361,10 +1361,10 @@ dissect_ipaddressport(int anchor, tvbuff_t *tvb, proto_tree *tree, guint16 offse
   ipaddressport_type = tvb_get_guint8(tvb, offset);
   proto_item_append_text(ti_ipaddressport, ": %s", val_to_str_const(ipaddressport_type, ipaddressporttypes,"Unknown Type"));
   if (ipaddressport_type == IPADDRESSPORTTYPE_IPV4) {
-    proto_item_append_text(ti_ipaddressport, " (%s:%d)", tvb_ip_to_str(tvb, offset+2),tvb_get_ntohs(tvb,offset+2+4));
+    proto_item_append_text(ti_ipaddressport, " (%s:%d)", tvb_ip_to_str(wmem_packet_scope(), tvb, offset+2),tvb_get_ntohs(tvb,offset+2+4));
   }
   else if (ipaddressport_type == IPADDRESSPORTTYPE_IPV6) {
-    proto_item_append_text(ti_ipaddressport, " (%s:%d)", tvb_ip6_to_str(tvb, offset+2),tvb_get_ntohs(tvb,offset+2+16));
+    proto_item_append_text(ti_ipaddressport, " (%s:%d)", tvb_ip6_to_str(wmem_packet_scope(), tvb, offset+2),tvb_get_ntohs(tvb,offset+2+16));
   }
   ipaddressport_tree = proto_item_add_subtree(ti_ipaddressport, ett_reload_ipaddressport);
   proto_tree_add_item(ipaddressport_tree, hf_reload_ipaddressport_type, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -1377,7 +1377,7 @@ dissect_ipaddressport(int anchor, tvbuff_t *tvb, proto_tree *tree, guint16 offse
     proto_item *ti_ipv4;
     proto_tree *ipv4_tree;
     ti_ipv4 = proto_tree_add_item(ipaddressport_tree, hf_reload_ipv4addrport, tvb, offset, 6, ENC_NA);
-    proto_item_append_text(ti_ipv4, ": %s:%d", tvb_ip_to_str(tvb, offset),tvb_get_ntohs(tvb,offset+4));
+    proto_item_append_text(ti_ipv4, ": %s:%d", tvb_ip_to_str(wmem_packet_scope(), tvb, offset),tvb_get_ntohs(tvb,offset+4));
     ipv4_tree = proto_item_add_subtree(ti_ipv4, ett_reload_ipv4addrport);
     proto_tree_add_item(ipv4_tree, hf_reload_ipv4addr, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(ipv4_tree, hf_reload_port, tvb, offset + 4, 2, ENC_BIG_ENDIAN);
@@ -1389,7 +1389,7 @@ dissect_ipaddressport(int anchor, tvbuff_t *tvb, proto_tree *tree, guint16 offse
     proto_item *ti_ipv6;
     proto_tree *ipv6_tree;
     ti_ipv6 = proto_tree_add_item(ipaddressport_tree, hf_reload_ipv6addrport, tvb, offset, 6, ENC_NA);
-    proto_item_append_text(ti_ipv6, ": %s:%d", tvb_ip6_to_str(tvb, offset),tvb_get_ntohs(tvb,offset+16));
+    proto_item_append_text(ti_ipv6, ": %s:%d", tvb_ip6_to_str(wmem_packet_scope(), tvb, offset),tvb_get_ntohs(tvb,offset+16));
     ipv6_tree = proto_item_add_subtree(ti_ipv6, ett_reload_ipv6addrport);
     proto_tree_add_item(ipv6_tree, hf_reload_ipv6addr, tvb, offset, 16, ENC_NA);
     proto_tree_add_item(ipv6_tree, hf_reload_port, tvb, offset + 16, 2, ENC_BIG_ENDIAN);
@@ -3016,7 +3016,7 @@ static int dissect_diagnosticinfo(tvbuff_t *tvb, proto_tree *tree, guint16 offse
     break;
 
   case DIAGNOSTICKINDID_SOFTWARE_VERSION:
-    proto_tree_add_item(local_tree, hf_reload_diagnosticinfo_software_version, tvb, offset+local_offset, length, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(local_tree, hf_reload_diagnosticinfo_software_version, tvb, offset+local_offset, length, ENC_ASCII);
     break;
 
   case DIAGNOSTICKINDID_MACHINE_UPTIME:
@@ -3059,7 +3059,7 @@ static int dissect_diagnosticinfo(tvbuff_t *tvb, proto_tree *tree, guint16 offse
       proto_tree_add_item(instances_per_kindid_tree, hf_reload_diagnosticinfo_instancesstored_instances,
                           tvb, offset+local_offset+instances_offset+4, 8, ENC_BIG_ENDIAN);
       instances = tvb_get_ntoh64(tvb, offset+local_offset+instances_offset+4);
-      proto_item_append_text(ti_instances_per_kindid, ": %s/%" G_GINT64_MODIFIER "d",
+      proto_item_append_text(ti_instances_per_kindid, ": %s/%" PRId64,
           ((kind != NULL) && (kind->name != NULL)) ? kind->name : "UNKNOWN KIND", instances);
       instances_offset += 12;
       nElements++;
@@ -3765,7 +3765,7 @@ extern gint dissect_reload_messagecontents(tvbuff_t *tvb, packet_info *pinfo, pr
 
     case ERRORCODE_UNDERLAY_DESTINATION_UNREACHABLE:
     {
-      proto_tree_add_item(error_tree, hf_reload_opaque_string, tvb, offset+2, 32, ENC_ASCII|ENC_NA);
+      proto_tree_add_item(error_tree, hf_reload_opaque_string, tvb, offset+2, 32, ENC_ASCII);
     }
     break;
 
@@ -3774,7 +3774,7 @@ extern gint dissect_reload_messagecontents(tvbuff_t *tvb, packet_info *pinfo, pr
       if (error_code <= 19) {
         guint16 info_length = tvb_get_ntohs(tvb,offset+2);
         if (info_length>0) {
-          proto_item_append_text(ti_error, " (%s)", tvb_get_string_enc(wmem_packet_scope(), tvb, offset+4, info_length, ENC_ASCII));
+          proto_item_append_text(ti_error, " (%s)", tvb_get_string_enc(pinfo->pool, tvb, offset+4, info_length, ENC_ASCII));
         }
       }
       break;
@@ -4146,7 +4146,7 @@ dissect_reload_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 
   if (!reload_trans) {
     /* create a "fake" pana_trans structure */
-    reload_trans = wmem_new(wmem_packet_scope(), reload_transaction_t);
+    reload_trans = wmem_new(pinfo->pool, reload_transaction_t);
     reload_trans->req_frame = 0;
     reload_trans->rep_frame = 0;
     reload_trans->req_time = pinfo->abs_ts;
@@ -5565,7 +5565,7 @@ proto_register_reload(void)
       }
     },
     { &hf_reload_diagnosticinfo_instancesstored_info,
-      { "InstancesStoredInfo)",  "reload.diagnostic.info.instancesstored_info",  FT_NONE,
+      { "InstancesStoredInfo",  "reload.diagnostic.info.instancesstored_info",  FT_NONE,
         BASE_NONE,  NULL, 0x0,  NULL, HFILL
       }
     },

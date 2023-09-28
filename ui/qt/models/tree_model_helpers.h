@@ -1,4 +1,4 @@
-/* tree_model_helpers.h
+/** @file
  *
  * Utility template classes for basic tree model functionality
  *
@@ -66,14 +66,14 @@ public:
 
     int childCount() const
     {
-        return childItems_.count();
+        return static_cast<int>(childItems_.count());
     }
 
     int row()
     {
         if (parent_)
         {
-            return parent_->childItems_.indexOf(VariantPointer<Item>::asQVariant((Item *)this));
+            return static_cast<int>(parent_->childItems_.indexOf(VariantPointer<Item>::asQVariant((Item *)this)));
         }
 
         return 0;
@@ -87,16 +87,3 @@ protected:
 };
 
 #endif // TREE_MODEL_HELPERS_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

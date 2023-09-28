@@ -1,4 +1,4 @@
-/* epan.h
+/** @file
  *
  * Wireshark Protocol Analyzer Library
  *
@@ -12,11 +12,12 @@
 
 #include <glib.h>
 
+#include <wsutil/feature_list.h>
 #include <epan/tvbuff.h>
 #include <epan/prefs.h>
 #include <epan/frame_data.h>
-#include <wsutil/plugins.h>
 #include <epan/register.h>
+#include <wiretap/wtap_opttypes.h>
 #include "ws_symbol_export.h"
 
 #ifdef __cplusplus
@@ -27,6 +28,7 @@ extern "C" {
  * to save fetching it repeatedly.
  */
 extern gboolean wireshark_abort_on_dissector_bug;
+extern gboolean wireshark_abort_on_too_many_items;
 
 typedef struct epan_dissect epan_dissect_t;
 
@@ -49,12 +51,8 @@ struct packet_provider_funcs {
 	const nstime_t *(*get_frame_ts)(struct packet_provider_data *prov, guint32 frame_num);
 	const char *(*get_interface_name)(struct packet_provider_data *prov, guint32 interface_id);
 	const char *(*get_interface_description)(struct packet_provider_data *prov, guint32 interface_id);
-	const char *(*get_user_comment)(struct packet_provider_data *prov, const frame_data *fd);
+	wtap_block_t (*get_modified_block)(struct packet_provider_data *prov, const frame_data *fd);
 };
-
-#ifdef HAVE_PLUGINS
-extern plugins_t *libwireshark_plugins;
-#endif
 
 /**
 	@section Epan The Enhanced Packet ANalyzer
@@ -118,9 +116,9 @@ e_prefs *epan_load_settings(void);
 WS_DLL_PUBLIC
 void epan_cleanup(void);
 
-#ifdef HAVE_PLUGINS
 typedef struct {
-	void (*init)(void);
+	void (*init)(void);		/* Called before proto_init() */
+	void (*post_init)(void);	/* Called at the end of epan_init() */
 	void (*dissect_init)(epan_dissect_t *);
 	void (*dissect_cleanup)(epan_dissect_t *);
 	void (*cleanup)(void);
@@ -130,7 +128,14 @@ typedef struct {
 } epan_plugin;
 
 WS_DLL_PUBLIC void epan_register_plugin(const epan_plugin *plugin);
-#endif
+
+/** Returns_
+ *     0 if plugins can be loaded for all of libwireshark (tap, dissector, epan).
+ *     1 if plugins are not supported by the platform.
+ *    -1 if plugins were disabled in the build configuration.
+ */
+WS_DLL_PUBLIC int epan_plugins_supported(void);
+
 /**
  * Initialize the table of conversations.  Conversations are identified by
  * their endpoints; they are used for protocols such as IP, TCP, and UDP,
@@ -151,7 +156,7 @@ typedef struct epan_session epan_t;
 WS_DLL_PUBLIC epan_t *epan_new(struct packet_provider_data *prov,
     const struct packet_provider_funcs *funcs);
 
-WS_DLL_PUBLIC const char *epan_get_user_comment(const epan_t *session, const frame_data *fd);
+WS_DLL_PUBLIC wtap_block_t epan_get_modified_block(const epan_t *session, const frame_data *fd);
 
 WS_DLL_PUBLIC const char *epan_get_interface_name(const epan_t *session, guint32 interface_id);
 
@@ -176,6 +181,7 @@ WS_DLL_PUBLIC void epan_get_version_number(int *major, int *minor, int *micro);
  * created if create_proto_tree is false in the call to epan_dissect_init().
  * Clearing this reverts the decision to epan_dissect_init() and proto_tree_visible.
  */
+WS_DLL_PUBLIC
 void epan_set_always_visible(gboolean force);
 
 /** initialize an existing single packet dissection */
@@ -269,14 +275,14 @@ epan_custom_set(epan_dissect_t *edt, GSList *ids, gint occurrence,
  */
 WS_DLL_PUBLIC
 void
-epan_get_compiled_version_info(GString *str);
+epan_gather_compile_info(feature_list l);
 
 /**
  * Get runtime information for libraries used by libwireshark.
  */
 WS_DLL_PUBLIC
 void
-epan_get_runtime_version_info(GString *str);
+epan_gather_runtime_info(feature_list l);
 
 #ifdef __cplusplus
 }

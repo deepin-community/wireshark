@@ -99,6 +99,9 @@ static int hf_ack_entry = -1;
 static int hf_ack_length = -1;
 static int hf_miss_seq_no = -1;
 static int hf_miss_seq_range = -1;
+static int hf_miss_seq_range_from = -1;
+static int hf_miss_seq_range_delimiter = -1;
+static int hf_miss_seq_range_to = -1;
 static int hf_tot_miss_seq_no = -1;
 static int hf_timestamp_option = -1;
 static int hf_dest_entry = -1;
@@ -459,7 +462,7 @@ static p_mul_seq_val *register_p_mul_id (packet_info *pinfo, address *addr, guin
       if (pdu_type == Ack_PDU) {
         /* Data is just copied to the structure and never stored,
              so keep a "more temporary" structure */
-        p_mul_data = wmem_new0(wmem_packet_scope(), p_mul_seq_val);
+        p_mul_data = wmem_new0(pinfo->pool, p_mul_seq_val);
       } else {
         p_mul_data = wmem_new0(wmem_file_scope(), p_mul_seq_val);
       }
@@ -891,7 +894,7 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
   en = proto_tree_add_item (p_mul_tree, hf_checksum, tvb, offset, 2, ENC_BIG_ENDIAN);
   checksum_tree = proto_item_add_subtree (en, ett_checksum);
   len = tvb_captured_length (tvb);
-  value = (guint8 *)tvb_memdup (wmem_packet_scope(), tvb, 0, len);
+  value = (guint8 *)tvb_memdup (pinfo->pool, tvb, 0, len);
   if (len >= offset+2) {
     value[offset] = 0;
     value[offset+1] = 0;
@@ -1054,7 +1057,7 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
     break;
 
   case Ack_PDU:
-    message_id_list = wmem_strbuf_new_label(wmem_packet_scope());
+    message_id_list = wmem_strbuf_new_label(pinfo->pool);
 
     for (i = 0; i < count; i++) {
       /* Ack Info Entry */
@@ -1118,17 +1121,12 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
               proto_item_append_text (en, "    (invalid)");
               expert_add_info(pinfo, en, &ei_miss_seq_range);
             } else {
-              proto_tree *missing_tree;
-              guint16 sno;
+              proto_tree *missing_tree = proto_item_add_subtree (en, ett_range_entry);
 
-              missing_tree = proto_item_add_subtree (en, ett_range_entry);
+              proto_tree_add_item (missing_tree, hf_miss_seq_range_from, tvb, offset, 2, ENC_BIG_ENDIAN);
+              proto_tree_add_item (missing_tree, hf_miss_seq_range_delimiter, tvb, offset + 2, 2, ENC_BIG_ENDIAN);
+              proto_tree_add_item (missing_tree, hf_miss_seq_range_to, tvb, offset + 4, 2, ENC_BIG_ENDIAN);
 
-              for (sno = ack_seq_no; sno <= end_seq_no; sno++) {
-                en = proto_tree_add_uint_format_value(missing_tree, hf_miss_seq_no,
-                                                 tvb, offset, 6, sno,
-                                                 "%d", sno);
-                proto_item_set_generated (en);
-              }
               tot_no_missing += (end_seq_no - ack_seq_no + 1);
             }
 
@@ -1167,7 +1165,7 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
       timestamp = tvb_get_ntoh64 (tvb, offset);
       proto_tree_add_uint64_format_value(p_mul_tree, hf_timestamp_option, tvb,
                                     offset, 8, timestamp,
-                                    "%" G_GINT64_MODIFIER "d.%d second%s (%" G_GINT64_MODIFIER "u)",
+                                    "%" PRId64 ".%d second%s (%" PRIu64 ")",
                                     timestamp / 10, (int) timestamp % 10,
                                     (timestamp == 10) ? "" : "s", timestamp);
       offset += 8;
@@ -1395,6 +1393,15 @@ void proto_register_p_mul (void)
     { &hf_miss_seq_range,
       { "Missing Data PDU Seq Range", "p_mul.missing_seq_range", FT_BYTES,
         BASE_NONE, NULL, 0x0, NULL, HFILL } },
+    { &hf_miss_seq_range_from,
+      { "Missing Data PDU Seq Range from", "p_mul.missing_seq_range.from", FT_UINT16,
+        BASE_DEC, NULL, 0x0, NULL, HFILL } },
+    { &hf_miss_seq_range_delimiter,
+      { "Range Delimiter (always zero)", "p_mul.missing_seq_range.delimiter", FT_UINT16,
+        BASE_DEC, NULL, 0x0, NULL, HFILL } },
+    { &hf_miss_seq_range_to,
+      { "Missing Data PDU Seq Range to", "p_mul.missing_seq_range.to", FT_UINT16,
+        BASE_DEC, NULL, 0x0, NULL, HFILL } },
     { &hf_tot_miss_seq_no,
       { "Total Number of Missing Data PDU Sequence Numbers",
         "p_mul.no_missing_seq_no", FT_UINT16, BASE_DEC, NULL, 0x0,

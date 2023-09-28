@@ -1,4 +1,5 @@
-/* simple_dialog.h
+/** @file
+ *
  * Definitions for alert box routines with toolkit-independent APIs but
  * toolkit-dependent implementations.
  *
@@ -90,7 +91,7 @@ typedef enum {
  *
  * Explicitly passing in separate primary and secondary messages would let us
  * get rid of primary_start and primary_end and reduce the amount of
- * gymnastics we have to to in the Qt UI.
+ * gymnastics we have to do in the Qt UI.
  */
 extern gpointer simple_dialog(ESD_TYPE_E type, gint btn_mask,
     const gchar *msg_format, ...)
@@ -145,16 +146,3 @@ extern void vsimple_warning_message_box(const char *msg_format, va_list ap);
 #endif /* __cplusplus */
 
 #endif /* __SIMPLE_DIALOG_UI_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

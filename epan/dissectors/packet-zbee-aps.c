@@ -51,6 +51,7 @@ static guint   dissect_zbee_t2                 (tvbuff_t *tvb, proto_tree *tree,
 /* Helper routine. */
 static guint   zbee_apf_transaction_len    (tvbuff_t *tvb, guint offset, guint8 type);
 
+void dissect_zbee_aps_status_code(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset);
 void proto_register_zbee_aps(void);
 
 /********************
@@ -512,7 +513,7 @@ const range_string zbee_aps_apid_names[] = {
 };
 
 /* ZigBee Application Profile ID Abbreviations */
-const range_string zbee_aps_apid_abbrs[] = {
+static const range_string zbee_aps_apid_abbrs[] = {
     { ZBEE_DEVICE_PROFILE,  ZBEE_DEVICE_PROFILE,    "ZDP" },
     { ZBEE_PROFILE_IPM,     ZBEE_PROFILE_IPM,       "IPM" },
     { ZBEE_PROFILE_T1,      ZBEE_PROFILE_T1,        "T1" },
@@ -651,7 +652,7 @@ const range_string zbee_aps_cid_names[] = {
 };
 
 /* APS Test Profile #2 Cluster Names */
-const value_string zbee_aps_t2_cid_names[] = {
+static const value_string zbee_aps_t2_cid_names[] = {
     { ZBEE_APS_T2_CID_BR,         "Broadcast Request"},
     { ZBEE_APS_T2_CID_BTADR,      "Broadcast to All Devices Response"},
     { ZBEE_APS_T2_CID_BTARACR,    "Broadcast to All Routers and Coordinator Response"},
@@ -674,7 +675,7 @@ const value_string zbee_aps_t2_cid_names[] = {
 };
 
 /* APS Test Profile #2 Buffer Test Response Status Names */
-const value_string zbee_aps_t2_btres_status_names[] = {
+static const value_string zbee_aps_t2_btres_status_names[] = {
     { ZBEE_APS_T2_CID_BTRES_S_SBT,   "Successful Buffer Test"},
     { ZBEE_APS_T2_CID_BTRES_S_TFOFA, "Transmission Failure on First Attempt"},
 
@@ -1179,7 +1180,7 @@ dissect_zbee_aps_no_endpt:
  *@param tvb pointer to buffer containing raw packet.
  *@param pinfo pointer to packet information fields
  *@param tree pointer to data tree Wireshark uses to display packet.
- *@param proto_root pointer to the root of the APS tree
+ *@param version version of APS
  *@param data raw packet private data.
 */
 static void dissect_zbee_aps_cmd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint8 version, void *data)
@@ -1920,6 +1921,13 @@ static const enum_val_t zbee_zcl_protocol_version_enums[] = {
 
 gint gPREF_zbee_se_protocol_version = ZBEE_SE_VERSION_1_4;
 
+void
+dissect_zbee_aps_status_code(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset)
+{
+    guint status = tvb_get_guint8(tvb, offset);
+    proto_tree_add_item(tree, hf_zbee_aps_cmd_status, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    col_append_fstr(pinfo->cinfo, COL_INFO, ", %s", val_to_str_const(status, zbee_aps_status_names, "Unknown Status"));
+}
 /**
  *ZigBee APS protocol registration routine.
  *

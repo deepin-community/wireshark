@@ -409,7 +409,7 @@ dissect_cbsp_content_ie(tvbuff_t *tvb, packet_info *pinfo, guint offset, gint le
 		guint captured_len = tvb_captured_length(unpacked_tvb);
 		proto_tree *cbs_page_subtree = proto_item_add_subtree(cbs_page_item, ett_cbsp_cbs_page_content);
 		proto_tree_add_item_ret_string(cbs_page_subtree, hf_cbsp_cbs_page_content, unpacked_tvb,
-						0, captured_len, ENC_UTF_8|ENC_NA, wmem_packet_scope(),
+						0, captured_len, ENC_UTF_8|ENC_NA, pinfo->pool,
 						&pstr);
 		proto_item_append_text(ti, ": '%s'", pstr);
 	}
@@ -701,8 +701,17 @@ dissect_cbsp_tlvs(tvbuff_t *tvb, int base_offs, int length, packet_info *pinfo, 
 			proto_item_append_text(ti, ": %s", val_to_str_const(tmp_u, cbsp_category_names, ""));
 			break;
 		case CBSP_IEI_REP_PERIOD:
-			proto_tree_add_item_ret_uint(att_tree, hf_cbsp_rep_period, tvb, offset, len, ENC_BIG_ENDIAN, &tmp_u);
-			proto_item_append_text(ti, ": %u", tmp_u);
+			{
+				guint64 tmp_u64;
+				crumb_spec_t cbsp_rep_period_crumbs[] = {
+					{  0, 8 },
+					{ 12, 4 },
+					{  0, 0 }
+				};
+
+				proto_tree_add_split_bits_item_ret_val(att_tree, hf_cbsp_rep_period, tvb, offset<<3, cbsp_rep_period_crumbs, &tmp_u64);
+				proto_item_append_text(ti, ": %u", (guint16)tmp_u64);
+			}
 			break;
 		case CBSP_IEI_NUM_BCAST_REQ:
 			proto_tree_add_item_ret_uint(att_tree, hf_cbsp_num_bcast_req, tvb, offset, len, ENC_BIG_ENDIAN, &tmp_u);
@@ -869,7 +878,7 @@ proto_register_cbsp(void)
 		{ &hf_cbsp_cb_msg_page, { "CBS Message Information Page", "cbsp.cb_msg_page",
 		  FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL } },
 		{ &hf_cbsp_cbs_page_content, { "CBS Page Content", "cbsp.cb_page_content",
-		  FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL } },
+		  FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL } },
 		{ &hf_cbsp_sched_period, { "Schedule Period", "cbsp.sched_period",
 		  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL } },
 		{ &hf_cbsp_num_of_res_slots, { "Number of Reserved Slots", "cbsp.num_of_res_slots",

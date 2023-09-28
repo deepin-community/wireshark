@@ -272,14 +272,14 @@ static gint dissect_counted_address(tvbuff_t *tvb, gint offset, packet_info *pin
   proto_tree_add_item(tree, hf_tnef_value_length, tvb, offset, 2, ENC_LITTLE_ENDIAN);
   offset += 2;
 
-  proto_tree_add_item(tree, hf_tnef_attribute_display_name, tvb, offset, length, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(tree, hf_tnef_attribute_display_name, tvb, offset, length, ENC_ASCII);
   offset += length;
 
   length = tvb_get_letohs(tvb, offset);
   proto_tree_add_item(tree, hf_tnef_value_length, tvb, offset, 2, ENC_LITTLE_ENDIAN);
   offset += 2;
 
-  proto_tree_add_item(tree, hf_tnef_attribute_email_address, tvb, offset, length, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(tree, hf_tnef_attribute_email_address, tvb, offset, length, ENC_ASCII);
   offset += length;
 
   return offset;
@@ -382,7 +382,7 @@ static void dissect_mapiprops(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
         offset += 4;
 
         proto_tree_add_item_ret_string(tag_tree, hf_tnef_property_tag_name_string, tvb, offset, tag_length,
-          ENC_UTF_16|ENC_LITTLE_ENDIAN, wmem_packet_scope(), &name_string);
+          ENC_UTF_16|ENC_LITTLE_ENDIAN, pinfo->pool, &name_string);
         offset += tag_length;
 
         if((padding = (4 - tag_length % 4)) != 4) {
@@ -564,10 +564,10 @@ static int dissect_tnef(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
       proto_tree_add_item(attr_tree, hf_tnef_version, tvb, offset, length, ENC_LITTLE_ENDIAN);
       break;
     case ATT_MESSAGE_CLASS:
-      proto_tree_add_item(attr_tree, hf_tnef_message_class, tvb, offset, length, ENC_ASCII|ENC_NA);
+      proto_tree_add_item(attr_tree, hf_tnef_message_class, tvb, offset, length, ENC_ASCII);
       break;
     case ATT_ORIGINAL_MESSAGE_CLASS:
-      proto_tree_add_item(attr_tree, hf_tnef_original_message_class, tvb, offset, length, ENC_ASCII|ENC_NA);
+      proto_tree_add_item(attr_tree, hf_tnef_original_message_class, tvb, offset, length, ENC_ASCII);
       break;
     case ATT_MAPI_PROPS:
       item = proto_tree_add_item(attr_tree, hf_tnef_mapi_props, tvb, offset, length, ENC_NA);
@@ -603,7 +603,7 @@ static int dissect_tnef(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
       case ATP_STRING:
         {
         const guint8* atp;
-        proto_tree_add_item_ret_string(attr_tree, hf_tnef_attribute_string, tvb, offset, length, oem_encoding, wmem_packet_scope(), &atp);
+        proto_tree_add_item_ret_string(attr_tree, hf_tnef_attribute_string, tvb, offset, length, oem_encoding, pinfo->pool, &atp);
         proto_item_append_text(attr_item, " %s", atp);
         }
         break;
@@ -724,7 +724,7 @@ proto_register_tnef(void)
       { "Priority", "tnef.priority", FT_UINT16,  BASE_DEC, VALS(tnef_Priority_vals), 0x0,
         NULL, HFILL }},
     { &hf_tnef_mapi_props_count,
-      { "Count", "tnef.mapi_props.count", FT_UINT16,  BASE_DEC, NULL, 0x0,
+      { "Count", "tnef.mapi_props.count", FT_UINT32,  BASE_DEC, NULL, 0x0,
         NULL, HFILL }},
     { &hf_tnef_property,
       { "Property", "tnef.property", FT_NONE,  BASE_NONE, NULL, 0x0,
@@ -760,10 +760,10 @@ proto_register_tnef(void)
       { "Padding", "tnef.padding", FT_NONE,  BASE_NONE, NULL, 0x0,
         NULL, HFILL }},
     { &hf_tnef_values_count,
-      { "Count", "tnef.values.count", FT_UINT16,  BASE_DEC, NULL, 0x0,
+      { "Count", "tnef.values.count", FT_UINT32,  BASE_DEC, NULL, 0x0,
         NULL, HFILL }},
     { &hf_tnef_value_length,
-      { "Length", "tnef.value.length", FT_UINT16,  BASE_DEC, NULL, 0x0,
+      { "Length", "tnef.value.length", FT_UINT32,  BASE_DEC, NULL, 0x0,
         NULL, HFILL }},
     { &hf_tnef_PropValue_i,
       { "I", "tnef.PropValue.i", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},

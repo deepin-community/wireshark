@@ -15,22 +15,44 @@
 
 #include "wtap-int.h"
 #include "wtap_opttypes.h"
-#include "pcapng.h"
 
 #include "file_wrappers.h"
 #include <wsutil/file_util.h>
 #include <wsutil/buffer.h>
+#include <wsutil/ws_assert.h>
+#include <wsutil/wslog.h>
+#ifdef HAVE_PLUGINS
+#include <wsutil/plugins.h>
+#endif
 
 #ifdef HAVE_PLUGINS
-
-
 static plugins_t *libwiretap_plugins = NULL;
+#endif
+
 static GSList *wtap_plugins = NULL;
 
+#ifdef HAVE_PLUGINS
 void
 wtap_register_plugin(const wtap_plugin *plug)
 {
 	wtap_plugins = g_slist_prepend(wtap_plugins, (wtap_plugin *)plug);
+}
+#else /* HAVE_PLUGINS */
+void
+wtap_register_plugin(const wtap_plugin *plug _U_)
+{
+	ws_warning("wtap_register_plugin: built without support for binary plugins");
+}
+#endif /* HAVE_PLUGINS */
+
+int
+wtap_plugins_supported(void)
+{
+#ifdef HAVE_PLUGINS
+	return g_module_supported() ? 0 : 1;
+#else
+	return -1;
+#endif
 }
 
 static void
@@ -42,7 +64,6 @@ call_plugin_register_wtap_module(gpointer data, gpointer user_data _U_)
 		plug->register_wtap_module();
 	}
 }
-#endif /* HAVE_PLUGINS */
 
 /*
  * Return the size of the file, as reported by the OS.
@@ -190,12 +211,12 @@ wtap_add_generated_idb(wtap *wth)
 	wtapng_if_descr_mandatory_t *if_descr_mand;
 	int snaplen;
 
-	g_assert(wth->file_encap != WTAP_ENCAP_UNKNOWN &&
+	ws_assert(wth->file_encap != WTAP_ENCAP_UNKNOWN &&
 	    wth->file_encap != WTAP_ENCAP_PER_PACKET);
-	g_assert(wth->file_tsprec != WTAP_TSPREC_UNKNOWN &&
+	ws_assert(wth->file_tsprec != WTAP_TSPREC_UNKNOWN &&
 	    wth->file_tsprec != WTAP_TSPREC_PER_PACKET);
 
-	idb = wtap_block_create(WTAP_BLOCK_IF_DESCR);
+	idb = wtap_block_create(WTAP_BLOCK_IF_ID_AND_INFO);
 
 	if_descr_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(idb);
 	if_descr_mand->wtap_encap = wth->file_encap;
@@ -238,7 +259,7 @@ wtap_add_generated_idb(wtap *wth)
 		/*
 		 * Don't do this.
 		 */
-		g_assert_not_reached();
+		ws_assert_not_reached();
 		break;
 	}
 	snaplen = wth->snapshot_length;
@@ -295,9 +316,9 @@ wtap_get_debug_if_descr(const wtap_block_t if_descr,
 	guint64 tmp64;
 	gint8 itmp8;
 	guint8 tmp8;
-	wtapng_if_descr_filter_t* if_filter;
+	if_filter_opt_t if_filter;
 
-	g_assert(if_descr);
+	ws_assert(if_descr);
 
 	if_descr_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(if_descr);
 	if (wtap_block_get_string_option_value(if_descr, OPT_IDB_NAME, &tmp_content) == WTAP_OPTTYPE_SUCCESS) {
@@ -307,7 +328,7 @@ wtap_get_debug_if_descr(const wtap_block_t if_descr,
 				line_end);
 	}
 
-	if (wtap_block_get_string_option_value(if_descr, OPT_IDB_DESCR, &tmp_content) == WTAP_OPTTYPE_SUCCESS) {
+	if (wtap_block_get_string_option_value(if_descr, OPT_IDB_DESCRIPTION, &tmp_content) == WTAP_OPTTYPE_SUCCESS) {
 		g_string_append_printf(info,
 				"%*cDescription = %s%s", indent, ' ',
 				tmp_content ? tmp_content : "NONE",
@@ -330,7 +351,7 @@ wtap_get_debug_if_descr(const wtap_block_t if_descr,
 
 	if (wtap_block_get_uint64_option_value(if_descr, OPT_IDB_SPEED, &tmp64) == WTAP_OPTTYPE_SUCCESS) {
 		g_string_append_printf(info,
-				"%*cSpeed = %" G_GINT64_MODIFIER "u%s", indent, ' ',
+				"%*cSpeed = %" PRIu64 "%s", indent, ' ',
 				tmp64,
 				line_end);
 	}
@@ -354,7 +375,7 @@ wtap_get_debug_if_descr(const wtap_block_t if_descr,
 			line_end);
 
 	g_string_append_printf(info,
-			"%*cTime ticks per second = %" G_GINT64_MODIFIER "u%s", indent, ' ',
+			"%*cTime ticks per second = %" PRIu64 "%s", indent, ' ',
 			if_descr_mand->time_units_per_second,
 			line_end);
 
@@ -365,16 +386,30 @@ wtap_get_debug_if_descr(const wtap_block_t if_descr,
 				line_end);
 	}
 
-	if (wtap_block_get_custom_option_value(if_descr, OPT_IDB_FILTER, (void**)&if_filter) == WTAP_OPTTYPE_SUCCESS) {
-		g_string_append_printf(info,
-				"%*cFilter string = %s%s", indent, ' ',
-				if_filter->if_filter_str ? if_filter->if_filter_str : "NONE",
-				line_end);
+	if (wtap_block_get_if_filter_option_value(if_descr, OPT_IDB_FILTER, &if_filter) == WTAP_OPTTYPE_SUCCESS) {
+		switch (if_filter.type) {
 
-		g_string_append_printf(info,
-				"%*cBPF filter length = %u%s", indent, ' ',
-				if_filter->bpf_filter_len,
-				line_end);
+		case if_filter_pcap:
+			g_string_append_printf(info,
+					"%*cFilter string = %s%s", indent, ' ',
+					if_filter.data.filter_str,
+					line_end);
+			break;
+
+		case if_filter_bpf:
+			g_string_append_printf(info,
+					"%*cBPF filter length = %u%s", indent, ' ',
+					if_filter.data.bpf_prog.bpf_prog_len,
+					line_end);
+			break;
+
+		default:
+			g_string_append_printf(info,
+					"%*cUnknown filter type %u%s", indent, ' ',
+					if_filter.type,
+					line_end);
+			break;
+		}
 	}
 
 	if (wtap_block_get_string_option_value(if_descr, OPT_IDB_OS, &tmp_content) == WTAP_OPTTYPE_SUCCESS) {
@@ -1059,7 +1094,7 @@ static struct encap_type_info encap_table_base[] = {
 	{ "vsock", "Linux vsock" },
 
 	/* WTAP_ENCAP_NORDIC_BLE */
-	{ "nordic_ble", "Nordic BLE Sniffer" },
+	{ "nordic_ble", "nRF Sniffer for Bluetooth LE" },
 
 	/* WTAP_ENCAP_NETMON_NET_NETEVENT */
 	{ "netmon_event", "Network Monitor Network Event" },
@@ -1135,6 +1170,24 @@ static struct encap_type_info encap_table_base[] = {
 
 	/* WTAP_ENCAP_ZWAVE_SERIAL */
 	{ "zwave-serial", "Z-Wave Serial API packets" },
+
+	/* WTAP_ENCAP_ETW */
+	{ "etw", "Event Tracing for Windows messages" },
+
+	/* WTAP_ENCAP_ERI_ENB_LOG */
+	{ "eri_enb_log", "Ericsson eNode-B raw log" },
+
+	/* WTAP_ENCAP_ZBNCP */
+	{ "zbncp", "ZBOSS NCP" },
+
+	/* WTAP_ENCAP_USB_2_0_LOW_SPEED */
+	{ "usb-20-low", "Low-Speed USB 2.0/1.1/1.0 packets" },
+
+	/* WTAP_ENCAP_USB_2_0_FULL_SPEED */
+	{ "usb-20-full", "Full-Speed USB 2.0/1.1/1.0 packets" },
+
+	/* WTAP_ENCAP_USB_2_0_HIGH_SPEED */
+	{ "usb-20-high", "High-Speed USB 2.0 packets" },
 };
 
 WS_DLL_LOCAL
@@ -1340,7 +1393,7 @@ wtap_strerror(int err)
 	if (err < 0) {
 		wtap_errlist_index = -1 - err;
 		if (wtap_errlist_index >= WTAP_ERRLIST_SIZE) {
-			g_snprintf(errbuf, 128, "Error %d", err);
+			snprintf(errbuf, 128, "Error %d", err);
 			return errbuf;
 		}
 		if (wtap_errlist[wtap_errlist_index] == NULL)
@@ -1404,6 +1457,8 @@ wtap_close(wtap *wth)
 
 	g_free(wth->priv);
 
+	g_free(wth->pathname);
+
 	if (wth->fast_seek != NULL) {
 		g_ptr_array_foreach(wth->fast_seek, g_fast_seek_item_free, NULL);
 		g_ptr_array_free(wth->fast_seek, TRUE);
@@ -1459,6 +1514,7 @@ wtapng_process_dsb(wtap *wth, wtap_block_t dsb)
 		wth->add_new_secrets(dsb_mand->secrets_type, dsb_mand->secrets_data, dsb_mand->secrets_len);
 }
 
+/* Perform per-packet initialization */
 static void
 wtap_init_rec(wtap *wth, wtap_rec *rec)
 {
@@ -1474,6 +1530,15 @@ wtap_init_rec(wtap *wth, wtap_rec *rec)
 	 */
 	rec->rec_header.packet_header.pkt_encap = wth->file_encap;
 	rec->tsprec = wth->file_tsprec;
+	rec->block = NULL;
+	rec->block_was_modified = FALSE;
+
+	/*
+	 * Assume the file has only one section; the module for the
+	 * file type needs to indicate the section number if there's
+	 * more than one section.
+	 */
+	rec->section_number = 0;
 }
 
 gboolean
@@ -1499,6 +1564,13 @@ wtap_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err,
 		 */
 		if (*err == 0)
 			*err = file_error(wth->fh, err_info);
+		if (rec->block != NULL) {
+			/*
+			 * Unreference any block created for this record.
+			 */
+			wtap_block_unref(rec->block);
+			rec->block = NULL;
+		}
 		return FALSE;	/* failure */
 	}
 
@@ -1507,19 +1579,12 @@ wtap_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err,
 	 */
 	if (rec->rec_type == REC_TYPE_PACKET) {
 		/*
-		 * It makes no sense for the captured data length
-		 * to be bigger than the actual data length.
-		 */
-		if (rec->rec_header.packet_header.caplen > rec->rec_header.packet_header.len)
-			rec->rec_header.packet_header.caplen = rec->rec_header.packet_header.len;
-
-		/*
 		 * Make sure that it's not WTAP_ENCAP_PER_PACKET, as that
 		 * probably means the file has that encapsulation type
 		 * but the read routine didn't set this packet's
 		 * encapsulation type.
 		 */
-		g_assert(rec->rec_header.packet_header.pkt_encap != WTAP_ENCAP_PER_PACKET);
+		ws_assert(rec->rec_header.packet_header.pkt_encap != WTAP_ENCAP_PER_PACKET);
 	}
 
 	return TRUE;	/* success */
@@ -1614,23 +1679,33 @@ wtap_read_so_far(wtap *wth)
 	return file_tell_raw(wth->fh);
 }
 
+/* Perform global/initial initialization */
 void
 wtap_rec_init(wtap_rec *rec)
 {
 	memset(rec, 0, sizeof *rec);
 	ws_buffer_init(&rec->options_buf, 0);
+	/* In the future, see if we can create rec->block here once
+	 * and have it be reused like the rest of rec.
+	 * Currently it's recreated for each packet.
+	 */
 }
 
+/* re-initialize record */
+void
+wtap_rec_reset(wtap_rec *rec)
+{
+	wtap_block_unref(rec->block);
+	rec->block = NULL;
+	rec->block_was_modified = FALSE;
+}
+
+/* clean up record metadata */
 void
 wtap_rec_cleanup(wtap_rec *rec)
 {
-	g_free(rec->opt_comment);
-	rec->opt_comment = NULL;
+	wtap_rec_reset(rec);
 	ws_buffer_free(&rec->options_buf);
-	if (rec->packet_verdict != NULL) {
-		g_ptr_array_free(rec->packet_verdict, TRUE);
-		rec->packet_verdict = NULL;
-	}
 }
 
 gboolean
@@ -1644,27 +1719,28 @@ wtap_seek_read(wtap *wth, gint64 seek_off, wtap_rec *rec, Buffer *buf,
 
 	*err = 0;
 	*err_info = NULL;
-	if (!wth->subtype_seek_read(wth, seek_off, rec, buf, err, err_info))
+	if (!wth->subtype_seek_read(wth, seek_off, rec, buf, err, err_info)) {
+		if (rec->block != NULL) {
+			/*
+			 * Unreference any block created for this record.
+			 */
+			wtap_block_unref(rec->block);
+			rec->block = NULL;
+		}
 		return FALSE;
+	}
 
 	/*
 	 * Is this a packet record?
 	 */
 	if (rec->rec_type == REC_TYPE_PACKET) {
 		/*
-		 * It makes no sense for the captured data length
-		 * to be bigger than the actual data length.
-		 */
-		if (rec->rec_header.packet_header.caplen > rec->rec_header.packet_header.len)
-			rec->rec_header.packet_header.caplen = rec->rec_header.packet_header.len;
-
-		/*
 		 * Make sure that it's not WTAP_ENCAP_PER_PACKET, as that
 		 * probably means the file has that encapsulation type
 		 * but the read routine didn't set this packet's
 		 * encapsulation type.
 		 */
-		g_assert(rec->rec_header.packet_header.pkt_encap != WTAP_ENCAP_PER_PACKET);
+		ws_assert(rec->rec_header.packet_header.pkt_encap != WTAP_ENCAP_PER_PACKET);
 	}
 
 	return TRUE;
@@ -1685,7 +1761,7 @@ wtap_full_file_read_file(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf, int *
 		 * Avoid allocating space for an immensely-large file.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("%s: File has %" G_GINT64_MODIFIER "d-byte packet, bigger than maximum of %u",
+		*err_info = ws_strdup_printf("%s: File has %" PRId64 "-byte packet, bigger than maximum of %u",
 				wtap_encap_name(wth->file_encap), file_size, G_MAXINT);
 		return FALSE;
 	}
@@ -1699,7 +1775,7 @@ wtap_full_file_read_file(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf, int *
 	for (;;) {
 		if (buffer_size <= 0) {
 			*err = WTAP_ERR_BAD_FILE;
-			*err_info = g_strdup_printf("%s: Uncompressed file is bigger than maximum of %u",
+			*err_info = ws_strdup_printf("%s: Uncompressed file is bigger than maximum of %u",
 					wtap_encap_name(wth->file_encap), G_MAXINT);
 			return FALSE;
 		}
@@ -1769,11 +1845,12 @@ wtap_init(gboolean load_wiretap_plugins)
 	init_open_routines();
 	wtap_opttypes_initialize();
 	wtap_init_encap_types();
+	wtap_init_file_type_subtypes();
 	if (load_wiretap_plugins) {
 #ifdef HAVE_PLUGINS
 		libwiretap_plugins = plugins_init(WS_PLUGIN_WIRETAP);
-		g_slist_foreach(wtap_plugins, call_plugin_register_wtap_module, NULL);
 #endif
+		g_slist_foreach(wtap_plugins, call_plugin_register_wtap_module, NULL);
 	}
 }
 
@@ -1787,9 +1864,9 @@ wtap_cleanup(void)
 	wtap_opttypes_cleanup();
 	ws_buffer_cleanup();
 	cleanup_open_routines();
-#ifdef HAVE_PLUGINS
 	g_slist_free(wtap_plugins);
 	wtap_plugins = NULL;
+#ifdef HAVE_PLUGINS
 	plugins_cleanup(libwiretap_plugins);
 	libwiretap_plugins = NULL;
 #endif

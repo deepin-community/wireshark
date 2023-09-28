@@ -1011,7 +1011,7 @@ VALUE_STRING_ARRAY2(lustre_op_codes);
 VALUE_STRING_ENUM(lustre_LMTypes);
 VALUE_STRING_ARRAY(lustre_LMTypes);
 
-const true_false_string lnet_flags_set_truth = { "Set", "Unset" };
+static const true_false_string lnet_flags_set_truth = { "Set", "Unset" };
 
 #define lustre_layout_intent_opc_vals_VALUE_STRING_LIST(XXX)    \
     XXX(LAYOUT_INTENT_ACCESS,     0, "ACCESS")                  \
@@ -1202,7 +1202,8 @@ VALUE_STRING_ARRAY2(lustre_barrier_status_vals);
 #define LDLM_FL_RESENT                  0x0100000000000000ULL
 #define LDLM_FL_COS_ENABLED             0x0200000000000000ULL
 
-const value_string lustre_ldlm_flags_vals[] = {
+#if 0
+static const value_string lustre_ldlm_flags_vals[] = {
   {LDLM_FL_LOCK_CHANGED,        "LDLM_FL_LOCK_CHANGED"},
   {LDLM_FL_BLOCK_GRANTED,       "LDLM_FL_BLOCK_GRANTED"},
   {LDLM_FL_BLOCK_CONV,          "LDLM_FL_BLOCK_CONV"},
@@ -1222,6 +1223,7 @@ const value_string lustre_ldlm_flags_vals[] = {
   {LDLM_FL_AST_DISCARD_DATA,    "LDLM_FL_AST_DISCARD_DATA"},
   { 0, NULL }
 };
+#endif
 
 /********************************************************************
  *
@@ -1480,7 +1482,7 @@ VALUE_STRING_ARRAY(fld_op_vals);
 #define UPDATE_REQUEST_MAGIC_V1 0xBDDE0001
 #define UPDATE_REQUEST_MAGIC_V2 0xBDDE0002
 
-const value_string update_request_magic_vals[] = {
+static const value_string update_request_magic_vals[] = {
     {UPDATE_REQUEST_MAGIC_V1, "UPDATE_REQUEST_MAGIC_V1"},
     {UPDATE_REQUEST_MAGIC_V2, "UPDATE_REQUEST_MAGIC_V2"},
     {0, NULL}
@@ -1616,11 +1618,11 @@ lustre_get_trans(packet_info *pinfo, struct lnet_trans_info *info)
     lustre_trans_t *trans;
 
     // Ignore ports because this is kernel level and there can only be one Lustre instance per server
-    conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype),
+    conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype),
                                      0, 0, 0);
     if (conversation == NULL)
         conversation = conversation_new(pinfo->num, &pinfo->src,
-                                        &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype), 0, 0, 0);
+                                        &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), 0, 0, 0);
 
     conv_info = (lustre_conv_info_t *)conversation_get_proto_data(conversation, proto_lustre);
     if (!conv_info) {
@@ -1641,8 +1643,8 @@ lustre_get_trans(packet_info *pinfo, struct lnet_trans_info *info)
             /* XXX - Is this even possible? ?*/
             trans = (lustre_trans_t *)ptr;
             REPORT_DISSECTOR_BUG("ERROR: packet-lustre: conversation replaced: "
-                                 "trans:{opcode:%u sub_opcode:%" G_GINT64_MODIFIER "u match_bits:%" G_GINT64_MODIFIER "x} "
-                                 "with match_bits:%" G_GINT64_MODIFIER "x",
+                                 "trans:{opcode:%u sub_opcode:%" PRIu64 " match_bits:%" PRIx64 "} "
+                                 "with match_bits:%" PRIx64,
                                  trans->opcode, trans->sub_opcode, trans->match_bits, info->match_bits);
         }
     }
@@ -1712,7 +1714,7 @@ lustre_fmt_ver( gchar *result, guint32 version )
     minor = version & 0xff;
     version >>= 8;
     major = version & 0xff;
-    g_snprintf( result, ITEM_LABEL_LENGTH, "%d.%d.%d.%d", major, minor, patch, fix);
+    snprintf( result, ITEM_LABEL_LENGTH, "%d.%d.%d.%d", major, minor, patch, fix);
 }
 
 static int
@@ -1749,7 +1751,7 @@ dissect_struct_lu_fid(tvbuff_t *tvb, int offset, proto_tree *parent_tree, int hf
     tree = proto_item_add_subtree(item, ett_lustre_lu_fid);
 
     proto_tree_add_item_ret_uint64(tree, hf_lustre_lu_fid_f_seq, tvb, offset, 8, ENC_LITTLE_ENDIAN, &seq);
-    proto_item_append_text(item, ": [%#" G_GINT64_MODIFIER "x:", seq);
+    proto_item_append_text(item, ": [%#" PRIx64 ":", seq);
     offset += 8;
 
     proto_tree_add_item_ret_uint(tree, hf_lustre_lu_fid_f_oid, tvb, offset, 4, ENC_LITTLE_ENDIAN, &val);
@@ -1775,7 +1777,7 @@ dissect_struct_obd_uuid(tvbuff_t *tvb, int offset, proto_tree *parent_tree, int 
      /* struct obd_uuid { */
      /*     char uuid[UUID_MAX]; */
      /* }; */
-     proto_tree_add_item(tree, hf_lustre_obd_uuid, tvb, offset, 40, ENC_ASCII|ENC_NA);
+     proto_tree_add_item(tree, hf_lustre_obd_uuid, tvb, offset, 40, ENC_ASCII);
      offset += 40;
 
      return offset;
@@ -2278,7 +2280,7 @@ dissect_struct_changelog_rec(tvbuff_t *tvb, int offset, proto_tree *parent_tree)
         offset = dissect_struct_lu_fid(tvb, offset, tree, hf_lustre_changelog_ext_rename_spfid);
     }
     if (flags & CLF_JOBID) {
-        proto_tree_add_item(tree, hf_lustre_changelog_ext_jobid_jobid, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_lustre_changelog_ext_jobid_jobid, tvb, offset, 32, ENC_ASCII);
         offset += 32;
     }
     if (flags & CLF_EXTRA_FLAGS) {
@@ -2286,7 +2288,7 @@ dissect_struct_changelog_rec(tvbuff_t *tvb, int offset, proto_tree *parent_tree)
         offset += 8;
     }
     if (namelen > 0) {
-        proto_tree_add_item(tree, hf_lustre_changelog_ext_name, tvb, offset, namelen, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_lustre_changelog_ext_name, tvb, offset, namelen, ENC_ASCII);
         offset += namelen;
     }
 
@@ -2326,9 +2328,9 @@ dissect_struct_cfg_marker(tvbuff_t *tvb, int offset, proto_tree *parent_tree)
     offset += 8;
     proto_tree_add_item(tree, hf_lustre_cfg_marker_canceltime, tvb, offset, 8, ENC_LITTLE_ENDIAN);
     offset += 8;
-    proto_tree_add_item(tree, hf_lustre_cfg_marker_tgtname, tvb, offset, 64, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_lustre_cfg_marker_tgtname, tvb, offset, 64, ENC_ASCII);
     offset += 64;
-    proto_tree_add_item(tree, hf_lustre_cfg_marker_comment, tvb, offset, 64, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_lustre_cfg_marker_comment, tvb, offset, 64, ENC_ASCII);
     offset += 64;
 
     return offset;
@@ -2388,7 +2390,7 @@ dissect_struct_lustre_cfg(tvbuff_t *tvb, int offset, proto_tree *parent_tree)
         if (count == 2) {
             len = tvb_get_letohl(tvb, buf_offset);
             len += buffer_padding_length(len+offset);
-            proto_tree_add_item(tree, hf_lustre_lustre_cfg_buffer, tvb, offset, len, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_lustre_lustre_cfg_buffer, tvb, offset, len, ENC_ASCII);
             offset += len;
             offset = dissect_struct_lov_desc(tvb, offset, tree);
             break;
@@ -2398,7 +2400,7 @@ dissect_struct_lustre_cfg(tvbuff_t *tvb, int offset, proto_tree *parent_tree)
         for (i = 0; i < count; ++i) {
             len = tvb_get_letohl(tvb, buf_offset+(4*i));
             len += buffer_padding_length(len+offset);
-            proto_tree_add_item(tree, hf_lustre_lustre_cfg_buffer, tvb, offset, len, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_lustre_lustre_cfg_buffer, tvb, offset, len, ENC_ASCII);
             offset += len;
         }
         break;
@@ -2460,7 +2462,7 @@ dissect_struct_ldlm_lock_desc(tvbuff_t *tvb, int offset, packet_info *pinfo, pro
                     *ltype = tvb_get_letoh64(tvb, offset);
                 proto_tree_add_item(id_tree, hf_lustre_ldlm_res_id_type, tvb, offset, 4, ENC_LITTLE_ENDIAN);
             } else
-                proto_tree_add_item(id_tree, hf_lustre_ldlm_res_id_string, tvb, offset, 8, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(id_tree, hf_lustre_ldlm_res_id_string, tvb, offset, 8, ENC_ASCII);
             break;
         default:
             proto_tree_add_item(id_tree, hf_lustre_ldlm_res_id_name, tvb, offset, 8, ENC_LITTLE_ENDIAN);
@@ -2791,7 +2793,7 @@ dissect_struct_mgs_config_body(tvbuff_t *tvb, int offset, packet_info *pinfo _U_
     /* }; */
     /* MTI_NAME_MAXLEN == 64 */
 
-    proto_tree_add_item(tree, hf_lustre_mgs_config_body_name, tvb, offset, 64, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_lustre_mgs_config_body_name, tvb, offset, 64, ENC_ASCII);
     offset += 64;
     proto_tree_add_item(tree, hf_lustre_mgs_config_body_offset, tvb, offset, 8, ENC_LITTLE_ENDIAN);
     offset += 8;
@@ -2886,7 +2888,7 @@ dissect_struct_mgs_target_info(tvbuff_t *tvb, int offset, packet_info *pinfo _U_
     offset += 64;
     proto_tree_add_item(tree, hf_lustre_mgs_target_info_mti_svname, tvb, offset, 64, ENC_NA);
     offset += 64;
-    proto_tree_add_item(tree, hf_lustre_mgs_target_info_mti_uuid, tvb, offset, 40, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_lustre_mgs_target_info_mti_uuid, tvb, offset, 40, ENC_ASCII);
     offset += 40;
     for (i = 0; i < count; ++i)
         offset = lnet_dissect_struct_nid(tvb, tree, offset, hf_lustre_mgs_target_info_mti_nids);
@@ -3229,7 +3231,7 @@ dissect_struct_lmv_mds_md_v1(tvbuff_t *tvb, packet_info *pinfo _U_, int offset, 
     offset += 4;
     proto_tree_add_item(tree, hf_lustre_lmv_mds_md_padding, tvb, offset, 20, ENC_NA);
     offset += 20;
-    proto_tree_add_item(tree, hf_lustre_lmv_mds_md_pool_name, tvb, offset, 16, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_lustre_lmv_mds_md_pool_name, tvb, offset, 16, ENC_ASCII);
     offset += 16;
 
     for (i = 0; i < count && magic == LMV_MAGIC_V1; ++i)
@@ -3321,7 +3323,7 @@ dissect_struct_lov_mds_md(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_t
     proto_tree_add_item(tree, hf_lustre_lov_mds_md_lmm_layout_gen, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     if (magic == LOV_MAGIC_V3) {
-        proto_tree_add_item(tree, hf_lustre_lov_mds_md_lmm_pool_name, tvb, offset, 16, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_lustre_lov_mds_md_lmm_pool_name, tvb, offset, 16, ENC_ASCII);
         offset += 16;
     }
 
@@ -3480,7 +3482,7 @@ dissect_struct_hsm_progress(tvbuff_t *tvb, int offset, proto_tree *parent_tree)
     offset += 2;
     proto_tree_add_item(tree, hf_lustre_hsm_prog_errval, tvb, offset, 1, ENC_LITTLE_ENDIAN);
     offset += 2;
-    proto_tree_add_item(tree, hf_lustre_hsm_prog_padding1, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_lustre_hsm_prog_padding1, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     proto_tree_add_item(tree, hf_lustre_hsm_prog_data_ver, tvb, offset, 8, ENC_LITTLE_ENDIAN);
     offset += 8;
@@ -3517,13 +3519,13 @@ dissect_struct_hsm_user_state(tvbuff_t *tvb, int offset, packet_info *pinfo, pro
     /*     char            hus_extended_info[]; */
     /* }; */
 
-    proto_tree_add_item(tree, hf_lustre_hsm_us_states, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_lustre_hsm_us_states, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    proto_tree_add_item(tree, hf_lustre_hsm_us_archive_id, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_lustre_hsm_us_archive_id, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    proto_tree_add_item(tree, hf_lustre_hsm_us_in_prog_state, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_lustre_hsm_us_in_prog_state, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
-    proto_tree_add_item(tree, hf_lustre_hsm_us_in_prog_action, tvb, offset, 8, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_lustre_hsm_us_in_prog_action, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
     offset = dissect_struct_hsm_extent(tvb, offset, tree);
 
@@ -4096,7 +4098,7 @@ dissect_struct_lu_ladvise(tvbuff_t *tvb, int offset, proto_tree *parent_tree)
     item = proto_tree_add_item(parent_tree, hf_lustre_lu_ladvise, tvb, offset, 32, ENC_NA);
     tree = proto_item_add_subtree(item, ett_lustre_ladvise);
 
-    proto_tree_add_item(tree, hf_lustre_lu_ladvise_advice, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    proto_tree_add_item(tree, hf_lustre_lu_ladvise_advice, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
     proto_tree_add_item(tree, hf_lustre_lu_ladvise_value1, tvb, offset, 2, ENC_LITTLE_ENDIAN);
     offset += 2;
@@ -4174,7 +4176,7 @@ dissect_struct_ptlrpc_body(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent
     if (*pb_type == PTL_RPC_MSG_REQUEST)
         trans->opcode = opcode;
     else if (trans->opcode != opcode) {
-        expert_add_info_format(pinfo, tree, &ei_lustre_badopc, "Mismatched: PTLRPC:%s != Conversation:%s (match_bits:%" G_GINT64_MODIFIER "x)",
+        expert_add_info_format(pinfo, tree, &ei_lustre_badopc, "Mismatched: PTLRPC:%s != Conversation:%s (match_bits:%" PRIx64 ")",
                                val_to_str(opcode, lustre_op_codes, "Unknown(%d)"),
                                val_to_str(trans->opcode, lustre_op_codes, "Unknown(%d)"), trans->match_bits);
         trans->opcode = opcode;
@@ -4227,7 +4229,7 @@ dissect_struct_ptlrpc_body(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent
 
     if (pb_version == LUSTRE_PTLRPC_MSG_VERSION && offset-old_offset < buf_len) {
         /* the length of the string is 32 bytes max, with \0 inside */
-        proto_tree_add_item(tree, hf_lustre_ptlrpc_body_pb_jobid, tvb, offset, 32, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_lustre_ptlrpc_body_pb_jobid, tvb, offset, 32, ENC_ASCII);
         offset+=32;
     }
 
@@ -4732,7 +4734,7 @@ dissect_xattr_buffers(tvbuff_t *tvb, int offset, packet_info *pinfo _U_, proto_t
 
         //@@ Add name to text
         proto_item_append_text(item, " [%d]", i);
-        proto_tree_add_item(tree, hf_lustre_xattr_name, tvb, nameoffset, namesize, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_lustre_xattr_name, tvb, nameoffset, namesize, ENC_ASCII);
         nameoffset += namesize;
 
         proto_tree_add_item(tree, hf_lustre_xattr_data, tvb, dataoffset, datasize, ENC_NA);
@@ -5020,7 +5022,7 @@ dissect_struct_obd_statfs(tvbuff_t *tvb, gint offset, proto_tree *parent_tree)
     offset += 8;
     proto_tree_add_item(tree, hf_lustre_obd_statfs_os_ffree, tvb, offset, 8, ENC_LITTLE_ENDIAN);
     offset += 8;
-    proto_tree_add_item(tree, hf_lustre_obd_statfs_os_fsid, tvb, offset, 40, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_lustre_obd_statfs_os_fsid, tvb, offset, 40, ENC_ASCII);
     offset += 40;
     proto_tree_add_item(tree, hf_lustre_obd_statfs_os_bsize, tvb, offset, 4, ENC_LITTLE_ENDIAN);
     offset += 4;
@@ -8177,7 +8179,7 @@ proto_register_lustre(void)
         { &hf_lustre_obj_update_params_count,
           { "Ou Param Count", "lustre.obj_update.params_count", FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL }},
         { &hf_lustre_obj_update_result_size,
-          { "Ou Reult Sz", "lustre.obj_update.result_size", FT_UINT32, BASE_DEC_HEX, NULL, 0, NULL, HFILL }},
+          { "Ou Result Sz", "lustre.obj_update.result_size", FT_UINT32, BASE_DEC_HEX, NULL, 0, NULL, HFILL }},
         { &hf_lustre_obj_update_flags,
           { "Ou Flags", "lustre.obj_update.flags", FT_UINT32, BASE_HEX, NULL, 0, NULL, HFILL }},
         { &hf_lustre_obj_update_padding,
@@ -8562,13 +8564,13 @@ proto_register_lustre(void)
     expert_module_t *expert_lustre;
     static ei_register_info ei[] = {
         { &ei_lustre_buflen,
-          { "lustre.bad_buflen", PI_ERROR, PI_MALFORMED, "Buffer length mis-match", EXPFILL } },
+          { "lustre.bad_buflen", PI_MALFORMED, PI_ERROR, "Buffer length mis-match", EXPFILL } },
         { &ei_lustre_badopc,
-          { "lustre.bad_opcode", PI_WARN, PI_PROTOCOL, "BAD OPCODE", EXPFILL } },
+          { "lustre.bad_opcode", PI_PROTOCOL, PI_WARN, "BAD OPCODE", EXPFILL } },
         { &ei_lustre_badmagic,
-          { "lustre.bad_magic", PI_WARN, PI_PROTOCOL, "BAD Magic Value", EXPFILL } },
+          { "lustre.bad_magic", PI_PROTOCOL, PI_WARN, "BAD Magic Value", EXPFILL } },
         { &ei_lustre_obsopc,
-          { "lustre.old_opcode", PI_NOTE, PI_DEPRECATED, "Deprecated Opcode", EXPFILL } },
+          { "lustre.old_opcode", PI_DEPRECATED, PI_NOTE, "Deprecated Opcode", EXPFILL } },
     };
 
     proto_lustre = proto_register_protocol("Lustre", "lustre", "lustre");

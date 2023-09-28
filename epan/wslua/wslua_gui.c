@@ -12,7 +12,7 @@
 
 #include "config.h"
 
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 
 #include "wslua.h"
 
@@ -48,16 +48,16 @@ static void lua_menu_callback(gpointer data) {
         case 0:
             break;
         case LUA_ERRRUN:
-            g_warning("Runtime error while calling menu callback");
+            ws_warning("Runtime error while calling menu callback");
             break;
         case LUA_ERRMEM:
-            g_warning("Memory alloc error while calling menu callback");
+            ws_warning("Memory alloc error while calling menu callback");
             break;
         case LUA_ERRERR:
-            g_warning("Error while running the error handler function for menu callback");
+            ws_warning("Error while running the error handler function for menu callback");
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             break;
     }
 
@@ -67,21 +67,39 @@ static void lua_menu_callback(gpointer data) {
 WSLUA_FUNCTION wslua_register_menu(lua_State* L) { /*  Register a menu item in one of the main menus. Requires a GUI. */
 #define WSLUA_ARG_register_menu_NAME 1 /* The name of the menu item. Use slashes to separate submenus. (e.g. menu:Lua Scripts[My Fancy Statistics]). (string) */
 #define WSLUA_ARG_register_menu_ACTION 2 /* The function to be called when the menu item is invoked. The function must take no arguments and return nothing. */
-#define WSLUA_OPTARG_register_menu_GROUP 3 /* Where to place the item in the menu hierarchy. If omitted, defaults to MENU_STAT_GENERIC. One of:
-                                              * MENU_STAT_UNSORTED: menu:Statistics[]
-                                              * MENU_STAT_GENERIC: menu:Statistics[], first section
-                                              * MENU_STAT_CONVERSATION: menu:Statistics[Conversation List]
-                                              * MENU_STAT_ENDPOINT: menu:Statistics[Endpoint List]
-                                              * MENU_STAT_RESPONSE: menu:Statistics[Service Response Time]
-                                              * MENU_STAT_TELEPHONY: menu:Telephony[]
-                                              * MENU_STAT_TELEPHONY_ANSI: menu:Telephony[ANSI]
-                                              * MENU_STAT_TELEPHONY_GSM: menu:Telephony[GSM]
-                                              * MENU_STAT_TELEPHONY_LTE: menu:Telephony[LTE]
-                                              * MENU_STAT_TELEPHONY_MTP3: menu:Telephony[MTP3]
-                                              * MENU_STAT_TELEPHONY_SCTP: menu:Telephony[SCTP]
-                                              * MENU_ANALYZE: menu:Analyze[]
-                                              * MENU_ANALYZE_CONVERSATION: menu:Analyze[Conversation Filter]
-                                              * MENU_TOOLS_UNSORTED: menu:Tools[] */
+#define WSLUA_OPTARG_register_menu_GROUP 3 /*
+    Where to place the item in the menu hierarchy.
+    If omitted, defaults to MENU_STAT_GENERIC.
+    Valid packet (Wireshark) items are:
+    * MENU_PACKET_ANALYZE_UNSORTED: menu:Analyze[]
+    * MENU_PACKET_STAT_UNSORTED: menu:Statistics[]
+    * MENU_STAT_GENERIC: menu:Statistics[], first section
+    * MENU_STAT_CONVERSATION_LIST: menu:Statistics[Conversation List]
+    * MENU_STAT_ENDPOINT_LIST: menu:Statistics[Endpoint List]
+    * MENU_STAT_RESPONSE_TIME: menu:Statistics[Service Response Time]
+    * MENU_STAT_RSERPOOL = menu:Statistics[Reliable Server Pooling (RSerPool)]
+    * MENU_STAT_TELEPHONY: menu:Telephony[]
+    * MENU_STAT_TELEPHONY_ANSI: menu:Telephony[ANSI]
+    * MENU_STAT_TELEPHONY_GSM: menu:Telephony[GSM]
+    * MENU_STAT_TELEPHONY_LTE: menu:Telephony[LTE]
+    * MENU_STAT_TELEPHONY_MTP3: menu:Telephony[MTP3]
+    * MENU_STAT_TELEPHONY_SCTP: menu:Telephony[SCTP]
+    * MENU_ANALYZE: menu:Analyze[]
+    * MENU_ANALYZE_CONVERSATION: menu:Analyze[Conversation Filter]
+    * MENU_TOOLS_UNSORTED: menu:Tools[]
+
+    Valid log (Logray) items are:
+    * MENU_LOG_ANALYZE_UNSORTED: menu:Analyze[]
+    * MENU_LOG_STAT_UNSORTED = 16
+
+    The following are deprecated and shouldn't be used in new code:
+    * MENU_ANALYZE_UNSORTED, superseded by MENU_PACKET_ANALYZE_UNSORTED
+    * MENU_ANALYZE_CONVERSATION, superseded by MENU_ANALYZE_CONVERSATION_FILTER
+    * MENU_STAT_CONVERSATION, superseded by MENU_STAT_CONVERSATION_LIST
+    * MENU_STAT_ENDPOINT, superseded by MENU_STAT_ENDPOINT_LIST
+    * MENU_STAT_RESPONSE, superseded by MENU_STAT_RESPONSE_TIME
+    * MENU_STAT_UNSORTED, superseded by MENU_PACKET_STAT_UNSORTED
+ */
 
     const gchar* name = luaL_checkstring(L,WSLUA_ARG_register_menu_NAME);
     struct _lua_menu_data* md;
@@ -98,7 +116,7 @@ WSLUA_FUNCTION wslua_register_menu(lua_State* L) { /*  Register a menu item in o
         return 0;
     }
 
-    md = (struct _lua_menu_data *)g_malloc(sizeof(struct _lua_menu_data));
+    md = g_new(struct _lua_menu_data, 1);
     md->L = L;
 
     lua_pushvalue(L, 2);
@@ -151,16 +169,16 @@ static void lua_dialog_cb(gchar** user_input, void* data) {
         case 0:
             break;
         case LUA_ERRRUN:
-            g_warning("Runtime error while calling dialog callback");
+            ws_warning("Runtime error while calling dialog callback");
             break;
         case LUA_ERRMEM:
-            g_warning("Memory alloc error while calling dialog callback");
+            ws_warning("Memory alloc error while calling dialog callback");
             break;
         case LUA_ERRERR:
-            g_warning("Error while running the error handler function for dialog callback");
+            ws_warning("Error while running the error handler function for dialog callback");
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             break;
     }
 
@@ -193,13 +211,13 @@ static void text_win_close_cb(void* data) {
             case 0:
                 break;
             case LUA_ERRRUN:
-                g_warning("Runtime error during execution of TextWindow close callback");
+                ws_warning("Runtime error during execution of TextWindow close callback");
                 break;
             case LUA_ERRMEM:
-                g_warning("Memory alloc error during execution of TextWindow close callback");
+                ws_warning("Memory alloc error during execution of TextWindow close callback");
                 break;
             case LUA_ERRERR:
-                g_warning("Error while running the error handler function for TextWindow close callback");
+                ws_warning("Error while running the error handler function for TextWindow close callback");
                 break;
             default:
                 break;
@@ -219,7 +237,7 @@ WSLUA_FUNCTION wslua_new_dialog(lua_State* L) { /*
     Displays a dialog, prompting for input. The dialog includes an btn:[OK] button and btn:[Cancel] button. Requires a GUI.
 
     .An input dialog in action
-    image::wsdg_graphics/wslua-new-dialog.png[{small-screenshot-attrs}]
+    image::images/wslua-new-dialog.png[{small-screenshot-attrs}]
 
     ===== Example
 
@@ -246,12 +264,14 @@ WSLUA_FUNCTION wslua_new_dialog(lua_State* L) { /*
     */
 #define WSLUA_ARG_new_dialog_TITLE 1 /* The title of the dialog. */
 #define WSLUA_ARG_new_dialog_ACTION 2 /* Action to be performed when the user presses btn:[OK]. */
-/* WSLUA_MOREARGS new_dialog Strings to be used a labels of the dialog's fields. Each string creates a new labeled field. The first field is required. */
+/* WSLUA_MOREARGS new_dialog Strings to be used a labels of the dialog's fields. Each string creates a new labeled field. The first field is required.
+Instead of a strings it is possible to provide tables with fields 'name' and 'value' of type string. Then the created dialog's field will labeld with the content of name and prefilled with the content of value.*/
 
     const gchar* title;
     int top = lua_gettop(L);
     int i;
-    GPtrArray* labels;
+    GPtrArray* field_names;
+    GPtrArray* field_values;
     struct _dlg_cb_data* dcbd;
 
     if (! ops) {
@@ -277,7 +297,7 @@ WSLUA_FUNCTION wslua_new_dialog(lua_State* L) { /*
     }
 
 
-    dcbd = (struct _dlg_cb_data *)g_malloc(sizeof(struct _dlg_cb_data));
+    dcbd = g_new(struct _dlg_cb_data, 1);
     dcbd->L = L;
 
     lua_remove(L,1);
@@ -286,26 +306,63 @@ WSLUA_FUNCTION wslua_new_dialog(lua_State* L) { /*
     dcbd->func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
     lua_remove(L,1);
 
-    labels = g_ptr_array_new_with_free_func(g_free);
+    field_names = g_ptr_array_new_with_free_func(g_free);
+    field_values = g_ptr_array_new_with_free_func(g_free);
 
     top -= 2;
 
-    for (i = 1; i <= top; i++) {
-        if (! lua_isstring(L,i)) {
-            g_ptr_array_free(labels,TRUE);
-            g_free (dcbd);
-            WSLUA_ERROR(new_dialog,"All fields must be strings");
+    for (i = 1; i <= top; i++)
+    {
+        if (lua_isstring(L, i))
+        {
+            gchar* field_name = g_strdup(luaL_checkstring(L, i));
+            gchar* field_value = g_strdup("");
+            g_ptr_array_add(field_names, (gpointer)field_name);
+            g_ptr_array_add(field_values, (gpointer)field_value);
+        }
+        else if (lua_istable(L, i))
+        {
+            lua_getfield(L, i, "name");
+            lua_getfield(L, i, "value");
+
+            if (!lua_isstring(L, -2))
+            {
+                lua_pop(L, 2);
+
+                g_ptr_array_free(field_names, TRUE);
+                g_ptr_array_free(field_values, TRUE);
+                g_free(dcbd);
+                WSLUA_ERROR(new_dialog, "All fields must be strings or a table with a string field 'name'.");
+                return 0;
+            }
+
+            gchar* field_name = g_strdup(luaL_checkstring(L, -2));
+            gchar* field_value = lua_isstring(L, -1) ?
+                g_strdup(luaL_checkstring(L, -1)) :
+                g_strdup("");
+
+            g_ptr_array_add(field_names, (gpointer)field_name);
+            g_ptr_array_add(field_values, (gpointer)field_value);
+
+            lua_pop(L, 2);
+        }
+        else
+        {
+            g_ptr_array_free(field_names, TRUE);
+            g_ptr_array_free(field_values, TRUE);
+            g_free(dcbd);
+            WSLUA_ERROR(new_dialog, "All fields must be strings or a table with a string field 'name'.");
             return 0;
         }
-
-        g_ptr_array_add(labels,(gpointer)g_strdup(luaL_checkstring(L,i)));
     }
 
-    g_ptr_array_add(labels,NULL);
+    g_ptr_array_add(field_names, NULL);
+    g_ptr_array_add(field_values, NULL);
 
-    ops->new_dialog(title, (const gchar**)(labels->pdata), lua_dialog_cb, dcbd, g_free);
+    ops->new_dialog(ops->ops_id, title, (const gchar**)(field_names->pdata), (const gchar**)(field_values->pdata), lua_dialog_cb, dcbd, g_free);
 
-    g_ptr_array_free(labels,TRUE);
+    g_ptr_array_free(field_names, TRUE);
+    g_ptr_array_free(field_values, TRUE);
 
     WSLUA_RETURN(0);
 }
@@ -319,7 +376,7 @@ WSLUA_CLASS_DEFINE(ProgDlg,FAIL_ON_NULL("ProgDlg"));
     The main thread checks the status of the btn:[Cancel] button and if it's not set, returns control to the coroutine.
 
     .A progress bar in action
-    image::wsdg_graphics/wslua-progdlg.png[{medium-screenshot-attrs}]
+    image::images/wslua-progdlg.png[{medium-screenshot-attrs}]
 
     The legacy (GTK+) user interface displayed this as a separate dialog, hence the “Dlg” suffix.
     The Qt user interface shows a progress bar inside the main status bar.
@@ -515,7 +572,7 @@ WSLUA_CLASS_DEFINE(TextWindow,FAIL_ON_NULL_OR_EXPIRED("TextWindow")); /*
     The text can be read-only or editable, and buttons can be added below the text.
 
     .A text window in action
-    image::wsdg_graphics/wslua-textwindow.png[{medium-screenshot-attrs}]
+    image::images/wslua-textwindow.png[{medium-screenshot-attrs}]
 */
 
 /* XXX: button and close callback data is being leaked */
@@ -565,11 +622,11 @@ WSLUA_CONSTRUCTOR TextWindow_new(lua_State* L) { /*
     }
 
     title = luaL_optstring(L,WSLUA_OPTARG_TextWindow_new_TITLE, "Untitled Window");
-    tw = (struct _wslua_tw *)g_malloc(sizeof(struct _wslua_tw));
+    tw = g_new(struct _wslua_tw, 1);
     tw->expired = FALSE;
-    tw->ws_tw = ops->new_text_window(title);
+    tw->ws_tw = ops->new_text_window(ops->ops_id, title);
 
-    default_cbd = (struct _close_cb_data *)g_malloc(sizeof(struct _close_cb_data));
+    default_cbd = g_new(struct _close_cb_data, 1);
 
     default_cbd->L = NULL;
     default_cbd->func_ref = 0;
@@ -585,7 +642,7 @@ WSLUA_CONSTRUCTOR TextWindow_new(lua_State* L) { /*
 }
 
 WSLUA_METHOD TextWindow_set_atclose(lua_State* L) { /* Set the function that will be called when the text window closes. */
-#define WSLUA_ARG_TextWindow_at_close_ACTION 2 /* A Lua function to be executed when the user closes the text window. */
+#define WSLUA_ARG_TextWindow_set_atclose_ACTION 2 /* A Lua function to be executed when the user closes the text window. */
 
     TextWindow tw = checkTextWindow(L,1);
     struct _close_cb_data* cbd;
@@ -598,11 +655,11 @@ WSLUA_METHOD TextWindow_set_atclose(lua_State* L) { /* Set the function that wil
     lua_settop(L,2);
 
     if (! lua_isfunction(L,2)) {
-        WSLUA_ARG_ERROR(TextWindow_at_close,ACTION,"Must be a function");
+        WSLUA_ARG_ERROR(TextWindow_set_atclose,ACTION,"Must be a function");
         return 0;
     }
 
-    cbd = (struct _close_cb_data *)g_malloc(sizeof(struct _close_cb_data));
+    cbd = g_new(struct _close_cb_data, 1);
 
     cbd->L = L;
     cbd->func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -692,7 +749,7 @@ WSLUA_METHOD TextWindow_get_text(lua_State* L) { /* Get the text of the window. 
     text = ops->get_text(tw->ws_tw);
 
     lua_pushstring(L,text);
-    WSLUA_RETURN(1); /* The `TextWindow`'s text. */
+    WSLUA_RETURN(1); /* The `TextWindow`++'++s text. */
 }
 
 WSLUA_METHOD TextWindow_close(lua_State* L) { /* Close the window. */
@@ -765,16 +822,16 @@ static gboolean wslua_button_callback(funnel_text_window_t* ws_tw, void* data) {
         case 0:
             break;
         case LUA_ERRRUN:
-            g_warning("Runtime error while calling button callback");
+            ws_warning("Runtime error while calling button callback");
             break;
         case LUA_ERRMEM:
-            g_warning("Memory alloc error while calling button callback");
+            ws_warning("Memory alloc error while calling button callback");
             break;
         case LUA_ERRERR:
-            g_warning("Error while running the error handler function for button callback");
+            ws_warning("Error while running the error handler function for button callback");
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             break;
     }
 
@@ -804,8 +861,8 @@ WSLUA_METHOD TextWindow_add_button(lua_State* L) {
     lua_settop(L,3);
 
     if (ops->add_button) {
-        fbt = (funnel_bt_t *)g_malloc(sizeof(funnel_bt_t));
-        cbd = (wslua_bt_cb_t *)g_malloc(sizeof(wslua_bt_cb_t));
+        fbt = g_new(funnel_bt_t, 1);
+        cbd = g_new(wslua_bt_cb_t, 1);
 
         fbt->tw = tw->ws_tw;
         fbt->func = wslua_button_callback;
@@ -1016,7 +1073,7 @@ WSLUA_FUNCTION wslua_set_color_filter_slot(lua_State* L) { /*
 
     For example, this command yields the same results as the table above (and with all foregrounds set to black):
     ----
-    wireshark -o gui.colorized_frame.bg:ffc0c0,ffc0ff,e0c0e0,c0c0ff,c0e0e0,c0ffff,c0ffc0,ffffc0,e0e0c0,e0e0e0 -o gui.colorized_frame.fg:000000,000000,000000,000000,000000,000000,000000,000000
+    wireshark -o gui.colorized_frame.bg:ffc0c0,ffc0ff,e0c0e0,c0c0ff,c0e0e0,c0ffff,c0ffc0,ffffc0,e0e0c0,e0e0e0 -o gui.colorized_frame.fg:000000,000000,000000,000000,000000,000000,000000,000000,000000,000000
     ----
     */
 #define WSLUA_ARG_set_color_filter_slot_TEXT  2 /* The https://gitlab.com/wireshark/wireshark/-/wikis/DisplayFilters[display filter] for selecting packets to be colorized
@@ -1085,6 +1142,28 @@ WSLUA_FUNCTION wslua_reload_packets(lua_State* L) { /*
     }
 
     ops->reload_packets(ops->ops_id);
+
+    return 0;
+}
+
+
+WSLUA_FUNCTION wslua_redissect_packets(lua_State* L) { /*
+    Redissect all packets in the current capture file.
+    Requires a GUI.
+
+    [WARNING]
+    ====
+    Avoid calling this from within a dissector function or else an infinite loop can occur if it causes the dissector to be called again.
+    This function is best used in a button callback (from a dialog or text window) or menu callback.
+    ====
+    */
+
+    if (!ops->redissect_packets) {
+        WSLUA_ERROR(reload, "GUI not available");
+        return 0;
+    }
+
+    ops->redissect_packets(ops->ops_id);
 
     return 0;
 }

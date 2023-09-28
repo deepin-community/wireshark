@@ -1,4 +1,4 @@
-/* funnel_string_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -28,11 +28,11 @@ class FunnelStringDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit FunnelStringDialog(const QString title, const QStringList field_name_list, funnel_dlg_cb_t dialog_cb, void *dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free);
+    explicit FunnelStringDialog(QWidget *parent, const QString title, const QList<QPair<QString, QString>> field_list, funnel_dlg_cb_t dialog_cb, void* dialog_cb_data, funnel_dlg_cb_data_free_t dialog_data_free_cb);
     ~FunnelStringDialog();
 
     // Funnel ops
-    static void stringDialogNew(const QString title, const QStringList field_name_list, funnel_dlg_cb_t dialog_cb, void* dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free);
+    static void stringDialogNew(QWidget *parent, const QString title, const QList<QPair<QString, QString>> field_list, funnel_dlg_cb_t dialog_cb, void* dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free);
 
     void accept();
     void reject();
@@ -60,21 +60,7 @@ signals:
 };
 
 extern "C" {
-void string_dialog_new(const gchar* title, const gchar** fieldnames, funnel_dlg_cb_t dialog_cb, void* dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free);
-void string_dialogs_close(void);
+    void string_dialogs_close(void);
 }
 
 #endif // FUNNEL_STRING_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -190,7 +190,7 @@ dissect_bthci_acl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
     direction         = pinfo->p2p_dir;
     frame_number      = pinfo->num;
 
-    acl_data = wmem_new(wmem_packet_scope(), bthci_acl_data_t);
+    acl_data = wmem_new(pinfo->pool, bthci_acl_data_t);
     acl_data->interface_id                = interface_id;
     acl_data->adapter_id                  = adapter_id;
     acl_data->adapter_disconnect_in_frame = bluetooth_data->adapter_disconnect_in_frame;
@@ -287,7 +287,7 @@ dissect_bthci_acl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
         remote_length = (gint)(strlen(remote_ether_addr) + 3 + strlen(remote_name) + 1);
         remote_addr_name = (gchar *)wmem_alloc(pinfo->pool, remote_length);
 
-        g_snprintf(remote_addr_name, remote_length, "%s (%s)", remote_ether_addr, remote_name);
+        snprintf(remote_addr_name, remote_length, "%s (%s)", remote_ether_addr, remote_name);
 
         if (pinfo->p2p_dir == P2P_DIR_RECV) {
             src_bd_addr   = remote_bdaddr->bd_addr;
@@ -334,7 +334,7 @@ dissect_bthci_acl(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
     localhost_length = (gint)(strlen(localhost_ether_addr) + 3 + strlen(localhost_name) + 1);
     localhost_addr_name = (gchar *)wmem_alloc(pinfo->pool, localhost_length);
 
-    g_snprintf(localhost_addr_name, localhost_length, "%s (%s)", localhost_ether_addr, localhost_name);
+    snprintf(localhost_addr_name, localhost_length, "%s (%s)", localhost_ether_addr, localhost_name);
 
     if (pinfo->p2p_dir == P2P_DIR_RECV) {
         dst_bd_addr   = localhost_bdaddr;

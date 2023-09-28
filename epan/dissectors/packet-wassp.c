@@ -1256,7 +1256,7 @@ static const value_string wassp_tlv_types[] =
 	{ EID_MU_ASSOC_TIME, "MU Associated Time"},
 	{ EID_MU_ACTIVE_TIME, "MU Active Time"},
 	{ EID_REPORT_REQ, "Report Request"},
-	{ EID_MU_URL, "MU Capive Portal Url"},
+	{ EID_MU_URL, "MU Captive Portal Url"},
 	{ EID_MU_SESSION_LIFETIME, "MU Session Life Time"},
 	{ EID_MU_REAUTH_TIMER, "MU Re-Authentication Timer"},
 	{ EID_MU_ACCT_SESSION_ID_STRING, "MU Acct Session ID String"},
@@ -1366,7 +1366,7 @@ static const value_string wassp_tlv_types[] =
 };
 
 
-const TLV_PARSER_ENTRY tlvMainTable[]  =
+static const TLV_PARSER_ENTRY tlvMainTable[]  =
 {
 	{ EID_UNUSED_0, "Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_STATUS, "Status/Action", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1495,7 +1495,7 @@ const TLV_PARSER_ENTRY tlvMainTable[]  =
 	{ EID_SIAPP_PACKET_RETRIES, "SIAPP Packet Retries", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_SIAPP_ASSOC_IN_WLAN, "SIAPP MU Association With In Same WLAN", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_SIAPP_ASSOC_IN_CLUSTER, "SIAPP MU Association With In Same Cluster", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
-	{ EID_SIAPP_REASSOC_IN_CLUSTER, "SIAPP MU Ressociation With In Same Cluster", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
+	{ EID_SIAPP_REASSOC_IN_CLUSTER, "SIAPP MU Reassociation With In Same Cluster", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_SIAPP_THIN_BLOCK, "SIAPP Thin Access Points Block", TLV_TYPE_BLOCK_TLV, TAB_SIAPP_THIN_BLOCK, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_SIAPP_NEWAP_BSSID, "SIAPP New Access Points BSSID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_SIAPP_OLDAP_BSSID, "SIAPP Old Access Points BSSID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1965,8 +1965,7 @@ typedef enum
 
 ****************************************************/
 
-//static const TLV_PARSER_ENTRY tlvGlobalConfigTable[]  =
-const TLV_PARSER_ENTRY tlvGlobalConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvGlobalConfigTable[]  =
 {
 	{ EID_CONFIG_UNUSED_0, "Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_RADIO_CONFIG_BLOCK, "Radio Configuration Block", TLV_TYPE_BLOCK_TLV, RADIO_CONFIG_BLOCK, 0, 0, 0, 0, 0, 0, 0},
@@ -2118,7 +2117,7 @@ const TLV_PARSER_ENTRY tlvGlobalConfigTable[]  =
 	{ EID_IOT_BLE_SCAN_WINDOW, "IOT BLE Scan Window In Milliseconds", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_IOT_BLE_SCAN_MIN_RSSI, "IOT BLE Scan Min RSSI", TLV_TYPE_INT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_LISENSE_SERVER, "License Server", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
-	{ EID_LISENSE_MIN_RSSI, "Lisense Min RSSI", TLV_TYPE_INT, 0, 0, 0, 0, 0, 0, 0, 0},
+	{ EID_LISENSE_MIN_RSSI, "License Min RSSI", TLV_TYPE_INT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_LISENSE_REP_FREQ, "License Report Frequency", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_DPI_SIG_HASH, "Deep Packet Inspection Signature Hash", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_ANT_MODELS_IOT, "Antanna Type for IOT Radio", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -2153,8 +2152,7 @@ typedef enum
 } wassp_tlv_S_topo_mcast_type_t;
 
 
-//static const TLV_PARSER_ENTRY tlvSTopoMcastFilterBlock[] =
-const TLV_PARSER_ENTRY  tlvSTopoMcastFilterBlock[] =
+static const TLV_PARSER_ENTRY tlvSTopoMcastFilterBlock[] =
 {
 	{ EID_S_TOPO_MCAST_FILTER_NAME, "Site Topology  Multicast Filter Name", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_S_TOPO_MCAST_FILTER_RULES, "Site Topology  Multicast Filter Rules", TLV_TYPE_OCTETS, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -2172,7 +2170,7 @@ typedef enum
 
 } wassp_tlv_S_topo_mcast_rule_type_t;
 
-const TLV_PARSER_ENTRY  tlvSTopoMcastFilterRuleBlock[] =
+static const TLV_PARSER_ENTRY  tlvSTopoMcastFilterRuleBlock[] =
 {
 	{ EID_S_TOPO_MCAST_FILTER_RULE_EXT_ACT_FLAGS, "Site Topology  Multicast Filter Rule Action Flags", TLV_TYPE_OCTETS, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_S_TOPO_MCAST_FILTER_RULES_IPV6, "Site Topology  Multicast Filter Rule IPv6 Addresses", TLV_TYPE_OCTETS, 0, 0, 0, 0, 0, 0, 0, 0}
@@ -2363,8 +2361,7 @@ typedef enum
 
 
 /* Value string object enumerates wassp tlv type field */
-//static const TLV_PARSER_ENTRY tlvBeastConfigTable[] =
-const TLV_PARSER_ENTRY tlvBeastConfigTable[] =
+static const TLV_PARSER_ENTRY tlvBeastConfigTable[] =
 {
 	{ EID_DOT11_NOT_USED, "DOT11Unused 0", TLV_TYPE_INT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_DOT11_ACKFailureCount, "802.11 Ack Failure Count", TLV_TYPE_INT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -2650,8 +2647,7 @@ typedef enum
 
 } wassp_subtlv_radio_block_type_t;
 
-//static const TLV_PARSER_ENTRY tlvRadioConfigTable[]  =
-const TLV_PARSER_ENTRY tlvRadioConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvRadioConfigTable[]  =
 {
 	{ EID_R_UNUSED_0, "Radio Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_R_RADIO_ID, "Radio ID", TLV_TYPE_INDEX, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -2871,8 +2867,7 @@ typedef enum
 
 } wassp_subtlv_vns_config_type_t;
 
-//static const TLV_PARSER_ENTRY tlvVnsConfigTable[]  =
-const TLV_PARSER_ENTRY tlvVnsConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvVnsConfigTable[]  =
 {
 	{ EID_V_UNUSED, "Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_V_RADIO_ID, "Radio ID", TLV_TYPE_INDEX, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3013,8 +3008,7 @@ typedef enum
 	EID_V_STATS_VNS_ENTRY = 118
 } wassp_subtlv_vns_status_type_t;
 
-//static const TLV_PARSER_ENTRY tlvVnsStatusTable[]  =
-const TLV_PARSER_ENTRY tlvVnsStatusTable[]  =
+static const TLV_PARSER_ENTRY tlvVnsStatusTable[]  =
 {
 	{ EID_V_STATS_UNUSED0, "VNS Stats Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_V_STATS_VNSID, "VNS ID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3045,7 +3039,7 @@ typedef enum
 
 } wassp_subtlv_radius_config_type_t;
 
-const TLV_PARSER_ENTRY tlvRadiusConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvRadiusConfigTable[]  =
 {
 	{ EID_RADIUS_ID, "Radius ID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_RADIUS_IP_NAME, "Radius Name", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3077,7 +3071,7 @@ typedef enum
 
 } wassp_subtlv_radius_server_config_type_t;
 
-const TLV_PARSER_ENTRY tlvRadiusServerConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvRadiusServerConfigTable[]  =
 {
 	{ EID_V_UNUSED0, "V_UNUSED0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_V_RADSRV_SRV_ID, "Radius Server ID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3108,7 +3102,7 @@ typedef enum
 } wassp_subtlv_filter_block_type_t;
 
 
-const TLV_PARSER_ENTRY tlvFilterConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvFilterConfigTable[]  =
 {
 	{ EID_V_FILTER_UNUSED_0, "Filter Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_V_FILTER_NAME, "Filter Rule Name", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3136,7 +3130,7 @@ typedef enum
 
 
 
-const TLV_PARSER_ENTRY tlvFilterRuleExtConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvFilterRuleExtConfigTable[]  =
 {
 	{ EID_V_FILTER_UNUSED0, "Filter Rule Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_V_FILTER_RULE_FIXED_APP_ID, "Fixed Application Rule ID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3161,7 +3155,7 @@ typedef enum
 
 
 
-const TLV_PARSER_ENTRY tlvSiteFilterRuleExtConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvSiteFilterRuleExtConfigTable[]  =
 {
 	{ EID_V_SITE_FILTER_UNUSED0, "Site Filter Rule Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_V_SITE_FILTER_RULE_FIXED_APP_ID, "Site Fixed Application Rule ID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3173,7 +3167,7 @@ const TLV_PARSER_ENTRY tlvSiteFilterRuleExtConfigTable[]  =
 
 
 
-
+#if 0
 //BSSID2IP: BSSID to IP mapping block (for V6R0: VoWIFI)
 typedef enum
 {
@@ -3184,13 +3178,14 @@ typedef enum
 } wassp_subtlv_bssid2ip_block_type_t;
 
 
-const TLV_PARSER_ENTRY tlvBssid2ipConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvBssid2ipConfigTable[]  =
 {
 	{ EID_BSSID2IP_UNUSED0, "BSSID2IP Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_BSSID2IP_BSSID, "BSSID2IP BSSID", TLV_TYPE_MACADD, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_BSSID2IP_IP, "BSSID2IP IP Address", TLV_TYPE_IP_ADDR, 0, 0, 0, 0, 0, 0, 0, 0}
 
 };
+#endif
 
 //EID_SITE_CONFIG_BLOCK: Site Config Block (V8.11: Rad@AP)
 typedef enum
@@ -3313,7 +3308,7 @@ typedef enum
 
 } wassp_subtlv_site_config_type_t;
 
-const TLV_PARSER_ENTRY tlvSiteConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvSiteConfigTable[]  =
 {
 	{ EID_G_SITE_ENABLE, "Enable Site", TLV_TYPE_BOOL, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_G_SITE_NAME, "Site Name", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3459,7 +3454,7 @@ typedef enum
 	// update below tlvPolicyConfigTable
 } wassp_subtlv_policy_config_type_t;
 
-const TLV_PARSER_ENTRY tlvPolicyConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvPolicyConfigTable[]  =
 {
 	{ EID_POLICY_UNUSED0, "Policy Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_POLICY_ENTRY_NAME, "Policy Entry name", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3491,7 +3486,7 @@ typedef enum
 	EID_COS_OUT_RATE_LIMIT
 } wassp_subtlv_cos_config_type_t;
 
-const TLV_PARSER_ENTRY tlvCosConfigTable[]  =
+static const TLV_PARSER_ENTRY tlvCosConfigTable[]  =
 {
 	{ EID_COS_UNUSED0, "COS Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_COS_KEY, "COS Key", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3537,7 +3532,7 @@ typedef enum
 } wassp_subtlv_11u_anqp_config_type_t;
 
 
-const TLV_PARSER_ENTRY tlv11U_ANQP_blockTable[]  =
+static const TLV_PARSER_ENTRY tlv11U_ANQP_blockTable[]  =
 {
 	//Members of EID_11U_ANQP_BLOCK block
 	{ EID_11U_UNUSED0, "11U Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3587,7 +3582,7 @@ typedef enum
 	EID_EXTAPP_GROUP_ID
 } wassp_subtlv_extapp_conf_block_type_t;
 
-const TLV_PARSER_ENTRY tlvExtapp_conf_blockTable[]  =
+static const TLV_PARSER_ENTRY tlvExtapp_conf_blockTable[]  =
 {
 	{ EID_EXTAPP_UNUSED0, "EXTAPP Unused 0", TLV_TYPE_UNKNOWN, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_EXTAPP_DISP_NAME, "EXTAPP Display Name", TLV_TYPE_STRING, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3634,7 +3629,7 @@ typedef enum
 	EID_HS2_HIGHT
 } wassp_subtlv_hs2_block_type_t;
 
-const TLV_PARSER_ENTRY tlvHS2_blockTable[]  =
+static const TLV_PARSER_ENTRY tlvHS2_blockTable[]  =
 {
 	{ EID_HS2_UNUSED0, "HS2 Unused 0", TLV_TYPE_UNKNOWN, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_HS2_ANQP_DOMAIN_ID, "HS2 ANQP Domain ID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3665,7 +3660,7 @@ const TLV_PARSER_ENTRY tlvHS2_blockTable[]  =
 	{ EID_HS2_WIDTH, "HS2 Width", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_HS2_DOWLINK_LOAD, "HS2 Downlink Load", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_HS2_DOWLINK_SPEED, "HS2 Downlink Speed", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
-	{ EID_HS2_HIGHT, "HS2 Hight", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0}
+	{ EID_HS2_HIGHT, "HS2 Height", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0}
 
 
 };
@@ -3679,7 +3674,7 @@ typedef enum
 } wassp_subtlv_locationbased_lookup_type_t;
 
 
-const TLV_PARSER_ENTRY tlvLocationBaseLookUpTable[]  =
+static const TLV_PARSER_ENTRY tlvLocationBaseLookUpTable[]  =
 {
 	{ EID_LOC_UNUSED0, "Location Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_LOC_VLAN_ID_KEY, "Location Vlan ID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -3696,7 +3691,7 @@ typedef enum
 	EID_APP_POLICY_ENTRY_BLOCK     //    1
 } wassp_subtlv_app_policy_fixed_type_t;
 
-const TLV_PARSER_ENTRY tlvAppPolicyFixedTable[]  =
+static const TLV_PARSER_ENTRY tlvAppPolicyFixedTable[]  =
 {
 	{ EID_APP_POLICY_UNUSED0, "Application Policy Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_APP_POLICY_ENTRY_BLOCK, "Application Policy Entry Block", TLV_TYPE_BLOCK_TLV, TAB_APP_POLICY_ENTRY_BLOCK, 0, 0, 0, 0, 0, 0, 0}
@@ -3718,7 +3713,7 @@ typedef enum
 } wassp_subtlv_app_policy_entry_type_t;
 
 
-const TLV_PARSER_ENTRY tlvAppPolicyEntryTable[]  =
+static const TLV_PARSER_ENTRY tlvAppPolicyEntryTable[]  =
 {
 	{ EID_APP_POLICY_ENTRY_UNUSED0, "Application Policy Entry Unused 0", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
 	{ EID_APP_POLICY_APP_ID, "Application Policy ID", TLV_TYPE_UINT, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -4347,8 +4342,8 @@ static int wassp_type_converter(int in_tlv_type)
 
 
 
-int dissect_wassp_sub_tlv(proto_tree *wassp_tree, tvbuff_t *tvb, packet_info *pinfo, int offset, int in_len, int which_tab, int ru_msg_type);
-int dissect_wassp_tlv(proto_tree *wassp_tree, tvbuff_t *tvb, packet_info *pinfo, int offset, wassp_ru_msg_t rumsg_type);
+static int dissect_wassp_sub_tlv(proto_tree *wassp_tree, tvbuff_t *tvb, packet_info *pinfo, int offset, int in_len, int which_tab, int ru_msg_type);
+static int dissect_wassp_tlv(proto_tree *wassp_tree, tvbuff_t *tvb, packet_info *pinfo, int offset, wassp_ru_msg_t rumsg_type);
 
 
 
@@ -4387,7 +4382,7 @@ static const char* wassp_match_strval(const WASSP_SUBTLV_DECODER_INFO_t *in_ptr,
 static void
 port_range_print(char *buf, guint32 temp)
 {
-	g_snprintf(buf, ITEM_LABEL_LENGTH, " %d - %d", (temp & 0xffff), (temp >> 16));
+	snprintf(buf, ITEM_LABEL_LENGTH, " %d - %d", (temp & 0xffff), (temp >> 16));
 }
 
 
@@ -4401,27 +4396,27 @@ static void topology_moder_print(char *buf, guint16 temp)
 	{
 	case 0xc000:
 		if (temp4)
-			g_snprintf(buf, ITEM_LABEL_LENGTH, " Routed At Controller  with vlanId = %d  (0x%x)", temp4, temp);
+			snprintf(buf, ITEM_LABEL_LENGTH, " Routed At Controller  with vlanId = %d  (0x%x)", temp4, temp);
 		else
-			g_snprintf(buf, ITEM_LABEL_LENGTH, " Routed At Controller,  Untagged (0x%x)", temp);
+			snprintf(buf, ITEM_LABEL_LENGTH, " Routed At Controller,  Untagged (0x%x)", temp);
 		break;
 	case 0x4000:
 		if (temp4)
-			g_snprintf(buf, ITEM_LABEL_LENGTH, " Bridge At AP with vlanId = %d  (0x%x)", temp4, temp);
+			snprintf(buf, ITEM_LABEL_LENGTH, " Bridge At AP with vlanId = %d  (0x%x)", temp4, temp);
 		else
-			g_snprintf(buf, ITEM_LABEL_LENGTH, " Bridge At AP,  Untagged  (0x%x) ", temp);
+			snprintf(buf, ITEM_LABEL_LENGTH, " Bridge At AP,  Untagged  (0x%x) ", temp);
 		break;
 	case 0x8000:
 		if (temp4)
-			g_snprintf(buf, ITEM_LABEL_LENGTH, " Bridge At Controller with vlanId = %d  (0x%x)  ", temp4, temp);
+			snprintf(buf, ITEM_LABEL_LENGTH, " Bridge At Controller with vlanId = %d  (0x%x)  ", temp4, temp);
 		else
-			g_snprintf(buf, ITEM_LABEL_LENGTH, " Bridge At Controller,  Untagged  (0x%x) ", temp);
+			snprintf(buf, ITEM_LABEL_LENGTH, " Bridge At Controller,  Untagged  (0x%x) ", temp);
 		break;
 	default:
 		if (temp4)
-			g_snprintf(buf, ITEM_LABEL_LENGTH, " Unknown mode with vlanId = %d (0x%x)", temp4, temp);
+			snprintf(buf, ITEM_LABEL_LENGTH, " Unknown mode with vlanId = %d (0x%x)", temp4, temp);
 		else
-			g_snprintf(buf, ITEM_LABEL_LENGTH, " Unknown mode,  Untagged (0x%x) ", temp);
+			snprintf(buf, ITEM_LABEL_LENGTH, " Unknown mode,  Untagged (0x%x) ", temp);
 		break;
 	}
 }
@@ -4431,19 +4426,19 @@ static void topology_moder_print(char *buf, guint16 temp)
 static void
 maskbit_priority_print(char *buf, guint8 temp)
 {
-	g_snprintf(buf, ITEM_LABEL_LENGTH, " Type of Service Mask bits  : %d     Priority TxQ : %d", (temp >> 4) & 0xf, temp & 0xf);
+	snprintf(buf, ITEM_LABEL_LENGTH, " Type of Service Mask bits  : %d     Priority TxQ : %d", (temp >> 4) & 0xf, temp & 0xf);
 }
 
 static void
 cos_priority_txq_print(char *buf, guint8 temp)
 {
-	g_snprintf(buf, ITEM_LABEL_LENGTH, " Class of Service priority bits  : %d     Class of Service Transmit Queue : %d", (temp >> 4) & 0xf, temp & 0xf);
+	snprintf(buf, ITEM_LABEL_LENGTH, " Class of Service priority bits  : %d     Class of Service Transmit Queue : %d", (temp >> 4) & 0xf, temp & 0xf);
 }
 
 static void
 cos_rate_id_print(char *buf, guint8 temp)
 {
-	g_snprintf(buf, ITEM_LABEL_LENGTH, " Class of Service Inbound Rate Limit ID  : %d    Class of Service Outbound Rate Limit ID : %d", (temp >> 4) & 0xf, temp & 0xf);
+	snprintf(buf, ITEM_LABEL_LENGTH, " Class of Service Inbound Rate Limit ID  : %d    Class of Service Outbound Rate Limit ID : %d", (temp >> 4) & 0xf, temp & 0xf);
 }
 
 
@@ -5057,7 +5052,7 @@ int dissect_wassp_tlv(proto_tree *wassp_tree, tvbuff_t *tvb, packet_info *pinfo,
 		case EID_DHCP_HOST_NAME:                      // 382
 		case EID_MU_ECP_PW:                           // 385
 		case EID_MU_ECP_TOKEN:                        // 386
-			proto_tree_add_item(tlv_tree, hf_wassp_tlv_value_string, tvb, offset + TLV_VALUE, length - 4, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tlv_tree, hf_wassp_tlv_value_string, tvb, offset + TLV_VALUE, length - 4, ENC_ASCII);
 			offset += length;
 			break;
 
@@ -5604,11 +5599,11 @@ static void
 mu_association_status(char *buf, guint8 value)
 {
 	if (value == 1)
-		g_snprintf(buf, ITEM_LABEL_LENGTH, " Success (%d)", value);
+		snprintf(buf, ITEM_LABEL_LENGTH, " Success (%d)", value);
 	else if (value == 2)
-		g_snprintf(buf, ITEM_LABEL_LENGTH, " Reject (%d)", value);
+		snprintf(buf, ITEM_LABEL_LENGTH, " Reject (%d)", value);
 	else
-		g_snprintf(buf, ITEM_LABEL_LENGTH, " Failure (%d)", value);
+		snprintf(buf, ITEM_LABEL_LENGTH, " Failure (%d)", value);
 }
 
 
@@ -5892,7 +5887,7 @@ static int dissect_wassp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree )
 	fragment_head *wassp_frag_msg = NULL;
 	gboolean   save_fragmented;
 	tvbuff_t *next_tvb = NULL, *combined_tvb = NULL;
-	char *label;
+	const char *label;
 	conversation_t  *conv = NULL;
 	guint32 reassembly_id;
 
@@ -5917,7 +5912,7 @@ static int dissect_wassp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree )
 
 	if ( ru_msg_type == WASSP_Data ) // wassp mu header
 	{
-		label = (char*)try_val_to_str(tvb_get_guint8(tvb, WASSP_HDR_LEN + WASSP_MU_HDR_TYPE), wassp_mu_header_types);
+		label = val_to_str_const(tvb_get_guint8(tvb, WASSP_HDR_LEN + WASSP_MU_HDR_TYPE), wassp_mu_header_types, "Unknown WASSP MU Message Type");
 		col_add_str(pinfo->cinfo, COL_INFO, label);
 	}
 	else if (ru_msg_type == WASSP_RU_Discov) /* ap discover header*/
@@ -5927,10 +5922,10 @@ static int dissect_wassp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree )
 		else
 			col_add_str(pinfo->cinfo, COL_INFO, "RU Discover Response");
 	}
-	else if (ru_msg_type != WASSP_Data)
-		col_add_str(pinfo->cinfo, COL_INFO, (char*)try_val_to_str(tvb_get_guint8(tvb, WASSP_HDR_TYPE), wassp_header_types));
 	else
-		col_add_str(pinfo->cinfo, COL_INFO, "Unknown WASSP Message Type");
+        {
+		col_add_str(pinfo->cinfo, COL_INFO, val_to_str_const(tvb_get_guint8(tvb, WASSP_HDR_TYPE), wassp_header_types, "Unknown WASSP Message Type"));
+        }
 
 	save_fragmented = pinfo->fragmented;
 
@@ -6170,7 +6165,7 @@ void proto_register_wassp(void)
 			&hf_lsb_wh_fc,
 			{
 				"LBS Wireless Header Frame Control", "wassp.lsb.wh_fc", FT_UINT16, BASE_HEX, NULL,
-				0x00, "LBS TAG Frame Controll", HFILL
+				0x00, "LBS TAG Frame Control", HFILL
 			}
 		},
 		{
@@ -6377,7 +6372,7 @@ void proto_register_wassp(void)
 			&hf_wassp_mu_action_field_value,
 			{
 				"SSID/Vlan ID", "wassp.data.mu_action_field_value",  FT_UINT16, BASE_DEC,  NULL,
-				0xfff, "SSID value or VlanID vlaue", HFILL
+				0x0fff, "SSID value or VlanID vlaue", HFILL
 			}
 		},
 		{
@@ -6596,7 +6591,7 @@ void proto_register_wassp(void)
 			&hf_wassp_tlv_value_string,
 			{
 				"Value", "wassp.tlv.valuestr", FT_STRING, BASE_NONE, NULL,
-				0x00, "Wassp TLV Value in string formst", HFILL
+				0x00, "Wassp TLV Value in string format", HFILL
 			}
 		},
 		{

@@ -10,6 +10,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN LOG_DOMAIN_EPAN
 
 #include <glib.h>
 #include <epan/packet.h>
@@ -18,6 +19,9 @@
 #include <epan/prefs.h>
 #include <epan/prefs-int.h>
 #include <epan/show_exception.h>
+#include <wsutil/ws_assert.h>
+
+#include <wsutil/wslog.h>
 
 static int proto_short = -1;
 static int proto_malformed = -1;
@@ -26,6 +30,7 @@ static int proto_unreassembled = -1;
 static expert_field ei_malformed_dissector_bug = EI_INIT;
 static expert_field ei_malformed_reassembly = EI_INIT;
 static expert_field ei_malformed = EI_INIT;
+static expert_field ei_unreassembled = EI_INIT;
 
 void
 register_show_exception(void)
@@ -34,6 +39,7 @@ register_show_exception(void)
 		{ &ei_malformed_dissector_bug, { "_ws.malformed.dissector_bug", PI_MALFORMED, PI_ERROR, "Dissector bug", EXPFILL }},
 		{ &ei_malformed_reassembly, { "_ws.malformed.reassembly", PI_MALFORMED, PI_ERROR, "Reassembly error", EXPFILL }},
 		{ &ei_malformed, { "_ws.malformed.expert", PI_MALFORMED, PI_ERROR, "Malformed Packet (Exception occurred)", EXPFILL }},
+		{ &ei_unreassembled, { "_ws.unreassembled.expert", PI_REASSEMBLE, PI_NOTE, "Unreassembled fragment (change preferences to enable reassembly)", EXPFILL }},
 	};
 
 	expert_module_t* expert_malformed;
@@ -64,7 +70,7 @@ show_exception(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		"Dissector writer didn't bother saying what the error was";
 	proto_item *item;
 
-	if (exception == ReportedBoundsError && pinfo->fragmented)
+	if ((exception == ReportedBoundsError || exception == ContainedBoundsError) && pinfo->fragmented)
 		exception = FragmentBoundsError;
 
 	switch (exception) {
@@ -104,13 +110,14 @@ show_exception(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		break;
 
 	case FragmentBoundsError:
-		col_append_fstr(pinfo->cinfo, COL_INFO, "[Unreassembled Packet%s]", pinfo->noreassembly_reason);
-		proto_tree_add_protocol_format(tree, proto_unreassembled,
-		    tvb, 0, 0, "[Unreassembled Packet%s: %s]",
+		col_append_fstr(pinfo->cinfo, COL_INFO, "[BoundErrorUnreassembled Packet%s]", pinfo->noreassembly_reason);
+		item = proto_tree_add_protocol_format(tree, proto_unreassembled,
+		    tvb, 0, 0, "[BoundError Unreassembled Packet%s: %s]",
 		    pinfo->noreassembly_reason, pinfo->current_proto);
-		/* Don't record FragmentBoundsError exceptions as expert events - they merely
-		 * reflect dissection done with reassembly turned off
+		/* FragmentBoundsError merely reflect dissection done with
+		 * reassembly turned off, so add a note to that effect
 		 * (any case where it's caused by something else is a bug). */
+		expert_add_info(pinfo, item, &ei_unreassembled);
 		break;
 
 	case ContainedBoundsError:
@@ -136,7 +143,8 @@ show_exception(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		    pinfo->current_proto,
 		    exception_message == NULL ?
 		        dissector_error_nomsg : exception_message);
-		g_warning("Dissector bug, protocol %s, in packet %u: %s",
+		ws_log(WS_LOG_DOMAIN, LOG_LEVEL_WARNING,
+		    "Dissector bug, protocol %s, in packet %u: %s",
 		    pinfo->current_proto, pinfo->num,
 		    exception_message == NULL ?
 		        dissector_error_nomsg : exception_message);
@@ -163,7 +171,7 @@ show_exception(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
 	default:
 		/* XXX - we want to know, if an unknown exception passed until here, don't we? */
-		g_assert_not_reached();
+		ws_assert_not_reached();
 	}
 }
 

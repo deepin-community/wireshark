@@ -19,7 +19,6 @@
 
 #include <glib.h>
 
-#include <version_info.h>
 #include <wsutil/report_message.h>
 
 #include <epan/exceptions.h>
@@ -31,16 +30,20 @@
 #include "epan_dissect.h"
 
 #include <wsutil/nstime.h>
+#include <wsutil/wslog.h>
+#include <wsutil/ws_assert.h>
+
+#include <ui/version_info.h>
 
 #include "conversation.h"
 #include "except.h"
 #include "packet.h"
 #include "prefs.h"
-#include "column-utils.h"
+#include "column-info.h"
 #include "tap.h"
 #include "addr_resolv.h"
 #include "oids.h"
-#include "wmem/wmem.h"
+#include <epan/wmem_scopes.h>
 #include "expert.h"
 #include "print.h"
 #include "capture_dissectors.h"
@@ -57,6 +60,7 @@
 #include "stats_tree.h"
 #include "secrets.h"
 #include "funnel.h"
+#include "wscbor.h"
 #include <dtd.h>
 
 #ifdef HAVE_PLUGINS
@@ -72,10 +76,18 @@
 #include <smi.h>
 #endif
 
-#include <ares_version.h>
+#include <ares.h>
+
+#ifdef HAVE_LZ4
+#include <lz4.h>
+#endif
+
+#ifdef HAVE_ZSTD
+#include <zstd.h>
+#endif
 
 #ifdef HAVE_NGHTTP2
-#include <nghttp2/nghttp2ver.h>
+#include <nghttp2/nghttp2.h>
 #endif
 
 #ifdef HAVE_BROTLI
@@ -103,9 +115,12 @@ gboolean wireshark_abort_on_dissector_bug = FALSE;
 gboolean wireshark_abort_on_too_many_items = FALSE;
 
 #ifdef HAVE_PLUGINS
-plugins_t *libwireshark_plugins = NULL;
-static GSList *epan_plugins = NULL;
+/* Used for bookkeeping, includes all libwireshark plugin types (dissector, tap, epan). */
+static plugins_t *libwireshark_plugins = NULL;
 #endif
+
+/* "epan_plugins" are a specific type of libwireshark plugin (the name isn't the best for clarity). */
+static GSList *epan_plugins = NULL;
 
 const gchar*
 epan_get_version(void) {
@@ -115,7 +130,12 @@ epan_get_version(void) {
 void
 epan_get_version_number(int *major, int *minor, int *micro)
 {
-	get_ws_version_number(major, minor, micro);
+	if (major)
+		*major = VERSION_MAJOR;
+	if (minor)
+		*minor = VERSION_MINOR;
+	if (micro)
+		*micro = VERSION_MICRO;
 }
 
 #if defined(_WIN32)
@@ -126,34 +146,41 @@ epan_get_version_number(int *major, int *minor, int *micro)
 static void
 quiet_gcrypt_logger (void *dummy _U_, int level, const char *format, va_list args)
 {
-	GLogLevelFlags log_level = G_LOG_LEVEL_WARNING;
+	enum ws_log_level log_level;
 
 	switch (level) {
 	case GCRY_LOG_CONT: // Continuation. Ignore for now.
 	case GCRY_LOG_DEBUG:
 	case GCRY_LOG_INFO:
-	default:
 		return;
+		break;
 	case GCRY_LOG_WARN:
 	case GCRY_LOG_BUG:
-		log_level = G_LOG_LEVEL_WARNING;
+		log_level = LOG_LEVEL_WARNING;
 		break;
 	case GCRY_LOG_ERROR:
-		log_level = G_LOG_LEVEL_ERROR;
+		log_level = LOG_LEVEL_ERROR;
 		break;
 	case GCRY_LOG_FATAL:
-		log_level = G_LOG_LEVEL_CRITICAL;
+		log_level = LOG_LEVEL_CRITICAL;
 		break;
+	default:
+		return;
 	}
-	g_logv(NULL, log_level, format, args);
+	ws_logv(LOG_DOMAIN_EPAN, log_level, format, args);
 }
 #endif // _WIN32
 
-#ifdef HAVE_PLUGINS
 static void
 epan_plugin_init(gpointer data, gpointer user_data _U_)
 {
 	((epan_plugin *)data)->init();
+}
+
+static void
+epan_plugin_post_init(gpointer data, gpointer user_data _U_)
+{
+	((epan_plugin *)data)->post_init();
 }
 
 static void
@@ -174,6 +201,7 @@ epan_plugin_cleanup(gpointer data, gpointer user_data _U_)
 	((epan_plugin *)data)->cleanup();
 }
 
+#ifdef HAVE_PLUGINS
 void epan_register_plugin(const epan_plugin *plug)
 {
 	epan_plugins = g_slist_prepend(epan_plugins, (epan_plugin *)plug);
@@ -182,14 +210,28 @@ void epan_register_plugin(const epan_plugin *plug)
 	if (plug->register_all_handoffs)
 		epan_plugin_register_all_handoffs = g_slist_prepend(epan_plugin_register_all_handoffs, plug->register_all_handoffs);
 }
+#else /* HAVE_PLUGINS */
+void epan_register_plugin(const epan_plugin *plug _U_)
+{
+	ws_warning("epan_register_plugin: built without support for binary plugins");
+}
+#endif /* HAVE_PLUGINS */
 
-void epan_plugin_register_all_tap_listeners(gpointer data, gpointer user_data _U_)
+int epan_plugins_supported(void)
+{
+#ifdef HAVE_PLUGINS
+	return g_module_supported() ? 0 : 1;
+#else
+	return -1;
+#endif
+}
+
+static void epan_plugin_register_all_tap_listeners(gpointer data, gpointer user_data _U_)
 {
 	epan_plugin *plug = (epan_plugin *)data;
 	if (plug->register_all_tap_listeners)
 		plug->register_all_tap_listeners();
 }
-#endif
 
 gboolean
 epan_init(register_cb cb, gpointer client_data, gboolean load_plugins)
@@ -220,7 +262,7 @@ epan_init(register_cb cb, gpointer client_data, gboolean load_plugins)
 	 * invocation just in case.
 	 */
 	/* initialize memory allocation subsystem */
-	wmem_init();
+	wmem_init_scopes();
 
 	/* initialize the GUID to name mapping table */
 	guids_init();
@@ -257,6 +299,7 @@ epan_init(register_cb cb, gpointer client_data, gboolean load_plugins)
 #endif
 
 	TRY {
+		export_pdu_init();
 		tap_init();
 		prefs_init();
 		expert_init();
@@ -265,22 +308,20 @@ epan_init(register_cb cb, gpointer client_data, gboolean load_plugins)
 		conversation_init();
 		capture_dissector_init();
 		reassembly_tables_init();
-#ifdef HAVE_PLUGINS
+        conversation_filters_init();
 		g_slist_foreach(epan_plugins, epan_plugin_init, NULL);
-#endif
 		proto_init(epan_plugin_register_all_procotols, epan_plugin_register_all_handoffs, cb, client_data);
-#ifdef HAVE_PLUGINS
 		g_slist_foreach(epan_plugins, epan_plugin_register_all_tap_listeners, NULL);
-#endif
 		packet_cache_proto_handles();
 		dfilter_init();
+		wscbor_init();
 		final_registration_all_protocols();
 		print_cache_field_handles();
 		expert_packet_init();
-		export_pdu_init();
 #ifdef HAVE_LUA
 		wslua_init(cb, client_data);
 #endif
+		g_slist_foreach(epan_plugins, epan_plugin_post_init, NULL);
 	}
 	CATCH(DissectorError) {
 		/*
@@ -329,11 +370,9 @@ epan_load_settings(void)
 void
 epan_cleanup(void)
 {
-#ifdef HAVE_PLUGINS
 	g_slist_foreach(epan_plugins, epan_plugin_cleanup, NULL);
 	g_slist_free(epan_plugins);
 	epan_plugins = NULL;
-#endif
 	g_slist_free(epan_plugin_register_all_procotols);
 	epan_plugin_register_all_procotols = NULL;
 	g_slist_free(epan_plugin_register_all_handoffs);
@@ -398,7 +437,7 @@ epan_cleanup(void)
 		pinfo_pool_cache = NULL;
 	}
 
-	wmem_cleanup();
+	wmem_cleanup_scopes();
 }
 
 struct epan_session {
@@ -421,11 +460,11 @@ epan_new(struct packet_provider_data *prov,
 	return session;
 }
 
-const char *
-epan_get_user_comment(const epan_t *session, const frame_data *fd)
+wtap_block_t
+epan_get_modified_block(const epan_t *session, const frame_data *fd)
 {
-	if (session->funcs.get_user_comment)
-		return session->funcs.get_user_comment(session->prov, fd);
+	if (session->funcs.get_modified_block)
+		return session->funcs.get_modified_block(session->prov, fd);
 
 	return NULL;
 }
@@ -457,7 +496,7 @@ epan_get_frame_ts(const epan_t *session, guint32 frame_num)
 		abs_ts = session->funcs.get_frame_ts(session->prov, frame_num);
 
 	if (!abs_ts)
-		g_warning("!!! couldn't get frame ts for %u !!!\n", frame_num);
+		ws_warning("!!! couldn't get frame ts for %u !!!\n", frame_num);
 
 	return abs_ts;
 }
@@ -497,7 +536,7 @@ epan_set_always_visible(gboolean force)
 void
 epan_dissect_init(epan_dissect_t *edt, epan_t *session, const gboolean create_proto_tree, const gboolean proto_tree_visible)
 {
-	g_assert(edt);
+	ws_assert(edt);
 
 	edt->session = session;
 
@@ -520,9 +559,7 @@ epan_dissect_init(epan_dissect_t *edt, epan_t *session, const gboolean create_pr
 
 	edt->tvb = NULL;
 
-#ifdef HAVE_PLUGINS
 	g_slist_foreach(epan_plugins, epan_plugin_dissect_init, edt);
-#endif
 }
 
 void
@@ -531,7 +568,9 @@ epan_dissect_reset(epan_dissect_t *edt)
 	/* We have to preserve the pool pointer across the memzeroing */
 	wmem_allocator_t *tmp;
 
-	g_assert(edt);
+	ws_assert(edt);
+
+	wtap_block_unref(edt->pi.rec->block);
 
 	g_slist_free(edt->pi.proto_data);
 	g_slist_free(edt->pi.dependent_frames);
@@ -586,6 +625,8 @@ epan_dissect_run(epan_dissect_t *edt, int file_type_subtype,
 
 	/* free all memory allocated */
 	wmem_leave_packet_scope();
+	wtap_block_unref(rec->block);
+	rec->block = NULL;
 }
 
 void
@@ -600,6 +641,8 @@ epan_dissect_run_with_taps(epan_dissect_t *edt, int file_type_subtype,
 
 	/* free all memory allocated */
 	wmem_leave_packet_scope();
+	wtap_block_unref(rec->block);
+	rec->block = NULL;
 }
 
 void
@@ -614,6 +657,8 @@ epan_dissect_file_run(epan_dissect_t *edt, wtap_rec *rec,
 
 	/* free all memory allocated */
 	wmem_leave_packet_scope();
+	wtap_block_unref(rec->block);
+	rec->block = NULL;
 }
 
 void
@@ -627,16 +672,16 @@ epan_dissect_file_run_with_taps(epan_dissect_t *edt, wtap_rec *rec,
 
 	/* free all memory allocated */
 	wmem_leave_packet_scope();
+	wtap_block_unref(rec->block);
+	rec->block = NULL;
 }
 
 void
 epan_dissect_cleanup(epan_dissect_t* edt)
 {
-	g_assert(edt);
+	ws_assert(edt);
 
-#ifdef HAVE_PLUGINS
 	g_slist_foreach(epan_plugins, epan_plugin_dissect_cleanup, edt);
-#endif
 
 	g_slist_free(edt->pi.proto_data);
 	g_slist_free(edt->pi.dependent_frames);
@@ -732,135 +777,138 @@ epan_dissect_packet_contains_field(epan_dissect_t* edt,
  * Get compile-time information for libraries used by libwireshark.
  */
 void
-epan_get_compiled_version_info(GString *str)
+epan_gather_compile_info(feature_list l)
 {
-	/* SNMP */
-	g_string_append(str, ", ");
-#ifdef HAVE_LIBSMI
-	g_string_append(str, "with SMI " SMI_VERSION_STRING);
-#else /* no SNMP library */
-	g_string_append(str, "without SMI");
-#endif /* _SMI_H */
-
-	/* c-ares */
-	g_string_append(str, ", ");
-	g_string_append(str, "with c-ares " ARES_VERSION_STR);
-
-	/* LUA */
-	g_string_append(str, ", ");
+	/* Lua */
 #ifdef HAVE_LUA
-	g_string_append(str, "with ");
-	g_string_append(str, LUA_RELEASE);
+	with_feature(l, "%s", LUA_RELEASE);
 #else
-	g_string_append(str, "without Lua");
+	without_feature(l, "Lua");
 #endif /* HAVE_LUA */
 
 	/* GnuTLS */
-	g_string_append(str, ", ");
 #ifdef HAVE_LIBGNUTLS
-	g_string_append(str, "with GnuTLS " LIBGNUTLS_VERSION);
 #ifdef HAVE_GNUTLS_PKCS11
-	g_string_append(str, " and PKCS #11 support");
+	with_feature(l, "GnuTLS %s and PKCS #11 support", LIBGNUTLS_VERSION);
+#else
+	with_feature(l, "GnuTLS %s", LIBGNUTLS_VERSION);
 #endif /* HAVE_GNUTLS_PKCS11 */
 #else
-	g_string_append(str, "without GnuTLS");
+	without_feature(l, "GnuTLS");
 #endif /* HAVE_LIBGNUTLS */
 
 	/* Gcrypt */
-	g_string_append(str, ", ");
-	g_string_append(str, "with Gcrypt " GCRYPT_VERSION);
+	with_feature(l, "Gcrypt %s", GCRYPT_VERSION);
 
 	/* Kerberos */
-	/* XXX - I don't see how to get the version number, at least for KfW */
-	g_string_append(str, ", ");
-#ifdef HAVE_KERBEROS
-#ifdef HAVE_MIT_KERBEROS
-	g_string_append(str, "with MIT Kerberos");
+#if defined(HAVE_MIT_KERBEROS)
+	with_feature(l, "Kerberos (MIT)");
+#elif defined(HAVE_HEIMDAL_KERBEROS)
+	with_feature(l, "Kerberos (Heimdal)");
 #else
-	/* HAVE_HEIMDAL_KERBEROS */
-	g_string_append(str, "with Heimdal Kerberos");
-#endif
-#else
-	g_string_append(str, "without Kerberos");
+	without_feature(l, "Kerberos");
 #endif /* HAVE_KERBEROS */
 
 	/* MaxMindDB */
-	g_string_append(str, ", ");
 #ifdef HAVE_MAXMINDDB
-	g_string_append(str, "with MaxMind DB resolver");
+	with_feature(l, "MaxMind");
 #else
-	g_string_append(str, "without MaxMind DB resolver");
+	without_feature(l, "MaxMind");
 #endif /* HAVE_MAXMINDDB */
 
 	/* nghttp2 */
-	g_string_append(str, ", ");
 #ifdef HAVE_NGHTTP2
-	g_string_append(str, "with nghttp2 " NGHTTP2_VERSION);
+	with_feature(l, "nghttp2 %s", NGHTTP2_VERSION);
 #else
-	g_string_append(str, "without nghttp2");
+	without_feature(l, "nghttp2");
 #endif /* HAVE_NGHTTP2 */
 
 	/* brotli */
-	g_string_append(str, ", ");
 #ifdef HAVE_BROTLI
-	g_string_append(str, "with brotli");
+	with_feature(l, "brotli");
 #else
-	g_string_append(str, "without brotli");
+	without_feature(l, "brotli");
 #endif /* HAVE_BROTLI */
 
 	/* LZ4 */
-	g_string_append(str, ", ");
 #ifdef HAVE_LZ4
-	g_string_append(str, "with LZ4");
+	with_feature(l, "LZ4");
 #else
-	g_string_append(str, "without LZ4");
+	without_feature(l, "LZ4");
 #endif /* HAVE_LZ4 */
 
 	/* Zstandard */
-	g_string_append(str, ", ");
 #ifdef HAVE_ZSTD
-	g_string_append(str, "with Zstandard");
+	with_feature(l, "Zstandard");
 #else
-	g_string_append(str, "without Zstandard");
+	without_feature(l, "Zstandard");
 #endif /* HAVE_ZSTD */
 
 	/* Snappy */
-	g_string_append(str, ", ");
 #ifdef HAVE_SNAPPY
-	g_string_append(str, "with Snappy");
+	with_feature(l, "Snappy");
 #else
-	g_string_append(str, "without Snappy");
+	without_feature(l, "Snappy");
 #endif /* HAVE_SNAPPY */
 
 	/* libxml2 */
-	g_string_append(str, ", ");
 #ifdef HAVE_LIBXML2
-	g_string_append(str, "with libxml2 " LIBXML_DOTTED_VERSION);
+	with_feature(l, "libxml2 %s", LIBXML_DOTTED_VERSION);
 #else
-	g_string_append(str, "without libxml2");
+	without_feature(l, "libxml2");
 #endif /* HAVE_LIBXML2 */
 
+	/* libsmi */
+#ifdef HAVE_LIBSMI
+	with_feature(l, "libsmi %s", SMI_VERSION_STRING);
+#else
+	without_feature(l, "libsmi");
+#endif /* HAVE_LIBSMI */
 }
 
 /*
  * Get runtime information for libraries used by libwireshark.
  */
 void
-epan_get_runtime_version_info(GString *str)
+epan_gather_runtime_info(feature_list l)
 {
+	/* c-ares */
+	with_feature(l, "c-ares %s", ares_version(NULL));
+
 	/* GnuTLS */
 #ifdef HAVE_LIBGNUTLS
-	g_string_append_printf(str, ", with GnuTLS %s", gnutls_check_version(NULL));
+	with_feature(l, "GnuTLS %s", gnutls_check_version(NULL));
 #endif /* HAVE_LIBGNUTLS */
 
 	/* Gcrypt */
-	g_string_append_printf(str, ", with Gcrypt %s", gcry_check_version(NULL));
+	with_feature(l, "Gcrypt %s", gcry_check_version(NULL));
+
+	/* nghttp2 */
+#if NGHTTP2_VERSION_AGE >= 1
+	nghttp2_info *nghttp2_ptr = nghttp2_version(0);
+	with_feature(l, "nghttp2 %s",  nghttp2_ptr->version_str);
+#endif /* NGHTTP2_VERSION_AGE */
 
 	/* brotli */
 #ifdef HAVE_BROTLI
-	g_string_append_printf(str, ", with brotli %d.%d.%d", BrotliDecoderVersion() >> 24,
+	with_feature(l, "brotli %d.%d.%d", BrotliDecoderVersion() >> 24,
 		(BrotliDecoderVersion() >> 12) & 0xFFF, BrotliDecoderVersion() & 0xFFF);
 #endif
+
+	/* LZ4 */
+#if LZ4_VERSION_NUMBER >= 10703
+	with_feature(l, "LZ4 %s", LZ4_versionString());
+#endif /* LZ4_VERSION_NUMBER */
+
+	/* Zstandard */
+#if ZSTD_VERSION_NUMBER >= 10300
+	with_feature(l, "Zstandard %s", ZSTD_versionString());
+#endif /* ZSTD_VERSION_NUMBER */
+
+	/* libsmi */
+#ifdef HAVE_SMI_VERSION_STRING
+	with_feature(l, "libsmi %s", smi_version_string);
+#endif /* HAVE_SMI_VERSION_STRING */
 }
 
 /*

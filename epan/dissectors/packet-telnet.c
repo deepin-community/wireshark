@@ -277,7 +277,7 @@ dissect_string_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, in
     if (len > 0) {
       proto_tree_add_item(tree, hf_telnet_string_subopt_value, tvb, offset, len, ENC_NA|ENC_ASCII);
     }
-    check_for_tn3270(pinfo, optname, tvb_format_text(tvb, offset, len));
+    check_for_tn3270(pinfo, optname, tvb_format_text(pinfo->pool, tvb, offset, len));
     break;
 
   case 1:       /* SEND */
@@ -419,7 +419,7 @@ dissect_tn3270e_subopt(packet_info *pinfo _U_, const char *optname _U_, tvbuff_t
                   datalen = connect_offset - (offset + 1);
                   if (datalen > 0) {
                     proto_tree_add_item( tree, hf_tn3270_is, tvb, offset + 1, datalen, ENC_NA|ENC_ASCII );
-                    check_tn3270_model(pinfo, tvb_format_text(tvb, offset + 1, datalen));
+                    check_tn3270_model(pinfo, tvb_format_text(pinfo->pool, tvb, offset + 1, datalen));
                     offset += datalen;
                     len -= datalen;
                   }
@@ -697,7 +697,7 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
     if (len == 0) {
       proto_tree_add_string_format(tree, hf_telnet_comport_subopt_signature, tvb, offset, 1, "", "%s Requests Signature", source);
     } else {
-      guint8 *sig = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 1, len, ENC_ASCII);
+      guint8 *sig = tvb_get_string_enc(pinfo->pool, tvb, offset + 1, len, ENC_ASCII);
       proto_tree_add_string_format(tree, hf_telnet_comport_subopt_signature, tvb, offset, 1 + len, sig,
                                          "%s Signature: %s",source, sig);
     }
@@ -781,9 +781,9 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
         int bit = ls & 1;
         if (bit) {
           if (print_count != 0) {
-            g_strlcat(ls_buffer,", ",512);
+            (void) g_strlcat(ls_buffer,", ",512);
           }
-          g_strlcat(ls_buffer,linestate_bits[idx], 512);
+          (void) g_strlcat(ls_buffer,linestate_bits[idx], 512);
           print_count++;
         }
         ls = ls >> 1;
@@ -813,9 +813,9 @@ dissect_comport_subopt(packet_info *pinfo, const char *optname, tvbuff_t *tvb, i
         int bit = ms & 1;
         if (bit) {
           if (print_count != 0) {
-            g_strlcat(ms_buffer,", ",256);
+            (void) g_strlcat(ms_buffer,", ",256);
           }
-          g_strlcat(ms_buffer,modemstate_bits[idx],256);
+          (void) g_strlcat(ms_buffer,modemstate_bits[idx],256);
           print_count++;
         }
         ms = ms >> 1;
@@ -1031,23 +1031,25 @@ unescape_and_tvbuffify_telnet_option(packet_info *pinfo, tvbuff_t *tvb, int offs
   guint8       *dpos;
   int           skip, l;
 
-  if(len>=MAX_KRB5_BLOB_LEN)
+  if(len >= MAX_KRB5_BLOB_LEN)
     return NULL;
 
-  spos=tvb_get_ptr(tvb, offset, len);
-  buf=(guint8 *)wmem_alloc(pinfo->pool, len);
-  dpos=buf;
-  skip=0;
-  l=len;
-  while(l>0){
-    if((spos[0]==0xff) && (spos[1]==0xff)){
+  spos = tvb_get_ptr(tvb, offset, len);
+  const guint8 *last_src_pos = spos + len - 1;
+  buf = (guint8 *)wmem_alloc(pinfo->pool, len);
+  dpos = buf;
+  skip = 0;
+  l = len;
+  while(l > 0) {
+    // XXX Add expert info if spos >= last_src_pos?
+    if(spos < last_src_pos && (spos[0] == 0xff) && (spos[1] == 0xff)) {
       skip++;
-      l-=2;
-      *(dpos++)=0xff;
-      spos+=2;
+      l -= 2;
+      *(dpos++) = 0xff;
+      spos += 2;
       continue;
     }
-    *(dpos++)=*(spos++);
+    *(dpos++) = *(spos++);
     l--;
   }
   krb5_tvb = tvb_new_child_real_data(tvb, buf, len-skip, len-skip);
@@ -1149,7 +1151,7 @@ dissect_authentication_subopt(packet_info *pinfo, const char *optname _U_, tvbuf
     }
     break;
   case TN_AC_NAME:
-    proto_tree_add_item(tree, hf_telnet_auth_name, tvb, offset, len, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_telnet_auth_name, tvb, offset, len, ENC_ASCII);
     break;
   }
 }
@@ -1701,7 +1703,7 @@ telnet_sub_option(packet_info *pinfo, proto_tree *option_tree, proto_item *optio
 }
 
 static void
-telnet_suboption_name(proto_tree *tree, tvbuff_t *tvb, int* offset, const gchar** optname,
+telnet_suboption_name(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, int* offset, const gchar** optname,
                       proto_tree **opt_tree, proto_item **opt_item, const char *type)
 {
   guint8      opt_byte;
@@ -1721,7 +1723,7 @@ telnet_suboption_name(proto_tree *tree, tvbuff_t *tvb, int* offset, const gchar*
   *opt_tree = proto_item_add_subtree(*opt_item, ett);
 
   (*offset)++;
-  (*optname) = wmem_strdup_printf(wmem_packet_scope(), "%s %s", type, opt);
+  (*optname) = wmem_strdup_printf(pinfo->pool, "%s %s", type, opt);
 }
 
 static int
@@ -1742,23 +1744,23 @@ telnet_command(packet_info *pinfo, proto_tree *telnet_tree, tvbuff_t *tvb, int s
 
   switch(optcode) {
   case TN_WILL:
-    telnet_suboption_name(cmd_tree, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Will");
+    telnet_suboption_name(cmd_tree, pinfo, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Will");
     break;
 
   case TN_WONT:
-    telnet_suboption_name(cmd_tree, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Won't");
+    telnet_suboption_name(cmd_tree, pinfo, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Won't");
     break;
 
   case TN_DO:
-    telnet_suboption_name(cmd_tree, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Do");
+    telnet_suboption_name(cmd_tree, pinfo, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Do");
     break;
 
   case TN_DONT:
-    telnet_suboption_name(cmd_tree, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Don't");
+    telnet_suboption_name(cmd_tree, pinfo, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Don't");
     break;
 
   case TN_SB:
-    telnet_suboption_name(cmd_tree, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Suboption");
+    telnet_suboption_name(cmd_tree, pinfo, tvb, &offset, &optname, &subopt_tree, &subopt_item, "Suboption");
     break;
 
   default:
@@ -1831,7 +1833,7 @@ telnet_add_text(proto_tree *tree, tvbuff_t *tvb, int offset, int len)
      */
     linelen = next_offset - offset;
 
-    proto_tree_add_item(tree, hf_telnet_data, tvb, offset, linelen, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_telnet_data, tvb, offset, linelen, ENC_ASCII);
     offset = next_offset;
   }
 }

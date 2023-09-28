@@ -1,7 +1,7 @@
 /* Do not modify this file. Changes will be overwritten.                      */
 /* Generated automatically by the ASN.1 to Wireshark dissector compiler       */
 /* packet-kerberos.h                                                          */
-/* asn2wrs.py -b -p kerberos -c ./kerberos.cnf -s ./packet-kerberos-template -D . -O ../.. KerberosV5Spec2.asn k5.asn RFC3244.asn RFC6113.asn */
+/* asn2wrs.py -b -p kerberos -c ./kerberos.cnf -s ./packet-kerberos-template -D . -O ../.. KerberosV5Spec2.asn k5.asn RFC3244.asn RFC6113.asn SPAKE.asn */
 
 /* Input file: packet-kerberos-template.h */
 
@@ -78,6 +78,9 @@ gint kerberos_rm_to_reclen(guint krb_rm);
 
 void
 show_krb_recordmark(proto_tree *tree, tvbuff_t *tvb, gint start, guint32 krb_rm);
+
+int
+dissect_kerberos_KERB_TICKET_LOGON(tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree);
 
 #ifdef HAVE_KERBEROS
 #define KRB_MAX_ORIG_LEN	256
@@ -157,9 +160,11 @@ extern gboolean krb_decrypt;
 #define KERBEROS_APPLICATIONS_ENCKRBPRIVPART  28
 #define KERBEROS_APPLICATIONS_ENCKRBCREDPART  29
 #define KERBEROS_APPLICATIONS_KRB_ERROR  30
+int dissect_kerberos_TGT_REQ(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_);
+int dissect_kerberos_TGT_REP(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_);
 int dissect_kerberos_ChangePasswdData(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_);
 
 /*--- End of included file: packet-kerberos-exp.h ---*/
-#line 130 "./asn1/kerberos/packet-kerberos-template.h"
+#line 133 "./asn1/kerberos/packet-kerberos-template.h"
 
 #endif  /* __PACKET_KERBEROS_H */

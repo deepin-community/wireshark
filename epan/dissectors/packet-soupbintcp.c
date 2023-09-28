@@ -192,20 +192,20 @@ dissect_soupbintcp_common(
 
     /* If first dissection of Login Accept, save sequence number */
     if (pkt_type == 'A' && !PINFO_FD_VISITED(pinfo)) {
-        ws_strtou32(tvb_get_string_enc(wmem_packet_scope(), tvb, 13, 20, ENC_ASCII),
+        ws_strtou32(tvb_get_string_enc(pinfo->pool, tvb, 13, 20, ENC_ASCII),
             NULL, &next_seq);
 
         /* Create new conversation for this session */
         conv = conversation_new(pinfo->num,
                                 &pinfo->src,
                                 &pinfo->dst,
-                                conversation_pt_to_endpoint_type(pinfo->ptype),
+                                conversation_pt_to_conversation_type(pinfo->ptype),
                                 pinfo->srcport,
                                 pinfo->destport,
                                 0);
 
         /* Store starting sequence number for session's packets */
-        conv_data = (struct conv_data *)wmem_alloc(wmem_file_scope(), sizeof(struct conv_data));
+        conv_data = wmem_new(wmem_file_scope(), struct conv_data);
         conv_data->next_seq = next_seq;
         conversation_add_proto_data(conv, proto_soupbintcp, conv_data);
     }
@@ -226,9 +226,7 @@ dissect_soupbintcp_common(
                     this_seq = 0;
                 }
 
-                pdu_data = (struct pdu_data *)wmem_alloc(
-                    wmem_file_scope(),
-                    sizeof(struct pdu_data));
+                pdu_data = wmem_new(wmem_file_scope(), struct pdu_data);
                 pdu_data->seq_num = this_seq;
                 p_add_proto_data(wmem_file_scope(), pinfo, proto_soupbintcp, key, pdu_data);
             }
@@ -271,16 +269,16 @@ dissect_soupbintcp_common(
         case '+': /* Debug Message */
             proto_tree_add_item(soupbintcp_tree,
                                 hf_soupbintcp_text,
-                                tvb, offset, expected_len - 1, ENC_ASCII|ENC_NA);
+                                tvb, offset, expected_len - 1, ENC_ASCII);
             break;
 
         case 'A': /* Login Accept */
             proto_tree_add_item(soupbintcp_tree,
                                 hf_soupbintcp_session,
-                                tvb, offset, 10, ENC_ASCII|ENC_NA);
+                                tvb, offset, 10, ENC_ASCII);
             offset += 10;
 
-            seq_num_valid = ws_strtoi32(tvb_get_string_enc(wmem_packet_scope(),
+            seq_num_valid = ws_strtoi32(tvb_get_string_enc(pinfo->pool,
                 tvb, offset, 20, ENC_ASCII), NULL, &seq_num);
             pi = proto_tree_add_string_format_value(soupbintcp_tree,
                                                hf_soupbintcp_next_seq_num,
@@ -316,20 +314,20 @@ dissect_soupbintcp_common(
         case 'L': /* Login Request */
             proto_tree_add_item(soupbintcp_tree,
                                 hf_soupbintcp_username,
-                                tvb, offset, 6, ENC_ASCII|ENC_NA);
+                                tvb, offset, 6, ENC_ASCII);
             offset += 6;
 
             proto_tree_add_item(soupbintcp_tree,
                                 hf_soupbintcp_password,
-                                tvb, offset, 10, ENC_ASCII|ENC_NA);
+                                tvb, offset, 10, ENC_ASCII);
             offset += 10;
 
             proto_tree_add_item(soupbintcp_tree,
                                 hf_soupbintcp_session,
-                                tvb, offset, 10, ENC_ASCII|ENC_NA);
+                                tvb, offset, 10, ENC_ASCII);
             offset += 10;
 
-            seq_num_valid = ws_strtoi32(tvb_get_string_enc(wmem_packet_scope(),
+            seq_num_valid = ws_strtoi32(tvb_get_string_enc(pinfo->pool,
                 tvb, offset, 20, ENC_ASCII), NULL, &seq_num);
             pi = proto_tree_add_string_format_value(soupbintcp_tree,
                                                hf_soupbintcp_req_seq_num,

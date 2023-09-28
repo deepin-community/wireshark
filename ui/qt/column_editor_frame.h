@@ -1,4 +1,4 @@
-/* column_editor_frame.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -21,7 +21,7 @@ class ColumnEditorFrame : public AccordionFrame
     Q_OBJECT
 
 public:
-    explicit ColumnEditorFrame(QWidget *parent = 0);
+    explicit ColumnEditorFrame(QWidget *parent = nullptr);
     ~ColumnEditorFrame();
     void editColumn(int column);
 
@@ -38,6 +38,7 @@ private slots:
     void on_occurrenceLineEdit_textEdited(const QString &occurrence);
     void on_buttonBox_rejected();
     void on_buttonBox_accepted();
+    void checkCanResolve(void);
 
 private:
     bool syntaxIsValid(void);
@@ -49,16 +50,3 @@ private:
 };
 
 #endif // COLUMN_EDITOR_FRAME_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

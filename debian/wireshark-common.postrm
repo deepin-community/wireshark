@@ -7,7 +7,7 @@ GROUP=wireshark
 . /usr/share/debconf/confmodule
 
 if [ "$1" = "purge" ] ; then
-    if getent group $GROUP >/dev/null && which delgroup > /dev/null; then
+    if getent group $GROUP >/dev/null && command -v delgroup > /dev/null; then
         if ! delgroup --quiet --system $GROUP; then
             db_input high wireshark-common/group-removal-failed || true
             db_go

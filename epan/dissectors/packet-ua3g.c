@@ -609,7 +609,7 @@ static const value_string opcodes_vals_term[] =
 {
     {CS_NOP_ACK              , "NOP Acknowledge"},
     {CS_HANDSET_OFFHOOK      , "Handset Offhook"},                      /* IP Phone */
-    {CS_HANDSET_ONHOOK       , "Hansdet Onhook"},                       /* IP Phone */
+    {CS_HANDSET_ONHOOK       , "Handset Onhook"},                       /* IP Phone */
     {CS_DIGIT_DIALED         , "Digital Dialed"},                       /* IP Phone */
     {CS_SUBDEVICE_MSG        , "Subdevice Message"},
     {CS_HE_ROUTING           , "HE Routing Response Code"},             /* IP Phone - NOT EXPECTED */
@@ -699,7 +699,7 @@ version_number_computer( gchar *result, guint32 hexa_version )
     release = (int)(hexa_version / 10000);
     vers    = (int)((hexa_version % 10000) / 100);
     fix     = (hexa_version % 10000) % 100;
-    g_snprintf( result, ITEM_LABEL_LENGTH, "%d.%02d.%02d", release, vers, fix);
+    snprintf( result, ITEM_LABEL_LENGTH, "%d.%02d.%02d", release, vers, fix);
 }
 
 static void
@@ -710,7 +710,7 @@ version_3bytes_computer(gchar *result, guint32 hexa_version)
     release = (hexa_version >> 16);
     vers    = ((hexa_version >> 8) & 0xff);
     fix     = (hexa_version & 0xff);;
-    g_snprintf(result, ITEM_LABEL_LENGTH, "%d.%02d.%02d", release, vers, fix);
+    snprintf(result, ITEM_LABEL_LENGTH, "%d.%02d.%02d", release, vers, fix);
 }
 
 
@@ -831,7 +831,7 @@ decode_super_msg(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
 /*-----------------------------------------------------------------------------
     SEGMENT MESSAGE - 0Ch (MESSAGE FROM THE TERMINAL AND FROM THE SYSTEM)
     ---------------------------------------------------------------------------*/
-const true_false_string tfs_segment_msg_segment = { "First Segment", "Subsequent Segment" };
+static const true_false_string tfs_segment_msg_segment = { "First Segment", "Subsequent Segment" };
 
 static void
 decode_segment_msg(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,
@@ -1983,9 +1983,9 @@ decode_lcd_line_cmd(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
     if (!ua3g_body_tree)
         return;
 
-    strbuf  = wmem_strbuf_new_label(wmem_packet_scope());
+    strbuf  = wmem_strbuf_new_label(pinfo->pool);
 
-    wmem_strbuf_append_printf(strbuf, "\"%s\"", tvb_format_text(tvb, offset + 2, length - 2));
+    wmem_strbuf_append_printf(strbuf, "\"%s\"", tvb_format_text(pinfo->pool, tvb, offset + 2, length - 2));
 
     ua3g_param_tree = proto_tree_add_subtree_format(ua3g_body_tree, tvb, offset,
         length, ett_ua3g_param, NULL, "%s %d: %s",
@@ -2712,8 +2712,8 @@ static const value_string str_device_configuration[] = {
     { 0, NULL }
 };
 
-const true_false_string tfs_audio_config_handsfree_return = { "Return Loss Active", "Return Loss Normal" };
-const true_false_string tfs_audio_config_handsfree_handsfree = { "More Full Duplex", "Handsfree Normal" };
+static const true_false_string tfs_audio_config_handsfree_return = { "Return Loss Active", "Return Loss Normal" };
+static const true_false_string tfs_audio_config_handsfree_handsfree = { "More Full Duplex", "Handsfree Normal" };
 
 static void
 decode_audio_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
@@ -2803,7 +2803,7 @@ decode_audio_config(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo,
             int j;
             int device_index = 0;
 
-            strbuf = wmem_strbuf_new_label(wmem_packet_scope());
+            strbuf = wmem_strbuf_new_label(pinfo->pool);
 
             while (length > 0) {
 
@@ -3964,9 +3964,9 @@ decode_i_m_here(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, guint o
     RESPONSE STATUS INQUIRY - 23h (MESSAGE FROM THE TERMINAL)
     SPECIAL KEY STATUS - 29h (MESSAGE FROM THE TERMINAL)
     ---------------------------------------------------------------------------*/
-const true_false_string tfs_special_key_parameters = { "Not Received Default In Effect", "Downloaded Values In Effect" };
-const true_false_string tfs_hookswitch_status = {"On Hook", "Off Hook"};
-const true_false_string tfs_released_pressed = { "Released", "Pressed" };
+static const true_false_string tfs_special_key_parameters = { "Not Received Default In Effect", "Downloaded Values In Effect" };
+static const true_false_string tfs_hookswitch_status = {"On Hook", "Off Hook"};
+static const true_false_string tfs_released_pressed = { "Released", "Pressed" };
 
 static void
 decode_special_key(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_,

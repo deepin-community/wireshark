@@ -198,9 +198,9 @@ dissect_a_binary_command(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
             {
                 proto_tree_add_item(subtree, hf_a_data, tvb, 1, 3, ENC_NA);
                 proto_tree_add_item(subtree, hf_a_length, tvb, 4, 1, ENC_BIG_ENDIAN);
-                proto_tree_add_item(subtree, hf_a_text, tvb, 5, -1, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(subtree, hf_a_text, tvb, 5, -1, ENC_ASCII);
 
-                pstr = tvb_get_string_enc(wmem_packet_scope(), tvb, 5, tvb_get_guint8(tvb, 4), ENC_ASCII|ENC_NA);
+                pstr = tvb_get_string_enc(pinfo->pool, tvb, 5, tvb_get_guint8(tvb, 4), ENC_ASCII|ENC_NA);
                 if(pstr)
                 {
                     proto_item_append_text(ti, ": '%s'", pstr);
@@ -265,7 +265,7 @@ dissect_a_binary_command(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
                         len = tvb_get_guint8(tvb, i+1);
                         ti = proto_tree_add_item(subtree, hf_a_item, tvb, i, len+2, ENC_NA);
                         infotree = proto_item_add_subtree(ti, ett_a_item);
-                        proto_tree_add_item_ret_string(infotree, hf_a_weekday, tvb, i+2, len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &pstr);
+                        proto_tree_add_item_ret_string(infotree, hf_a_weekday, tvb, i+2, len, ENC_ASCII|ENC_NA, pinfo->pool, &pstr);
                         if(pstr)
                             proto_item_append_text(ti, ", Weekday: '%s'", pstr);
 
@@ -277,7 +277,7 @@ dissect_a_binary_command(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
                         len = tvb_get_guint8(tvb, i+1);
                         ti = proto_tree_add_item(subtree, hf_a_item, tvb, i, len+2, ENC_NA);
                         infotree = proto_item_add_subtree(ti, ett_a_item);
-                        proto_tree_add_item_ret_string(infotree, hf_a_month_name, tvb, i+2, len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &pstr);
+                        proto_tree_add_item_ret_string(infotree, hf_a_month_name, tvb, i+2, len, ENC_ASCII|ENC_NA, pinfo->pool, &pstr);
                         if(pstr)
                             proto_item_append_text(ti, ", Month name: '%s'", pstr);
                         i += len +2;
@@ -288,7 +288,7 @@ dissect_a_binary_command(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
                         len = tvb_get_guint8(tvb, i+1);
                         ti = proto_tree_add_item(subtree, hf_a_item, tvb, i, len+2, ENC_NA);
                         infotree = proto_item_add_subtree(ti, ett_a_item);
-                        proto_tree_add_item_ret_string(infotree, hf_a_weekofyear_prefix, tvb, i+2, len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &pstr);
+                        proto_tree_add_item_ret_string(infotree, hf_a_weekofyear_prefix, tvb, i+2, len, ENC_ASCII|ENC_NA, pinfo->pool, &pstr);
                         if(pstr)
                             proto_item_append_text(ti, ", Week of the year prefix: '%s'", pstr);
                         i += len +2;
@@ -333,9 +333,9 @@ dissect_a_binary_command(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
             {
                 proto_tree_add_item(subtree, hf_a_line, tvb, 1, 1, ENC_BIG_ENDIAN);
                 proto_tree_add_item(subtree, hf_a_length, tvb, 2, 1, ENC_BIG_ENDIAN);
-                proto_tree_add_item(subtree, hf_a_cdpn, tvb, 3, -1, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(subtree, hf_a_cdpn, tvb, 3, -1, ENC_ASCII);
 
-                pstr = tvb_get_string_enc(wmem_packet_scope(), tvb, 3, tvb_get_guint8(tvb, 2), ENC_ASCII|ENC_NA);
+                pstr = tvb_get_string_enc(pinfo->pool, tvb, 3, tvb_get_guint8(tvb, 2), ENC_ASCII|ENC_NA);
                 if(pstr)
                     proto_item_append_text(ti, ": '%s'", pstr);
             }
@@ -423,7 +423,7 @@ dissect_aasp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
         }
         else
         {
-            proto_tree_add_item(aasp_tree, hf_a_text, tvb, 0, -1, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(aasp_tree, hf_a_text, tvb, 0, -1, ENC_ASCII);
         }
     }
 

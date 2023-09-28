@@ -9,7 +9,7 @@
 
 #include <ui/qt/widgets/follow_stream_text.h>
 
-#include <wireshark_application.h>
+#include <main_application.h>
 
 #include <QMouseEvent>
 #include <QTextCursor>
@@ -25,7 +25,7 @@ FollowStreamText::FollowStreamText(QWidget *parent) :
     setMouseTracking(true);
 //    setMaximumBlockCount(1);
     QTextDocument *text_doc = document();
-    text_doc->setDefaultFont(wsApp->monospaceFont());
+    text_doc->setDefaultFont(mainApp->monospaceFont());
 }
 
 void FollowStreamText::mouseMoveEvent(QMouseEvent *event)
@@ -45,16 +45,3 @@ void FollowStreamText::leaveEvent(QEvent *event)
     emit mouseMovedToTextCursorPosition(-1);
     QPlainTextEdit::leaveEvent(event);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

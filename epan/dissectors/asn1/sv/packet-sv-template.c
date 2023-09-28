@@ -16,6 +16,7 @@
 #include <epan/etypes.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
+#include <epan/addr_resolv.h>
 
 #include "packet-ber.h"
 #include "packet-acse.h"
@@ -53,6 +54,10 @@
 /* see UCA Implementation Guideline for IEC 61850-9-2 */
 #define Q_DERIVED			(1U << 13)
 
+/* Bit fields in the Reserved attributes */
+#define F_RESERVE1_S_BIT  0x8000
+
+
 void proto_register_sv(void);
 void proto_reg_handoff_sv(void);
 
@@ -65,6 +70,7 @@ static int proto_sv = -1;
 static int hf_sv_appid = -1;
 static int hf_sv_length = -1;
 static int hf_sv_reserve1 = -1;
+static int hf_sv_reserve1_s_bit = -1;
 static int hf_sv_reserve2 = -1;
 static int hf_sv_phmeas_instmag_i = -1;
 static int hf_sv_phsmeas_q = -1;
@@ -81,6 +87,8 @@ static int hf_sv_phsmeas_q_source = -1;
 static int hf_sv_phsmeas_q_test = -1;
 static int hf_sv_phsmeas_q_operatorblocked = -1;
 static int hf_sv_phsmeas_q_derived = -1;
+static int hf_sv_gmidentity = -1;
+static int hf_sv_gmidentity_manuf = -1;
 
 #include "packet-sv-hf.c"
 
@@ -88,11 +96,15 @@ static int hf_sv_phsmeas_q_derived = -1;
 static int ett_sv = -1;
 static int ett_phsmeas = -1;
 static int ett_phsmeas_q = -1;
+static int ett_gmidentity = -1;
+static int ett_reserve1 = -1;
+
 
 #include "packet-sv-ett.c"
 
 static expert_field ei_sv_mal_utctime = EI_INIT;
 static expert_field ei_sv_zero_pdu = EI_INIT;
+static expert_field ei_sv_mal_gmidentity = EI_INIT;
 
 static gboolean sv_decode_data_as_phsmeas = FALSE;
 
@@ -184,6 +196,12 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* dat
 	guint sv_length = 0;
 	proto_item *item;
 	proto_tree *tree;
+
+	static int * const reserve1_flags[] = {
+		&hf_sv_reserve1_s_bit,
+		NULL
+	};
+
 	asn1_ctx_t asn1_ctx;
 
 	asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
@@ -201,13 +219,16 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* dat
 	proto_tree_add_item_ret_uint(tree, hf_sv_length, tvb, offset + 2, 2, ENC_BIG_ENDIAN, &sv_length);
 
 	/* Reserved 1 */
-	proto_tree_add_item(tree, hf_sv_reserve1, tvb, offset + 4, 2, ENC_BIG_ENDIAN);
+	proto_tree_add_bitmask(tree, tvb, offset + 4, hf_sv_reserve1, ett_reserve1,
+						reserve1_flags, ENC_BIG_ENDIAN);
+
 
 	/* Reserved 2 */
 	proto_tree_add_item(tree, hf_sv_reserve2, tvb, offset + 6, 2, ENC_BIG_ENDIAN);
 
 	offset = 8;
-	while ((tvb_reported_length_remaining(tvb, offset) > 0) && ((guint)offset < sv_length)) {
+	set_actual_length(tvb, sv_length);
+	while (tvb_reported_length_remaining(tvb, offset) > 0) {
 		old_offset = offset;
 		offset = dissect_sv_SampledValues(FALSE, tvb, offset, &asn1_ctx , tree, -1);
 		if (offset == old_offset) {
@@ -234,6 +255,10 @@ void proto_register_sv(void) {
 
 		{ &hf_sv_reserve1,
 		{ "Reserved 1",	"sv.reserve1", FT_UINT16, BASE_HEX_DEC, NULL, 0x0, NULL, HFILL }},
+
+		{ &hf_sv_reserve1_s_bit,
+		{ "Simulated",	"sv.reserve1.s_bit",
+		  FT_BOOLEAN, 16, NULL, F_RESERVE1_S_BIT, NULL, HFILL } },
 
 		{ &hf_sv_reserve2,
 		{ "Reserved 2",	"sv.reserve2", FT_UINT16, BASE_HEX_DEC, NULL, 0x0, NULL, HFILL }},
@@ -275,13 +300,19 @@ void proto_register_sv(void) {
 		{ "source", "sv.meas_quality.source", FT_UINT32, BASE_HEX, VALS(sv_q_source_vals), Q_SOURCE_MASK, NULL, HFILL}},
 
 		{ &hf_sv_phsmeas_q_test,
-		{ "test", "sv.meas_quality.teset", FT_BOOLEAN, 32, NULL, Q_TEST, NULL, HFILL}},
+		{ "test", "sv.meas_quality.test", FT_BOOLEAN, 32, NULL, Q_TEST, NULL, HFILL}},
 
 		{ &hf_sv_phsmeas_q_operatorblocked,
 		{ "operator blocked", "sv.meas_quality.operatorblocked", FT_BOOLEAN, 32, NULL, Q_OPERATORBLOCKED, NULL, HFILL}},
 
 		{ &hf_sv_phsmeas_q_derived,
 		{ "derived", "sv.meas_quality.derived", FT_BOOLEAN, 32, NULL, Q_DERIVED, NULL, HFILL}},
+
+		{ &hf_sv_gmidentity,
+		{ "gmIdentity", "sv.gmidentity", FT_UINT64, BASE_HEX, NULL, 0x00, NULL, HFILL}},
+
+		{ &hf_sv_gmidentity_manuf,
+		{ "MAC Vendor", "sv.gmidentity_manuf", FT_BYTES, BASE_NONE, NULL, 0x00, NULL, HFILL}},
 
 
 #include "packet-sv-hfarr.c"
@@ -292,12 +323,15 @@ void proto_register_sv(void) {
 		&ett_sv,
 		&ett_phsmeas,
 		&ett_phsmeas_q,
+		&ett_gmidentity,
+		&ett_reserve1,
 #include "packet-sv-ettarr.c"
 	};
 
 	static ei_register_info ei[] = {
 		{ &ei_sv_mal_utctime, { "sv.malformed.utctime", PI_MALFORMED, PI_WARN, "BER Error: malformed UTCTime encoding", EXPFILL }},
 		{ &ei_sv_zero_pdu, { "sv.zero_pdu", PI_PROTOCOL, PI_ERROR, "Internal error, zero-byte SV PDU", EXPFILL }},
+		{ &ei_sv_mal_gmidentity, { "sv.malformed.gmidentity", PI_MALFORMED, PI_WARN, "BER Error: malformed gmIdentity encoding", EXPFILL }},
 	};
 
 	expert_module_t* expert_sv;

@@ -1,4 +1,5 @@
-/* tap-rtp-analysis.h
+/** @file
+ *
  * RTP analysis addition for Wireshark
  *
  * Copyright 2003, Alcatel Business Systems
@@ -45,12 +46,10 @@ typedef struct _tap_rtp_stat_t {
     /* all of the following fields will be initialized after
      * rtppacket_analyse has been called
      */
-    address         first_packet_mac_addr; /**< MAC address of first packet, used to determine duplicates due to mirroring */
     guint32         flags;      /* see STAT_FLAG-defines below */
     guint16         seq_num;
     guint32         timestamp;
     guint32         first_timestamp;
-    guint32         delta_timestamp;
     double          bandwidth;
     bw_history_item bw_history[BUFF_BW];
     guint16         bw_start_index;
@@ -68,7 +67,10 @@ typedef struct _tap_rtp_stat_t {
     double          time;       /**< Unit is ms */
     double          start_time; /**< Unit is ms */
     double          lastnominaltime;
+    double          min_delta;
     double          max_delta;
+    double          mean_delta;
+    double          min_jitter;
     double          max_jitter;
     double          max_skew;
     double          mean_jitter;
@@ -78,7 +80,7 @@ typedef struct _tap_rtp_stat_t {
     guint32         total_nr;
     guint32         sequence;
     gboolean        under;
-    gint            cycles;
+    gint            seq_cycles;
     guint16         pt;
     int             reg_pt;
     guint32         first_packet_num;
@@ -110,7 +112,7 @@ struct _rtp_info;
 
 /* function for analysing an RTP packet. Called from rtp_analysis and rtp_streams */
 extern void rtppacket_analyse(tap_rtp_stat_t *statinfo,
-                              packet_info *pinfo,
+                              const packet_info *pinfo,
                               const struct _rtp_info *rtpinfo);
 
 #ifdef __cplusplus
@@ -118,16 +120,3 @@ extern void rtppacket_analyse(tap_rtp_stat_t *statinfo,
 #endif /* __cplusplus */
 
 #endif /* __TAP_RTP_ANALYSIS_H__ */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

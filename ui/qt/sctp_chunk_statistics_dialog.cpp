@@ -13,6 +13,7 @@
 #include "uat_dialog.h"
 
 #include <wsutil/strtoi.h>
+#include <wsutil/wslog.h>
 
 #include "ui/tap-sctp-analysis.h"
 #include <ui/qt/utils/qt_ui_utils.h>
@@ -44,7 +45,7 @@ SCTPChunkStatisticsDialog::SCTPChunkStatisticsDialog(QWidget *parent, const sctp
     this->setWindowTitle(QString(tr("SCTP Chunk Statistics: %1 Port1 %2 Port2 %3"))
             .arg(gchar_free_to_qstring(cf_get_display_name(cap_file_)))
             .arg(assoc->port1).arg(assoc->port2));
- //   connect(ui->tableWidget->verticalHeader(), SIGNAL(sectionMoved(int,int,int)), this, SLOT(on_sectionMoved(int, int, int)));
+//    connect(ui->tableWidget->verticalHeader(), &QHeaderView::sectionMoved, this, &SCTPChunkStatisticsDialog::on_sectionMoved);
 
     ctx_menu_.addAction(ui->actionHideChunkType);
     ctx_menu_.addAction(ui->actionChunkTypePreferences);
@@ -66,11 +67,11 @@ void SCTPChunkStatisticsDialog::initializeChunkMap()
     for (int i = 0; i < 256; i++) {
         temp.id = i;
         temp.row = i;
-        g_snprintf(buf, sizeof buf, "%d", i);
-        g_strlcpy(temp.name, val_to_str_const(i, chunk_type_values, "NA"), sizeof temp.name);
+        snprintf(buf, sizeof buf, "%d", i);
+        (void) g_strlcpy(temp.name, val_to_str_const(i, chunk_type_values, "NA"), sizeof temp.name);
         if (strcmp(temp.name, "NA") == 0) {
             temp.hide = 1;
-            g_strlcpy(temp.name, buf, sizeof temp.name);
+            (void) g_strlcpy(temp.name, buf, sizeof temp.name);
         } else {
             temp.hide = 0;
         }
@@ -89,7 +90,7 @@ void SCTPChunkStatisticsDialog::fillTable(bool all, const sctp_assoc_info_t *sel
 
     pref_t *pref = prefs_find_preference(prefs_find_module("sctp"),"statistics_chunk_types");
     if (!pref) {
-        g_log(NULL, G_LOG_LEVEL_ERROR, "Can't find preference sctp/statistics_chunk_types");
+        ws_log(LOG_DOMAIN_QTUI, LOG_LEVEL_ERROR, "Can't find preference sctp/statistics_chunk_types");
         return;
     }
     uat_t *uat = prefs_get_uat_value(pref);
@@ -105,7 +106,7 @@ void SCTPChunkStatisticsDialog::fillTable(bool all, const sctp_assoc_info_t *sel
             if (errno == ENOENT) {
                 init = true;
             } else {
-                g_log(NULL, G_LOG_LEVEL_ERROR, "Can't open %s: %s", fname, g_strerror(errno));
+                ws_log(LOG_DOMAIN_QTUI, LOG_LEVEL_ERROR, "Can't open %s: %s", fname, g_strerror(errno));
                 return;
             }
         }
@@ -150,7 +151,7 @@ void SCTPChunkStatisticsDialog::fillTable(bool all, const sctp_assoc_info_t *sel
                 continue;
             /* Get rid of the quotation marks */
             QString ch = QString(token).mid(1, (int)strlen(token)-2);
-            g_strlcpy(id, qPrintable(ch), sizeof id);
+            (void) g_strlcpy(id, qPrintable(ch), sizeof id);
             if (!ws_strtoi32(id, NULL, &temp.id))
                 continue;
             temp.hide = 0;
@@ -164,7 +165,7 @@ void SCTPChunkStatisticsDialog::fillTable(bool all, const sctp_assoc_info_t *sel
                         temp.hide = 0;
                     } else {
                         QString ch2 = QString(token).mid(1, (int)strlen(token)-2);
-                        g_strlcpy(temp.name, qPrintable(ch2), sizeof temp.name);
+                        (void) g_strlcpy(temp.name, qPrintable(ch2), sizeof temp.name);
                     }
                 }
             }
@@ -201,7 +202,7 @@ void SCTPChunkStatisticsDialog::contextMenuEvent(QContextMenuEvent * event)
     selected_point = event->pos();
     QTableWidgetItem *item = ui->tableWidget->itemAt(selected_point.x(), selected_point.y()-60);
     if (item) {
-        ctx_menu_.exec(event->globalPos());
+        ctx_menu_.popup(event->globalPos());
     }
 }
 
@@ -213,7 +214,7 @@ void SCTPChunkStatisticsDialog::on_pushButton_clicked()
 
     pref_t *pref = prefs_find_preference(prefs_find_module("sctp"),"statistics_chunk_types");
     if (!pref) {
-        g_log(NULL, G_LOG_LEVEL_ERROR, "Can't find preference sctp/statistics_chunk_types");
+        ws_log(LOG_DOMAIN_QTUI, LOG_LEVEL_ERROR, "Can't find preference sctp/statistics_chunk_types");
         return;
     }
 
@@ -247,7 +248,7 @@ void SCTPChunkStatisticsDialog::on_pushButton_clicked()
 
     for (int i = 0; i < chunks.size(); i++) {
         tempChunk = chunks.value(i);
-        g_snprintf(str, sizeof str, "\"%d\",\"%s\",\"%s\"\n", tempChunk.id, tempChunk.name, tempChunk.hide==0?"Show":"Hide");
+        snprintf(str, sizeof str, "\"%d\",\"%s\",\"%s\"\n", tempChunk.id, tempChunk.name, tempChunk.hide==0?"Show":"Hide");
         fputs(str, fp);
         void *rec = g_malloc0(uat->record_size);
         uat_add_record(uat, rec, TRUE);
@@ -290,7 +291,7 @@ void SCTPChunkStatisticsDialog::on_actionChunkTypePreferences_triggered()
 
     pref_t *pref = prefs_find_preference(prefs_find_module("sctp"),"statistics_chunk_types");
     if (!pref) {
-        g_log(NULL, G_LOG_LEVEL_ERROR, "Can't find preference sctp/statistics_chunk_types");
+        ws_log(LOG_DOMAIN_QTUI, LOG_LEVEL_ERROR, "Can't find preference sctp/statistics_chunk_types");
         return;
     }
 
@@ -299,7 +300,7 @@ void SCTPChunkStatisticsDialog::on_actionChunkTypePreferences_triggered()
 
     if (!uat_load(uat, NULL, &err)) {
         /* XXX - report this through the GUI */
-        g_log(NULL, G_LOG_LEVEL_WARNING, "Error loading table '%s': %s", uat->name, err);
+        ws_log(LOG_DOMAIN_QTUI, LOG_LEVEL_WARNING, "Error loading table '%s': %s", uat->name, err);
         g_free(err);
     }
 
@@ -307,7 +308,7 @@ void SCTPChunkStatisticsDialog::on_actionChunkTypePreferences_triggered()
     uatdialog->exec();
     // Emitting PacketDissectionChanged directly from a QDialog can cause
     // problems on macOS.
-    wsApp->flushAppSignals();
+    mainApp->flushAppSignals();
 
     ui->tableWidget->clear();
     ui->tableWidget->setRowCount(0);
@@ -327,16 +328,3 @@ void SCTPChunkStatisticsDialog::on_actionShowAllChunkTypes_triggered()
     initializeChunkMap();
     fillTable(true);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

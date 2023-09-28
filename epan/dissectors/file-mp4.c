@@ -209,13 +209,17 @@ make_fract(guint x)
 }
 
 static inline gchar *
-timescaled_val_to_str(guint64 val)
+timescaled_val_to_str(wmem_allocator_t *pool, guint64 val)
 {
     nstime_t nstime;
 
+    if (mvhd_timescale == 0) {
+        return wmem_strdup(pool, "no timescale");
+    }
+
     nstime.secs = val / mvhd_timescale;
     nstime.nsecs = (val % mvhd_timescale) * (1000000000UL / mvhd_timescale);
-    return rel_time_to_str(NULL, &nstime);
+    return rel_time_to_str(pool, &nstime);
 }
 
 static gint
@@ -283,10 +287,17 @@ dissect_mp4_mvhd_body(tvbuff_t *tvb, gint offset, gint len _U_,
     } else {
         duration = tvb_get_ntoh64(tvb , offset);
     }
-    proto_tree_add_uint64_format(tree, hf_mp4_mvhd_duration,
-            tvb, offset, time_len, duration,
-            "Duration: %f seconds (%" G_GUINT64_FORMAT ")",
-            (double) duration / mvhd_timescale, duration);
+    if (mvhd_timescale == 0) {
+        proto_tree_add_uint64_format(tree, hf_mp4_mvhd_duration,
+                tvb, offset, time_len, duration,
+                "Duration: no timescale (%" PRIu64 ")",
+                duration);
+    } else {
+        proto_tree_add_uint64_format(tree, hf_mp4_mvhd_duration,
+                tvb, offset, time_len, duration,
+                "Duration: %f seconds (%" PRIu64 ")",
+                (double) duration / mvhd_timescale, duration);
+    }
     offset += time_len;
 
     rate = tvb_get_ntohs(tvb, offset);
@@ -405,7 +416,7 @@ dissect_mp4_ftyp_body(tvbuff_t *tvb, gint offset, gint len,
 
     offset_start = offset;
     proto_tree_add_item(tree, hf_mp4_ftyp_brand,
-            tvb, offset, 4, ENC_ASCII|ENC_NA);
+            tvb, offset, 4, ENC_ASCII);
     offset += 4;
     proto_tree_add_item(tree, hf_mp4_ftyp_ver,
             tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -413,7 +424,7 @@ dissect_mp4_ftyp_body(tvbuff_t *tvb, gint offset, gint len,
 
     while ((offset-offset_start) < len) {
         proto_tree_add_item(tree, hf_mp4_ftyp_add_brand,
-                tvb, offset, 4, ENC_ASCII|ENC_NA);
+                tvb, offset, 4, ENC_ASCII);
         offset += 4;
     }
 
@@ -521,7 +532,7 @@ dissect_mp4_hdlr_body(tvbuff_t *tvb, gint offset, gint len _U_,
     offset += 4;   /* four reserved 0 bytes */
 
     proto_tree_add_item(tree, hf_mp4_hdlr_type,
-            tvb, offset, 4, ENC_ASCII|ENC_NA);
+            tvb, offset, 4, ENC_ASCII);
     offset += 4;
 
     offset += 12;   /* 3x32bit reserved */
@@ -529,7 +540,7 @@ dissect_mp4_hdlr_body(tvbuff_t *tvb, gint offset, gint len _U_,
     /* name is a 0-terminated UTF-8 string, len includes the final 0 */
     hdlr_name_len = tvb_strsize(tvb, offset);
     proto_tree_add_item(tree, hf_mp4_hdlr_name,
-            tvb, offset, hdlr_name_len, ENC_UTF_8|ENC_NA);
+            tvb, offset, hdlr_name_len, ENC_UTF_8);
     offset += hdlr_name_len;
 
     return offset-offset_start;
@@ -738,7 +749,7 @@ dissect_mp4_ctts_body(tvbuff_t *tvb, gint offset, gint len,
 
 static gint
 dissect_mp4_elst_body(tvbuff_t *tvb, gint offset, gint len,
-        packet_info *pinfo _U_, guint depth _U_, proto_tree *tree)
+        packet_info *pinfo, guint depth _U_, proto_tree *tree)
 {
     guint8 version;
     guint32 entry_cnt;
@@ -771,10 +782,10 @@ dissect_mp4_elst_body(tvbuff_t *tvb, gint offset, gint len,
         } else {
             segment_duration = tvb_get_ntohl(tvb, offset);
         }
-        segment_duration_str = timescaled_val_to_str(segment_duration);
+        segment_duration_str = timescaled_val_to_str(pinfo->pool, segment_duration);
         proto_tree_add_uint64_format(subtree, hf_mp4_elst_segment_duration,
                 tvb, offset, field_length, segment_duration,
-                "Segment duration: %s (%" G_GUINT64_FORMAT ")",
+                "Segment duration: %s (%" PRIu64 ")",
                 segment_duration_str, segment_duration);
         offset += field_length;
 
@@ -783,10 +794,10 @@ dissect_mp4_elst_body(tvbuff_t *tvb, gint offset, gint len,
         } else {
             media_time = tvb_get_ntohl(tvb, offset);
         }
-        media_time_str = timescaled_val_to_str(media_time);
+        media_time_str = timescaled_val_to_str(pinfo->pool, media_time);
         proto_tree_add_int64_format(subtree, hf_mp4_elst_media_time,
                 tvb, offset, field_length, media_time,
-                "Media time: %s (%" G_GINT64_FORMAT ")",
+                "Media time: %s (%" PRId64 ")",
                 media_time_str, media_time);
         offset += field_length;
 
@@ -801,9 +812,6 @@ dissect_mp4_elst_body(tvbuff_t *tvb, gint offset, gint len,
         proto_item_append_text (subtree_item,
                 " Segment duration: %s; Media time: %s; Media rate: %d.%d",
                 segment_duration_str, media_time_str, rate_int, rate_fraction);
-
-        wmem_free (NULL, segment_duration_str);
-        wmem_free (NULL, media_time_str);
     }
 
     return len;
@@ -836,7 +844,7 @@ dissect_mp4_box(guint32 parent_box_type _U_, guint depth,
         return -1;
 
     box_type = tvb_get_ntohl(tvb, offset+4);
-    box_type_str = tvb_get_string_enc(wmem_packet_scope(), tvb,
+    box_type_str = tvb_get_string_enc(pinfo->pool, tvb,
             offset+4, 4, ENC_ASCII|ENC_NA);
 
     box_tree = proto_tree_add_subtree_format(tree, tvb, offset, -1, ett_mp4_box, &type_pi, "%s (%s)",
@@ -849,7 +857,7 @@ dissect_mp4_box(guint32 parent_box_type _U_, guint depth,
 
     offset += 4;
     proto_tree_add_item(box_tree, hf_mp4_box_type_str,
-            tvb, offset, 4, ENC_ASCII|ENC_NA);
+            tvb, offset, 4, ENC_ASCII);
     offset += 4;
 
     if (box_size == BOX_SIZE_EXTENDED) {

@@ -42,24 +42,14 @@ void ClickableLabel::mouseReleaseEvent(QMouseEvent * event)
 void ClickableLabel::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton)
-        emit clickedAt(QPoint(event->globalPos()), Qt::LeftButton);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0 ,0)
+        emit clickedAt(event->globalPosition().toPoint(), Qt::LeftButton);
+#else
+        emit clickedAt(event->globalPos(), Qt::LeftButton);
+#endif
 }
 
 void ClickableLabel::contextMenuEvent(QContextMenuEvent *event)
 {
     emit clickedAt(QPoint(event->globalPos()), Qt::RightButton);
 }
-
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -14,7 +14,7 @@
 #include <glib.h>
 
 #include <epan/proto.h>
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 
 #include <wsutil/pint.h>
 #include <wsutil/unicode-utils.h>
@@ -106,7 +106,6 @@ get_utf_8_string(wmem_allocator_t *scope, const guint8 *ptr, gint length)
     wmem_strbuf_t *str;
     guint8 ch;
     const guint8 *prev;
-    gsize unichar_len;
 
     str = wmem_strbuf_sized_new(scope, length+1, 0);
 
@@ -115,8 +114,8 @@ get_utf_8_string(wmem_allocator_t *scope, const guint8 *ptr, gint length)
      * Table 3-7 "Well-Formed UTF-8 Byte Sequences" and
      * U+FFFD Substitution of Maximal Subparts. */
     while (length > 0) {
+        gsize unichar_len;
         ch = *ptr;
-        unichar_len = 1;
 
         if (ch < 0x80) {
             wmem_strbuf_append_c(str, ch);
@@ -1173,7 +1172,7 @@ get_etsi_ts_102_221_annex_a_string(wmem_allocator_t *scope, const guint8 *ptr,
      */
     if (length == 0) {
         /* XXX - return error indication */
-        strbuf = wmem_strbuf_new(wmem_packet_scope(), "");
+        strbuf = wmem_strbuf_new(scope, "");
         return (guint8 *)wmem_strbuf_finalize(strbuf);
     }
     string_type = *ptr;
@@ -1215,14 +1214,14 @@ get_etsi_ts_102_221_annex_a_string(wmem_allocator_t *scope, const guint8 *ptr,
      */
     if (length == 0) {
         /* XXX - return error indication */
-        strbuf = wmem_strbuf_new(wmem_packet_scope(), "");
+        strbuf = wmem_strbuf_new(scope, "");
         return (guint8 *)wmem_strbuf_finalize(strbuf);
     }
     string_len = *ptr;
     ptr++;
     length--;
 
-    strbuf = wmem_strbuf_sized_new(wmem_packet_scope(), 2*string_len+1, 0);
+    strbuf = wmem_strbuf_sized_new(scope, 2*string_len+1, 0);
 
     /*
      * Get the UCS-2 base.

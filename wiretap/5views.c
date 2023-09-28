@@ -95,6 +95,9 @@ static int _5views_read_header(wtap *wth, FILE_T fh, t_5VW_TimeStamped_Header *h
 static gboolean _5views_dump(wtap_dumper *wdh, const wtap_rec *rec, const guint8 *pd, int *err, gchar **err_info);
 static gboolean _5views_dump_finish(wtap_dumper *wdh, int *err, gchar **err_info);
 
+static int _5views_file_type_subtype = -1;
+
+void register_5views(void);
 
 wtap_open_return_val
 _5views_open(wtap *wth, int *err, gchar **err_info)
@@ -125,7 +128,7 @@ _5views_open(wtap *wth, int *err, gchar **err_info)
 
 	default:
 		*err = WTAP_ERR_UNSUPPORTED;
-		*err_info = g_strdup_printf("5views: header version %u unsupported", Capture_Header.Info_Header.Version);
+		*err_info = ws_strdup_printf("5views: header version %u unsupported", Capture_Header.Info_Header.Version);
 		return WTAP_OPEN_ERROR;
 	}
 
@@ -135,7 +138,7 @@ _5views_open(wtap *wth, int *err, gchar **err_info)
 	if((Capture_Header.Info_Header.FileType & CST_5VW_CAPTURE_FILE_TYPE_MASK) != CST_5VW_CAPTURE_FILEID)
 	{
 		*err = WTAP_ERR_UNSUPPORTED;
-		*err_info = g_strdup_printf("5views: file is not a capture file (filetype is %u)", Capture_Header.Info_Header.Version);
+		*err_info = ws_strdup_printf("5views: file is not a capture file (filetype is %u)", Capture_Header.Info_Header.Version);
 		return WTAP_OPEN_ERROR;
 	}
 
@@ -149,7 +152,7 @@ _5views_open(wtap *wth, int *err, gchar **err_info)
 */
 	default:
 		*err = WTAP_ERR_UNSUPPORTED;
-		*err_info = g_strdup_printf("5views: network type %u unknown or unsupported",
+		*err_info = ws_strdup_printf("5views: network type %u unknown or unsupported",
 		    Capture_Header.Info_Header.FileType);
 		return WTAP_OPEN_ERROR;
 	}
@@ -160,7 +163,7 @@ _5views_open(wtap *wth, int *err, gchar **err_info)
 		return WTAP_OPEN_ERROR;
 
 	/* This is a 5views capture file */
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_5VIEWS;
+	wth->file_type_subtype = _5views_file_type_subtype;
 	wth->subtype_read = _5views_read;
 	wth->subtype_seek_read = _5views_seek_read;
 	wth->file_encap = encap;
@@ -218,7 +221,7 @@ _5views_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err,
 		 * to allocate space for an immensely-large packet.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("5views: File has %u-byte packet, bigger than maximum of %u",
+		*err_info = ws_strdup_printf("5views: File has %u-byte packet, bigger than maximum of %u",
 		    rec->rec_header.packet_header.caplen, WTAP_MAX_PACKET_SIZE_STANDARD);
 		return FALSE;
 	}
@@ -267,7 +270,7 @@ _5views_read_header(wtap *wth, FILE_T fh, t_5VW_TimeStamped_Header *hdr,
 	hdr->Key = pletoh32(&hdr->Key);
 	if (hdr->Key != CST_5VW_RECORDS_HEADER_KEY) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("5views: Time-stamped header has bad key value 0x%08X",
+		*err_info = ws_strdup_printf("5views: Time-stamped header has bad key value 0x%08X",
 		    hdr->Key);
 		return FALSE;
 	}
@@ -278,6 +281,7 @@ _5views_read_header(wtap *wth, FILE_T fh, t_5VW_TimeStamped_Header *hdr,
 	hdr->NanoSecondes = pletoh32(&hdr->NanoSecondes);
 
 	rec->rec_type = REC_TYPE_PACKET;
+	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 	rec->presence_flags = WTAP_HAS_TS;
 	rec->ts.secs = hdr->Utc;
 	rec->ts.nsecs = hdr->NanoSecondes;
@@ -307,7 +311,7 @@ static const int wtap_encap[] = {
 
 /* Returns 0 if we could write the specified encapsulation type,
    an error indication otherwise. */
-int _5views_dump_can_write_encap(int encap)
+static int _5views_dump_can_write_encap(int encap)
 {
 	/* Per-packet encapsulations aren't supported. */
 	if (encap == WTAP_ENCAP_PER_PACKET)
@@ -321,7 +325,7 @@ int _5views_dump_can_write_encap(int encap)
 
 /* Returns TRUE on success, FALSE on failure; sets "*err" to an error code on
    failure */
-gboolean _5views_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
+static gboolean _5views_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
 {
 	_5views_dump_t *_5views;
 
@@ -335,7 +339,7 @@ gboolean _5views_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
 	/* This is a 5Views file */
 	wdh->subtype_write = _5views_dump;
 	wdh->subtype_finish = _5views_dump_finish;
-	_5views = (_5views_dump_t *)g_malloc(sizeof(_5views_dump_t));
+	_5views = g_new(_5views_dump_t, 1);
 	wdh->priv = (void *)_5views;
 	_5views->nframes = 0;
 
@@ -448,6 +452,31 @@ static gboolean _5views_dump_finish(wtap_dumper *wdh, int *err, gchar **err_info
 		return FALSE;
 
 	return TRUE;
+}
+
+static const struct supported_block_type _5views_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info _5views_info = {
+	"InfoVista 5View capture", "5views", "5vw", NULL,
+	TRUE, BLOCKS_SUPPORTED(_5views_blocks_supported),
+	_5views_dump_can_write_encap, _5views_dump_open, NULL
+};
+
+void register_5views(void)
+{
+	_5views_file_type_subtype = wtap_register_file_type_subtype(&_5views_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("5VIEWS",
+	    _5views_file_type_subtype);
 }
 
 /*

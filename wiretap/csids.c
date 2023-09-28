@@ -43,6 +43,10 @@ struct csids_header {
   guint16 caplen;  /* the capture length  */
 };
 
+static int csids_file_type_subtype = -1;
+
+void register_csids(void);
+
 wtap_open_return_val csids_open(wtap *wth, int *err, gchar **err_info)
 {
   /* There is no file header. There is only a header for each packet
@@ -109,11 +113,11 @@ wtap_open_return_val csids_open(wtap *wth, int *err, gchar **err_info)
   if (file_seek(wth->fh, 0, SEEK_SET, err) == -1)
     return WTAP_OPEN_ERROR;
 
-  csids = (csids_t *)g_malloc(sizeof(csids_t));
+  csids = g_new(csids_t, 1);
   wth->priv = (void *)csids;
   csids->byteswapped = byteswap;
   wth->file_encap = WTAP_ENCAP_RAW_IP;
-  wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_CSIDS;
+  wth->file_type_subtype = csids_file_type_subtype;
   wth->snapshot_length = 0; /* not known */
   wth->subtype_read = csids_read;
   wth->subtype_seek_read = csids_seek_read;
@@ -181,6 +185,7 @@ csids_read_packet(FILE_T fh, csids_t *csids, wtap_rec *rec,
    */
 
   rec->rec_type = REC_TYPE_PACKET;
+  rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
   rec->presence_flags = WTAP_HAS_TS;
   rec->rec_header.packet_header.len = hdr.caplen;
   rec->rec_header.packet_header.caplen = hdr.caplen;
@@ -203,6 +208,31 @@ csids_read_packet(FILE_T fh, csids_t *csids, wtap_rec *rec,
   }
 
   return TRUE;
+}
+
+static const struct supported_block_type csids_blocks_supported[] = {
+  /*
+   * We support packet blocks, with no comments or other options.
+   */
+  { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info csids_info = {
+  "CSIDS IPLog", "csids", NULL, NULL,
+  FALSE, BLOCKS_SUPPORTED(csids_blocks_supported),
+  NULL, NULL, NULL
+};
+
+void register_csids(void)
+{
+  csids_file_type_subtype = wtap_register_file_type_subtype(&csids_info);
+
+  /*
+   * Register name for backwards compatibility with the
+   * wtap_filetypes table in Lua.
+   */
+  wtap_register_backwards_compatibility_lua_name("CSIDS",
+                                                 csids_file_type_subtype);
 }
 
 /*

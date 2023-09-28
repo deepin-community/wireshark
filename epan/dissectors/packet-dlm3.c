@@ -42,10 +42,16 @@
 #define SCTP_PORT_DLM3          TCP_PORT_DLM3
 
 #define DLM3_MAJOR_VERSION      0x00030000
-#define DLM3_MINOR_VERSION_MAX  0x00000001
+#define DLM3_MINOR_VERSION_MAX  0x00000002
+
+#define DLM_VERSION_3_1         0x00030001
+#define DLM_VERSION_3_2         0x00030002
 
 #define DLM3_MSG                1
 #define DLM3_RCOM               2
+#define DLM3_OPTS               3
+#define DLM3_ACK                4
+#define DLM3_FIN                5
 
 #define DLM3_MSG_REQUEST        1
 #define DLM3_MSG_CONVERT        2
@@ -156,6 +162,9 @@
 #define DLM3_RESNAME_MAXLEN     64
 
 #define DLM_HEADER_LEN (4 + 4 + 4 + 2 + 1 + 1)
+#define DLM_RCOM_LEN (DLM_HEADER_LEN + 4 + 4 + 8 + 8 + 8)
+#define DLM_MSG_LEN (DLM_HEADER_LEN + ((4 * 12) + (4 * 6)))
+#define DLM_OPTS_LEN (DLM_HEADER_LEN + 1 + 1 + 2 + 4)
 
 /* Forward declaration we need below */
 void proto_register_dlm3(void);
@@ -170,10 +179,24 @@ static int hf_dlm3_h_version   = -1;
 static int hf_dlm3_h_major_version = -1;
 static int hf_dlm3_h_minor_version = -1;
 static int hf_dlm3_h_lockspace = -1;
+static int hf_dlm3_h_seq       = -1;
 static int hf_dlm3_h_nodeid    = -1;
 static int hf_dlm3_h_length    = -1;
 static int hf_dlm3_h_cmd       = -1;
 static int hf_dlm3_h_pad       = -1;
+
+/* fields for struct dlm_opts(o) */
+static int hf_dlm3_o_nextcmd = -1;
+static int hf_dlm3_o_pad     = -1;
+static int hf_dlm3_o_optlen  = -1;
+static int hf_dlm3_o_pad2    = -1;
+static int hf_dlm3_o_opts    = -1;
+
+/* fields for struct dlm_opt_header(t) */
+static int hf_dlm3_t_type   = -1;
+static int hf_dlm3_t_length = -1;
+static int hf_dlm3_t_pad    = -1;
+static int hf_dlm3_t_value  = -1;
 
 /* fields for struct dlm_message(m) */
 static int hf_dlm3_m_type         = -1;
@@ -320,6 +343,10 @@ static int hf_dlm3_rl_lvb                 = -1;
 static gint ett_dlm3         = -1;
 static gint ett_dlm3_version = -1;
 
+static gint ett_dlm3_opts  = -1;
+static gint ett_dlm3_options  = -1;
+static gint ett_dlm3_next_cmd = -1;
+
 static gint ett_dlm3_msg       = -1;
 static gint ett_dlm3_m_exflags = -1;
 static gint ett_dlm3_sbflags   = -1;
@@ -340,15 +367,15 @@ static gint ett_dlm3_rl_asts     = -1;
 static gint ett_dlm3_rl_name     = -1;
 
 
-/* configurable parameters */
-static guint dlm3_sctp_port = SCTP_PORT_DLM3;
-
 /*
  * Value strings
  */
 static const value_string dlm3_cmd[] = {
   { DLM3_MSG,  "message"          },
   { DLM3_RCOM, "recovery command" },
+  { DLM3_OPTS, "options"          },
+  { DLM3_ACK,  "acknowledge"      },
+  { DLM3_FIN,  "fin"              },
   { 0,         NULL               }
 };
 
@@ -755,7 +782,7 @@ dissect_dlm3_rcom_lock(tvbuff_t *tvb, proto_tree *tree,
     sub_offset = offset;
     proto_tree_add_item(sub_tree,
                         hf_dlm3_rl_name_contents, tvb, sub_offset,
-                        namelen, ENC_ASCII|ENC_NA);
+                        namelen, ENC_ASCII);
 
     sub_offset += namelen;
     proto_tree_add_item(sub_tree,
@@ -865,20 +892,237 @@ dissect_dlm3_rcom(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 }
 
 static int
+dissect_dlm3_1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_,
+               guint8 h_cmd, guint32 h_version, guint length, int offset)
+{
+  proto_item *sub_item;
+  proto_tree *sub_tree;
+
+  switch (h_cmd) {
+  case DLM3_MSG:
+  case DLM3_RCOM:
+    break;
+  default:
+    return 0;
+  }
+
+  sub_item = proto_tree_add_uint(tree,
+                                 hf_dlm3_h_version, tvb, offset, 4,
+                                 h_version);
+  sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_version);
+  proto_tree_add_uint(sub_tree,
+                      hf_dlm3_h_major_version, tvb, offset + 0, 2,
+                      (h_version & 0xFFFF0000) >> 16);
+  proto_tree_add_uint(sub_tree,
+                      hf_dlm3_h_minor_version, tvb, offset + 2, 2,
+                      (h_version & 0x0000FFFF));
+  offset += 4;
+
+  proto_tree_add_item(tree,
+                      hf_dlm3_h_lockspace, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+  offset += 4;
+
+  proto_tree_add_item(tree,
+                      hf_dlm3_h_nodeid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+  offset += 4;
+
+  proto_tree_add_item(tree,
+                      hf_dlm3_h_length, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+  offset += 2;
+
+  sub_item = proto_tree_add_uint(tree,
+                                 hf_dlm3_h_cmd, tvb, offset, 1, h_cmd);
+  offset += 1;
+
+  proto_tree_add_item(tree,
+                      hf_dlm3_h_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+  offset += 1;
+
+  switch (h_cmd) {
+  case DLM3_MSG:
+    if (length < DLM_MSG_LEN)
+      return 0;
+
+    sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_msg);
+    dissect_dlm3_msg(tvb, pinfo, sub_tree, length, offset);
+    break;
+  case DLM3_RCOM:
+    if (length < DLM_RCOM_LEN)
+      return 0;
+
+    sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_rcom);
+    dissect_dlm3_rcom(tvb, pinfo, sub_tree, length, offset, h_version);
+    break;
+  default:
+    break;
+  }
+
+  return tvb_captured_length(tvb);
+}
+
+static int
+dissect_dlm3_2(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_,
+               guint8 h_cmd, guint32 h_version, guint length)
+{
+  proto_item *sub_item, *opts_item;
+  proto_tree *sub_tree, *opts_tree;
+  int        offset, tlv_offset;
+  guint o_nextcmd;
+  guint16 o_optlen, tmp, t_len;
+
+  switch (h_cmd) {
+  case DLM3_MSG:
+  case DLM3_RCOM:
+  case DLM3_OPTS:
+  case DLM3_ACK:
+  case DLM3_FIN:
+    break;
+  default:
+    return 0;
+  }
+
+  offset = 0;
+
+  sub_item = proto_tree_add_uint(tree,
+                                 hf_dlm3_h_version, tvb, offset, 4,
+                                 h_version);
+  sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_version);
+  proto_tree_add_uint(sub_tree,
+                      hf_dlm3_h_major_version, tvb, offset + 0, 2,
+                      (h_version & 0xFFFF0000) >> 16);
+  proto_tree_add_uint(sub_tree,
+                      hf_dlm3_h_minor_version, tvb, offset + 2, 2,
+                      (h_version & 0x0000FFFF));
+  offset += 4;
+
+  proto_tree_add_item(tree,
+                      hf_dlm3_h_seq, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+  offset += 4;
+
+  proto_tree_add_item(tree,
+                      hf_dlm3_h_nodeid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+  offset += 4;
+
+  proto_tree_add_item(tree,
+                      hf_dlm3_h_length, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+  offset += 2;
+
+  sub_item = proto_tree_add_uint(tree,
+                                 hf_dlm3_h_cmd, tvb, offset, 1, h_cmd);
+  offset += 1;
+
+  proto_tree_add_item(tree,
+                      hf_dlm3_h_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+  offset += 1;
+
+  switch (h_cmd) {
+  case DLM3_OPTS:
+    if (length < DLM_OPTS_LEN)
+      return 0;
+
+    sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_opts);
+    o_nextcmd = tvb_get_guint8(tvb, offset);
+    col_append_fstr(pinfo->cinfo, COL_INFO,
+                    ": %s", val_to_str_const(o_nextcmd,
+                                             dlm3_cmd,
+                                             "Unknown"));
+    sub_item = proto_tree_add_uint(sub_tree, hf_dlm3_o_nextcmd, tvb, offset, 1, o_nextcmd);
+    offset += 1;
+
+    proto_tree_add_item(sub_tree, hf_dlm3_o_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+    offset += 1;
+
+    o_optlen = tvb_get_letohs(tvb, offset);
+    tmp = DLM_OPTS_LEN + o_optlen;
+    if (length < tmp)
+      return 0;
+
+    proto_tree_add_uint(sub_tree, hf_dlm3_o_optlen, tvb, offset, 2, o_optlen);
+    offset += 2;
+
+    proto_tree_add_item(sub_tree, hf_dlm3_o_pad2, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+    offset += 4;
+
+    tmp = o_optlen;
+    if (tmp) {
+      opts_item = proto_tree_add_item(sub_tree, hf_dlm3_o_opts, tvb, offset, tmp, ENC_NA);
+      opts_tree = proto_item_add_subtree(opts_item, ett_dlm3_options);
+
+      tlv_offset = 0;
+      while (tmp > 0) {
+        proto_tree_add_item(opts_tree, hf_dlm3_t_type, tvb, offset, 2, ENC_LITTLE_ENDIAN);
+        tlv_offset += 2;
+
+        t_len = tvb_get_letohs(tvb, offset);
+        if (t_len > o_optlen - tlv_offset)
+          return 0;
+        proto_tree_add_uint(opts_tree, hf_dlm3_t_length, tvb, offset, 2, t_len);
+        tlv_offset += 2;
+
+        proto_tree_add_item(opts_tree, hf_dlm3_t_pad, tvb, offset, 4, ENC_LITTLE_ENDIAN);
+        tlv_offset += 4;
+
+        proto_tree_add_item(opts_tree, hf_dlm3_t_value, tvb, offset, t_len, ENC_NA);
+        tlv_offset += t_len;
+        tmp -= t_len;
+      }
+      offset += tlv_offset;
+    }
+
+    switch (o_nextcmd) {
+    case DLM3_MSG:
+      tmp = DLM_OPTS_LEN + o_optlen + DLM_RCOM_LEN;
+      if (length < tmp)
+        return 0;
+
+      sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_next_cmd);
+      dissect_dlm3_1(tvb, pinfo, sub_tree, data, o_nextcmd, h_version, length, offset);
+      break;
+    case DLM3_RCOM:
+      tmp = DLM_OPTS_LEN + o_optlen + DLM_RCOM_LEN;
+      if (length < tmp)
+        return 0;
+
+      sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_next_cmd);
+      dissect_dlm3_1(tvb, pinfo, sub_tree, data, o_nextcmd, h_version, length, offset);
+      break;
+    default:
+      return 0;
+    }
+    break;
+  case DLM3_MSG:
+    if (length < DLM_MSG_LEN)
+      return 0;
+
+    dissect_dlm3_1(tvb, pinfo, sub_tree, data, h_cmd, h_version, length, offset);
+    break;
+  case DLM3_RCOM:
+    if (length < DLM_RCOM_LEN)
+      return 0;
+
+    dissect_dlm3_1(tvb, pinfo, sub_tree, data, h_cmd, h_version, length, offset);
+    break;
+  default:
+    break;
+  }
+
+  return tvb_captured_length(tvb);
+}
+
+static int
 dissect_dlm3(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *data _U_)
 {
-  proto_item *item, *sub_item;
-  proto_tree *tree, *sub_tree;
-
-  int        offset;
+  proto_item *item;
+  proto_tree *tree;
   guint      length;
   guint32    h_version;
   guint8     h_cmd;
+  int        ret = 0;
 
 
   /* Check that there's enough data */
   length = tvb_captured_length(tvb);
-  if (length < 4 + 4 + 4 + 2 + 1 + 1)
+  if (length < DLM_HEADER_LEN)
     return 0;
 
   /* Check the protocol version  */
@@ -887,77 +1131,33 @@ dissect_dlm3(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void *d
       (h_version & 0xffff) > DLM3_MINOR_VERSION_MAX)
     return 0;
 
-  /* Check the command */
-  h_cmd = tvb_get_guint8(tvb, 4 + 4 + 4 + 2) ;
-  if ((h_cmd != DLM3_MSG) && (h_cmd != DLM3_RCOM))
-    return 0;
-
-  if ((h_cmd == DLM3_MSG) && (length < ((4 + 4 + 4 + 2 + 1 + 1)
-                                        + (4 * 12 + 4 * 6))))
-    return 0;
-  else if ((h_cmd == DLM3_RCOM) && (length < 4 + 4 + 8 + 8 + 8))
-    return 0;
-
-
   col_set_str(pinfo->cinfo, COL_PROTOCOL, "DLM3");
 
 
   col_set_str(pinfo->cinfo, COL_INFO, "DLM3");
 
+  h_cmd = tvb_get_guint8(tvb, DLM_HEADER_LEN - 1 - 1);
   col_set_str(pinfo->cinfo, COL_INFO,
                 val_to_str_const(h_cmd,
                            dlm3_cmd,
                            "packet-dlm3.c internal bug"));
 
-  /* if (parent_tree) */ {
-    offset = 0;
+  item = proto_tree_add_item(parent_tree, proto_dlm3, tvb, 0,
+                             -1, ENC_NA);
+  tree = proto_item_add_subtree(item, ett_dlm3);
 
-    item = proto_tree_add_item(parent_tree, proto_dlm3, tvb, offset,
-                               -1, ENC_NA);
-    tree = proto_item_add_subtree(item, ett_dlm3);
-
-    sub_item = proto_tree_add_uint(tree,
-                                   hf_dlm3_h_version, tvb, offset, 4,
-                                   h_version);
-    sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_version);
-    proto_tree_add_uint(sub_tree,
-                        hf_dlm3_h_major_version, tvb, offset + 0, 2,
-                        (h_version & 0xFFFF0000) >> 16);
-    proto_tree_add_uint(sub_tree,
-                        hf_dlm3_h_minor_version, tvb, offset + 2, 2,
-                        (h_version & 0x0000FFFF));
-
-
-    offset += 4;
-    proto_tree_add_item(tree,
-                        hf_dlm3_h_lockspace, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-
-    offset += 4;
-    proto_tree_add_item(tree,
-                        hf_dlm3_h_nodeid, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-    offset += 4;
-    proto_tree_add_item(tree,
-                        hf_dlm3_h_length, tvb, offset, 2, ENC_LITTLE_ENDIAN);
-
-    offset += 2;
-    sub_item = proto_tree_add_uint(tree,
-                                   hf_dlm3_h_cmd, tvb, offset, 1, h_cmd);
-
-    offset += 1;
-    proto_tree_add_item(tree,
-                        hf_dlm3_h_pad, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-
-
-    offset += 1;
-    if (h_cmd == DLM3_MSG) {
-      sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_msg);
-      dissect_dlm3_msg(tvb, pinfo, sub_tree, length, offset);
-    } else if (h_cmd== DLM3_RCOM) {
-      sub_tree = proto_item_add_subtree(sub_item, ett_dlm3_rcom);
-      dissect_dlm3_rcom(tvb, pinfo, sub_tree, length, offset, h_version);
-    }
+  switch (h_version) {
+  case DLM_VERSION_3_1:
+    ret = dissect_dlm3_1(tvb, pinfo, tree, data, h_cmd, h_version, length, 0);
+    break;
+  case DLM_VERSION_3_2:
+    ret = dissect_dlm3_2(tvb, pinfo, tree, data, h_cmd, h_version, length);
+    break;
+  default:
+    break;
   }
-  return tvb_captured_length(tvb);
+
+  return ret;
 }
 
 /* This method dissects fully reassembled messages */
@@ -988,8 +1188,6 @@ dissect_tcp_dlm3(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data
 void
 proto_register_dlm3(void)
 {
-  module_t *dlm3_module;
-
 
   static hf_register_info hf[] = {
     /* dlm_header */
@@ -1009,6 +1207,10 @@ proto_register_dlm3(void)
       { "Lockspace Global ID", "dlm3.h.lockspac",
         FT_UINT32, BASE_DEC_HEX, NULL, 0x0,
         NULL, HFILL }},
+    { &hf_dlm3_h_seq,
+      { "Sequence Number", "dlm3.h.seq",
+        FT_UINT32, BASE_DEC, NULL, 0x0,
+        NULL, HFILL }},
     { &hf_dlm3_h_nodeid,
       { "Sender Node ID", "dlm3.h.nodeid",
         FT_UINT32, BASE_DEC_HEX, NULL, 0x0,
@@ -1024,6 +1226,46 @@ proto_register_dlm3(void)
     { &hf_dlm3_h_pad,
       { "Padding", "dlm3.h.pad",
         FT_UINT8, BASE_DEC, NULL, 0x0,
+        NULL, HFILL }},
+
+    /* dlm_opts */
+    { &hf_dlm3_o_nextcmd,
+      { "Next Command", "dlm3.o.nextcmd",
+        FT_UINT8, BASE_DEC, VALS(dlm3_cmd), 0x0,
+        NULL, HFILL }},
+    { &hf_dlm3_o_pad,
+      { "Padding", "dlm3.o.pad",
+        FT_UINT8, BASE_DEC, NULL, 0x0,
+        NULL, HFILL }},
+    { &hf_dlm3_o_optlen,
+      { "Options Length", "dlm3.o.optlen",
+        FT_UINT16, BASE_DEC, NULL, 0x0,
+        NULL, HFILL }},
+    { &hf_dlm3_o_pad2,
+      { "Padding", "dlm3.o.pad2",
+        FT_UINT32, BASE_DEC, NULL, 0x0,
+        NULL, HFILL }},
+    { &hf_dlm3_o_opts,
+      { "Options", "dlm3.o.opts",
+        FT_BYTES, BASE_NONE, NULL, 0x0,
+        NULL, HFILL }},
+
+    /* dlm_opt_header */
+    { &hf_dlm3_t_type,
+      { "Type", "dlm3.t.type",
+        FT_UINT16, BASE_DEC, NULL, 0x0,
+        NULL, HFILL }},
+    { &hf_dlm3_t_length,
+      { "Length", "dlm3.t.length",
+        FT_UINT16, BASE_DEC, NULL, 0x0,
+        NULL, HFILL }},
+    { &hf_dlm3_t_pad,
+      { "Padding", "dlm3.t.pad",
+        FT_UINT32, BASE_DEC, NULL, 0x0,
+        NULL, HFILL }},
+    { &hf_dlm3_t_value,
+      { "Value", "dlm3.t.value",
+        FT_BYTES, BASE_NONE, NULL, 0x0,
         NULL, HFILL }},
 
     /* dlm_message */
@@ -1160,7 +1402,7 @@ proto_register_dlm3(void)
         FT_UINT32, BASE_HEX, NULL, 0x0,
         NULL, HFILL}},
     { &hf_dlm3_m_flags_user,
-      { "User space lock realted", "dlm3.m.flags.user",
+      { "User space lock related", "dlm3.m.flags.user",
         FT_BOOLEAN, 32, NULL, DLM3_IFL_USER,
         NULL, HFILL}},
     { &hf_dlm3_m_flags_orphan,
@@ -1463,7 +1705,7 @@ proto_register_dlm3(void)
         FT_UINT32, BASE_HEX, NULL, 0x0,
         NULL, HFILL}},
     { &hf_dlm3_rl_flags_user,
-      { "User space lock realted", "dlm3.rl.flags.user",
+      { "User space lock related", "dlm3.rl.flags.user",
         FT_BOOLEAN, 32, NULL, DLM3_IFL_USER,
         NULL, HFILL}},
     { &hf_dlm3_rl_flags_orphan,
@@ -1535,6 +1777,10 @@ proto_register_dlm3(void)
     &ett_dlm3,
     &ett_dlm3_version,
 
+    &ett_dlm3_opts,
+    &ett_dlm3_options,
+    &ett_dlm3_next_cmd,
+
     &ett_dlm3_msg,
     &ett_dlm3_m_exflags,
     &ett_dlm3_sbflags,
@@ -1560,38 +1806,21 @@ proto_register_dlm3(void)
   proto_register_field_array(proto_dlm3, hf, array_length(hf));
   proto_register_subtree_array(ett, array_length(ett));
 
-  dlm3_module = prefs_register_protocol(proto_dlm3,
-                                        proto_reg_handoff_dlm3);
-
-  prefs_register_uint_preference(dlm3_module, "sctp.port",
-                                 "DLM3 SCTP Port",
-                                 "Set the SCTP port for Distributed Lock Manager",
-                                 10,
-                                 &dlm3_sctp_port);
+  /* dlm3_module = prefs_register_protocol(proto_dlm3, NULL); */
 }
 
 
 void
 proto_reg_handoff_dlm3(void)
 {
-  static gboolean dissector_registered = FALSE;
+  dissector_handle_t dlm3_tcp_handle;
+  dissector_handle_t dlm3_sctp_handle;
 
-  static guint sctp_port;
+  dlm3_sctp_handle = create_dissector_handle(dissect_dlm3, proto_dlm3);
+  dlm3_tcp_handle = create_dissector_handle(dissect_tcp_dlm3, proto_dlm3);
 
-  static dissector_handle_t dlm3_tcp_handle;
-  static dissector_handle_t dlm3_sctp_handle;
-
-  if (!dissector_registered) {
-    dlm3_sctp_handle = create_dissector_handle(dissect_dlm3, proto_dlm3);
-    dlm3_tcp_handle = create_dissector_handle(dissect_tcp_dlm3, proto_dlm3);
-    dissector_add_uint_with_preference("tcp.port", TCP_PORT_DLM3, dlm3_tcp_handle);
-    dissector_registered = TRUE;
-  } else {
-    dissector_delete_uint("sctp.port", sctp_port, dlm3_sctp_handle);
-  }
-
-  sctp_port = dlm3_sctp_port;
-  dissector_add_uint("sctp.port", sctp_port, dlm3_sctp_handle);
+  dissector_add_uint_with_preference("tcp.port", TCP_PORT_DLM3, dlm3_tcp_handle);
+  dissector_add_uint_with_preference("sctp.port", SCTP_PORT_DLM3, dlm3_sctp_handle);
 }
 
 /* packet-dlm3.c ends here. */

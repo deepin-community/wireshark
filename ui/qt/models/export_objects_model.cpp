@@ -12,7 +12,7 @@
 
 #include <ui/qt/utils/qt_ui_utils.h>
 #include <ui/qt/utils/variant_pointer.h>
-#include <ui/export_object_ui.h>
+#include <wsutil/filesystem.h>
 #include <epan/prefs.h>
 
 #include <QDir>
@@ -53,6 +53,13 @@ ExportObjectModel::ExportObjectModel(register_eo_t* eo, QObject *parent) :
     export_object_list_.gui_data = (void*)&eo_gui_data_;
 }
 
+ExportObjectModel::~ExportObjectModel()
+{
+    foreach (QVariant v, objects_) {
+        eo_free_entry(VariantPointer<export_object_entry_t>::asPtr(v));
+    }
+}
+
 QVariant ExportObjectModel::data(const QModelIndex &index, int role) const
 {
     if ((!index.isValid()) || ((role != Qt::DisplayRole) && (role != Qt::UserRole))) {
@@ -70,13 +77,13 @@ QVariant ExportObjectModel::data(const QModelIndex &index, int role) const
         case colPacket:
             return QString::number(entry->pkt_num);
         case colHostname:
-            return entry->hostname;
+            return QString::fromUtf8(entry->hostname);
         case colContent:
-            return entry->content_type;
+            return QString::fromUtf8(entry->content_type);
         case colSize:
             return file_size_to_qstring(entry->payload_len);
         case colFilename:
-            return entry->filename;
+            return QString::fromUtf8(entry->filename);
         }
     }
     else if (role == Qt::UserRole)
@@ -115,7 +122,7 @@ int ExportObjectModel::rowCount(const QModelIndex &parent) const
         return 0;
     }
 
-    return objects_.count();
+    return static_cast<int>(objects_.count());
 }
 
 int ExportObjectModel::columnCount(const QModelIndex&) const
@@ -128,7 +135,7 @@ void ExportObjectModel::addObjectEntry(export_object_entry_t *entry)
     if (entry == NULL)
         return;
 
-    int count = objects_.count();
+    int count = static_cast<int>(objects_.count());
     beginInsertRows(QModelIndex(), count, count);
     objects_.append(VariantPointer<export_object_entry_t>::asQVariant(entry));
     endInsertRows();
@@ -149,7 +156,7 @@ bool ExportObjectModel::saveEntry(QModelIndex &index, QString filename)
         return false;
 
     if (filename.length() > 0) {
-        eo_save_entry(filename.toUtf8().constData(), entry);
+        write_file_binary_mode(qUtf8Printable(filename), entry->payload_data, entry->payload_len);
     }
 
     return true;
@@ -182,7 +189,7 @@ void ExportObjectModel::saveAllEntries(QString path)
                 char generic_name[EXPORT_OBJECT_MAXFILELEN+1];
                 const char *ext;
                 ext = eo_ct2ext(entry->content_type);
-                g_snprintf(generic_name, sizeof(generic_name),
+                snprintf(generic_name, sizeof(generic_name),
                     "object%u%s%s", entry->pkt_num, ext ? "." : "",
                     ext ? ext : "");
                 safe_filename = eo_massage_str(generic_name,
@@ -191,7 +198,8 @@ void ExportObjectModel::saveAllEntries(QString path)
             filename = QString::fromUtf8(safe_filename->str);
             g_string_free(safe_filename, TRUE);
         } while (save_dir.exists(filename) && ++count < prefs.gui_max_export_objects);
-        eo_save_entry(save_dir.filePath(filename).toUtf8().constData(), entry);
+        write_file_binary_mode(qUtf8Printable(save_dir.filePath(filename)),
+                               entry->payload_data, entry->payload_len);
     }
 }
 
@@ -199,9 +207,9 @@ void ExportObjectModel::resetObjects()
 {
     export_object_gui_reset_cb reset_cb = get_eo_reset_func(eo_);
 
-    emit beginResetModel();
+    beginResetModel();
     objects_.clear();
-    emit endResetModel();
+    endResetModel();
 
     if (reset_cb)
         reset_cb();
@@ -306,16 +314,3 @@ bool ExportObjectProxyModel::filterAcceptsRow(int source_row, const QModelIndex 
 
     return true;
 }
-
-
-/* * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

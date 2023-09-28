@@ -1,4 +1,5 @@
-/* voip_calls.h
+/** @file
+ *
  * VoIP calls summary addition for Wireshark
  *
  * Copyright 2004, Ericsson , Spain
@@ -139,6 +140,12 @@ typedef struct _skinny_calls_info {
     guint32 callId;
 } skinny_calls_info_t;
 
+/** defines info types for graph analysis additional information */
+typedef enum _ga_info_type {
+    GA_INFO_TYPE_NONE=0,
+    GA_INFO_TYPE_RTP
+} ga_info_type;
+
 /** defines a voip call */
 typedef struct _voip_calls_info {
     voip_call_state         call_state;
@@ -211,12 +218,13 @@ typedef struct _voip_calls_tapinfo {
     gint32                actrace_direction;
     flow_show_options     fs_option;
     guint32               redraw;
+    gboolean              apply_display_filter;
 } voip_calls_tapinfo_t;
 
 #if 0
 #define VOIP_CALLS_DEBUG(...) { \
-    char *VOIP_CALLS_DEBUG_MSG = g_strdup_printf(__VA_ARGS__); \
-    g_warning("voip_calls: %s:%d %s", G_STRFUNC, __LINE__, VOIP_CALLS_DEBUG_MSG); \
+    char *VOIP_CALLS_DEBUG_MSG = ws_strdup_printf(__VA_ARGS__); \
+    ws_warning("voip_calls: %s:%d %s", G_STRFUNC, __LINE__, VOIP_CALLS_DEBUG_MSG); \
     g_free(VOIP_CALLS_DEBUG_MSG); \
 }
 #else
@@ -246,21 +254,14 @@ void voip_calls_remove_all_tap_listeners(voip_calls_tapinfo_t *tap_id_base);
  */
 void voip_calls_reset_all_taps(voip_calls_tapinfo_t *tapinfo);
 
+/**
+ * Frees one callsinfo
+ */
+void
+voip_calls_free_callsinfo(voip_calls_info_t *callsinfo);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
 #endif /* __VOIP_CALLS_H__ */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

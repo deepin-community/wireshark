@@ -106,7 +106,7 @@ static gint compare_doubles(gconstpointer a, gconstpointer b)
  *  TAP_PACKET_REDRAW: state has changed, call (*draw) sometime later
  */
 static tap_packet_status
-icmpstat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *data)
+icmpstat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *data, tap_flags_t flags _U_)
 {
     icmpstat_t *icmpstat = (icmpstat_t *)tapdata;
     const icmp_transaction_t *trans = (const icmp_transaction_t *)data;
@@ -313,16 +313,3 @@ register_tap_listener_icmpstat(void)
 {
     register_stat_tap_ui(&icmpstat_ui, NULL);
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

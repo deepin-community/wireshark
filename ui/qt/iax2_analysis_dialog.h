@@ -1,4 +1,4 @@
-/* iax2_analysis_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -56,7 +56,6 @@ signals:
     void goToPacket(int packet_num);
 
 protected slots:
-    void captureEvent(CaptureEvent e);
     virtual void updateWidgets();
 
 private slots:
@@ -108,7 +107,7 @@ private:
 
     // Tap callbacks
     static void tapReset(void *tapinfo_ptr);
-    static tap_packet_status tapPacket(void *tapinfo_ptr, packet_info *pinfo, struct epan_dissect *, const void *iax2info_ptr);
+    static tap_packet_status tapPacket(void *tapinfo_ptr, packet_info *pinfo, struct epan_dissect *, const void *iax2info_ptr, tap_flags_t flags);
     static void tapDraw(void *tapinfo_ptr);
 
     void resetStatistics();
@@ -129,16 +128,3 @@ private:
 };
 
 #endif // IAX2_ANALYSIS_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

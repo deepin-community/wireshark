@@ -31,14 +31,12 @@ set_source_files_properties(
 	COMPILE_FLAGS "${WERROR_COMMON_FLAGS}"
 )
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
 register_plugin_files(plugin.c
 	plugin
 	${DISSECTOR_SRC}
 )
 
-add_plugin_library(wimaxasncp epan)
+add_wireshark_plugin_library(wimaxasncp epan)
 
 target_link_libraries(wimaxasncp epan)
 
@@ -49,7 +47,8 @@ CHECKAPI(
 	NAME
 	  wimaxasncp
 	SWITCHES
-	  -g abort -g termoutput
+	  --group dissectors-prohibited
+	  --group dissectors-restricted
 	SOURCES
 	  ${DISSECTOR_SRC}
 	  ${DISSECTOR_HEADERS}

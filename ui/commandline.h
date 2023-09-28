@@ -1,4 +1,5 @@
-/* commandline.h
+/** @file
+ *
  * Common command line handling between GUIs
  *
  * Wireshark - Network traffic analyzer
@@ -27,6 +28,13 @@ typedef struct commandline_param_info
     gboolean list_timestamp_types;
     gboolean start_capture;
     gboolean quit_after_cap;
+
+    /*
+     * We currently don't support this as a way to add file comments
+     * to an existing capture file in Wireshark; we only support it
+     * for adding comments to live captures.
+     */
+    GPtrArray *capture_comments;
 #endif
     e_prefs *prefs_p;
     search_direction jump_backwards;
@@ -36,10 +44,17 @@ typedef struct commandline_param_info
     gchar* rfilter;
     gchar* dfilter;
     gboolean full_screen;
+    GSList *user_opts;
 
 } commandline_param_info_t;
 
 extern void commandline_other_options(int argc, char *argv[], gboolean opt_reset);
+
+extern void commandline_options_drop(const char *module_name, const char *pref_name);
+
+extern void commandline_options_reapply(void);
+
+extern void commandline_options_free(void);
 
 extern commandline_param_info_t global_commandline_info;
 
@@ -48,16 +63,3 @@ extern commandline_param_info_t global_commandline_info;
 #endif /* __cplusplus */
 
 #endif /* __COMMANDLINE_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

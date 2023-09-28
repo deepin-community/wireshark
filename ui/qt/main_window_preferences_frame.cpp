@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-#include "wireshark_application.h"
+#include "main_application.h"
 #include "main_window_preferences_frame.h"
 #include <ui/qt/utils/qt_ui_utils.h>
 
@@ -162,8 +162,7 @@ void MainWindowPreferencesFrame::on_foStyleSpecifiedRadioButton_toggled(bool che
 void MainWindowPreferencesFrame::on_foStyleSpecifiedLineEdit_textEdited(const QString &new_dir)
 {
     prefs_set_string_value(pref_fileopen_dir_, new_dir.toStdString().c_str(), pref_stashed);
-    prefs_set_enum_value(pref_fileopen_style_, FO_STYLE_SPECIFIED, pref_stashed);
-    updateWidgets();
+    ui->foStyleSpecifiedRadioButton->setChecked(true);
 }
 
 void MainWindowPreferencesFrame::on_foStyleSpecifiedPushButton_clicked()
@@ -174,8 +173,7 @@ void MainWindowPreferencesFrame::on_foStyleSpecifiedPushButton_clicked()
 
     ui->foStyleSpecifiedLineEdit->setText(specified_dir);
     prefs_set_string_value(pref_fileopen_dir_, specified_dir.toStdString().c_str(), pref_stashed);
-    prefs_set_enum_value(pref_fileopen_style_, FO_STYLE_SPECIFIED, pref_stashed);
-    updateWidgets();
+    ui->foStyleSpecifiedRadioButton->setChecked(true);
 }
 
 void MainWindowPreferencesFrame::on_maxFilterLineEdit_textEdited(const QString &new_max)
@@ -219,16 +217,3 @@ void MainWindowPreferencesFrame::on_prependWindowTitle_textEdited(const QString 
 {
     prefs_set_string_value(pref_prepend_window_title_, new_prefix.toStdString().c_str(), pref_stashed);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

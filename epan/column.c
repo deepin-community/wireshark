@@ -22,8 +22,9 @@
 #include <epan/prefs.h>
 #include <epan/dfilter/dfilter.h>
 #include <epan/column.h>
+#include <epan/column-info.h>
 #include <epan/packet.h>
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
+#include <wsutil/ws_assert.h>
 
 /* Given a format number (as defined in column-utils.h), returns its equivalent
    string */
@@ -172,7 +173,7 @@ col_format_desc(const gint fmt_num) {
   };
 
   const gchar *val_str = try_val_to_str(fmt_num, dlist_vals);
-  g_assert(val_str != NULL);
+  ws_assert(val_str != NULL);
   return val_str;
 }
 
@@ -182,10 +183,10 @@ column_dump_column_formats(void)
   gint fmt;
 
   for (fmt = 0; fmt < NUM_COL_FMTS; fmt++) {
-    ws_debug_printf("%s\t%s\n", col_format_to_string(fmt), col_format_desc(fmt));
+    printf("%s\t%s\n", col_format_to_string(fmt), col_format_desc(fmt));
   }
 
-  ws_debug_printf("\nFor example, to print Wireshark's default columns with tshark:\n\n"
+  printf("\nFor example, to print Wireshark's default columns with tshark:\n\n"
 #ifdef _WIN32
   "tshark.exe -o \"gui.column.format:"
     "\\\"No.\\\",\\\"%%m\\\","
@@ -295,7 +296,7 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
                 return "0000-00-00 00:00:00.000000000";
                 break;
             default:
-                g_assert_not_reached();
+                ws_assert_not_reached();
         }
             break;
     case(TS_ABSOLUTE_WITH_YDOY):
@@ -321,7 +322,7 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
                 return "0000/000 00:00:00.000000000";
                 break;
             default:
-                g_assert_not_reached();
+                ws_assert_not_reached();
         }
             break;
     case(TS_ABSOLUTE):
@@ -347,7 +348,7 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
                 return "00:00:00.000000000";
                 break;
             default:
-                g_assert_not_reached();
+                ws_assert_not_reached();
         }
         break;
     case(TS_RELATIVE):  /* fallthrough */
@@ -374,7 +375,7 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
                 return "0000.000000000";
                 break;
             default:
-                g_assert_not_reached();
+                ws_assert_not_reached();
         }
         break;
     case(TS_EPOCH):
@@ -400,14 +401,14 @@ get_timestamp_column_longest_string(const gint type, const gint precision)
                 return "0000000000000000000.000000000";
                 break;
             default:
-                g_assert_not_reached();
+                ws_assert_not_reached();
         }
         break;
     case(TS_NOT_SET):
         return "0000.000000";
         break;
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     /* never reached, satisfy compiler */
@@ -747,21 +748,21 @@ get_custom_field_tooltip (gchar *custom_field, gint occurrence)
     header_field_info *hfi = proto_registrar_get_byname(custom_field);
     if (hfi == NULL) {
         /* Not a valid field */
-        return g_strdup_printf("Unknown Field: %s", custom_field);
+        return ws_strdup_printf("Unknown Field: %s", custom_field);
     }
 
     if (hfi->parent == -1) {
         /* Protocol */
-        return g_strdup_printf("%s (%s)", hfi->name, hfi->abbrev);
+        return ws_strdup_printf("%s (%s)", hfi->name, hfi->abbrev);
     }
 
     if (occurrence == 0) {
         /* All occurrences */
-        return g_strdup_printf("%s\n%s (%s)", proto_get_protocol_name(hfi->parent), hfi->name, hfi->abbrev);
+        return ws_strdup_printf("%s\n%s (%s)", proto_get_protocol_name(hfi->parent), hfi->name, hfi->abbrev);
     }
 
     /* One given occurrence */
-    return g_strdup_printf("%s\n%s (%s#%d)", proto_get_protocol_name(hfi->parent), hfi->name, hfi->abbrev, occurrence);
+    return ws_strdup_printf("%s\n%s (%s#%d)", proto_get_protocol_name(hfi->parent), hfi->name, hfi->abbrev, occurrence);
 }
 
 gchar *
@@ -806,6 +807,20 @@ get_column_tooltip(const gint col)
     return g_string_free (column_tooltip, FALSE);
 }
 
+const gchar*
+get_column_text(column_info *cinfo, const gint col)
+{
+  ws_assert(cinfo);
+  ws_assert(col < cinfo->num_cols);
+
+  if (!get_column_resolved(col) && cinfo->col_expr.col_expr_val[col]) {
+      /* Use the unresolved value in col_expr_val */
+      return cinfo->col_expr.col_expr_val[col];
+  }
+
+  return cinfo->columns[col].col_data;
+}
+
 void
 col_finalize(column_info *cinfo)
 {
@@ -846,17 +861,17 @@ col_finalize(column_info *cinfo)
       col_item->col_custom_dfilter = NULL;
     }
 
-    col_item->fmt_matx = (gboolean *) g_malloc0(sizeof(gboolean) * NUM_COL_FMTS);
+    col_item->fmt_matx = g_new0(gboolean, NUM_COL_FMTS);
     get_column_format_matches(col_item->fmt_matx, col_item->col_fmt);
     col_item->col_data = NULL;
 
     if (col_item->col_fmt == COL_INFO)
-      col_item->col_buf = (gchar *) g_malloc(sizeof(gchar) * COL_MAX_INFO_LEN);
+      col_item->col_buf = g_new(gchar, COL_MAX_INFO_LEN);
     else
-      col_item->col_buf = (gchar *) g_malloc(sizeof(gchar) * COL_MAX_LEN);
+      col_item->col_buf = g_new(gchar, COL_MAX_LEN);
 
     cinfo->col_expr.col_expr[i] = "";
-    cinfo->col_expr.col_expr_val[i] = (gchar *) g_malloc(sizeof(gchar) * COL_MAX_LEN);
+    cinfo->col_expr.col_expr_val[i] = g_new(gchar, COL_MAX_LEN);
   }
 
   cinfo->col_expr.col_expr[i] = NULL;

@@ -19,7 +19,7 @@
 #include <epan/capture_dissectors.h>
 #include <wsutil/pint.h>
 #include <epan/crc32-tvb.h>
-#include <wsutil/frequency-utils.h>
+#include <wsutil/802_11-utils.h>
 #include <epan/tap.h>
 #include <epan/prefs.h>
 #include <epan/addr_resolv.h>
@@ -39,7 +39,6 @@ static int hf_radiotap_pad = -1;
 static int hf_radiotap_length = -1;
 static int hf_radiotap_present = -1;
 
-static int hf_radiotap_tlv = -1;
 static int hf_radiotap_tlv_type = -1;
 static int hf_radiotap_tlv_datalen = -1;
 static int hf_radiotap_unknown_tlv_data = -1;
@@ -48,6 +47,9 @@ static int hf_radiotap_mactime = -1;
 /* static int hf_radiotap_channel = -1; */
 static int hf_radiotap_channel_frequency = -1;
 static int hf_radiotap_channel_flags = -1;
+static int hf_radiotap_channel_flags_700mhz = -1;
+static int hf_radiotap_channel_flags_800mhz = -1;
+static int hf_radiotap_channel_flags_900mhz = -1;
 static int hf_radiotap_channel_flags_turbo = -1;
 static int hf_radiotap_channel_flags_cck = -1;
 static int hf_radiotap_channel_flags_ofdm = -1;
@@ -101,6 +103,7 @@ static int hf_radiotap_db_antnoise = -1;
 static int hf_radiotap_tx_attenuation = -1;
 static int hf_radiotap_db_tx_attenuation = -1;
 static int hf_radiotap_txpower = -1;
+static int hf_radiotap_data_retries = -1;
 static int hf_radiotap_vendor_ns = -1;
 static int hf_radiotap_ven_oui = -1;
 static int hf_radiotap_ven_subns = -1;
@@ -188,6 +191,7 @@ static int hf_radiotap_present_db_antnoise = -1;
 static int hf_radiotap_present_hdrfcs = -1;
 static int hf_radiotap_present_rxflags = -1;
 static int hf_radiotap_present_txflags = -1;
+static int hf_radiotap_present_data_retries = -1;
 static int hf_radiotap_present_xchannel = -1;
 static int hf_radiotap_present_mcs = -1;
 static int hf_radiotap_present_ampdu = -1;
@@ -363,6 +367,120 @@ static int hf_radiotap_l_sig_data_2 = -1;
 static int hf_radiotap_l_sig_rate = -1;
 static int hf_radiotap_l_sig_length = -1;
 
+/* S1G */
+static int hf_radiotap_s1g_known = -1;
+static int hf_radiotap_s1g_s1g_ppdu_format_known = -1;
+static int hf_radiotap_s1g_response_indication_known = -1;
+static int hf_radiotap_s1g_guard_interval_known = -1;
+static int hf_radiotap_s1g_nss_known = -1;
+static int hf_radiotap_s1g_bandwidth_known = -1;
+static int hf_radiotap_s1g_mcs_known = -1;
+static int hf_radiotap_s1g_color_known = -1;
+static int hf_radiotap_s1g_uplink_indication_known = -1;
+static int hf_radiotap_s1g_reserved_1 = -1;
+static int hf_radiotap_s1g_data_1 = -1;
+static int hf_radiotap_s1g_s1g_ppdu_format = -1;
+static int hf_radiotap_s1g_response_indication = -1;
+static int hf_radiotap_s1g_reserved_2 = -1;
+static int hf_radiotap_s1g_guard_interval = -1;
+static int hf_radiotap_s1g_nss = -1;
+static int hf_radiotap_s1g_bandwidth = -1;
+static int hf_radiotap_s1g_mcs = -1;
+static int hf_radiotap_s1g_data_2 = -1;
+static int hf_radiotap_s1g_color = -1;
+static int hf_radiotap_s1g_uplink_indication = -1;
+static int hf_radiotap_s1g_rssi = -1;
+static int hf_radiotap_s1g_reserved_3 = -1;
+
+/* S1G NDP */
+static int hf_radiotap_s1g_ndp_bytes = -1;
+static int hf_radiotap_s1g_ndp_ctrl = -1;
+static int hf_radiotap_s1g_ndp_mgmt = -1;
+static int hf_radiotap_s1g_ndp_type_3bit = -1;
+static int hf_radiotap_s1g_ndp_ack_1m = -1;
+static int hf_radiotap_s1g_ndp_ack_1m_ack_id = -1;
+static int hf_radiotap_s1g_ndp_ack_1m_more_data = -1;
+static int hf_radiotap_s1g_ndp_ack_1m_idle_indication = -1;
+static int hf_radiotap_s1g_ndp_ack_1m_duration = -1;
+static int hf_radiotap_s1g_ndp_ack_1m_relayed_frame = -1;
+static int hf_radiotap_s1g_ndp_ack_2m = -1;
+static int hf_radiotap_s1g_ndp_ack_2m_ack_id = -1;
+static int hf_radiotap_s1g_ndp_ack_2m_more_data = -1;
+static int hf_radiotap_s1g_ndp_ack_2m_idle_indication = -1;
+static int hf_radiotap_s1g_ndp_ack_2m_duration = -1;
+static int hf_radiotap_s1g_ndp_ack_2m_relayed_frame = -1;
+static int hf_radiotap_s1g_ndp_ack_2m_reserved = -1;
+static int hf_radiotap_s1g_ndp_cts_1m = -1;
+static int hf_radiotap_s1g_ndp_cts_cf_end_indic = -1;
+static int hf_radiotap_s1g_ndp_cts_address_indic = -1;
+static int hf_radiotap_s1g_ndp_cts_ra_partial_bssid = -1;
+static int hf_radiotap_s1g_ndp_cts_duration_1m = -1;
+static int hf_radiotap_s1g_ndp_cts_duration_2m = -1;
+static int hf_radiotap_s1g_ndp_cts_early_sector_indic_1m = -1;
+static int hf_radiotap_s1g_ndp_cts_2m = -1;
+static int hf_radiotap_s1g_ndp_cts_early_sector_indic_2m = -1;
+static int hf_radiotap_s1g_ndp_cts_bandwidth_indic_2m = -1;
+static int hf_radiotap_s1g_ndp_cts_reserved = -1;
+static int hf_radiotap_s1g_ndp_cf_end_1m = -1;
+static int hf_radiotap_s1g_ndp_cf_end_partial_bssid = -1;
+static int hf_radiotap_s1g_ndp_cf_end_duration_1m = -1;
+static int hf_radiotap_s1g_ndp_cf_end_reserved_1m = -1;
+static int hf_radiotap_s1g_ndp_cf_end_2m = -1;
+static int hf_radiotap_s1g_ndp_cf_end_duration_2m = -1;
+static int hf_radiotap_s1g_ndp_cf_end_reserved_2m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_1m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ra = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ta = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_preferred_mcs_1m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_udi_1m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_2m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_preferred_mcs_2m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_udi_2m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_1m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_id = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_more_data = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_idle_indication = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_duration_1m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_reserved_1m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_2m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_id_2m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_more_data_2m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_idle_indication_2m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_duration_2m = -1;
+static int hf_radiotap_s1g_ndp_ps_poll_ack_reserved_2m = -1;
+static int hf_radiotap_s1g_ndp_block_ack_1m = -1;
+static int hf_radiotap_s1g_ndp_block_ack_id_1m = -1;
+static int hf_radiotap_s1g_ndp_block_ack_starting_sequence_control_1m = -1;
+static int hf_radiotap_s1g_ndp_block_ack_bitmap_1m = -1;
+static int hf_radiotap_s1g_ndp_block_ack_unused_1m = -1;
+static int hf_radiotap_s1g_ndp_block_ack_2m = -1;
+static int hf_radiotap_s1g_ndp_block_ack_id_2m = -1;
+static int hf_radiotap_s1g_ndp_block_ack_starting_sequence_control_2m = -1;
+static int hf_radiotap_s1g_ndp_block_ack_bitmap_2m = -1;
+static int hf_radiotap_s1g_ndp_beamforming_report_poll = -1;
+static int hf_radiotap_s1g_ndp_beamforming_ap_address = -1;
+static int hf_radiotap_s1g_ndp_beamforming_non_ap_sta_address = -1;
+static int hf_radiotap_s1g_ndp_beamforming_feedback_segment_bitmap = -1;
+static int hf_radiotap_s1g_ndp_beamforming_reserved = -1;
+static int hf_radiotap_s1g_ndp_paging_1m = -1;
+static int hf_radiotap_s1g_ndp_paging_p_id = -1;
+static int hf_radiotap_s1g_ndp_paging_apdi_partial_aid = -1;
+static int hf_radiotap_s1g_ndp_paging_direction = -1;
+static int hf_radiotap_s1g_ndp_paging_reserved_1m = -1;
+static int hf_radiotap_s1g_ndp_paging_2m = -1;
+static int hf_radiotap_s1g_ndp_paging_reserved_2m = -1;
+static int hf_radiotap_s1g_ndp_probe_1m = -1;
+static int hf_radiotap_s1g_ndp_probe_cssid_ano_present = -1;
+static int hf_radiotap_s1g_ndp_probe_1m_cssid_ano = -1;
+static int hf_radiotap_s1g_ndp_probe_1m_requested_response_type = -1;
+static int hf_radiotap_s1g_ndp_probe_1m_reserved = -1;
+static int hf_radiotap_s1g_ndp_probe_2m = -1;
+static int hf_radiotap_s1g_ndp_probe_2m_cssid_ano = -1;
+static int hf_radiotap_s1g_ndp_probe_2m_requested_response_type = -1;
+static int hf_radiotap_s1g_ndp_1m_unused = -1;
+static int hf_radiotap_s1g_ndp_2m_unused = -1;
+static int hf_radiotap_s1g_ndp_bw = -1;
+
 static gint ett_radiotap = -1;
 static gint ett_radiotap_tlv = -1;
 static gint ett_radiotap_present = -1;
@@ -398,6 +516,23 @@ static gint ett_radiotap_l_sig = -1;
 static gint ett_radiotap_l_sig_data_1 = -1;
 static gint ett_radiotap_l_sig_data_2 = -1;
 static gint ett_radiotap_unknown_tlv = -1;
+/* S1G */
+static gint ett_radiotap_s1g = -1;
+static gint ett_radiotap_s1g_known = -1;
+static gint ett_radiotap_s1g_data_1 = -1;
+static gint ett_radiotap_s1g_data_2 = -1;
+
+/* S1G NDP */
+static gint ett_s1g_ndp = -1;
+static gint ett_s1g_ndp_ack = -1;
+static gint ett_s1g_ndp_cts = -1;
+static gint ett_s1g_ndp_cf_end = -1;
+static gint ett_s1g_ndp_ps_poll = -1;
+static gint ett_s1g_ndp_ps_poll_ack = -1;
+static gint ett_s1g_ndp_block_ack = -1;
+static gint ett_s1g_ndp_beamforming_report_poll = -1;
+static gint ett_s1g_ndp_paging = -1;
+static gint ett_s1g_ndp_probe = -1;
 
 static expert_field ei_radiotap_invalid_header_length = EI_INIT;
 static expert_field ei_radiotap_data_past_header = EI_INIT;
@@ -737,6 +872,72 @@ static const value_string timestamp_spos[] = {
 	{ 0, NULL }
 };
 
+/* S1G */
+static const value_string s1g_ppdu_format[] = {
+	{ 0, "S1G 1M" },
+	{ 1, "S1G Short" },
+	{ 2, "S1G Long" },
+	{ 0, NULL},
+};
+
+static const value_string s1g_response_indication[] = {
+	{ 0, "No response" },
+	{ 1, "NDP response" },
+	{ 2, "Normal response" },
+	{ 3, "Long response" },
+	{ 0, NULL},
+};
+
+static const value_string s1g_guard_interval[] = {
+	{ 0, "Long GI" },
+	{ 1, "Short GI" },
+	{ 0, NULL},
+};
+
+static const value_string s1g_nss[] = {
+	{ 0, "1" },
+	{ 1, "2" },
+	{ 2, "3" },
+	{ 3, "4" },
+	{ 0, NULL},
+};
+
+static const value_string s1g_bandwidth[] = {
+	{ 0, "1MHz channel" },
+	{ 1, "2MHz channel" },
+	{ 2, "4MHz channel" },
+	{ 3, "8MHz channel" },
+	{ 4, "16MHz channel" },
+	{ 0, NULL},
+};
+
+static const value_string s1g_mcs[] = {
+	{ 0, "0" },
+	{ 1, "1" },
+	{ 2, "2" },
+	{ 3, "3" },
+	{ 4, "4" },
+	{ 5, "5" },
+	{ 6, "6" },
+	{ 7, "7" },
+	{ 8, "8" },
+	{ 9, "9" },
+	{ 10, "10" },
+	{ 0, NULL},
+};
+
+static const value_string s1g_color[] = {
+	{ 0, "0" },
+	{ 1, "1" },
+	{ 2, "2" },
+	{ 3, "3" },
+	{ 4, "4" },
+	{ 5, "5" },
+	{ 6, "6" },
+	{ 7, "7" },
+	{ 0, NULL},
+};
+
 /*
  * The NetBSD ieee80211_radiotap man page
  * (http://netbsd.gw.com/cgi-bin/man-cgi?ieee80211_radiotap+9+NetBSD-current)
@@ -835,6 +1036,19 @@ capture_radiotap(const guchar * pd, int offset, int len, capture_packet_info_t *
 		return call_capture_dissector(ieee80211_datapad_cap_handle, pd, offset + it_len, len, cpinfo, pseudo_header);
 
 	return call_capture_dissector(ieee80211_cap_handle, pd, offset + it_len, len, cpinfo, pseudo_header);
+}
+
+static void
+add_tlv_items(proto_tree *tree, tvbuff_t *tvb, int offset)
+{
+	offset -= 4;
+
+	proto_tree_add_item(tree, hf_radiotap_tlv_type, tvb,
+			    offset, 2, ENC_LITTLE_ENDIAN);
+	offset += 2;
+
+	proto_tree_add_item(tree, hf_radiotap_tlv_datalen, tvb,
+			    offset, 2, ENC_LITTLE_ENDIAN);
 }
 
 static const true_false_string tfs_known_unknown = {
@@ -971,7 +1185,7 @@ static const value_string he_midamble_periodicity_vals[] = {
 
 static void
 dissect_radiotap_he_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
-	int offset, struct ieee_802_11ax *info_11ax)
+	int offset, struct ieee_802_11ax *info_11ax, gboolean is_tlv)
 {
 	guint16 ppdu_format = tvb_get_letohs(tvb, offset) &
 		IEEE80211_RADIOTAP_HE_PPDU_FORMAT_MASK;
@@ -1102,6 +1316,10 @@ dissect_radiotap_he_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 
 	he_info_tree = proto_tree_add_subtree(tree, tvb, offset, 12,
 		ett_radiotap_he_info, NULL, "HE information");
+
+	if (is_tlv) {
+		add_tlv_items(he_info_tree, tvb, offset);
+	}
 
 	/* Add the bitmasks for each of D1 through D6 */
 	proto_tree_add_bitmask(he_info_tree, tvb, offset,
@@ -1251,19 +1469,19 @@ dissect_radiotap_he_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 static void
 not_captured_custom(gchar *result, guint32 value _U_)
 {
-	g_snprintf(result, ITEM_LABEL_LENGTH,
+	snprintf(result, ITEM_LABEL_LENGTH,
 		"NOT CAPTURED BY CAPTURE SOFTWARE");
 }
 
 static void
 he_sig_b_symbols_custom(gchar *result, guint32 value)
 {
-	g_snprintf(result, ITEM_LABEL_LENGTH, "%d", value+1);
+	snprintf(result, ITEM_LABEL_LENGTH, "%d", value+1);
 }
 
 static void
-dissect_radiotap_he_mu_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
-	int offset)
+dissect_radiotap_he_mu_info(tvbuff_t *tvb, packet_info *pinfo _U_,
+		proto_tree *tree, int offset, gboolean is_tlv)
 {
 	proto_tree *he_mu_info_tree = NULL;
 	guint16 flags1 = tvb_get_letohs(tvb, offset);
@@ -1362,6 +1580,11 @@ dissect_radiotap_he_mu_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
 		flags1_headers[5] = &hf_radiotap_he_mu_chan1_rus_unknown;
 	} else {
 		flags1_headers[5] = &hf_radiotap_he_mu_chan1_rus_known;
+	}
+	if (!mu_chan2_rus_known) {
+		flags1_headers[6] = &hf_radiotap_he_mu_chan2_rus_unknown;
+	} else {
+		flags1_headers[6] = &hf_radiotap_he_mu_chan2_rus_known;
 	}
 	if (!mu_chan1_center_26_tone_ru_bit_known) {
 		flags1_headers[8] = &hf_radiotap_he_mu_chan1_center_26_tone_ru_bit_unknown;
@@ -1463,6 +1686,10 @@ dissect_radiotap_he_mu_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
 	he_mu_info_tree = proto_tree_add_subtree(tree, tvb, offset, 12,
 		ett_radiotap_he_mu_info, NULL, "HE-MU information");
 
+	if (is_tlv) {
+		add_tlv_items(he_mu_info_tree, tvb, offset);
+	}
+
 	proto_tree_add_bitmask(he_mu_info_tree, tvb, offset,
 				hf_radiotap_he_mu_info_flags_1,
 				ett_radiotap_he_mu_info_flags_1,
@@ -1517,10 +1744,15 @@ dissect_radiotap_he_mu_info(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *t
 
 static const range_string zero_length_psdu_rsvals[] = {
 	{ 0, 0, "sounding PPDU" },
-	{ 1, 254, "reserved" },
+	{ 1, 1, "reserved" },
+	{ 2, 2, "S1G NDP CMAC frame" },
+	{ 3, 254, "reserved" },
 	{ 255, 255, "vendor-specific" },
 	{ 0, 0, NULL }
 };
+
+static int
+dissect_s1g_ndp(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree);
 
 static void
 dissect_radiotap_0_length_psdu(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
@@ -1528,12 +1760,16 @@ dissect_radiotap_0_length_psdu(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
 {
 	proto_tree *zero_len_tree = NULL;
 	guint32 psdu_type;
+	tvbuff_t *new_tvb = NULL;
 
-	zero_len_tree = proto_tree_add_subtree(tree, tvb, offset, 1,
+	zero_len_tree = proto_tree_add_subtree(tree, tvb, offset,
+		tvb_captured_length_remaining(tvb, offset),
 		ett_radiotap_0_length_psdu, NULL, "0-length PSDU");
 
 	proto_tree_add_item_ret_uint(zero_len_tree, hf_radiotap_0_length_psdu_type,
 		tvb, offset, 1, ENC_NA, &psdu_type);
+	offset += 1;
+
 	switch (psdu_type) {
 
 	case 0:
@@ -1544,6 +1780,13 @@ dissect_radiotap_0_length_psdu(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree
 	case 1:
 		phdr->has_zero_length_psdu_type = TRUE;
 		phdr->zero_length_psdu_type = PHDR_802_11_DATA_NOT_CAPTURED;
+		break;
+
+	case 2:
+		phdr->has_zero_length_psdu_type = TRUE;
+		phdr->zero_length_psdu_type = PHDR_802_11_0_LENGTH_PSDU_S1G_NDP;
+		new_tvb = tvb_new_subset_length(tvb, offset, 6);
+		dissect_s1g_ndp(new_tvb, pinfo, zero_len_tree);
 		break;
 
 	case 0xff:
@@ -1585,34 +1828,451 @@ dissect_radiotap_l_sig(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 		l_sig_data2_headers, ENC_LITTLE_ENDIAN);
 }
 
-static void
-dissect_radiotap_tlv(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
-        int offset, struct ieee_802_11_phdr *phdr _U_)
+/*
+ * Dissect an S1G NDP as it is currently. This is a 6-byte field, with the
+ * first byte looking like the first byte of the FCF, and coded using
+ * reserved values for the subtype. The remaining bytes are the NDP data,
+ * with the last two bits distinguishing between 1M and 2M.
+ */
+
+#define S1G_NDP_CTS_CF_END              0x00
+#define S1G_NDP_PS_POLL                 0x01
+#define S1G_NDP_ACK                     0x02
+#define S1G_NDP_PS_POLL_ACK             0x03
+#define S1G_NDP_BLOCK_ACK               0x04
+#define S1G_NDP_BEAMFORMING_REPORT_POLL 0x05
+#define S1G_NDP_PAGING                  0x06
+#define S1G_NDP_PROBE_REQ               0x07
+
+static int * const ndp_ack_1m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_ack_1m_ack_id,
+  &hf_radiotap_s1g_ndp_ack_1m_more_data,
+  &hf_radiotap_s1g_ndp_ack_1m_idle_indication,
+  &hf_radiotap_s1g_ndp_ack_1m_duration,
+  &hf_radiotap_s1g_ndp_ack_1m_relayed_frame,
+  &hf_radiotap_s1g_ndp_1m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_ack_2m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_ack_2m_ack_id,
+  &hf_radiotap_s1g_ndp_ack_2m_more_data,
+  &hf_radiotap_s1g_ndp_ack_2m_idle_indication,
+  &hf_radiotap_s1g_ndp_ack_2m_duration,
+  &hf_radiotap_s1g_ndp_ack_2m_relayed_frame,
+  &hf_radiotap_s1g_ndp_ack_2m_reserved,
+  &hf_radiotap_s1g_ndp_2m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_probe_1m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_probe_cssid_ano_present,
+  &hf_radiotap_s1g_ndp_probe_1m_cssid_ano,
+  &hf_radiotap_s1g_ndp_probe_1m_requested_response_type,
+  &hf_radiotap_s1g_ndp_probe_1m_reserved,
+  &hf_radiotap_s1g_ndp_1m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_probe_2m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_probe_cssid_ano_present,
+  &hf_radiotap_s1g_ndp_probe_2m_cssid_ano,
+  &hf_radiotap_s1g_ndp_probe_2m_requested_response_type,
+  &hf_radiotap_s1g_ndp_2m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_cts_1m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_cts_cf_end_indic,
+  &hf_radiotap_s1g_ndp_cts_address_indic,
+  &hf_radiotap_s1g_ndp_cts_ra_partial_bssid,
+  &hf_radiotap_s1g_ndp_cts_duration_1m,
+  &hf_radiotap_s1g_ndp_cts_early_sector_indic_1m,
+  &hf_radiotap_s1g_ndp_1m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_cts_2m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_cts_cf_end_indic,
+  &hf_radiotap_s1g_ndp_cts_address_indic,
+  &hf_radiotap_s1g_ndp_cts_ra_partial_bssid,
+  &hf_radiotap_s1g_ndp_cts_duration_2m,
+  &hf_radiotap_s1g_ndp_cts_early_sector_indic_2m,
+  &hf_radiotap_s1g_ndp_cts_bandwidth_indic_2m,
+  &hf_radiotap_s1g_ndp_cts_reserved,
+  &hf_radiotap_s1g_ndp_2m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_cf_end_1m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_cts_cf_end_indic,
+  &hf_radiotap_s1g_ndp_cf_end_partial_bssid,
+  &hf_radiotap_s1g_ndp_cf_end_duration_1m,
+  &hf_radiotap_s1g_ndp_cf_end_reserved_1m,
+  &hf_radiotap_s1g_ndp_1m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_cf_end_2m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_cts_cf_end_indic,
+  &hf_radiotap_s1g_ndp_cf_end_partial_bssid,
+  &hf_radiotap_s1g_ndp_cf_end_duration_2m,
+  &hf_radiotap_s1g_ndp_cf_end_reserved_2m,
+  &hf_radiotap_s1g_ndp_1m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_ps_poll_1m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_ps_poll_ra,
+  &hf_radiotap_s1g_ndp_ps_poll_ta,
+  &hf_radiotap_s1g_ndp_ps_poll_preferred_mcs_1m,
+  &hf_radiotap_s1g_ndp_ps_poll_udi_1m,
+  &hf_radiotap_s1g_ndp_1m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_ps_poll_2m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_ps_poll_ra,
+  &hf_radiotap_s1g_ndp_ps_poll_ta,
+  &hf_radiotap_s1g_ndp_ps_poll_preferred_mcs_2m,
+  &hf_radiotap_s1g_ndp_ps_poll_udi_2m,
+  &hf_radiotap_s1g_ndp_2m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_ps_poll_ack_1m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_id,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_more_data,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_idle_indication,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_duration_1m,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_reserved_1m,
+  &hf_radiotap_s1g_ndp_1m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_ps_poll_ack_2m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_id_2m,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_more_data_2m,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_idle_indication_2m,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_duration_2m,
+  &hf_radiotap_s1g_ndp_ps_poll_ack_reserved_2m,
+  &hf_radiotap_s1g_ndp_2m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_block_ack_1m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_block_ack_id_1m,
+  &hf_radiotap_s1g_ndp_block_ack_starting_sequence_control_1m,
+  &hf_radiotap_s1g_ndp_block_ack_bitmap_1m,
+  &hf_radiotap_s1g_ndp_block_ack_unused_1m,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_block_ack_2m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_block_ack_id_2m,
+  &hf_radiotap_s1g_ndp_block_ack_starting_sequence_control_2m,
+  &hf_radiotap_s1g_ndp_block_ack_bitmap_2m,
+  &hf_radiotap_s1g_ndp_2m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_beamforming_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_beamforming_ap_address,
+  &hf_radiotap_s1g_ndp_beamforming_non_ap_sta_address,
+  &hf_radiotap_s1g_ndp_beamforming_feedback_segment_bitmap,
+  &hf_radiotap_s1g_ndp_beamforming_reserved,
+  &hf_radiotap_s1g_ndp_2m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_paging_1m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_paging_p_id,
+  &hf_radiotap_s1g_ndp_paging_apdi_partial_aid,
+  &hf_radiotap_s1g_ndp_paging_direction,
+  &hf_radiotap_s1g_ndp_paging_reserved_1m,
+  &hf_radiotap_s1g_ndp_1m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int * const ndp_paging_2m_headers[] = {
+  &hf_radiotap_s1g_ndp_type_3bit,
+  &hf_radiotap_s1g_ndp_paging_p_id,
+  &hf_radiotap_s1g_ndp_paging_apdi_partial_aid,
+  &hf_radiotap_s1g_ndp_paging_direction,
+  &hf_radiotap_s1g_ndp_paging_reserved_2m,
+  &hf_radiotap_s1g_ndp_2m_unused,
+  &hf_radiotap_s1g_ndp_bw,
+  NULL
+};
+
+static int
+dissect_s1g_ndp(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 {
-	guint16 type = tvb_get_letohs(tvb, offset);
-	guint16 length = tvb_get_letohs(tvb, offset + 2);
-	proto_tree *unknown_tlv = NULL;
+  proto_tree *ndp_tree = NULL;
+  proto_item *ndp_item = NULL;
+  int offset = 0;
+  guint8 ndp_type = tvb_get_guint8(tvb, 1);
+  guint8 ndp_bw = tvb_get_guint8(tvb, 5) >> 7;
 
-	/* Insert code here to call the dissector for your TLV type */
-	switch (type) {
+  ndp_tree = proto_tree_add_subtree(tree, tvb, offset, 6, ett_s1g_ndp,
+                                    &ndp_item, "S1G NDP");
 
-	default:
-		unknown_tlv = proto_tree_add_subtree(tree, tvb, offset,
-						    length + 4,
-						    ett_radiotap_unknown_tlv,
-						    NULL, "Unknown TLV");
-		proto_tree_add_item(unknown_tlv, hf_radiotap_tlv_type, tvb,
-				    offset, 2, ENC_LITTLE_ENDIAN);
-		offset += 2;
+  switch (ndp_type & 0x07) {
+  case S1G_NDP_PROBE_REQ:
+    proto_tree_add_item(ndp_tree, hf_radiotap_s1g_ndp_mgmt, tvb, offset, 1,
+                        ENC_NA);
+    break;
 
-		proto_tree_add_item(unknown_tlv, hf_radiotap_tlv_datalen, tvb,
-				    offset, 2, ENC_LITTLE_ENDIAN);
-		offset += 2;
+  default:
+    proto_tree_add_item(ndp_tree, hf_radiotap_s1g_ndp_ctrl, tvb, offset, 1,
+                        ENC_NA);
+  }
+  offset += 1;
 
-		proto_tree_add_item(unknown_tlv, hf_radiotap_unknown_tlv_data,
-				    tvb, offset, length, ENC_NA);
-		break;
-	}
+  col_append_str(pinfo->cinfo, COL_INFO, ", S1G");
+
+  switch (ndp_type & 0x07) {
+  case S1G_NDP_CTS_CF_END: /* This uses an extra bit to distinguish */
+    if (ndp_type & 0x8) { /* NDP CF-END */
+      proto_item_append_text(ndp_item, " CF-End");
+      if (ndp_bw == 0) {
+        col_append_str(pinfo->cinfo, COL_INFO, " CF-End 1MHz");
+        proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                               hf_radiotap_s1g_ndp_cf_end_1m,
+                               ett_s1g_ndp_cf_end, ndp_cf_end_1m_headers,
+                               ENC_LITTLE_ENDIAN);
+      } else {
+        col_append_str(pinfo->cinfo, COL_INFO, " CF-End 2MHz");
+        proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                               hf_radiotap_s1g_ndp_cf_end_2m,
+                               ett_s1g_ndp_cf_end, ndp_cf_end_2m_headers,
+                               ENC_LITTLE_ENDIAN);
+      }
+    } else {               /* NDP CTS */
+      proto_item_append_text(ndp_item, " CTS");
+      if (ndp_bw == 0) {
+        col_append_str(pinfo->cinfo, COL_INFO, " CTS 1MHz");
+        proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                               hf_radiotap_s1g_ndp_cts_1m,
+                               ett_s1g_ndp_cts, ndp_cts_1m_headers,
+                               ENC_LITTLE_ENDIAN);
+      } else {
+        col_append_str(pinfo->cinfo, COL_INFO, " CTS 2MHz");
+        proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                               hf_radiotap_s1g_ndp_cts_2m,
+                               ett_s1g_ndp_cts, ndp_cts_2m_headers,
+                               ENC_LITTLE_ENDIAN);
+      }
+    }
+    break;
+
+  case S1G_NDP_PS_POLL:
+    proto_item_append_text(ndp_item, " PS-Poll");
+    if (ndp_bw == 0) {
+      col_append_str(pinfo->cinfo, COL_INFO, " PS-Poll 1MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_ps_poll_1m,
+                             ett_s1g_ndp_ps_poll, ndp_ps_poll_1m_headers,
+                             ENC_LITTLE_ENDIAN);
+    } else {
+      col_append_str(pinfo->cinfo, COL_INFO, " PS-Poll 2MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_ps_poll_2m,
+                             ett_s1g_ndp_ps_poll, ndp_ps_poll_2m_headers,
+                             ENC_LITTLE_ENDIAN);
+    }
+    break;
+
+  case S1G_NDP_ACK:
+    proto_item_append_text(ndp_item, " Ack");
+    if (ndp_bw == 0) {
+      col_append_str(pinfo->cinfo, COL_INFO, " ACK 1MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_ack_1m,
+                             ett_s1g_ndp_ack, ndp_ack_1m_headers,
+                             ENC_LITTLE_ENDIAN);
+    } else {
+      col_append_str(pinfo->cinfo, COL_INFO, " ACK 2MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_ack_2m,
+                             ett_s1g_ndp_ack, ndp_ack_2m_headers,
+                             ENC_LITTLE_ENDIAN);
+    }
+    break;
+
+  case S1G_NDP_PS_POLL_ACK:
+    proto_item_append_text(ndp_item, " PS-Poll-Ack");
+    if (ndp_bw == 0) {
+      col_append_str(pinfo->cinfo, COL_INFO, " PS-Poll-Ack 1MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_ps_poll_ack_1m,
+                             ett_s1g_ndp_ps_poll_ack, ndp_ps_poll_ack_1m_headers,
+                             ENC_LITTLE_ENDIAN);
+    } else {
+      col_append_str(pinfo->cinfo, COL_INFO, " PS-Poll-Ack 2MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_ps_poll_ack_2m,
+                             ett_s1g_ndp_ps_poll_ack, ndp_ps_poll_ack_2m_headers,
+                             ENC_LITTLE_ENDIAN);
+    }
+    break;
+
+  case S1G_NDP_BLOCK_ACK:
+    proto_item_append_text(ndp_item, " BlockAck");
+    if (ndp_bw == 0) {
+      col_append_str(pinfo->cinfo, COL_INFO, " BlockAck 1MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_block_ack_1m,
+                             ett_s1g_ndp_block_ack, ndp_block_ack_1m_headers,
+                             ENC_LITTLE_ENDIAN);
+    } else {
+      col_append_str(pinfo->cinfo, COL_INFO, " BlockAck 2MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_block_ack_2m,
+                             ett_s1g_ndp_block_ack, ndp_block_ack_2m_headers,
+                             ENC_LITTLE_ENDIAN);
+    }
+    break;
+
+  case S1G_NDP_BEAMFORMING_REPORT_POLL:
+    proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                           hf_radiotap_s1g_ndp_beamforming_report_poll,
+                           ett_s1g_ndp_beamforming_report_poll, ndp_beamforming_headers,
+                           ENC_LITTLE_ENDIAN);
+    break;
+
+  case S1G_NDP_PAGING:
+    proto_item_append_text(ndp_item, " NDP Paging");
+    if (ndp_bw == 0) {
+      col_append_str(pinfo->cinfo, COL_INFO, " NDP Paging 1MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_paging_1m,
+                             ett_s1g_ndp_paging, ndp_paging_1m_headers,
+                             ENC_LITTLE_ENDIAN);
+    } else {
+      col_append_str(pinfo->cinfo, COL_INFO, " NDP Paging 2MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_paging_2m,
+                             ett_s1g_ndp_paging, ndp_paging_2m_headers,
+                             ENC_LITTLE_ENDIAN);
+    }
+    break;
+
+  case S1G_NDP_PROBE_REQ:
+    proto_item_append_text(ndp_item, " Probe Request");
+    if (ndp_bw == 0) {
+      col_append_str(pinfo->cinfo, COL_INFO, " Probe Request 1MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_probe_1m,
+                             ett_s1g_ndp_probe, ndp_probe_1m_headers,
+                             ENC_LITTLE_ENDIAN);
+    } else {
+      col_append_str(pinfo->cinfo, COL_INFO, " Probe Request 2MHz");
+      proto_tree_add_bitmask(ndp_tree, tvb, offset,
+                             hf_radiotap_s1g_ndp_probe_2m,
+                             ett_s1g_ndp_probe, ndp_probe_2m_headers,
+                             ENC_LITTLE_ENDIAN);
+    }
+    break;
+  default:
+    proto_item_append_text(ndp_item, ", Unknown NDP type");
+    col_append_str(pinfo->cinfo, COL_INFO, " Unknown NDP type");
+    proto_tree_add_item(ndp_tree, hf_radiotap_s1g_ndp_bytes, tvb, offset,
+                        5, ENC_NA);
+  }
+
+  return tvb_captured_length(tvb);
+}
+
+static int * const s1g_known_headers[] = {
+	&hf_radiotap_s1g_s1g_ppdu_format_known,
+	&hf_radiotap_s1g_response_indication_known,
+	&hf_radiotap_s1g_guard_interval_known,
+	&hf_radiotap_s1g_nss_known,
+	&hf_radiotap_s1g_bandwidth_known,
+	&hf_radiotap_s1g_mcs_known,
+	&hf_radiotap_s1g_color_known,
+	&hf_radiotap_s1g_uplink_indication_known,
+	&hf_radiotap_s1g_reserved_1,
+	NULL
+};
+
+static int * const s1g_data1_headers[] = {
+	&hf_radiotap_s1g_s1g_ppdu_format,
+	&hf_radiotap_s1g_response_indication,
+	&hf_radiotap_s1g_reserved_2,
+	&hf_radiotap_s1g_guard_interval,
+	&hf_radiotap_s1g_nss,
+	&hf_radiotap_s1g_bandwidth,
+	&hf_radiotap_s1g_mcs,
+	NULL
+};
+
+static int * const s1g_data2_headers[] = {
+	&hf_radiotap_s1g_color,
+	&hf_radiotap_s1g_uplink_indication,
+	&hf_radiotap_s1g_reserved_3,
+	&hf_radiotap_s1g_rssi,
+	NULL
+};
+
+static void
+dissect_radiotap_s1g(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
+        int offset, struct ieee_802_11_phdr *phdr, gboolean is_tlv _U_)
+{
+	proto_tree *s1g_tree = NULL;
+
+	phdr->phy = PHDR_802_11_PHY_11AH;
+	s1g_tree = proto_tree_add_subtree(tree, tvb, offset, 6,
+					  ett_radiotap_s1g, NULL, "S1G");
+
+	add_tlv_items(s1g_tree, tvb, offset);
+
+	proto_tree_add_bitmask(s1g_tree, tvb, offset,
+			hf_radiotap_s1g_known, ett_radiotap_s1g_known,
+			s1g_known_headers, ENC_LITTLE_ENDIAN);
+	offset += 2;
+
+	proto_tree_add_bitmask(s1g_tree, tvb, offset,
+			hf_radiotap_s1g_data_1, ett_radiotap_s1g_data_1,
+			s1g_data1_headers, ENC_LITTLE_ENDIAN);
+	offset += 2;
+
+	proto_tree_add_bitmask(s1g_tree, tvb, offset,
+			hf_radiotap_s1g_data_2, ett_radiotap_s1g_data_2,
+			s1g_data2_headers, ENC_LITTLE_ENDIAN);
 }
 
 static void
@@ -1725,8 +2385,7 @@ dissect_radiotap_rate(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
 
 static void
 dissect_radiotap_channel(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
-	int offset, guint8 rflags, gboolean have_rflags,
-	struct ieee_802_11_phdr *phdr)
+	int offset, struct ieee_802_11_phdr *phdr)
 {
 	guint32     freq;
 	guint16     cflags;
@@ -1767,30 +2426,22 @@ dissect_radiotap_channel(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 
 	case IEEE80211_CHAN_B:
 		phdr->phy = PHDR_802_11_PHY_11B;
-		if (have_rflags) {
-			phdr->phy_info.info_11b.has_short_preamble = TRUE;
-			phdr->phy_info.info_11b.short_preamble = (rflags & IEEE80211_RADIOTAP_F_SHORTPRE) != 0;
-		}
 		break;
 
 	case IEEE80211_CHAN_PUREG:
-		phdr->phy = PHDR_802_11_PHY_11G;
-		phdr->phy_info.info_11g.has_mode = TRUE;
-		phdr->phy_info.info_11g.mode = PHDR_802_11G_MODE_NORMAL;
-		if (have_rflags) {
-			phdr->phy_info.info_11g.has_short_preamble = TRUE;
-			phdr->phy_info.info_11g.short_preamble = (rflags & IEEE80211_RADIOTAP_F_SHORTPRE) != 0;
-		}
-		break;
-
 	case IEEE80211_CHAN_G:
+		/*
+		 * One of those means, in theory, that there should
+		 * only be ERP-OFDM traffic, and the other means that
+		 * there could be both ERP-DSSS and ERP-OFDM traffic.
+		 *
+		 * For now, we treat it as 11g; later, we'll check
+		 * the rate and, if it's a DSSS rate, mark it as 11b,
+		 * instead.
+		 */
 		phdr->phy = PHDR_802_11_PHY_11G;
 		phdr->phy_info.info_11g.has_mode = TRUE;
 		phdr->phy_info.info_11g.mode = PHDR_802_11G_MODE_NORMAL;
-		if (have_rflags) {
-			phdr->phy_info.info_11g.has_short_preamble = TRUE;
-			phdr->phy_info.info_11g.short_preamble = (rflags & IEEE80211_RADIOTAP_F_SHORTPRE) != 0;
-		}
 		break;
 
 	case IEEE80211_CHAN_108A:
@@ -1804,10 +2455,6 @@ dissect_radiotap_channel(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 		phdr->phy = PHDR_802_11_PHY_11G;
 		phdr->phy_info.info_11g.has_mode = TRUE;
 		phdr->phy_info.info_11g.mode = PHDR_802_11G_MODE_SUPER_G;
-		if (have_rflags) {
-			phdr->phy_info.info_11g.has_short_preamble = TRUE;
-			phdr->phy_info.info_11g.short_preamble = (rflags & IEEE80211_RADIOTAP_F_SHORTPRE) != 0;
-		}
 		break;
 	}
 
@@ -1822,6 +2469,9 @@ dissect_radiotap_channel(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
 	if (tree) {
 		gchar	   *chan_str;
 		static int * const channel_flags[] = {
+			&hf_radiotap_channel_flags_700mhz,
+			&hf_radiotap_channel_flags_800mhz,
+			&hf_radiotap_channel_flags_900mhz,
 			&hf_radiotap_channel_flags_turbo,
 			&hf_radiotap_channel_flags_cck,
 			&hf_radiotap_channel_flags_ofdm,
@@ -1975,8 +2625,7 @@ dissect_radiotap_tx_flags(tvbuff_t *tvb, packet_info *pinfo _U_,
 
 static void
 dissect_radiotap_xchannel(tvbuff_t *tvb, packet_info *pinfo _U_,
-	proto_tree *tree, int offset, guint8 rflags, gboolean have_rflags,
-	struct ieee_802_11_phdr *phdr)
+	proto_tree *tree, int offset, struct ieee_802_11_phdr *phdr)
 {
 	guint32     xcflags = tvb_get_letohl(tvb, offset);
 	guint32     freq;
@@ -1984,13 +2633,7 @@ dissect_radiotap_xchannel(tvbuff_t *tvb, packet_info *pinfo _U_,
 	switch (xcflags & IEEE80211_CHAN_ALLTURBO) {
 
 	case IEEE80211_CHAN_FHSS:
-		/*
-		 * Don't overwrite any FHSS information
-		 * we've seen before this.
-		 */
-		if (phdr->phy != PHDR_802_11_PHY_11_FHSS) {
-			phdr->phy = PHDR_802_11_PHY_11_FHSS;
-		}
+		phdr->phy = PHDR_802_11_PHY_11_FHSS;
 		break;
 
 	case IEEE80211_CHAN_DSSS:
@@ -2005,30 +2648,13 @@ dissect_radiotap_xchannel(tvbuff_t *tvb, packet_info *pinfo _U_,
 
 	case IEEE80211_CHAN_B:
 		phdr->phy = PHDR_802_11_PHY_11B;
-		if (have_rflags) {
-			phdr->phy_info.info_11b.has_short_preamble = TRUE;
-			phdr->phy_info.info_11b.short_preamble = (rflags & IEEE80211_RADIOTAP_F_SHORTPRE) != 0;
-		}
 		break;
 
 	case IEEE80211_CHAN_PUREG:
-		phdr->phy = PHDR_802_11_PHY_11G;
-		phdr->phy_info.info_11g.has_mode = TRUE;
-		phdr->phy_info.info_11g.mode = PHDR_802_11G_MODE_NORMAL;
-		if (have_rflags) {
-			phdr->phy_info.info_11g.has_short_preamble = TRUE;
-			phdr->phy_info.info_11g.short_preamble = (rflags & IEEE80211_RADIOTAP_F_SHORTPRE) != 0;
-		}
-		break;
-
 	case IEEE80211_CHAN_G:
 		phdr->phy = PHDR_802_11_PHY_11G;
 		phdr->phy_info.info_11g.has_mode = TRUE;
 		phdr->phy_info.info_11g.mode = PHDR_802_11G_MODE_NORMAL;
-		if (have_rflags) {
-			phdr->phy_info.info_11g.has_short_preamble = TRUE;
-			phdr->phy_info.info_11g.short_preamble = (rflags & IEEE80211_RADIOTAP_F_SHORTPRE) != 0;
-		}
 		break;
 
 	case IEEE80211_CHAN_108A:
@@ -2042,10 +2668,6 @@ dissect_radiotap_xchannel(tvbuff_t *tvb, packet_info *pinfo _U_,
 		phdr->phy = PHDR_802_11_PHY_11G;
 		phdr->phy_info.info_11g.has_mode = TRUE;
 		phdr->phy_info.info_11g.mode = PHDR_802_11G_MODE_SUPER_G;
-		if (have_rflags) {
-			phdr->phy_info.info_11g.has_short_preamble = TRUE;
-			phdr->phy_info.info_11g.short_preamble = (rflags & IEEE80211_RADIOTAP_F_SHORTPRE) != 0;
-		}
 		break;
 
 	case IEEE80211_CHAN_ST:
@@ -2061,21 +2683,6 @@ dissect_radiotap_xchannel(tvbuff_t *tvb, packet_info *pinfo _U_,
 	case IEEE80211_CHAN_G|IEEE80211_CHAN_HT40U:
 	case IEEE80211_CHAN_G|IEEE80211_CHAN_HT40D:
 		phdr->phy = PHDR_802_11_PHY_11N;
-
-		/*
-		 * This doesn't supply "short GI" information,
-		 * so use the 0x80 bit in the Flags field,
-		 * if we have it; it's "Currently unspecified
-		 * but used" for that purpose, according to
-		 * the radiotap.org page for that field.
-		 */
-		if (have_rflags) {
-			phdr->phy_info.info_11n.has_short_gi = TRUE;
-			if (rflags & 0x80)
-				phdr->phy_info.info_11n.short_gi = 1;
-			else
-				phdr->phy_info.info_11n.short_gi = 0;
-		}
 		break;
 	}
 	freq = tvb_get_letohs(tvb, offset + 4);
@@ -2254,7 +2861,7 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* u
 		return tvb_captured_length(tvb);
 	}
 
-	data = tvb_memdup(wmem_packet_scope(), tvb, 0, length);
+	data = tvb_memdup(pinfo->pool, tvb, 0, length);
 
 	if (ieee80211_radiotap_iterator_init(&iter, (struct ieee80211_radiotap_header *)data, length, NULL)) {
 		if (tree)
@@ -2379,6 +2986,9 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* u
 					    hf_radiotap_present_txflags, tvb,
 					    offset + 4, 4, ENC_LITTLE_ENDIAN);
 			proto_tree_add_item(present_word_tree,
+					    hf_radiotap_present_data_retries, tvb,
+					    offset + 4, 4, ENC_LITTLE_ENDIAN);
+			proto_tree_add_item(present_word_tree,
 					    hf_radiotap_present_xchannel, tvb,
 					    offset + 4, 4, ENC_LITTLE_ENDIAN);
 
@@ -2429,18 +3039,8 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* u
 
 		offset = (int)((guchar *) iter.this_arg - (guchar *) data);
 
-		if (iter.tlv_mode) {
-
-			offset -= sizeof(struct ieee80211_radiotap_tlv);
-
-			dissect_radiotap_tlv(tvb, pinfo, radiotap_tree, offset,
-					     &phdr);
-
-			continue;
-		}
-
 		if (iter.this_arg_index == IEEE80211_RADIOTAP_VENDOR_NAMESPACE
-		    && tree) {
+		    && tree && !iter.tlv_mode) {
 			proto_tree *ven_tree;
 			proto_item *vt;
 			const gchar *manuf_name;
@@ -2506,7 +3106,7 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* u
 
 		case IEEE80211_RADIOTAP_CHANNEL:
 			dissect_radiotap_channel(tvb, pinfo, item_tree, offset,
-					rflags, have_rflags, &phdr);
+					&phdr);
 			break;
 
 		case IEEE80211_RADIOTAP_FHSS:
@@ -2575,10 +3175,15 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* u
 						offset);
 			break;
 
+		case IEEE80211_RADIOTAP_DATA_RETRIES:
+			proto_tree_add_item(item_tree,
+				hf_radiotap_data_retries, tvb,
+				offset, 1, ENC_LITTLE_ENDIAN);
+			break;
+
 		case IEEE80211_RADIOTAP_XCHANNEL:
 			dissect_radiotap_xchannel(tvb, pinfo, item_tree,
-						offset, rflags, have_rflags,
-						&phdr);
+						offset, &phdr);
 			break;
 
 		case IEEE80211_RADIOTAP_MCS: {
@@ -2821,7 +3426,7 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* u
 						tvb, offset, 12, ENC_NA);
 				vht_tree = proto_item_add_subtree(it_root, ett_radiotap_vht);
 				it = proto_tree_add_item(vht_tree, hf_radiotap_vht_known,
-						tvb, offset, 2, known);
+						tvb, offset, 2, ENC_NA);
 				vht_known_tree = proto_item_add_subtree(it, ett_radiotap_vht_known);
 
 				proto_tree_add_item(vht_known_tree, hf_radiotap_vht_have_stbc,
@@ -3020,10 +3625,13 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* u
 			 * without this field.
 			 */
 			phdr.phy = PHDR_802_11_PHY_11AX;
-			dissect_radiotap_he_info(tvb, pinfo, radiotap_tree, offset, &phdr.phy_info.info_11ax);
+			dissect_radiotap_he_info(tvb, pinfo, radiotap_tree,
+					offset, &phdr.phy_info.info_11ax,
+					iter.tlv_mode);
 			break;
 		case IEEE80211_RADIOTAP_HE_MU:
-			dissect_radiotap_he_mu_info(tvb, pinfo, item_tree, offset);
+			dissect_radiotap_he_mu_info(tvb, pinfo, item_tree,
+					offset, iter.tlv_mode);
 			break;
 		case IEEE80211_RADIOTAP_0_LENGTH_PSDU:
 			dissect_radiotap_0_length_psdu(tvb, pinfo, item_tree, offset, &phdr);
@@ -3035,9 +3643,38 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* u
 		case IEEE80211_RADIOTAP_TLVS:
 			/* used for padding */
 			break;
+		case IEEE80211_RADIOTAP_TLV_S1G:
+			dissect_radiotap_s1g(tvb, pinfo, item_tree, offset,
+					     &phdr, iter.tlv_mode);
+			break;
 		default:
-			proto_tree_add_item(item_tree, hf_radiotap_unknown_tlv_data, tvb,
-					    offset, iter.this_arg_size, ENC_NA);
+			if (iter.tlv_mode) {
+				proto_tree *unknown_tlv;
+
+				unknown_tlv = proto_tree_add_subtree(tree, tvb,
+						offset,
+						length + 4,
+						ett_radiotap_unknown_tlv,
+						NULL, "Unknown TLV");
+				proto_tree_add_item(unknown_tlv,
+						hf_radiotap_tlv_type, tvb,
+						offset, 2, ENC_LITTLE_ENDIAN);
+				offset += 2;
+
+				proto_tree_add_item(unknown_tlv,
+						hf_radiotap_tlv_datalen, tvb,
+						offset, 2, ENC_LITTLE_ENDIAN);
+				offset += 2;
+
+				proto_tree_add_item(unknown_tlv,
+						hf_radiotap_unknown_tlv_data,
+						tvb, offset, length, ENC_NA);
+			} else {
+				proto_tree_add_item(item_tree,
+						hf_radiotap_unknown_tlv_data,
+						tvb, offset,
+						iter.this_arg_size, ENC_NA);
+			}
 			break;
 		}
 	}
@@ -3057,6 +3694,147 @@ dissect_radiotap(tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* u
 	}
 
  hand_off_to_80211:
+	/*
+	 * The comment in the radiotap.org page about the suggested
+	 * xchannel field says:
+	 *
+	 *  As used, this field conflates channel properties (which
+	 *  need not be stored per packet but are more or less fixed)
+	 *  with packet properties (like the modulation).
+	 *
+	 * The channel field, in practice, seems to be used, in some
+	 * cases, to indicate channel properties (from which the packet
+	 * modulation cannot be inferred) and, in other cases, to
+	 * indicate the packet's modulation.
+	 *
+	 * There is even a capture in which the channel field indicates
+	 * that the channel is an OFDM channel with a center frequency
+	 * of 2452 MHz, and the data rate field indicates a 1 Mb/s rate,
+	 * which means you can't rely on the CCK/OFDM/dynamic CCK/OFDM
+	 * bits in the channel field to indicate anything. (There are
+	 * also captures in which a 1 Mb/s packet has the CCK flag set,
+	 * so it clearly doesn't indicate how the packet was transmitted.)
+	 *
+	 * That makes the channel field unusable either for determining
+	 * the channel type or for determining the packet modulation,
+	 * as it cannot be determined how it's being used.  The xchannel
+	 * field might well be used inconsistently as well.
+	 *
+	 * Fortunately, there are other ways to determine the packet
+	 * modulation:
+	 *
+	 *  if there's an FHSS flag, the packet was transmitted
+	 *  using the 802.11 legacy FHSS modulation;
+	 *
+	 *  otherwise:
+	 *
+	 *    if there's an HE field, the packet was transmitted
+	 *    using one of the 11ax HE PHY's specified modulations;
+	 *
+	 *    otherwise, if there's a VHT field, the packet was
+	 *    transmitted using one of the 11ac VHT PHY's specified
+	 *    modulations;
+	 *
+	 *    otherwise, if there's an MCS field, the packet was
+	 *    transmitted using one of the 11n HT PHY's specified
+	 *    modulations;
+	 *
+	 *    otherwise:
+	 *
+	 *      if the data rate is 1 Mb/s or 2 Mb/s, the packet was
+	 *      transmitted using the 802.11 legacy DSSS modulation
+	 *      (we ignore the IR PHY - was it ever implemented?);
+	 *
+	 *      if the data rate is 5 Mb/s or 11 Mb/s, the packet
+	 *      was transmitted using the 802.11b DSSS/CCK modulation
+	 *      (or the now-obsolete DSSS/PBCC modulation; *if* we can
+	 *      rely on the channel/xchannel field's "CCK channel" and
+	 *      "Dynamic CCK-OFDM channel" flags, the absence of either
+	 *      flag would presumably indicate DSSS/PBCC);
+	 *
+	 *      if the data rate is 22 Mb/s or 33 Mb/s, the packet was
+	 *      transmitted using the 802.11b DSSS/PBCC modulation (as
+	 *      those speeds aren't supported by DSSS/CCK);
+	 *
+	 *      if the data rate is one of the OFDM rates for the 11a
+	 *      OFDM PHY and the OFDM part of the 11g ERP PHY, the
+	 *      packet was transmitted with the 11g/11a OFDM modulation.
+	 *
+	 * We've already handled the HE, VHT, and MCS fields, and may
+	 * have attempted to use the channel and xchannel fields to
+	 * guess the modulation.  That guess might get the wrong answer
+	 * for 11g "Dynamic CCK-OFDM" channels.
+	 *
+	 * If we have the data rate, we use it to:
+	 *
+	 *  fix up the 11g channels;
+	 *
+	 *  determine the modulation if we haven't been able to
+	 *  determine it any other way.
+	 */
+	if (phdr.has_data_rate) {
+		if (phdr.phy == PHDR_802_11_PHY_UNKNOWN) {
+			/*
+			 * We don't know they PHY, but we do have the
+			 * data rate; try to guess it based on the
+			 * data rate and center frequency.
+			 */
+			if (RATE_IS_DSSS(phdr.data_rate)) {
+				/* 11b */
+				phdr.phy = PHDR_802_11_PHY_11B;
+			} else if (RATE_IS_OFDM(phdr.data_rate)) {
+				/* 11a or 11g, depending on the band. */
+				if (phdr.has_frequency) {
+					if (FREQ_IS_BG(phdr.frequency)) {
+						/* 11g */
+						phdr.phy = PHDR_802_11_PHY_11G;
+					} else {
+						/* 11a */
+						phdr.phy = PHDR_802_11_PHY_11A;
+					}
+				}
+			}
+		} else if (phdr.phy == PHDR_802_11_PHY_11G) {
+			if (RATE_IS_DSSS(phdr.data_rate)) {
+				/* DSSS, so 11b. */
+				phdr.phy = PHDR_802_11_PHY_11B;
+			}
+		}
+	}
+
+	switch (phdr.phy) {
+
+	case PHDR_802_11_PHY_11B:
+		/*
+		 * We now know it's 11b, so set the "short preamble"
+		 * property.
+		 */
+		if (have_rflags) {
+			phdr.phy_info.info_11b.has_short_preamble = TRUE;
+			phdr.phy_info.info_11b.short_preamble =
+			    (rflags & IEEE80211_RADIOTAP_F_SHORTPRE) ? TRUE : FALSE;;
+		} else
+			phdr.phy_info.info_11b.has_short_preamble = FALSE;
+		break;
+
+	case PHDR_802_11_PHY_11N:
+		/*
+		 * This doesn't supply "short GI" information,
+		 * so use the 0x80 bit in the Flags field,
+		 * if we have it; it's "Currently unspecified
+		 * but used" for that purpose, according to
+		 * the radiotap.org page for that field.
+		 */
+		if (!phdr.phy_info.info_11n.has_short_gi && have_rflags) {
+			phdr.phy_info.info_11n.has_short_gi = TRUE;
+			if (rflags & 0x80)
+				phdr.phy_info.info_11n.short_gi = 1;
+			else
+				phdr.phy_info.info_11n.short_gi = 0;
+		}
+		break;
+	}
+
 	/* Grab the rest of the frame. */
 	next_tvb = tvb_new_subset_remaining(tvb, length);
 
@@ -3135,11 +3913,6 @@ void proto_register_radiotap(void)
 		 {"Present flags word", "radiotap.present.word",
 		  FT_UINT32, BASE_HEX, NULL, 0x0,
 		  "Word from present flags bitmask", HFILL}},
-
-		{&hf_radiotap_tlv,
-		 {"TLV", "radiotap.tlv",
-		  FT_BYTES, BASE_NONE, NULL, 0x0,
-		  NULL, HFILL}},
 
 		{&hf_radiotap_tlv_type,
 		 {"TLV type", "radiotap.tlv.type",
@@ -3243,6 +4016,11 @@ void proto_register_radiotap(void)
 		 {"FCS in header", "radiotap.present.fcs",
 		  FT_BOOLEAN, 32, TFS(&tfs_present_absent), RADIOTAP_MASK(RX_FLAGS),
 		  "Specifies if the FCS field is present", HFILL}},
+
+		{ &hf_radiotap_present_data_retries,
+		 {"data retries", "radiotap.present.data_retries",
+		  FT_BOOLEAN, 32, TFS(&tfs_present_absent), RADIOTAP_MASK(DATA_RETRIES),
+		  "Specifies if the data retries field is present", HFILL}},
 
 		{&hf_radiotap_present_xchannel,
 		 {"Channel+", "radiotap.present.xchannel",
@@ -3392,6 +4170,18 @@ void proto_register_radiotap(void)
 		{&hf_radiotap_channel_flags_turbo,
 		 {"Turbo", "radiotap.channel.flags.turbo",
 		  FT_BOOLEAN, 16, NULL, 0x0010, "Channel Flags Turbo", HFILL}},
+
+		{&hf_radiotap_channel_flags_700mhz,
+		 {"700 MHz spectrum", "radiotap.channel.flags.700mhz",
+		  FT_BOOLEAN, 16, NULL, 0x0001, "Channel Flags Turbo", HFILL}},
+
+		{&hf_radiotap_channel_flags_800mhz,
+		 {"800 MHz spectrum", "radiotap.channel.flags.800mhz",
+		  FT_BOOLEAN, 16, NULL, 0x0002, "Channel Flags Turbo", HFILL}},
+
+		{&hf_radiotap_channel_flags_900mhz,
+		 {"900 MHz spectrum", "radiotap.channel.flags.900mhz",
+		  FT_BOOLEAN, 16, NULL, 0x0004, "Channel Flags Turbo", HFILL}},
 
 		{&hf_radiotap_channel_flags_cck,
 		 {"Complementary Code Keying (CCK)", "radiotap.channel.flags.cck",
@@ -3570,12 +4360,12 @@ void proto_register_radiotap(void)
 
 		{&hf_radiotap_xchannel_flags_ht20,
 		 {"HT Channel (20MHz Channel Width)", "radiotap.xchannel.flags.ht20",
-		  FT_BOOLEAN, 24, NULL, 0x10000,
+		  FT_BOOLEAN, 24, NULL, 0x010000,
 		  "Channel Flags HT/20", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_ht40u,
 		 {"HT Channel (40MHz Channel Width with Extension channel above)", "radiotap.xchannel.flags.ht40u",
-		  FT_BOOLEAN, 24, NULL, 0x20000,
+		  FT_BOOLEAN, 24, NULL, 0x020000,
 		  "Channel Flags HT/40+", HFILL}},
 
 		{&hf_radiotap_xchannel_flags_ht40d,
@@ -3649,6 +4439,11 @@ void proto_register_radiotap(void)
 		  FT_INT8, BASE_DEC|BASE_UNIT_STRING, &units_dbm, 0x0,
 		  "Transmit power at the antenna port expressed as decibels"
 		  " from one milliwatt", HFILL}},
+
+		{ &hf_radiotap_data_retries,
+		 {"data retries", "radiotap.data_retries",
+		  FT_UINT8, BASE_DEC, NULL, 0x0,
+		  "Number of data retries a transmitted frame used", HFILL} },
 
 		{&hf_radiotap_mcs,
 		 {"MCS information", "radiotap.mcs",
@@ -3726,8 +4521,8 @@ void proto_register_radiotap(void)
 		  "Number of Space Time Block Code streams", HFILL}},
 
 		{&hf_radiotap_mcs_ness_bit0,
-		 {"Number of extension spatial streams bit 0", "radiotap.mcs.ness_bit1",
-		  FT_UINT8, BASE_DEC, NULL, IEEE80211_RADIOTAP_MCS_NESS_BIT1,
+		 {"Number of extension spatial streams bit 0", "radiotap.mcs.ness_bit0",
+		  FT_UINT8, BASE_DEC, NULL, IEEE80211_RADIOTAP_MCS_NESS_BIT0,
 		  "Bit 0 of number of extension spatial streams information", HFILL}},
 
 		{&hf_radiotap_mcs_index,
@@ -4139,7 +4934,7 @@ void proto_register_radiotap(void)
 		  IEEE80211_RADIOTAP_HE_SPATIAL_REUSE_4_KNOWN, NULL, HFILL}},
 
 		{&hf_radiotap_he_data_bw_ru_allocation_known,
-		 {"dat BW/RU allocation known", "radiotap.he.data_1.data_bw_ru_allocation_known",
+		 {"data BW/RU allocation known", "radiotap.he.data_1.data_bw_ru_allocation_known",
 		  FT_BOOLEAN, 16, TFS(&tfs_known_unknown),
 		  IEEE80211_RADIOTAP_HE_DATA_BW_RU_ALLOCATION_KNOWN, NULL, HFILL}},
 
@@ -4785,6 +5580,470 @@ void proto_register_radiotap(void)
 		 {"length", "radiotap.l_sig.length",
 		  FT_UINT16, BASE_DEC, NULL,
 		  IEEE80211_RADIOTAP_L_SIG_LENGTH_MASK, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_known,
+		 {"Known", "radiotap.s1g.known",
+		  FT_UINT16, BASE_HEX, NULL, 0, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_s1g_ppdu_format_known,
+		 {"S1G PPDU Format Known", "radiotap.s1g.s1g_ppdu_format_known",
+		  FT_BOOLEAN, 16, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_S1G_PPDU_FORMAT_KNOWN, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_response_indication_known,
+		 {"Response Indication Known", "radiotap.s1g.response_indication_known",
+		  FT_BOOLEAN, 16, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_RESPONSE_INDICATION_KNOWN, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_guard_interval_known,
+		 {"Guard Interval Known", "radiotap.s1g.guard_interval_known",
+		  FT_BOOLEAN, 16, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_GUARD_INTERVAL_KNOWN, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_nss_known,
+		 {"NSS Known", "radiotap.s1g.nss_known",
+		  FT_BOOLEAN, 16, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_NSS_KNOWN, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_bandwidth_known,
+		 {"Bandwidth Known", "radiotap.s1g.bandwidth_known",
+		  FT_BOOLEAN, 16, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_BANDWIDTH_KNOWN, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_mcs_known,
+		 {"MCS Known", "radiotap.s1g.mcs_known",
+		  FT_BOOLEAN, 16, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_MCS_KNOWN, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_color_known,
+		 {"Color Known", "radiotap.s1g.color_known",
+		  FT_BOOLEAN, 16, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_COLOR_KNOWN, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_uplink_indication_known,
+		 {"Uplink Indication Known",
+		  "radiotap.s1g.uplink_indication_known",
+		  FT_BOOLEAN, 16, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_UPLINK_INDICATION_KNOWN,
+		  NULL, HFILL}},
+
+		{&hf_radiotap_s1g_reserved_1,
+		 {"Reserved 1", "radiotap.s1g.reserved_1",
+		  FT_UINT16, BASE_HEX, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_RESERVED_1, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_data_1,
+		 {"Data1", "radiotap.s1g.data_1",
+		  FT_UINT16, BASE_HEX, NULL, 0, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_s1g_ppdu_format,
+		 {"S1G PPDU Format", "radiotap.s1g.s1g_ppdu_format",
+		  FT_UINT16, BASE_DEC, VALS(s1g_ppdu_format),
+		  IEEE80211_RADIOTAP_TLV_S1G_S1G_PPDU_FORMAT, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_response_indication,
+		 {"Response Indication", "radiotap.s1g.response_indication",
+		  FT_UINT16, BASE_DEC, VALS(s1g_response_indication),
+		  IEEE80211_RADIOTAP_TLV_S1G_RESPONSE_INDICATION, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_reserved_2,
+		 {"Reserved 2", "radiotap.s1g.reserved_2",
+		  FT_UINT16, BASE_HEX, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_RESERVED_2, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_guard_interval,
+		 {"Guard Interval", "radiotap.s1g.guard_interval",
+		  FT_UINT16, BASE_DEC, VALS(s1g_guard_interval),
+		  IEEE80211_RADIOTAP_TLV_S1G_GUARD_INTERVAL, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_nss,
+		 {"NSS", "radiotap.s1g.nss",
+		  FT_UINT16, BASE_DEC, VALS(s1g_nss),
+		  IEEE80211_RADIOTAP_TLV_S1G_NSS, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_bandwidth,
+		 {"Bandwidth", "radiotap.s1g.bandwidth",
+		  FT_UINT16, BASE_DEC, VALS(s1g_bandwidth),
+		 IEEE80211_RADIOTAP_TLV_S1G_BANDWIDTH, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_mcs,
+		 {"MCS", "radiotap.s1g.mcs",
+		  FT_UINT16, BASE_DEC, VALS(s1g_mcs),
+		  IEEE80211_RADIOTAP_TLV_S1G_MCS, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_data_2,
+		 {"Data2", "radiotap.s1g.data_2",
+		  FT_UINT16, BASE_HEX, NULL, 0, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_color,
+		 {"Color", "radiotap.s1g.color",
+		  FT_UINT16, BASE_DEC, VALS(s1g_color),
+		  IEEE80211_RADIOTAP_TLV_S1G_COLOR, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_uplink_indication,
+		 {"Uplink Indication", "radiotap.s1g.uplink_indication",
+		  FT_BOOLEAN, 16, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_UPLINK_INDICATION, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_reserved_3,
+		 {"Reserved 3", "radiotap.s1g.reserved_3",
+		  FT_UINT16, BASE_HEX, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_RESERVED_3, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_rssi,
+		 {"RSSI", "radiotap.s1g.rssi",
+		  FT_INT16, BASE_DEC, NULL,
+		  IEEE80211_RADIOTAP_TLV_S1G_RSSI, NULL, HFILL}},
+
+		{&hf_radiotap_s1g_ndp_bytes,
+		 {"NDP Bytes", "radiotap.s1g.ndp.bytes",
+		  FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ctrl,
+		 {"NDP Control", "radiotap.s1g.ndp.control",
+		  FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_mgmt,
+		 {"NDP Management", "radiotap.s1g.ndp.management",
+		  FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_type_3bit,
+		 {"NDP Type", "radiotap.s1g.ndp.type",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000000007, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_1m,
+		 {"NDP Ack 1MHz", "radiotap.s1g.ndp.ack_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_1m_ack_id,
+		 {"ACK Id", "radiotap.s1g.ndp.ack.ack_id",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000000FF8, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_1m_more_data,
+		 {"More Data", "radiotap.s1g.ndp.ack.more_data",
+		  FT_BOOLEAN, 40, NULL, 0x0000001000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_1m_idle_indication,
+		 {"Idle Indication", "radiotap.s1g.ndp.ack.idle_indication",
+		  FT_BOOLEAN, 40, NULL, 0x0000002000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_1m_duration,
+		 {"Duration", "radiotap.s1g.ndp.ack.duration",
+		  FT_UINT40, BASE_DEC, NULL, 0x0000FFC000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_1m_relayed_frame,
+		 {"Relayed Frame", "radiotap.s1g.ndp.ack.relayed_frame",
+		  FT_BOOLEAN, 40, NULL, 0x0001000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_2m,
+		 {"NDP Ack 2MHz", "radiotap.s1g.ndp.ack_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_2m_ack_id,
+		 {"ACK Id", "radiotap.s1g.ndp.ack.ack_id",
+		  FT_UINT40, BASE_HEX, NULL, 0x000007FFF8, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_2m_more_data,
+		 {"More Data", "radiotap.s1g.ndp.ack.more_data",
+		  FT_BOOLEAN, 40, NULL, 0x0000080000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_2m_idle_indication,
+		 {"Idle Indication", "radiotap.s1g.ndp.ack.idle_indication",
+		  FT_BOOLEAN, 40, NULL, 0x0000100000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_2m_duration,
+		 {"Duration", "radiotap.s1g.ndp.ack.duration",
+		  FT_UINT40, BASE_DEC, NULL, 0x07FFE00000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_2m_relayed_frame,
+		 {"Relayed Frame", "radiotap.s1g.ndp.ack.relayed_frame",
+		  FT_BOOLEAN, 40, NULL, 0x0800000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ack_2m_reserved,
+		 {"Reserved", "radiotap.s1g.ndp.ack.reserved",
+		  FT_UINT40, BASE_HEX, NULL, 0x1000000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_1m,
+		 {"NDP CTS 1MHz", "radiotap.s1g.ndp.cts_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_cf_end_indic,
+		 {"NDP CTS/CF_End Indicator", "radiotap.s1g.ndp.cts_cf_end_indic",
+		  FT_BOOLEAN, 40, NULL, 0x0000000008, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_address_indic,
+		 {"Address Indicator", "radiotap.s1g.ndp.cts.address_indic",
+		  FT_BOOLEAN, 40, NULL, 0x0000000010, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_ra_partial_bssid,
+		 {"RA/Partial BSSID", "radiotap.s1g.ndp.cts.ra_partial_bssid",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000003FE0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_duration_1m,
+		 {"Duration", "radiotap.s1g.ndp.cts.duration_1m",
+		  FT_UINT40, BASE_DEC, NULL, 0x0000FFC000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_early_sector_indic_1m,
+		 {"Early Sector Indicator", "radiotap.s1g.ndp.cts.early_sector_indic_1m",
+		  FT_BOOLEAN, 40, NULL, 0x0001000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_2m,
+		 {"NDP CTS 2MHz", "radiotap.s1g.ndp.cts_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_duration_2m,
+		 {"Duration", "radiotap.s1g.ndp.cts.duration_2m",
+		  FT_UINT40, BASE_DEC, NULL, 0x001FFFC000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_early_sector_indic_2m,
+		 {"Early Sector Indicator", "radiotap.s1g.ndp.cts.early_sector_indic_2m",
+		  FT_BOOLEAN, 40, NULL, 0x0020000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_bandwidth_indic_2m,
+		 {"Bandwidth Indicator", "radiotap.s1g.ndp.cts.bandwidth_indic_2m",
+		  FT_UINT40, BASE_DEC, NULL, 0x01C0000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cts_reserved,
+		 {"Reserved", "radiotap.s1g.ndp.cts.reserved",
+		  FT_UINT40, BASE_HEX, NULL, 0x1E00000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cf_end_1m,
+		 {"NDP CF-End 1MHz", "radiotap.s1g.ndp.cf_end_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cf_end_partial_bssid,
+		 {"Partial BSSID (TA)", "radiotap.s1g.ndp.cf_end.partial_bssid",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000001FF0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cf_end_duration_1m,
+		 {"Duration", "radiotap.s1g.ndp.cf_end.duration_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x00007FE000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cf_end_reserved_1m,
+		 {"Reserved", "radiotap.s1g.ndp.cf_end.reserved_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0001800000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cf_end_2m,
+		 {"NDP CF-End 2MHz", "radiotap.s1g.ndp.cf_end_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cf_end_duration_2m,
+		 {"Duration", "radiotap.s1g.ndp.cf_end.duration_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x000FFFE000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_cf_end_reserved_2m,
+		 {"Reserved", "radiotap.s1g.ndp.cf_end.reserved_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x1FF0000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_1m,
+		 {"NDP PS-Poll 1MHz", "radiotap.s1g.ndp.ps_poll_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ra,
+		 {"RA", "radiotap.s1g.ndp.ps_poll.ra",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000000FF8, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ta,
+		 {"TA", "radiotap.s1g.ndp.ps_poll.ta",
+		  FT_UINT40, BASE_HEX, NULL, 0x00001FF000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_preferred_mcs_1m,
+		 {"Preferred MCS", "radiotap.s1g.ndp.ps_poll.preferred_mcs",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000E00000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_udi_1m,
+		 {"UDI", "radiotap.s1g.ndp.ps_poll.udi",
+		  FT_UINT40, BASE_HEX, NULL, 0x0001000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_2m,
+		 {"NDP PS-Poll 2MHz", "radiotap.s1g.ndp.ps_poll_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_preferred_mcs_2m,
+		 {"Preferred MCS", "radiotap.s1g.ndp.ps_poll.preferred_mcs",
+		  FT_UINT40, BASE_HEX, NULL, 0x0001E00000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_udi_2m,
+		 {"UDI", "radiotap.s1g.ndp.ps_poll.udi",
+		  FT_UINT40, BASE_HEX, NULL, 0x1FFE00000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_1m,
+		 {"NDP PS-Poll-Ack 1MHz", "radiotap.s1g.ndp.ndp_ps_poll_ack_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_id,
+		 {"Ack ID", "radiotap.s1g.ndp.ps_poll.ack_id",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000000FF8, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_more_data,
+		 {"More Data", "radiotap.s1g.ndp.ps_poll.more_data",
+		  FT_BOOLEAN, 40, NULL, 0x0000001000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_idle_indication,
+		 {"Idle Indication", "radiotap.s1g.ndp.ps_poll.idle_indication",
+		  FT_BOOLEAN, 40, NULL, 0x0000002000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_duration_1m,
+		 {"Duration", "radiotap.s1g.ndp.ps_poll.duration",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000FFC000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_reserved_1m,
+		 {"Reserved", "radiotap.s1g.ndp.ps_poll.reserved_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0001000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_2m,
+		 {"NDP PS-Poll-Ack 2MHz", "radiotap.s1g.ndp.ndp_ps_poll_ack_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_id_2m,
+		 {"Ack ID", "radiotap.s1g.ndp.ps_poll.ack_id",
+		  FT_UINT40, BASE_HEX, NULL, 0x000007FFF8, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_more_data_2m,
+		 {"More Data", "radiotap.s1g.ndp.ps_poll.more_data",
+		  FT_BOOLEAN, 40, NULL, 0x0000080000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_idle_indication_2m,
+		 {"Idle Indication", "radiotap.s1g.ndp.ps_poll.idle_indication",
+		  FT_BOOLEAN, 40, NULL, 0x0000100000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_duration_2m,
+		 {"Duration", "radiotap.s1g.ndp.ps_poll.duration",
+		  FT_UINT40, BASE_HEX, NULL, 0x07FFE00000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_ps_poll_ack_reserved_2m,
+		 {"Reserved", "radiotap.s1g.ndp.ps_poll.reserved",
+		  FT_UINT40, BASE_HEX, NULL, 0x1800000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_block_ack_1m,
+		 {"NDP Block Ack 1MHz", "radiotap.s1g.ndp.block_ack_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_block_ack_id_1m,
+		 {"BlockAck ID", "radiotap.s1g.ndp.block_ack.blockack_id",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000000018, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_block_ack_starting_sequence_control_1m,
+		 {"Starting Sequence Control", "radiotap.s1g.ndp.ps_poll.starting_sequence_control",
+		  FT_UINT40, BASE_HEX, NULL, 0x000001FFE0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_block_ack_bitmap_1m,
+		 {"Block Ack Bitmap", "radiotap.s1g.ndp.ps_poll.block_ack_bitmap",
+		  FT_UINT40, BASE_HEX, NULL, 0x001FFE0000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_block_ack_unused_1m,
+		 {"Unused", "radiotap.s1g.ndp.ps_poll.block_ack_unused",
+		  FT_UINT40, BASE_HEX, NULL, 0x3FE0000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_block_ack_2m,
+		 {"NDP Block Ack 2MHz", "radiotap.s1g.ndp.block_ack_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_block_ack_id_2m,
+		 {"BlockAck ID", "radiotap.s1g.ndp.ps_poll.blockack_id",
+		  FT_UINT40, BASE_HEX, NULL, 0x00000001F8, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_block_ack_starting_sequence_control_2m,
+		 {"Starting Sequence Control", "radiotap.s1g.ndp.ps_poll.starting_sequence_control",
+		  FT_UINT40, BASE_HEX, NULL, 0x00001FFE00, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_block_ack_bitmap_2m,
+		 {"Block Ack Bitmap", "radiotap.s1g.ndp.ps_poll.block_ack_bitmap",
+		  FT_UINT40, BASE_HEX, NULL, 0x1FFFE00000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_beamforming_report_poll,
+		 {"Beamforming Report Poll", "radiotap.s1g.ndp.beamforming_report_poll",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_beamforming_ap_address,
+		 {"AP Address", "radiotap.s1g.ndp.beamforming_report_poll.ap_address",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000000FF8, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_beamforming_non_ap_sta_address,
+		 {"Non-AP STA Address", "radiotap.s1g.ndp.beamforming_report_poll.non_ap_sta_address",
+		  FT_UINT40, BASE_HEX, NULL, 0x0001FFF000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_beamforming_feedback_segment_bitmap,
+		 {"Retransmission Segment Retransmission Bitmap",
+      "radiotap.s1g.ndp.beamforming_report_poll.feedback_segment_retransmission_bitmap",
+		  FT_UINT40, BASE_HEX, NULL, 0x01FE000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_beamforming_reserved,
+		 {"Reserved", "radiotap.s1g.ndp.beamforming_report_poll.reserved",
+		  FT_UINT40, BASE_HEX, NULL, 0x1E00000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_paging_1m,
+		 {"NDP Paging 1MHz", "radiotap.s1g.ndp.ndp_paging_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_paging_p_id,
+		 {"P-ID", "radiotap.s1g.ndp.ndp_paging.p_id",
+		  FT_BOOLEAN, 40, NULL, 0x0000000FF8, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_paging_apdi_partial_aid,
+		 {"APDI/Partial AID", "radiotap.s1g.ndp.ndp_paging.apdi_partial_aid",
+		  FT_BOOLEAN, 40, NULL, 0x00001FF000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_paging_direction,
+		 {"Direction", "radiotap.s1g.ndp.ndp_paging.direction",
+		  FT_BOOLEAN, 40, NULL, 0x0000200000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_paging_reserved_1m,
+		 {"Reserved", "radiotap.s1g.ndp.ndp_paging.reserved",
+		  FT_BOOLEAN, 40, NULL, 0x0001C00000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_paging_2m,
+		 {"NDP Paging 2MHz", "radiotap.s1g.ndp.ndp_paging_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_paging_reserved_2m,
+		 {"Reserved", "radiotap.s1g.ndp.reserved",
+		  FT_BOOLEAN, 40, NULL, 0x1FFFC00000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_probe_1m,
+		 {"NDP Probe 1MHz", "radiotap.s1g.ndp.ndp_probe_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_probe_cssid_ano_present,
+		 {"CSSID/ANO Present", "radiotap.s1g.ndp.ndp_probe.cssid_ano_present",
+		  FT_BOOLEAN, 40, NULL, 0x0000000008, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_probe_1m_cssid_ano,
+		 {"Compressed SSID/ANO", "radiotap.s1g.ndp.ndp_probe.compressed_ssid_ano",
+		  FT_UINT40, BASE_HEX, NULL, 0x00000FFFF0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_probe_1m_requested_response_type,
+		 {"Requested Response Type", "radiotap.s1g.ndp.ndp_probe.requested_response_type_1m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0000100000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_probe_1m_reserved,
+		 {"Reserved", "radiotap.s1g.ndp.probe_1m.ndp_probe.reserved",
+		  FT_UINT40, BASE_HEX, NULL, 0x0001E00000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_probe_2m,
+		 {"NDP Probe 2MHz", "radiotap.s1g.ndp.probe_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_probe_2m_cssid_ano,
+		 {"Compressed SSID/ANO", "radiotap.s1g.ndp.ndp_probe.compressed_ssid_ano",
+		  FT_UINT40, BASE_HEX, NULL, 0x0FFFFFFFF0, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_probe_2m_requested_response_type,
+		 {"Requested Response Type", "radiotap.s1g.ndp.ndp_probe.requested_response_type_2m",
+		  FT_UINT40, BASE_HEX, NULL, 0x1000000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_1m_unused,
+		 {"Unused", "radiotap.s1g.ndp.ack.1m_unused",
+		  FT_UINT40, BASE_HEX, NULL, 0x3FFE000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_2m_unused,
+		 {"Unused", "radiotap.s1g.ndp.ack.2m_unused",
+		  FT_UINT40, BASE_HEX, NULL, 0x2000000000, NULL, HFILL }},
+
+		{&hf_radiotap_s1g_ndp_bw,
+		 {"NDP BW", "radiotap.s1g.ndp.bw",
+		  FT_UINT40, BASE_HEX, NULL, 0xC000000000, NULL, HFILL }},
+
 	};
 	static gint *ett[] = {
 		&ett_radiotap,
@@ -4821,6 +6080,20 @@ void proto_register_radiotap(void)
 		&ett_radiotap_l_sig,
 		&ett_radiotap_l_sig_data_1,
 		&ett_radiotap_l_sig_data_2,
+		&ett_radiotap_s1g,
+		&ett_radiotap_s1g_known,
+		&ett_radiotap_s1g_data_1,
+		&ett_radiotap_s1g_data_2,
+		&ett_s1g_ndp,
+		&ett_s1g_ndp_ack,
+		&ett_s1g_ndp_cts,
+		&ett_s1g_ndp_cf_end,
+		&ett_s1g_ndp_ps_poll,
+		&ett_s1g_ndp_ps_poll_ack,
+		&ett_s1g_ndp_block_ack,
+		&ett_s1g_ndp_beamforming_report_poll,
+		&ett_s1g_ndp_paging,
+		&ett_s1g_ndp_probe,
 		&ett_radiotap_unknown_tlv,
 	};
 	static ei_register_info ei[] = {

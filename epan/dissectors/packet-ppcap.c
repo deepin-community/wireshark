@@ -12,7 +12,6 @@
 #include "config.h"
 #include <epan/packet.h>
 #include <epan/address_types.h>
-#include <epan/prefs.h>
 #include "packet-mtp3.h"
 
 #define INVALID_SSN	0xff
@@ -222,7 +221,7 @@ dissect_ppcap_payload_type(tvbuff_t *tvb, proto_tree * ppcap_tree1, int offset, 
 		*payload_type = PPCAP_GTPV2;
 	}
 
-	proto_tree_add_item(ppcap_tree1, hf_ppcap_payload_type, tvb, offset, msg_len, ENC_UTF_8|ENC_NA);
+	proto_tree_add_item(ppcap_tree1, hf_ppcap_payload_type, tvb, offset, msg_len, ENC_UTF_8);
 
 	if (msg_len%4)
 		msg_len = msg_len+(4-(msg_len%4));
@@ -307,7 +306,7 @@ dissect_ppcap_source_address(tvbuff_t *tvb, packet_info *pinfo, proto_tree * ppc
 	else if (key1 == 4)
 
 	{
-		proto_tree_add_item(ppcap_tree1, hf_ppcap_source_nodeid, tvb, offset, msg_len, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(ppcap_tree1, hf_ppcap_source_nodeid, tvb, offset, msg_len, ENC_ASCII);
 		set_address_tvb(&pinfo->net_src, AT_STRINGZ, msg_len, tvb, offset);
 		copy_address_shallow(&pinfo->src, &pinfo->net_src);
 	}
@@ -426,7 +425,7 @@ dissect_ppcap_info_string(tvbuff_t *tvb, proto_tree * ppcap_tree1, int offset)
 	msg_len = tvb_get_ntohs(tvb, offset);
 	proto_tree_add_item( ppcap_tree1, hf_ppcap_length, tvb, offset, 2, ENC_BIG_ENDIAN);
 	offset  = offset + 2;
-	proto_tree_add_item(ppcap_tree1, hf_ppcap_info, tvb, offset, msg_len, ENC_ASCII|ENC_NA);
+	proto_tree_add_item(ppcap_tree1, hf_ppcap_info, tvb, offset, msg_len, ENC_ASCII);
 
 	if (msg_len%4)
 		msg_len = msg_len +( 4- (msg_len%4));
@@ -577,14 +576,13 @@ dissect_ppcap_payload_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree * ppcap
 
 void proto_register_ppcap(void)
 {
-module_t *ppcap_module;
 
 	static hf_register_info hf[] = {
 	{ &hf_ppcap_length,
 	{ "Length",         "ppcap.length",
 		FT_UINT16, BASE_DEC, NULL,   0x00, NULL, HFILL}},
 	{ &hf_ppcap_payload_type,
-	{ "Payload Type" , "ppcap.payload_type", FT_STRING,
+	{ "Payload Type", "ppcap.payload_type", FT_STRING,
 		BASE_NONE, 	NULL, 	0x0    , NULL,    HFILL}},
 	{ &hf_ppcap_reserved,
 	{ "Reserved",         "ppcap.reserved",    FT_UINT16,
@@ -601,7 +599,7 @@ module_t *ppcap_module;
 	{ "SSN",     "ppcap.ssn",   FT_UINT16,
 		BASE_DEC,       NULL,   0x00,   NULL,     HFILL}},
 	{ &hf_ppcap_spc,
-	{"OPC",     "ppcap.spc",   FT_UINT16,
+	{"OPC",     "ppcap.spc",   FT_UINT24,
 		BASE_DEC,       NULL,   0x00,   NULL,     HFILL}},
 	{ &hf_ppcap_opc,
 	{ "OPC",     "ppcap.opc",   FT_UINT16,
@@ -631,22 +629,22 @@ module_t *ppcap_module;
 		BASE_DEC,       NULL,   0x00,   NULL,     HFILL}},
 	{ &hf_ppcap_destination_ip_address1,
 	{ "Destination IP Address",     "ppcap.destination_ip_address1",   FT_IPv4,
-		BASE_NONE,       NULL,   0x00,   NULL,     HFILL}},
+		BASE_NONE,       NULL,   0x0,   NULL,     HFILL}},
 	{ &hf_ppcap_destination_ip_address2,
 	{ "Destination IP Address",     "ppcap.destination_ip_address2",   FT_IPv6,
-		BASE_NONE,       NULL,   0x00,   NULL,     HFILL}},
+		BASE_NONE,       NULL,   0x0,   NULL,     HFILL}},
 	{ &hf_ppcap_source_nodeid,
 	{ "Source Node ID",         "ppcap.source_nodeid",    FT_STRING,
-		BASE_NONE,       NULL,   0x00,   NULL,     HFILL}},
+		BASE_NONE,       NULL,   0x0,   NULL,     HFILL}},
 	{ &hf_ppcap_destination_nodeid,
 	{ "Destination Node ID",         "ppcap.destination_address",    FT_STRING,
-		BASE_NONE,       NULL,   0x00,   NULL,     HFILL}},
+		BASE_NONE,       NULL,   0x0,   NULL,     HFILL}},
 	{ &hf_ppcap_info,
 	{ "Info",         "ppcap.info",    FT_STRING,
-		BASE_NONE,       NULL,   0x0000,   NULL,     HFILL}},
+		BASE_NONE,       NULL,   0x0,   NULL,     HFILL}},
 	{ &hf_ppcap_payload_data,
 	{ "Payload Data",         "ppcap.payload_data",    FT_BYTES,
-		BASE_NONE,       NULL,   0x0000,   NULL,     HFILL}},
+		BASE_NONE,       NULL,   0x0,   NULL,     HFILL}},
 	{ &hf_ppcap_local_port,
 	{ "Local Port",         "ppcap.local_port",    FT_UINT16,
 		BASE_DEC,       NULL,   0x00,   NULL,     HFILL}},
@@ -654,10 +652,10 @@ module_t *ppcap_module;
 	{ "Remote Port",         "ppcap.remote_port",    FT_UINT16,
 		BASE_DEC,       NULL,   0x00,   NULL,     HFILL}},
 	{ &hf_ppcap_transport_prot,
-	{ "Transport Protocol" , "ppcap.transport_prot", FT_STRING,
+	{ "Transport Protocol", "ppcap.transport_prot", FT_STRING,
 		BASE_NONE,      NULL,   0x0    , NULL,    HFILL}},
 	{ &hf_ppcap_sctp_assoc,
-	{ "SCTP Association ID" , "ppcap.sctp_assoc", FT_STRING,
+	{ "SCTP Association ID", "ppcap.sctp_assoc", FT_STRING,
 		BASE_NONE,      NULL,   0x0    , NULL,    HFILL } },
 	};
 
@@ -670,8 +668,6 @@ module_t *ppcap_module;
 	proto_register_field_array(proto_ppcap , hf , array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 	register_dissector("ppcap", dissect_ppcap, proto_ppcap);
-	ppcap_module = prefs_register_protocol(proto_ppcap, proto_reg_handoff_ppcap);
-	prefs_register_obsolete_preference(ppcap_module, "rev_doc");
 
 }
 

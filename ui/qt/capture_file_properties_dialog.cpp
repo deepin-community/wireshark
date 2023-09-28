@@ -12,14 +12,15 @@
 #include "capture_file_properties_dialog.h"
 #include <ui_capture_file_properties_dialog.h>
 
+#include "ui/simple_dialog.h"
 #include "ui/summary.h"
 
 #include "wsutil/str_util.h"
 #include "wsutil/utf8_entities.h"
-#include "version_info.h"
+#include "ui/version_info.h"
 
 #include <ui/qt/utils/qt_ui_utils.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 
 #include <QPushButton>
 #include <QScrollBar>
@@ -184,7 +185,7 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
         << table_data_tmpl.arg(summary.file_sha1)
         << table_row_end;
 
-    QString format_str = wtap_file_type_subtype_string(summary.file_type);
+    QString format_str = wtap_file_type_subtype_description(summary.file_type);
     const char *compression_type_description = wtap_compression_type_description(summary.compression_type);
     if (compression_type_description != nullptr) {
         format_str += QString(" (%1)").arg(compression_type_description);
@@ -325,7 +326,7 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
                 << table_hheader20_tmpl.arg(tr("Dropped packets"))
                 << table_hheader20_tmpl.arg(tr("Capture filter"))
                 << table_hheader20_tmpl.arg(tr("Link type"))
-                << table_hheader20_tmpl.arg(tr("Packet size limit"))
+                << table_hheader20_tmpl.arg(tr("Packet size limit (snaplen)"))
                 << table_row_end;
         }
 
@@ -483,15 +484,15 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
     captured_str = displayed_str = marked_str = n_a;
     if (seconds > 0) {
         captured_str =
-                gchar_free_to_qstring(format_size(summary.bytes / seconds, format_size_unit_none|format_size_prefix_si));
+                gchar_free_to_qstring(format_size(summary.bytes / seconds, FORMAT_SIZE_UNIT_NONE, FORMAT_SIZE_PREFIX_SI));
     }
     if (disp_seconds > 0) {
         displayed_str =
-                gchar_free_to_qstring(format_size(summary.filtered_bytes / disp_seconds, format_size_unit_none|format_size_prefix_si));
+                gchar_free_to_qstring(format_size(summary.filtered_bytes / disp_seconds, FORMAT_SIZE_UNIT_NONE, FORMAT_SIZE_PREFIX_SI));
     }
     if (marked_seconds > 0) {
         marked_str =
-                gchar_free_to_qstring(format_size(summary.marked_bytes / marked_seconds, format_size_unit_none|format_size_prefix_si));
+                gchar_free_to_qstring(format_size(summary.marked_bytes / marked_seconds, FORMAT_SIZE_UNIT_NONE, FORMAT_SIZE_PREFIX_SI));
     }
     out << table_row_begin
         << table_data_tmpl.arg(tr("Average bytes/s"))
@@ -504,15 +505,15 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
     captured_str = displayed_str = marked_str = n_a;
     if (seconds > 0) {
             captured_str =
-                    gchar_free_to_qstring(format_size(summary.bytes * 8 / seconds, format_size_unit_none|format_size_prefix_si));
+                    gchar_free_to_qstring(format_size(summary.bytes * 8 / seconds, FORMAT_SIZE_UNIT_NONE, FORMAT_SIZE_PREFIX_SI));
     }
     if (disp_seconds > 0) {
             displayed_str =
-                    gchar_free_to_qstring(format_size(summary.filtered_bytes * 8 / disp_seconds, format_size_unit_none|format_size_prefix_si));
+                    gchar_free_to_qstring(format_size(summary.filtered_bytes * 8 / disp_seconds, FORMAT_SIZE_UNIT_NONE, FORMAT_SIZE_PREFIX_SI));
     }
     if (marked_seconds > 0) {
             marked_str =
-                    gchar_free_to_qstring(format_size(summary.marked_bytes * 8 / marked_seconds, format_size_unit_none|format_size_prefix_si));
+                    gchar_free_to_qstring(format_size(summary.marked_bytes * 8 / marked_seconds, FORMAT_SIZE_UNIT_NONE, FORMAT_SIZE_PREFIX_SI));
     }
     out << table_row_begin
         << table_data_tmpl.arg(tr("Average bits/s"))
@@ -562,17 +563,24 @@ void CaptureFilePropertiesDialog::fillDetails()
 
         for (guint32 framenum = 1; framenum <= cap_file_.capFile()->count ; framenum++) {
             frame_data *fdata = frame_data_sequence_find(cap_file_.capFile()->provider.frames, framenum);
-            char *pkt_comment = cf_get_packet_comment(cap_file_.capFile(), fdata);
+            wtap_block_t pkt_block = cf_get_packet_block(cap_file_.capFile(), fdata);
 
-            if (pkt_comment) {
-                QString frame_comment_html = tr("<p>Frame %1: ").arg(framenum);
-                QString raw_comment = gchar_free_to_qstring(pkt_comment);
+            if (pkt_block) {
+                guint n_comments = wtap_block_count_option(pkt_block, OPT_COMMENT);
+                for (guint i = 0; i < n_comments; i++) {
+                    char *comment_text;
+                    if (WTAP_OPTTYPE_SUCCESS == wtap_block_get_nth_string_option_value(pkt_block, OPT_COMMENT, i, &comment_text)) {
+                        QString frame_comment_html = tr("<p>Frame %1: ").arg(framenum);
+                        QString raw_comment = comment_text;
 
-                frame_comment_html += html_escape(raw_comment).replace('\n', "<br>");
-                frame_comment_html += "</p>\n";
-                cursor.insertBlock();
-                cursor.insertHtml(frame_comment_html);
+                        frame_comment_html += html_escape(raw_comment).replace('\n', "<br>");
+                        frame_comment_html += "</p>\n";
+                        cursor.insertBlock();
+                        cursor.insertHtml(frame_comment_html);
+                    }
+                }
             }
+            wtap_block_unref(pkt_block);
         }
     }
     ui->detailsTextEdit->verticalScrollBar()->setValue(0);
@@ -597,7 +605,7 @@ void CaptureFilePropertiesDialog::changeEvent(QEvent* event)
 
 void CaptureFilePropertiesDialog::on_buttonBox_helpRequested()
 {
-    wsApp->helpTopicAction(HELP_STATS_SUMMARY_DIALOG);
+    mainApp->helpTopicAction(HELP_STATS_SUMMARY_DIALOG);
 }
 
 void CaptureFilePropertiesDialog::on_buttonBox_accepted()
@@ -609,6 +617,20 @@ void CaptureFilePropertiesDialog::on_buttonBox_accepted()
     if (wtap_dump_can_write(cap_file_.capFile()->linktypes, WTAP_COMMENT_PER_SECTION))
     {
         gchar *str = qstring_strdup(ui->commentsTextEdit->toPlainText());
+
+        /*
+         * Make sure this would fit in a pcapng option.
+         *
+         * XXX - 65535 is the maximum size for an option in pcapng;
+         * what if another capture file format supports larger
+         * comments?
+         */
+        if (strlen(str) > 65535) {
+            /* It doesn't fit.  Tell the user and give up. */
+            simple_dialog(ESD_TYPE_ERROR, ESD_BTN_OK,
+                          "That comment is too large to save in a capture file.");
+            return;
+        }
         cf_update_section_comment(cap_file_.capFile(), str);
         emit captureCommentChanged();
         fillDetails();
@@ -631,16 +653,3 @@ void CaptureFilePropertiesDialog::on_buttonBox_rejected()
 {
     reject();
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -28,7 +28,7 @@ static GPtrArray* outstanding_TreeItem = NULL;
 
 /* pushing a TreeItem with a NULL item or subtree is completely valid for this function */
 TreeItem push_TreeItem(lua_State *L, proto_tree *tree, proto_item *item) {
-    TreeItem ti = (struct _wslua_treeitem *)g_malloc(sizeof(struct _wslua_treeitem));
+    TreeItem ti = g_new(struct _wslua_treeitem, 1);
 
     ti->tree = tree;
     ti->item = item;
@@ -53,16 +53,16 @@ TreeItem create_TreeItem(proto_tree* tree, proto_item* item)
 CLEAR_OUTSTANDING(TreeItem, expired, TRUE)
 
 WSLUA_CLASS_DEFINE(TreeItem,FAIL_ON_NULL_OR_EXPIRED("TreeItem"));
-/* <lua_class_TreeItem,`TreeItem`>>s represent information in the https://www.wireshark.org/docs/wsug_html_chunked/ChUsePacketDetailsPaneSection.html[packet details] pane of Wireshark, and the packet details view of Tshark.
+/* <<lua_class_TreeItem,`TreeItem`>>s represent information in the https://www.wireshark.org/docs/wsug_html_chunked/ChUsePacketDetailsPaneSection.html[packet details] pane of Wireshark, and the packet details view of TShark.
    A <<lua_class_TreeItem,`TreeItem`>> represents a node in the tree, which might also be a subtree and have a list of children.
    The children of a subtree have zero or more siblings which are other children of the same <<lua_class_TreeItem,`TreeItem`>> subtree.
 
-   During dissection, heuristic-dissection, and post-dissection, a root <lua_class_TreeItem,`TreeItem`>> is passed to dissectors as the third argument of the function
+   During dissection, heuristic-dissection, and post-dissection, a root <<lua_class_TreeItem,`TreeItem`>> is passed to dissectors as the third argument of the function
    callback (e.g., `myproto.dissector(tvbuf,pktinfo,root)`).
 
    In some cases the tree is not truly added to, in order to improve performance.
    For example for packets not currently displayed/selected in Wireshark's visible
-   window pane, or if Tshark isn't invoked with the `-V` switch. However the
+   window pane, or if TShark isn't invoked with the `-V` switch. However the
    "add" type <<lua_class_TreeItem,`TreeItem`>> functions can still be called, and still return <<lua_class_TreeItem,`TreeItem`>>
    objects - but the info isn't really added to the tree. Therefore you do not
    typically need to worry about whether there's a real tree or not. If, for some
@@ -76,7 +76,7 @@ try_add_packet_field(lua_State *L, TreeItem tree_item, TvbRange tvbr, const int 
                      const ftenum_t type, const guint encoding, gint *ret_err)
 {
     gint err = 0;
-    proto_item* item = NULL;
+    proto_item *volatile item = NULL;
     gint endoff = 0;
 
     switch(type) {
@@ -103,7 +103,7 @@ try_add_packet_field(lua_State *L, TreeItem tree_item, TvbRange tvbr, const int 
         case FT_RELATIVE_TIME:
             {
                /* nstime_t will be g_free'd by Lua */
-                nstime_t *nstime = (nstime_t *) g_malloc0(sizeof(nstime_t));
+                nstime_t *nstime = g_new0(nstime_t, 1);
                 item = proto_tree_add_time_item(tree_item->tree, hfid, tvbr->tvb->ws_tvb,
                                                    tvbr->offset, tvbr->len, encoding,
                                                    nstime, &endoff, &err);
@@ -164,9 +164,9 @@ WSLUA_METHOD TreeItem_add_packet_field(lua_State *L) {
      returned, but the second returned value is `nil`.
 
      Another new feature added to this function in Wireshark version 1.11.3 is the
-     ability to extract native number `ProtoField`s from string encoding in the
+     ability to extract native number `ProtoField`++s++ from string encoding in the
      `TvbRange`, for ASCII-based and similar string encodings. For example, a
-     <<lua_class_ProtoField,`ProtoField`>> of as `ftypes.UINT32` type can be extracted from a `TvbRange`
+     <<lua_class_ProtoField,`ProtoField`>> of type `ftypes.UINT32` can be extracted from a `TvbRange`
      containing the ASCII string "123", and it will correctly decode the ASCII to
      the number `123`, both in the tree as well as for the second return value of
      this function. To do so, you must set the `encoding` argument of this function
@@ -223,8 +223,8 @@ WSLUA_METHOD TreeItem_add_packet_field(lua_State *L) {
     tvbr = shiftTvbRange(L,1);
     if (!tvbr) {
         /* No TvbRange specified */
-        tvbr = wmem_new(wmem_packet_scope(), struct _wslua_tvbrange);
-        tvbr->tvb = wmem_new(wmem_packet_scope(), struct _wslua_tvb);
+        tvbr = wmem_new(lua_pinfo->pool, struct _wslua_tvbrange);
+        tvbr->tvb = wmem_new(lua_pinfo->pool, struct _wslua_tvb);
         tvbr->tvb->ws_tvb = lua_tvb;
         tvbr->offset = 0;
         tvbr->len = 0;
@@ -325,8 +325,8 @@ static int TreeItem_add_item_any(lua_State *L, gboolean little_endian) {
     tvbr = shiftTvbRange(L,1);
 
     if (!tvbr) {
-        tvbr = wmem_new(wmem_packet_scope(), struct _wslua_tvbrange);
-        tvbr->tvb = wmem_new(wmem_packet_scope(), struct _wslua_tvb);
+        tvbr = wmem_new(lua_pinfo->pool, struct _wslua_tvbrange);
+        tvbr->tvb = wmem_new(lua_pinfo->pool, struct _wslua_tvb);
         tvbr->tvb->ws_tvb = lua_tvb;
         tvbr->offset = 0;
         tvbr->len = 0;
@@ -760,10 +760,10 @@ WSLUA_METHOD TreeItem_add_tvb_expert_info(lua_State *L) {
     tvbr = shiftTvbRange(L,WSLUA_ARG_TreeItem_add_tvb_expert_info_TVB);
 
     if (!tvbr) {
-        tvbr = wmem_new(wmem_packet_scope(), struct _wslua_tvbrange);
+        tvbr = wmem_new(lua_pinfo->pool, struct _wslua_tvbrange);
         tvbr->tvb = shiftTvb(L,WSLUA_ARG_TreeItem_add_tvb_expert_info_TVB);
         if (!tvbr->tvb) {
-            tvbr->tvb = wmem_new(wmem_packet_scope(), struct _wslua_tvb);
+            tvbr->tvb = wmem_new(lua_pinfo->pool, struct _wslua_tvb);
         }
         tvbr->tvb->ws_tvb = lua_tvb;
         tvbr->offset = 0;

@@ -126,7 +126,7 @@ struct dpaux_register {
     } data;
 };
 
-struct dpaux_register registers[] = {
+static struct dpaux_register registers[] = {
     { 0x0, DPAUX_REGISTER_TYPE_BITFIELD, .data.bitfield = { &hf_00000, reg00000_fields } },
     { 0x1, DPAUX_REGISTER_TYPE_BITFIELD, .data.bitfield = { &hf_00001, reg00001_fields } },
     { 0x2, DPAUX_REGISTER_TYPE_BITFIELD, .data.bitfield = { &hf_00002, reg00002_fields } },
@@ -177,10 +177,9 @@ dissect_dpaux_from_source(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     struct dpaux_transaction *transaction = NULL;
 
     conversation = conversation_new(pinfo->num,  &pinfo->src, &pinfo->dst,
-        ENDPOINT_NONE, pinfo->srcport, pinfo->destport, 0);
+        CONVERSATION_NONE, pinfo->srcport, pinfo->destport, 0);
 
-    transaction = (struct dpaux_transaction*)wmem_alloc(wmem_file_scope(),
-        sizeof(struct dpaux_transaction));
+    transaction = wmem_new(wmem_file_scope(), struct dpaux_transaction);
     transaction->is_native = type;
     transaction->addr = addr;
 
@@ -221,7 +220,7 @@ dissect_dpaux_from_sink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     proto_item *ti;
 
     conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst,
-            ENDPOINT_NONE, pinfo->srcport, pinfo->destport, 0);
+            CONVERSATION_NONE, pinfo->srcport, pinfo->destport, 0);
     if (conversation)
         transaction = (struct dpaux_transaction*)conversation_get_proto_data(
             conversation, proto_dpaux);

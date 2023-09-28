@@ -20,8 +20,6 @@
 
 #include "config.h"
 
-#include <stdio.h>
-
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/conversation.h>
@@ -29,7 +27,9 @@
 #include "packet-scsi.h"
 #include <epan/crc32-tvb.h>
 #include <wsutil/crc32.h>
+#include <wsutil/inet_addr.h>
 #include <wsutil/strtoi.h>
+#include <wsutil/ws_roundup.h>
 
 void proto_register_iscsi(void);
 void proto_reg_handoff_iscsi(void);
@@ -192,6 +192,7 @@ static gint ett_iscsi_ISID = -1;
 /* #endif */
 
 static expert_field ei_iscsi_keyvalue_invalid = EI_INIT;
+static expert_field ei_iscsi_opcode_invalid = EI_INIT;
 
 enum iscsi_digest {
     ISCSI_DIGEST_AUTO,
@@ -512,70 +513,81 @@ typedef struct _iscsi_conv_data {
    dissector for the address/port that TargetAddress points to.
    (it starts to be common to use redirectors to point to non-3260 ports)
 */
+static address null_address = ADDRESS_INIT_NONE;
+
 static void
-iscsi_dissect_TargetAddress(packet_info *pinfo, tvbuff_t* tvb, proto_tree *tree, char *val, guint offset)
+iscsi_dissect_TargetAddress(packet_info *pinfo, tvbuff_t* tvb, proto_tree *tree, guint offset)
 {
-    address *addr = NULL;
+    address addr = ADDRESS_INIT_NONE;
     guint16 port;
-    char *value = wmem_strdup(wmem_packet_scope(), val);
-    char *p = NULL, *pgt = NULL;
+    int colon_offset;
+    int end_offset;
+    char *ip_str, *port_str;
 
-    if (value[0] == '[') {
-        /* this looks like an ipv6 address */
-        p = strchr(value, ']');
-        if (p != NULL) {
-            *p = 0;
-            p += 2;    /* skip past "]:" */
-
-            pgt = strchr(p, ',');
-            if (pgt != NULL) {
-                *pgt++ = 0;
-            }
-
-            /* can't handle ipv6 yet */
-        }
-    } else {
-        /* This is either a ipv4 address or a dns name */
-        int i0,i1,i2,i3;
-        if (sscanf(value, "%d.%d.%d.%d", &i0,&i1,&i2,&i3) == 4) {
-            /* looks like a ipv4 address */
-            p = strchr(value, ':');
-            if (p != NULL) {
-                char *addr_data;
-
-                *p++ = 0;
-
-                pgt = strchr(p, ',');
-                if (pgt != NULL) {
-                    *pgt++ = 0;
-                }
-
-                addr_data = (char *) wmem_alloc(wmem_packet_scope(), 4);
-                addr_data[0] = i0;
-                addr_data[1] = i1;
-                addr_data[2] = i2;
-                addr_data[3] = i3;
-
-                addr = wmem_new(wmem_packet_scope(), address);
-                addr->type = AT_IPv4;
-                addr->len  = 4;
-                addr->data = addr_data;
-
-                if (!ws_strtou16(p, NULL, &port)) {
-                    proto_tree_add_expert_format(tree, pinfo, &ei_iscsi_keyvalue_invalid,
-                        tvb, offset + (guint)strlen(value), (guint)strlen(p), "Invalid port: %s", p);
-                }
-            }
-
-        }
+    colon_offset = tvb_find_guint8(tvb, offset, -1, ':');
+    if (colon_offset == -1) {
+        /* RFC 7143 13.8 TargetAddress "If the TCP port is not specified,
+         * it is assumed to be the IANA-assigned default port for iSCSI",
+         * so nothing to do here.
+         */
+        return;
     }
 
+    /* We found a colon, so there's at least one byte and this won't fail. */
+    if (tvb_get_guint8(tvb, offset) == '[') {
+        offset++;
+        /* could be an ipv6 address */
+        end_offset = tvb_find_guint8(tvb, offset, -1, ']');
+        if (end_offset == -1) {
+            return;
+        }
+
+        /* look for the colon before the port, if any */
+        colon_offset = tvb_find_guint8(tvb, end_offset, -1, ':');
+        if (colon_offset == -1) {
+            return;
+        }
+
+        ws_in6_addr *ip6_addr = wmem_new(pinfo->pool, ws_in6_addr);
+        ip_str = tvb_get_string_enc(pinfo->pool, tvb, offset, end_offset - offset, ENC_ASCII);
+        if (ws_inet_pton6(ip_str, ip6_addr)) {
+            /* looks like a ipv6 address */
+            set_address(&addr, AT_IPv6, sizeof(ws_in6_addr), ip6_addr);
+        }
+
+    } else {
+        /* This is either a ipv4 address or a dns name */
+        ip_str = tvb_get_string_enc(pinfo->pool, tvb, offset, colon_offset - offset, ENC_ASCII);
+        ws_in4_addr *ip4_addr = wmem_new(pinfo->pool, ws_in4_addr);
+        if (ws_inet_pton4(ip_str, ip4_addr)) {
+            /* looks like a ipv4 address */
+            set_address(&addr, AT_IPv4, 4, ip4_addr);
+        }
+        /* else a DNS host name; we could, theoretically, try to use
+         * name resolution information in the capture to lookup the address.
+         */
+    }
+
+    /* Extract the port */
+    end_offset = tvb_find_guint8(tvb, colon_offset, -1, ',');
+    int port_len;
+    if (end_offset == -1) {
+        port_len = tvb_reported_length_remaining(tvb, colon_offset + 1);
+    } else {
+        port_len = end_offset - (colon_offset + 1);
+    }
+    port_str = tvb_get_string_enc(pinfo->pool, tvb, colon_offset + 1, port_len, ENC_ASCII);
+    if (!ws_strtou16(port_str, NULL, &port)) {
+        proto_tree_add_expert_format(tree, pinfo, &ei_iscsi_keyvalue_invalid,
+            tvb, colon_offset + 1, port_len, "Invalid port: %s", port_str);
+        return;
+    }
 
     /* attach a conversation dissector to this address/port tuple */
-    if (addr && !pinfo->fd->visited) {
+    if (!addresses_equal(&addr, &null_address) && !pinfo->fd->visited) {
         conversation_t *conv;
 
-        conv = conversation_new(pinfo->num, addr, addr, ENDPOINT_TCP, port, port, NO_ADDR2|NO_PORT2);
+        conv = conversation_new(pinfo->num, &addr, &null_address, CONVERSATION_TCP, port, 0, NO_ADDR2|NO_PORT2);
         if (conv == NULL) {
             return;
         }
@@ -587,30 +599,24 @@ iscsi_dissect_TargetAddress(packet_info *pinfo, tvbuff_t* tvb, proto_tree *tree,
 static gint
 addTextKeys(packet_info *pinfo, proto_tree *tt, tvbuff_t *tvb, gint offset, guint32 text_len) {
     const gint limit = offset + text_len;
+    tvbuff_t *keyvalue_tvb;
+    int len, value_offset;
 
     while(offset < limit) {
-        char *key = NULL, *value = NULL;
-        gint len = tvb_strnlen(tvb, offset, limit - offset);
-
-        if(len == -1) {
-            len = limit - offset;
-        } else {
-            len = len + 1;
-        }
-
-        key = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII);
-        if (key == NULL) {
+        /* RFC 7143 6.1 Text Format: "Every key=value pair, including the
+         * last or only pair in a LTDS, MUST be followed by one null (0x00)
+         * delimiter.
+         */
+        proto_tree_add_item_ret_length(tt, hf_iscsi_KeyValue, tvb, offset, -1, ENC_ASCII, &len);
+        keyvalue_tvb = tvb_new_subset_length(tvb, offset, len);
+        value_offset = tvb_find_guint8(keyvalue_tvb, 0, len, '=');
+        if (value_offset == -1) {
             break;
         }
-        value = strchr(key, '=');
-        if (value == NULL) {
-            break;
-        }
-        *value++ = 0;
+        value_offset++;
 
-        proto_tree_add_item(tt, hf_iscsi_KeyValue, tvb, offset, len, ENC_ASCII|ENC_NA);
-        if (!strcmp(key, "TargetAddress")) {
-            iscsi_dissect_TargetAddress(pinfo, tvb, tt, value, offset + (guint)strlen("TargetAddress") + 2);
+        if (tvb_strneql(keyvalue_tvb, 0, "TargetAddress=", strlen("TargetAddress=")) == 0) {
+            iscsi_dissect_TargetAddress(pinfo, keyvalue_tvb, tt, value_offset);
         }
 
         offset += len;
@@ -709,10 +715,10 @@ handleDataSegmentAsTextKeys(iscsi_session_t *iscsi_session, packet_info *pinfo, 
 
 /* Code to actually dissect the packets */
 static void
-dissect_iscsi_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, guint8 opcode, const char *opcode_str, guint32 data_segment_len, iscsi_session_t *iscsi_session, conversation_t *conversation) {
+dissect_iscsi_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint offset, guint8 opcode, guint32 data_segment_len, iscsi_session_t *iscsi_session, conversation_t *conversation) {
 
     guint original_offset = offset;
-    proto_tree *ti = NULL;
+    proto_tree *ti = NULL, *opcode_item = NULL;
     guint8 scsi_status = 0;
     gboolean S_bit=FALSE;
     gboolean A_bit=FALSE;
@@ -729,6 +735,7 @@ dissect_iscsi_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint off
     guint32 data_offset=0;
     wmem_tree_key_t key[3];
     guint32 itt;
+    const char* opcode_str = val_to_str_const(opcode, iscsi_opcodes, "Unknown");
 
     if(paddedDataSegmentLength & 3)
         paddedDataSegmentLength += 4 - (paddedDataSegmentLength & 3);
@@ -777,7 +784,7 @@ dissect_iscsi_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint off
 
     if(!cdata) {
         /* Create a fake temporary structure */
-        cdata = wmem_new(wmem_packet_scope(), iscsi_conv_data_t);
+        cdata = wmem_new(pinfo->pool, iscsi_conv_data_t);
         cdata->itlq.lun = 0xffff;
         cdata->itlq.scsi_opcode = 0xffff;
         cdata->itlq.task_flags = 0;
@@ -920,8 +927,11 @@ dissect_iscsi_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint off
                                             opcode_str);
         ti = proto_item_add_subtree(tp, ett_iscsi);
     }
-    proto_tree_add_uint(ti, hf_iscsi_Opcode, tvb,
-                        offset + 0, 1, opcode);
+    opcode_item = proto_tree_add_item(ti, hf_iscsi_Opcode, tvb,
+                        offset + 0, 1, ENC_NA);
+    if (!try_val_to_str(opcode, iscsi_opcodes)) {
+        expert_add_info(pinfo, opcode_item, &ei_iscsi_opcode_invalid);
+    }
     if((opcode & TARGET_OPCODE_BIT) == 0) {
         /* initiator -> target */
         gint b = tvb_get_guint8(tvb, offset + 0);
@@ -1035,7 +1045,7 @@ dissect_iscsi_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint off
 
                 /* strip off padding bytes */
                 if(ahs_offset & 3){
-                    ahs_offset=(ahs_offset+3) & ~3;
+                    ahs_offset=WS_ROUNDUP_4(ahs_offset);
                 }
 
             }
@@ -1534,8 +1544,7 @@ dissect_iscsi_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint off
         offset=end_offset;
     } else if(opcode == ISCSI_OPCODE_REJECT) {
         proto_tree *tt;
-        int next_opcode;
-        const char *next_opcode_str;
+        guint8 next_opcode;
 
         /* Reject */
         proto_tree_add_item(ti, hf_iscsi_Reject_Reason, tvb, offset + 2, 1, ENC_BIG_ENDIAN);
@@ -1549,12 +1558,11 @@ dissect_iscsi_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint off
         proto_tree_add_item(ti, hf_iscsi_DataSN, tvb, offset + 36, 4, ENC_BIG_ENDIAN);
         offset = handleHeaderDigest(iscsi_session, ti, tvb, offset, 48);
 
-        next_opcode = tvb_get_guint8(tvb, offset) & 0x3f;
-        next_opcode_str = try_val_to_str(next_opcode, iscsi_opcodes);
+        next_opcode = tvb_get_guint8(tvb, offset) & OPCODE_MASK;
 
         tt = proto_tree_add_subtree(ti, tvb, offset, -1, ett_iscsi_RejectHeader, NULL, "Rejected Header");
 
-        dissect_iscsi_pdu(tvb, pinfo, tt, offset, next_opcode, next_opcode_str, 0, iscsi_session, conversation);
+        dissect_iscsi_pdu(tvb, pinfo, tt, offset, next_opcode, 0, iscsi_session, conversation);
     } else if(opcode == ISCSI_OPCODE_VENDOR_SPECIFIC_I0 ||
               opcode == ISCSI_OPCODE_VENDOR_SPECIFIC_I1 ||
               opcode == ISCSI_OPCODE_VENDOR_SPECIFIC_I2 ||
@@ -2276,7 +2284,6 @@ dissect_iscsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean chec
 
     /* process multiple iSCSI PDUs per packet */
     while(available_bytes >= 48 || (iscsi_desegment && available_bytes >= 8)) {
-        const char *opcode_str = NULL;
         guint32 data_segment_len;
         guint32 pduLen = 48;
         guint8 secondPduByte = tvb_get_guint8(tvb, offset + 1);
@@ -2288,7 +2295,6 @@ dissect_iscsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean chec
         opcode = tvb_get_guint8(tvb, offset + 0);
         opcode &= OPCODE_MASK;
 
-        opcode_str = try_val_to_str(opcode, iscsi_opcodes);
         if(opcode == ISCSI_OPCODE_TASK_MANAGEMENT_FUNCTION ||
            opcode == ISCSI_OPCODE_TASK_MANAGEMENT_FUNCTION_RESPONSE ||
            opcode == ISCSI_OPCODE_R2T ||
@@ -2299,7 +2305,7 @@ dissect_iscsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean chec
         else
             data_segment_len = tvb_get_ntohl(tvb, offset + 4) & 0x00ffffff;
 
-        if(opcode_str == NULL) {
+        if (!try_val_to_str(opcode, iscsi_opcodes)) {
             badPdu = TRUE;
         }
 
@@ -2499,7 +2505,7 @@ dissect_iscsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean chec
         else
             col_append_str(pinfo->cinfo, COL_INFO, ", ");
 
-        dissect_iscsi_pdu(tvb, pinfo, tree, offset, opcode, opcode_str, data_segment_len, iscsi_session, conversation);
+        dissect_iscsi_pdu(tvb, pinfo, tree, offset, opcode, data_segment_len, iscsi_session, conversation);
         if(pduLen > available_bytes)
             pduLen = available_bytes;
         offset += pduLen;
@@ -2641,7 +2647,7 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_Opcode,
           { "Opcode", "iscsi.opcode",
-            FT_UINT8, BASE_HEX, VALS(iscsi_opcodes), 0,
+            FT_UINT8, BASE_HEX, VALS(iscsi_opcodes), OPCODE_MASK,
             NULL, HFILL }
         },
 /* #ifdef DRAFT08 */
@@ -2693,7 +2699,7 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_TotalAHSLength,
           { "TotalAHSLength", "iscsi.totalahslength",
-            FT_UINT8, BASE_HEX, NULL, 0,
+            FT_UINT8, BASE_DEC_HEX, NULL, 0,
             "Total additional header segment length (4 byte words)", HFILL }
         },
         { &hf_iscsi_InitiatorTaskTag,
@@ -2703,37 +2709,37 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_ExpectedDataTransferLength,
           { "ExpectedDataTransferLength", "iscsi.scsicommand.expecteddatatransferlength",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Expected length of data transfer", HFILL }
         },
         { &hf_iscsi_CmdSN,
           { "CmdSN", "iscsi.cmdsn",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Sequence number for this command", HFILL }
         },
         { &hf_iscsi_ExpStatSN,
           { "ExpStatSN", "iscsi.expstatsn",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Next expected status sequence number", HFILL }
         },
         { &hf_iscsi_SCSIResponse_ResidualCount,
           { "ResidualCount", "iscsi.scsiresponse.residualcount",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Residual count", HFILL }
         },
         { &hf_iscsi_StatSN,
           { "StatSN", "iscsi.statsn",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Status sequence number", HFILL }
         },
         { &hf_iscsi_ExpCmdSN,
           { "ExpCmdSN", "iscsi.expcmdsn",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Next expected command sequence number", HFILL }
         },
         { &hf_iscsi_MaxCmdSN,
           { "MaxCmdSN", "iscsi.maxcmdsn",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Maximum acceptable command sequence number", HFILL }
         },
         { &hf_iscsi_SCSIResponse_o,
@@ -2768,12 +2774,12 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_SCSIResponse_BidiReadResidualCount,
           { "BidiReadResidualCount", "iscsi.scsiresponse.bidireadresidualcount",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Bi-directional read residual count", HFILL }
         },
         { &hf_iscsi_SenseLength,
           { "SenseLength", "iscsi.scsiresponse.senselength",
-            FT_UINT16, BASE_HEX, NULL, 0,
+            FT_UINT16, BASE_DEC_HEX, NULL, 0,
             "Sense data length", HFILL }
         },
         { &hf_iscsi_SCSIData_F,
@@ -2808,17 +2814,17 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_BufferOffset,
           { "BufferOffset", "iscsi.bufferOffset",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Buffer offset", HFILL }
         },
         { &hf_iscsi_SCSIData_ResidualCount,
           { "ResidualCount", "iscsi.scsidata.readresidualcount",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Residual count", HFILL }
         },
         { &hf_iscsi_DataSN,
           { "DataSN", "iscsi.datasn",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Data sequence number", HFILL }
         },
         { &hf_iscsi_VersionMax,
@@ -2941,7 +2947,7 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_KeyValue,
           { "KeyValue", "iscsi.keyvalue",
-            FT_STRING, BASE_NONE, NULL, 0,
+            FT_STRINGZ, BASE_NONE, NULL, 0,
             "Key/value pair", HFILL }
         },
         { &hf_iscsi_Text_F,
@@ -2961,7 +2967,7 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_R2TSN,
           { "R2TSN", "iscsi.r2tsn",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "R2T PDU Number", HFILL }
         },
         { &hf_iscsi_TaskManagementFunction_Response,
@@ -2976,7 +2982,7 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_RefCmdSN,
           { "RefCmdSN", "iscsi.refcmdsn",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Command sequence number for command to be aborted", HFILL }
         },
         { &hf_iscsi_TaskManagementFunction_Function,
@@ -3006,7 +3012,7 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_DesiredDataLength,
           { "DesiredDataLength", "iscsi.desireddatalength",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Desired data length (bytes)", HFILL }
         },
         { &hf_iscsi_AsyncEvent,
@@ -3051,7 +3057,7 @@ proto_register_iscsi(void)
         },
         { &hf_iscsi_RunLength,
           { "RunLength", "iscsi.snack.runlength",
-            FT_UINT32, BASE_HEX, NULL, 0,
+            FT_UINT32, BASE_DEC_HEX, NULL, 0,
             "Number of additional missing status PDUs in this run", HFILL }
         },
     };
@@ -3071,7 +3077,9 @@ proto_register_iscsi(void)
 
     static ei_register_info ei[] = {
         { &ei_iscsi_keyvalue_invalid, { "iscsi.keyvalue.invalid", PI_MALFORMED, PI_ERROR,
-            "Invalid key/value pair", EXPFILL }}
+            "Invalid key/value pair", EXPFILL }},
+        { &ei_iscsi_opcode_invalid, { "iscsi.opcode.invalid", PI_MALFORMED, PI_ERROR,
+            "Invalid opcode", EXPFILL }},
     };
 
     /* Register the protocol name and description */

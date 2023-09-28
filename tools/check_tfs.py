@@ -104,11 +104,18 @@ def findDissectorFilesInFolder(folder):
             files.append(filename)
     return files
 
-issues_found = 0
+warnings_found = 0
+errors_found = 0
 
 # Check the given dissector file.
 def checkFile(filename, tfs_items, look_for_common=False):
-    global issues_found
+    global warnings_found
+    global errors_found
+
+    # Check file exists - e.g. may have been deleted in a recent commit.
+    if not os.path.exists(filename):
+        print(filename, 'does not exist!')
+        return
 
     # Find items.
     items = findItems(filename)
@@ -117,18 +124,34 @@ def checkFile(filename, tfs_items, look_for_common=False):
     for i in items:
         for t in tfs_items:
             found = False
-            exact_case = False
-            if tfs_items[t].val1 == items[i].val1 and tfs_items[t].val2 == items[i].val2:
-                found = True
-                exact_case = True
-            elif tfs_items[t].val1.upper() == items[i].val1.upper() and tfs_items[t].val2.upper() == items[i].val2.upper():
-                found = True
 
-            if found:
-                print(filename, i, "- could have used", t, 'from tfs.c instead: ', tfs_items[t],
-                      '' if exact_case else '  (capitalisation differs)')
-                issues_found += 1
-                break
+            #
+            # Do not do this check for plugins; plugins cannot import
+            # data values from libwireshark (functions, yes; data
+            # values, no).
+            #
+            # Test whether there's a common prefix for the file name
+            # and "plugin/epan/"; if so, this is a plugin, and there
+            # is no common path and os.path.commonprefix returns an
+            # empty string, otherwise it returns the common path, so
+            # we check whether the common path is an empty string.
+            #
+            if os.path.commonprefix([filename, 'plugin/epan/']) == '':
+                exact_case = False
+                if tfs_items[t].val1 == items[i].val1 and tfs_items[t].val2 == items[i].val2:
+                    found = True
+                    exact_case = True
+                elif tfs_items[t].val1.upper() == items[i].val1.upper() and tfs_items[t].val2.upper() == items[i].val2.upper():
+                    found = True
+
+                if found:
+                    print(filename, i, "- could have used", t, 'from tfs.c instead: ', tfs_items[t],
+                          '' if exact_case else '  (capitalisation differs)')
+                    if exact_case:
+                        errors_found += 1
+                    else:
+                        warnings_found += 1
+                    break
         if not found:
             if look_for_common:
                 AddCustomEntry(items[i].val1, items[i].val2, filename)
@@ -140,7 +163,7 @@ def checkFile(filename, tfs_items, look_for_common=False):
 # command-line args.  Controls which dissector files should be checked.
 # If no args given, will just scan epan/dissectors folder.
 parser = argparse.ArgumentParser(description='Check calls in dissectors')
-parser.add_argument('--file', action='store', default='',
+parser.add_argument('--file', action='append',
                     help='specify individual dissector file to test')
 parser.add_argument('--commits', action='store',
                     help='last N commits to check')
@@ -156,11 +179,15 @@ args = parser.parse_args()
 # Get files from wherever command-line args indicate.
 files = []
 if args.file:
-    # Add single specified file..
-    if not args.file.startswith('epan'):
-        files.append(os.path.join('epan', 'dissectors', args.file))
-    else:
-        files.append(args.file)
+    # Add specified file(s)
+    for f in args.file:
+        if not f.startswith('epan'):
+            f = os.path.join('epan', 'dissectors', f)
+        if not os.path.isfile(f):
+            print('Chosen file', f, 'does not exist.')
+            exit(1)
+        else:
+            files.append(f)
 elif args.commits:
     # Get files affected by specified number of commits.
     command = ['git', 'diff', '--name-only', 'HEAD~' + args.commits]
@@ -181,8 +208,6 @@ elif args.open:
                     for f in subprocess.check_output(command).splitlines()]
     # Only interested in dissector files.
     files_staged = list(filter(lambda f : is_dissector_file(f), files_staged))
-    for f in files:
-        files.append(f)
     for f in files_staged:
         if not f in files:
             files.append(f)
@@ -213,7 +238,10 @@ for f in files:
 
 
 # Show summary.
-print(issues_found, 'issues found')
+print(warnings_found, 'warnings found')
+if errors_found:
+    print(errors_found, 'errors found')
+    exit(1)
 
 if args.common:
     # Looking for items that could potentially be moved to tfs.c

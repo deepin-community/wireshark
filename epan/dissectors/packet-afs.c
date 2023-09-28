@@ -19,7 +19,7 @@
 
 #include "config.h"
 
-#include <stdio.h>
+#include <stdio.h>		/* for sscanf() */
 
 #include <epan/packet.h>
 #include <epan/conversation.h>
@@ -722,13 +722,13 @@ static void OUT_FS_AFSVolSync(ptvcursor_t *cursor)
 		int acllen; \
 		char tmp[10]; \
 		tmp[0] = 0; \
-		if ( acl & PRSFS_READ ) g_strlcat(tmp, "r", 10);	\
-		if ( acl & PRSFS_LOOKUP ) g_strlcat(tmp, "l", 10);	\
-		if ( acl & PRSFS_INSERT ) g_strlcat(tmp, "i", 10);	\
-		if ( acl & PRSFS_DELETE ) g_strlcat(tmp, "d", 10);	\
-		if ( acl & PRSFS_WRITE ) g_strlcat(tmp, "w", 10);	\
-		if ( acl & PRSFS_LOCK ) g_strlcat(tmp, "k", 10);	\
-		if ( acl & PRSFS_ADMINISTER ) g_strlcat(tmp, "a", 10);  \
+		if ( acl & PRSFS_READ ) (void) g_strlcat(tmp, "r", 10);	\
+		if ( acl & PRSFS_LOOKUP ) (void) g_strlcat(tmp, "l", 10);	\
+		if ( acl & PRSFS_INSERT ) (void) g_strlcat(tmp, "i", 10);	\
+		if ( acl & PRSFS_DELETE ) (void) g_strlcat(tmp, "d", 10);	\
+		if ( acl & PRSFS_WRITE ) (void) g_strlcat(tmp, "w", 10);	\
+		if ( acl & PRSFS_LOCK ) (void) g_strlcat(tmp, "k", 10);	\
+		if ( acl & PRSFS_ADMINISTER ) (void) g_strlcat(tmp, "a", 10);  \
 		save = tree; \
 		tree = proto_tree_add_subtree_format(tree, tvb, offset, bytes, \
 			ett_afs_acl, NULL, "ACL:  %s %s%s", \
@@ -1452,7 +1452,7 @@ afs_hash (gconstpointer v)
  *
  * "positive" and "negative" are integers which contain the number of
  * positive and negative ACL's in the string.  The uid/aclbits pair are
- * ASCII strings containing the UID/PTS record and and a ascii number
+ * ASCII strings containing the UID/PTS record and a ascii number
  * representing a logical OR of all the ACL permission bits
  */
 /*
@@ -1462,7 +1462,7 @@ afs_hash (gconstpointer v)
  *
  * Should this just scan the string itself, rather than using "sscanf()"?
  */
-#define GETSTR (tvb_format_text(tvb,ptvcursor_current_offset(cursor),tvb_captured_length_remaining(tvb,ptvcursor_current_offset(cursor))))
+#define GETSTR (tvb_format_text(wmem_packet_scope(),tvb,ptvcursor_current_offset(cursor),tvb_captured_length_remaining(tvb,ptvcursor_current_offset(cursor))))
 
 static void
 dissect_acl(ptvcursor_t *cursor, struct rxinfo *rxinfo _U_)
@@ -3015,7 +3015,7 @@ dissect_afs(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 			/* Process the packet according to what service it is */
 			/* Only for first packet in an rx data stream or the full reassembled stream */
 			if ( dissector && ( rxinfo->seq == 1 || reassembled ) ) {
-				cursor = ptvcursor_new(afs_op_tree, tvb, offset);
+				cursor = ptvcursor_new(pinfo->pool, afs_op_tree, tvb, offset);
 				(*dissector)(cursor, rxinfo, opcode);
 			}
 		}

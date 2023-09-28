@@ -16,10 +16,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
-#ifdef DEBUG
-#include <stdio.h>
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
-#endif
 
 #include <epan/packet.h>
 
@@ -55,7 +51,7 @@ void asn1_ctx_clean_epdv(asn1_ctx_t *actx) {
 void asn1_stack_frame_push(asn1_ctx_t *actx, const gchar *name) {
   asn1_stack_frame_t *frame;
 
-  frame = wmem_new0(wmem_packet_scope(), asn1_stack_frame_t);
+  frame = wmem_new0(actx->pinfo->pool, asn1_stack_frame_t);
   frame->name = name;
   frame->next = actx->stack;
   actx->stack = frame;
@@ -103,7 +99,7 @@ static asn1_par_t *push_new_par(asn1_ctx_t *actx) {
 
   DISSECTOR_ASSERT(actx->stack);
 
-  par = wmem_new0(wmem_packet_scope(), asn1_par_t);
+  par = wmem_new0(actx->pinfo->pool, asn1_par_t);
 
   pp = &(actx->stack->par);
   while (*pp)
@@ -260,9 +256,6 @@ double asn1_get_real(const guint8 *real_ptr, gint len) {
       p++;
     }
     val = (double) S * N * pow(2, F) * pow(B, E);
-#ifdef DEBUG
-    ws_debug_printf("S = %d, N = %lu, F = %u, B = %u, E = %d -> %f\n", S, N, F, B, E, val);
-#endif
   } else if (octet & 0x40) {  /* SpecialRealValue */
     switch (octet & 0x3F) {
       case 0x00: val = HUGE_VAL; break;

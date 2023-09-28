@@ -123,7 +123,7 @@ dissect_sebek(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 		case 2:	col_append_fstr(pinfo->cinfo, COL_INFO, " pid(%d)", tvb_get_ntohl(tvb, 20));
 				col_append_fstr(pinfo->cinfo, COL_INFO, " uid(%d)", tvb_get_ntohl(tvb, 24));
 				col_append_fstr(pinfo->cinfo, COL_INFO, " fd(%d)", tvb_get_ntohl(tvb, 28));
-				col_append_fstr(pinfo->cinfo, COL_INFO, " cmd: %s", tvb_format_text(tvb, 32, 12));
+				col_append_fstr(pinfo->cinfo, COL_INFO, " cmd: %s", tvb_format_text(pinfo->pool, tvb, 32, 12));
 				break;
 		case 3:	col_append_fstr(pinfo->cinfo, COL_INFO, " pid(%d)", tvb_get_ntohl(tvb, 24));
 				col_append_fstr(pinfo->cinfo, COL_INFO, " uid(%d)", tvb_get_ntohl(tvb, 28));
@@ -131,7 +131,7 @@ dissect_sebek(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 				cmd_len = tvb_strnlen(tvb, 40, 12);
 				if (cmd_len<0)
 					cmd_len = 0;
-				col_append_fstr(pinfo->cinfo, COL_INFO, " cmd: %s", tvb_format_text(tvb, 40, cmd_len));
+				col_append_fstr(pinfo->cinfo, COL_INFO, " cmd: %s", tvb_format_text(pinfo->pool, tvb, 40, cmd_len));
 				break;
 		default:
 			break;
@@ -173,13 +173,13 @@ dissect_sebek(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 				proto_tree_add_item(sebek_tree, hf_sebek_fd, tvb, offset, 4, ENC_BIG_ENDIAN);
 				offset += 4;
 
-				proto_tree_add_item(sebek_tree, hf_sebek_cmd, tvb, offset, 12, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(sebek_tree, hf_sebek_cmd, tvb, offset, 12, ENC_ASCII);
 				offset += 12;
 
 				proto_tree_add_item(sebek_tree, hf_sebek_len, tvb, offset, 4, ENC_BIG_ENDIAN);
 				offset += 4;
 
-				proto_tree_add_item(sebek_tree, hf_sebek_data, tvb, offset, -1, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(sebek_tree, hf_sebek_data, tvb, offset, -1, ENC_ASCII);
 
 				break;
 
@@ -214,7 +214,7 @@ dissect_sebek(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 				proto_tree_add_item(sebek_tree, hf_sebek_inode, tvb, offset, 4, ENC_BIG_ENDIAN);
 				offset += 4;
 
-				proto_tree_add_item(sebek_tree, hf_sebek_cmd, tvb, offset, 12, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(sebek_tree, hf_sebek_cmd, tvb, offset, 12, ENC_ASCII);
 				offset += 12;
 
 				proto_tree_add_item(sebek_tree, hf_sebek_len, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -235,7 +235,7 @@ dissect_sebek(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 					proto_tree_add_item(sebek_tree, hf_sebek_socket_proto, tvb, offset, 1, ENC_BIG_ENDIAN);
 					offset += 1;
 				} else {
-					proto_tree_add_item(sebek_tree, hf_sebek_data, tvb, offset, -1, ENC_ASCII|ENC_NA);
+					proto_tree_add_item(sebek_tree, hf_sebek_data, tvb, offset, -1, ENC_ASCII);
 				}
 
 				break;

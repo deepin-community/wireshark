@@ -19,6 +19,7 @@
  *           (not yet implemented)
  * RFC 6038: TWAMP Reflect Octets and Symmetrical Size Features
  *           (not yet implemented)
+ * RFC 8186: Support of the IEEE 1588 Timestamp Format in TWAMP
  */
 
 #include <config.h>
@@ -41,6 +42,8 @@ void proto_register_twamp(void);
 #define TWAMP_MODE_UNAUTHENTICATED  0x1
 #define TWAMP_MODE_AUTHENTICATED    0x2
 #define TWAMP_MODE_ENCRYPTED        0x4
+
+#define TWAMP_ERROR_ESTIMATE_ZBIT   0x4000
 
 enum twamp_control_state {
     CONTROL_STATE_UNKNOWN = 0,
@@ -121,6 +124,10 @@ static int hf_twamp_control_keyid  = -1;
 static int hf_twamp_control_sessionid  = -1;
 static int hf_twamp_control_iv = -1;
 static int hf_twamp_control_ipvn = -1;
+static int hf_twamp_control_conf_sender = -1;
+static int hf_twamp_control_conf_receiver = -1;
+static int hf_twamp_control_number_of_schedule_slots = -1;
+static int hf_twamp_control_number_of_packets = -1;
 static int hf_twamp_control_start_time = -1;
 static int hf_twamp_control_accept = -1;
 static int hf_twamp_control_timeout = -1;
@@ -250,9 +257,9 @@ dissect_twamp_control(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
             sender_port = tvb_get_ntohs(tvb, 12);
             receiver_port = tvb_get_ntohs(tvb, 14);
             /* try to find session from past visits */
-            if ((list = g_slist_find_custom(ct->sessions, &sender_port,
-                    (GCompareFunc) find_twamp_session_by_sender_port)) == NULL) {
-                session = (twamp_session_t *) g_malloc0(sizeof(twamp_session_t));
+            if (g_slist_find_custom(ct->sessions, &sender_port,
+                    (GCompareFunc) find_twamp_session_by_sender_port) == NULL) {
+                session = g_new0(twamp_session_t, 1);
                 session->sender_port = sender_port;
                 session->receiver_port = receiver_port;
                 session->accepted = 0;
@@ -292,10 +299,10 @@ dissect_twamp_control(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
                 session = (twamp_session_t*) list->data;
                 session->receiver_port = receiver_port;
 
-                cp->conversation = find_conversation(pinfo->fd->num, &pinfo->dst, &pinfo->src, ENDPOINT_UDP,
+                cp->conversation = find_conversation(pinfo->fd->num, &pinfo->dst, &pinfo->src, CONVERSATION_UDP,
                         session->sender_port, session->receiver_port, 0);
                 if (cp->conversation == NULL /*|| cp->conversation->dissector_handle != twamp_test_handle*/) {
-                    cp->conversation = conversation_new(pinfo->fd->num, &pinfo->dst, &pinfo->src, ENDPOINT_UDP,
+                    cp->conversation = conversation_new(pinfo->fd->num, &pinfo->dst, &pinfo->src, CONVERSATION_UDP,
                             session->sender_port, session->receiver_port, 0);
                     if (cp->conversation) {
                         /* create conversation specific data for test sessions */
@@ -385,8 +392,20 @@ dissect_twamp_control(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
 
         ipvn = tvb_get_guint8(tvb, offset) & 0x0F;
         proto_tree_add_uint(twamp_tree, hf_twamp_control_ipvn, tvb, offset, 1, ipvn);
+        offset += 1;
 
-        offset = 12;
+        proto_tree_add_item(twamp_tree, hf_twamp_control_conf_sender, tvb, offset, 1, ENC_NA);
+        offset += 1;
+
+        proto_tree_add_item(twamp_tree, hf_twamp_control_conf_receiver, tvb, offset, 1, ENC_NA);
+        offset += 1;
+
+        proto_tree_add_item(twamp_tree, hf_twamp_control_number_of_schedule_slots, tvb, offset, 4, ENC_BIG_ENDIAN);
+        offset += 4;
+
+        proto_tree_add_item(twamp_tree, hf_twamp_control_number_of_packets, tvb, offset, 4, ENC_BIG_ENDIAN);
+        offset += 4;
+
         proto_tree_add_item(twamp_tree, hf_twamp_control_sender_port, tvb, offset, 2, ENC_BIG_ENDIAN);
         offset += 2;
         proto_tree_add_item(twamp_tree, hf_twamp_control_receiver_port, tvb, offset, 2, ENC_BIG_ENDIAN);
@@ -516,6 +535,11 @@ static const true_false_string tfs_twamp_sbit_tfs = {
     "No notion of external synchronization"
 };
 
+static const true_false_string tfs_twamp_zbit_tfs = {
+    "Abbreviated PTP Timestamp (RFC8186)",
+    "Always Zero (RFC5357) or NTP Timestamp (RFC8186)"
+};
+
 static int
 dissect_owamp_test(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
@@ -578,7 +602,10 @@ dissect_twamp_test(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     proto_tree_add_item(twamp_tree, hf_twamp_seq_number, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset += 4;
 
-    proto_tree_add_item(twamp_tree, hf_twamp_timestamp, tvb, offset, 8, ENC_TIME_NTP | ENC_BIG_ENDIAN);
+    if (tvb_get_ntohs(tvb, offset + 8) & TWAMP_ERROR_ESTIMATE_ZBIT)
+        proto_tree_add_item(twamp_tree, hf_twamp_timestamp, tvb, offset, 8, ENC_TIME_SECS_NSECS | ENC_BIG_ENDIAN);
+    else
+        proto_tree_add_item(twamp_tree, hf_twamp_timestamp, tvb, offset, 8, ENC_TIME_NTP | ENC_BIG_ENDIAN);
     offset += 8;
 
     /*
@@ -596,16 +623,22 @@ dissect_twamp_test(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
     if (tvb_reported_length(tvb) - offset >= 27) {
         proto_tree_add_item (twamp_tree, hf_twamp_mbz1, tvb, offset, 2, ENC_BIG_ENDIAN);
         offset += 2;
-        proto_tree_add_item(twamp_tree, hf_twamp_receive_timestamp, tvb, offset, 8, ENC_TIME_NTP | ENC_BIG_ENDIAN);
+        if (tvb_get_ntohs(tvb, offset - 4) & TWAMP_ERROR_ESTIMATE_ZBIT)
+            proto_tree_add_item(twamp_tree, hf_twamp_receive_timestamp, tvb, offset, 8, ENC_TIME_SECS_NSECS | ENC_BIG_ENDIAN);
+        else
+            proto_tree_add_item(twamp_tree, hf_twamp_receive_timestamp, tvb, offset, 8, ENC_TIME_NTP | ENC_BIG_ENDIAN);
         offset += 8;
 
         proto_tree_add_item (twamp_tree, hf_twamp_sender_seq_number, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
 
-        proto_tree_add_item(twamp_tree, hf_twamp_sender_timestamp, tvb, offset, 8, ENC_TIME_NTP | ENC_BIG_ENDIAN);
+        if (tvb_get_ntohs(tvb, offset) & TWAMP_ERROR_ESTIMATE_ZBIT)
+            proto_tree_add_item(twamp_tree, hf_twamp_sender_timestamp, tvb, offset, 8, ENC_TIME_NTP | ENC_BIG_ENDIAN);
+        else
+            proto_tree_add_item(twamp_tree, hf_twamp_sender_timestamp, tvb, offset, 8, ENC_TIME_SECS_NSECS | ENC_BIG_ENDIAN);
         offset += 8;
 
-        proto_tree_add_item (twamp_tree, hf_twamp_sender_error_estimate, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_bitmask(twamp_tree, tvb, offset, hf_twamp_sender_error_estimate, ett_twamp_error_estimate, twamp_error_estimate_flags, ENC_BIG_ENDIAN);
         offset += 2;
         proto_tree_add_item (twamp_tree, hf_twamp_mbz2, tvb, offset, 2, ENC_BIG_ENDIAN);
         offset += 2;
@@ -636,7 +669,7 @@ void proto_register_twamp(void)
          {"Error Estimate", "twamp.test.error_estimate", FT_UINT16,
           BASE_DEC_HEX, NULL, 0x0, NULL, HFILL}},
         {&hf_twamp_mbz1,
-         {"MBZ", "twamp.test.mbz1", FT_UINT8, BASE_DEC_HEX,
+         {"MBZ", "twamp.test.mbz1", FT_UINT16, BASE_DEC_HEX,
           NULL, 0x0, NULL, HFILL}},
         {&hf_twamp_receive_timestamp,
          {"Receive Timestamp", "twamp.test.receive_timestamp", FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0x0, NULL, HFILL}},
@@ -649,7 +682,7 @@ void proto_register_twamp(void)
          {"Sender Error Estimate", "twamp.test.sender_error_estimate",
           FT_UINT16, BASE_DEC_HEX, NULL, 0x0, NULL, HFILL}},
         {&hf_twamp_mbz2,
-         {"MBZ", "twamp.test.mbz2", FT_UINT8, BASE_DEC_HEX,
+         {"MBZ", "twamp.test.mbz2", FT_UINT16, BASE_DEC_HEX,
           NULL, 0x0, NULL, HFILL}},
         {&hf_twamp_sender_ttl,
          {"Sender TTL", "twamp.test.sender_ttl", FT_UINT8, BASE_DEC,
@@ -665,7 +698,7 @@ void proto_register_twamp(void)
           NULL, 0x3f00, NULL, HFILL } },
         { &hf_twamp_error_estimate_b14,
           { "Z", "twamp.test.error_estimate.z", FT_BOOLEAN, 16,
-          NULL, 0x4000, NULL, HFILL } },
+          TFS(&tfs_twamp_zbit_tfs), 0x4000, NULL, HFILL } },
         { &hf_twamp_error_estimate_b15,
           { "S", "twamp.test.error_estimate.s", FT_BOOLEAN, 16,
           TFS(&tfs_twamp_sbit_tfs), 0x8000, NULL, HFILL } },
@@ -747,6 +780,18 @@ void proto_register_twamp(void)
         },
         {&hf_twamp_control_ipvn,
             {"IP Version", "twamp.control.ipvn", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        {&hf_twamp_control_conf_sender,
+            {"Conf-Sender", "twamp.control.conf_sender", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        {&hf_twamp_control_conf_receiver,
+            {"Conf-Receiver", "twamp.control.conf_receiver", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        {&hf_twamp_control_number_of_schedule_slots,
+            {"Number of Schedule Slots", "twamp.control.number_of_schedule_slots", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
+        },
+        {&hf_twamp_control_number_of_packets,
+            {"Number of Packets", "twamp.control.number_of_packets", FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL}
         },
         {&hf_twamp_control_sender_ipv4,
             {"Sender Address", "twamp.control.sender_ipv4", FT_IPv4, BASE_NONE, NULL, 0x0,

@@ -1,4 +1,4 @@
-/* manage_interfaces_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -66,8 +66,6 @@ private slots:
     void on_delPipe_clicked();
 #endif
 
-    void onSelectionChanged(const QItemSelection &sel, const QItemSelection &desel);
-
 #ifdef HAVE_PCAP_REMOTE
     void on_addRemote_clicked();
     void on_delRemote_clicked();
@@ -84,16 +82,3 @@ private slots:
 };
 
 #endif // MANAGE_INTERFACES_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

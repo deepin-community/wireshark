@@ -1322,7 +1322,7 @@ dissect_elf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
     file_size = ehsize + (guint32)phnum * (guint32)phentsize + (guint32)shnum * (guint32)shentsize;
 
     /* Collect infos for blackholes */
-    segment_info = (segment_info_t *) wmem_alloc(wmem_packet_scope(), sizeof(segment_info_t) * (shnum + phnum + 3));
+    segment_info = (segment_info_t *) wmem_alloc(pinfo->pool, sizeof(segment_info_t) * (shnum + phnum + 3));
 
     segment_info[area_counter].offset = 0;
     segment_info[area_counter].size = ehsize;
@@ -1436,7 +1436,7 @@ dissect_elf(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
         if (segment_size) {
             gchar  *name;
 
-            name = wmem_strdup_printf(wmem_packet_scope(), "ProgramHeaderEntry #%u", phnum - i_16 - 1);
+            name = wmem_strdup_printf(pinfo->pool, "ProgramHeaderEntry #%u", phnum - i_16 - 1);
 
             proto_tree_add_bytes_format(ph_entry_tree, hf_elf_segment, tvb, value_guard(p_offset), value_guard(segment_size), NULL, "Segment");
 
@@ -2266,7 +2266,7 @@ proto_register_elf(void)
         { &hf_elf_eh_frame_fde_cie_pointer,
             { "CIE Pointer",                               "elf.eh_frame.fde.cie_pointer",
             FT_UINT32, BASE_DEC_HEX, NULL, 0x00,
-            "A 4 byte unsigned value that when subtracted from the offset of the the CIE Pointer in the current FDE yields the offset of the start of the associated CIE. This value shall never be 0.", HFILL }
+            "A 4 byte unsigned value that when subtracted from the offset of the CIE Pointer in the current FDE yields the offset of the start of the associated CIE. This value shall never be 0.", HFILL }
         },
         { &hf_elf_eh_frame_fde_pc_begin,
             { "PC Begin",                                  "elf.eh_frame.fde.pc_begin",

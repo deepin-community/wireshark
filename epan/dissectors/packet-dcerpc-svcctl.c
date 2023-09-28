@@ -214,7 +214,7 @@ svcctl_scm_specific_rights(tvbuff_t *tvb, gint offset, proto_tree *tree,
 	proto_tree_add_boolean(tree, hf_svcctl_scm_rights_connect, tvb, offset, 4, access);
 }
 
-struct access_mask_info svcctl_scm_access_mask_info = {
+static struct access_mask_info svcctl_scm_access_mask_info = {
 	"SVCCTL",
 	svcctl_scm_specific_rights,
 	NULL,			/* Generic mapping table */
@@ -297,7 +297,7 @@ svcctl_dissect_OpenSCManager_reply(tvbuff_t *tvb, int offset,
 		const char *pol_name;
 
 		if (dcv->se_data){
-			pol_name = wmem_strdup_printf(wmem_packet_scope(),
+			pol_name = wmem_strdup_printf(pinfo->pool,
 				"OpenSCManagerW(%s)", (char *)dcv->se_data);
 		} else {
 			pol_name = "Unknown OpenSCManagerW() handle";
@@ -381,7 +381,7 @@ svcctl_dissect_OpenSCManagerW_reply(tvbuff_t *tvb, int offset,
 		const char *pol_name;
 
 		if (dcv->se_data){
-			pol_name = wmem_strdup_printf(wmem_packet_scope(),
+			pol_name = wmem_strdup_printf(pinfo->pool,
 				"OpenSCManagerW(%s)", (char *)dcv->se_data);
 		} else {
 			pol_name = "Unknown OpenSCManagerW() handle";

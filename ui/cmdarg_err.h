@@ -1,4 +1,5 @@
-/* cmdarg_err.h
+/** @file
+ *
  * Declarations of routines to report command-line argument errors.
  *
  * Wireshark - Network traffic analyzer
@@ -29,6 +30,10 @@ cmdarg_err_init(void (*err)(const char *, va_list),
 /*
  * Report an error in command-line arguments.
  */
+extern void
+vcmdarg_err(const char *fmt, va_list ap)
+    G_GNUC_PRINTF(1, 0);
+
 extern void
 cmdarg_err(const char *fmt, ...)
     G_GNUC_PRINTF(1, 2);

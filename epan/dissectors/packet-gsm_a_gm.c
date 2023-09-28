@@ -71,6 +71,12 @@
  *   Stage 3
  *   (3GPP TS 24.008 version 15.6.0 Release 15)
  *
+ *   Reference [16]
+ *   Mobile radio interface Layer 3 specification;
+ *   Core network protocols;
+ *   Stage 3
+ *   (3GPP TS 24.008 version 16.6.0 Release 16)
+ *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
  * Copyright 1998 Gerald Combs
@@ -84,6 +90,7 @@
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/ipproto.h>
+#include <epan/etypes.h>
 #include "packet-ber.h"
 #include "packet-gsm_a_common.h"
 #include "packet-e212.h"
@@ -297,6 +304,11 @@ static int hf_gsm_a_sm_tft_ip_flow_number = -1;
 static int hf_gsm_a_sm_tft_packet_filter_identifier = -1;
 static int hf_gsm_a_sm_tft_parameter_content = -1;
 static int hf_gsm_a_sm_tft_packet_filter_component_type_id = -1;
+static int hf_gsm_a_sm_tft_mac_addr = -1;
+static int hf_gsm_a_sm_tft_vlan_tag_vid = -1;
+static int hf_gsm_a_sm_tft_vlan_tag_pcp = -1;
+static int hf_gsm_a_sm_tft_vlan_tag_dei = -1;
+static int hf_gsm_a_sm_tft_ethertype = -1;
 static int hf_gsm_a_gm_acc_tech_type = -1;
 static int hf_gsm_a_gm_acc_cap_struct_len = -1;
 static int hf_gsm_a_gm_sms_value = -1;
@@ -563,6 +575,18 @@ static int hf_gsm_a_gm_sm_pco_pdu_session_address_lifetime = -1;
 static int hf_gsm_a_gm_sm_pco_eth_frame_payload_mtu = -1;
 static int hf_gsm_a_gm_sm_pco_unstruct_link_mtu = -1;
 static int hf_gsm_a_gm_sm_pco_5gsm_cause = -1;
+static int hf_gsm_a_gm_sm_pco_acs_info = -1;
+static int hf_gsm_a_gm_sm_pco_init_small_data_rate_ctrl_params_max_ul_rate_allowed = -1;
+static int hf_gsm_a_gm_sm_pco_init_small_data_rate_ctrl_params_termination_timestamp = -1;
+static int hf_gsm_a_gm_sm_pco_atsss_response = -1;
+static int hf_gsm_a_gm_sm_pco_dns_serv_sec_info_type = -1;
+static int hf_gsm_a_gm_sm_pco_dns_serv_sec_info_sec_proto_type = -1;
+static int hf_gsm_a_gm_sm_pco_dns_serv_sec_info_port_number = -1;
+static int hf_gsm_a_gm_sm_pco_dns_serv_sec_info_auth_domain_name = -1;
+static int hf_gsm_a_gm_sm_pco_dns_serv_sec_info_spki_pin_set = -1;
+static int hf_gsm_a_gm_sm_pco_dns_serv_sec_info_root_certificate = -1;
+static int hf_gsm_a_gm_sm_pco_dns_serv_sec_info_raw_public_key = -1;
+static int hf_gsm_a_gm_sm_pco_dns_serv_sec_info_value_part = -1;
 static int hf_gsm_a_sm_pdp_type_number = -1;
 static int hf_gsm_a_sm_pdp_address = -1;
 static int hf_gsm_a_gm_ti_value = -1;
@@ -580,7 +604,6 @@ static gint ett_sm_pco = -1;
 static expert_field ei_gsm_a_gm_extraneous_data = EI_INIT;
 static expert_field ei_gsm_a_gm_not_enough_data = EI_INIT;
 static expert_field ei_gsm_a_gm_undecoded = EI_INIT;
-static expert_field ei_gsm_a_gm_apn_too_long = EI_INIT;
 static expert_field ei_gsm_a_gm_missing_mandatory_element = EI_INIT;
 
 static dissector_handle_t rrc_irat_ho_info_handle;
@@ -686,7 +709,7 @@ de_gmm_ciph_alg(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
 /*
  * [13] 10.5.5.3a Integrity protection algorithm
  */
-const value_string gsm_a_gm_type_of_integ_alg_vals[] = {
+static const value_string gsm_a_gm_type_of_integ_alg_vals[] = {
 	{ 0x00, "GPRS Integrity Algorithm GIA/4" },
 	{ 0x01, "GPRS Integrity Algorithm GIA/5" },
 	{ 0x02, "GPRS Integrity Algorithm GIA/6" },
@@ -707,7 +730,7 @@ de_gmm_integ_alg(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint3
 /*
  * [9] 10.5.5.4 TMSI status
  */
-const true_false_string gsm_a_gm_tmsi_flag_value = {
+static const true_false_string gsm_a_gm_tmsi_flag_value = {
 	"valid TMSI available",
 	"no valid TMSI available"
 };
@@ -725,19 +748,19 @@ de_gmm_tmsi_stat(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint3
 /*
  * [7] 10.5.5.5
  */
-const true_false_string gsm_a_gm_power_off_value = {
+static const true_false_string gsm_a_gm_power_off_value = {
 	"power switched off",
 	"normal detach"
 };
 
-const value_string gsm_a_gm_type_of_detach_mo_vals[] = {
+static const value_string gsm_a_gm_type_of_detach_mo_vals[] = {
 	{ 0x01, "GPRS detach" },
 	{ 0x02, "IMSI detach" },
 	{ 0x03, "Combined GPRS/IMSI detach" },
 	{ 0, NULL }
 };
 
-const value_string gsm_a_gm_type_of_detach_mt_vals[] = {
+static const value_string gsm_a_gm_type_of_detach_mt_vals[] = {
 	{ 0x01, "re-attach required" },
 	{ 0x02, "re-attach not required" },
 	{ 0x03, "IMSI detach (after VLR failure)" },
@@ -1561,10 +1584,10 @@ static void
 gsm_a_gm_dlmc_max_nb_dl_ts_fmt(gchar *s, guint32 v)
 {
 	if (v < 0x3E)
-		g_snprintf(s, ITEM_LABEL_LENGTH, "%u TS supported (%u)",
+		snprintf(s, ITEM_LABEL_LENGTH, "%u TS supported (%u)",
 		           2*v + 6, v);
 	else
-		g_snprintf(s, ITEM_LABEL_LENGTH, "Reserved (%u)", v);
+		snprintf(s, ITEM_LABEL_LENGTH, "Reserved (%u)", v);
 }
 
 static const value_string gsm_a_gm_dlmc_max_nb_dl_carriers_vals[] = {
@@ -1857,7 +1880,7 @@ de_gmm_ms_radio_acc_cap(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gui
 
 				/* decode_bits_in_field(gint bit_offset, gint no_of_bits, guint64 value)*/
 				proto_tree_add_uint_format(tf_tree, hf_gsm_a_gm_rf_power_capability, tvb, curr_offset-1-add_octets, 1+add_octets, value,
-												"%s RF Power Capability, GMSK Power Class: %s (%u)", decode_bits_in_field(bit_offset, 3, value), str, value);
+												"%s RF Power Capability, GMSK Power Class: %s (%u)", decode_bits_in_field(pinfo->pool, bit_offset, 3, value, ENC_BIG_ENDIAN), str, value);
 				bit_offset	  += 3;
 				curr_bits_length  -= bits_needed;
 				oct		 <<= bits_needed;
@@ -1925,7 +1948,7 @@ de_gmm_ms_radio_acc_cap(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, gui
 			str = "Not specified??";
 
 		proto_tree_add_uint_format(tf_tree, hf_gsm_a_gm_rf_power_capability, tvb, curr_offset-1-add_octets, 1+add_octets, value,
-						"%s RF Power Capability, GMSK Power Class: %s (%u)", decode_bits_in_field(bit_offset, 3, value), str, value);
+						"%s RF Power Capability, GMSK Power Class: %s (%u)", decode_bits_in_field(pinfo->pool, bit_offset, 3, value, ENC_BIG_ENDIAN), str, value);
 
 		bit_offset	  += 3;
 		curr_bits_length  -= bits_needed;
@@ -3486,7 +3509,7 @@ de_gmm_rai(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, 
 	{
 		if (add_string[0] == '\0')
 		{
-			g_snprintf(add_string, string_len, " - RAI: %x-%x-%u-%u", mcc, mnc, lac, rac);
+			snprintf(add_string, string_len, " - RAI: %x-%x-%u-%u", mcc, mnc, lac, rac);
 		}
 	}
 
@@ -3917,22 +3940,22 @@ de_gmm_net_res_id_cont(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, 
 
 /* [13] 10.5.5.32 Extended DRX parameters */
 static const value_string gsm_a_gm_paging_time_window_vals[] = {
-	{0x0,	"Iu: 0 s / WB-S1: 1.28 s / NB-S1: 2.56 s"},
-	{0x1,	"Iu: 1 s / WB-S1: 2.56 s / NB-S1: 5.12 s"},
-	{0x2,	"Iu: 2 s / WB-S1: 3.84 s / NB-S1: 7.68 s"},
-	{0x3,	"Iu: 3 s / WB-S1: 5.12 s / NB-S1: 10.24 s"},
-	{0x4,	"Iu: 4 s / WB-S1: 6.4 s / NB-S1: 12.8 s"},
-	{0x5,	"Iu: 5 s / WB-S1: 7.68 s / NB-S1: 15.36 s"},
-	{0x6,	"Iu: 6 s / WB-S1: 8.96 s / NB-S1: 17.92 s"},
-	{0x7,	"Iu: 7 s / WB-S1: 10.24 s / NB-S1: 20.48 s"},
-	{0x8,	"Iu: 8 s / WB-S1: 11.52 s / NB-S1: 23.04 s"},
-	{0x9,	"Iu: 9 s / WB-S1: 12.8 s / NB-S1: 25.6 s"},
-	{0xa,	"Iu: 10 s / WB-S1: 14.08 s / NB-S1: 28.16 s"},
-	{0xb,	"Iu: 12 s / WB-S1: 15.36 s / NB-S1: 30.72 s"},
-	{0xc,	"Iu: 14 s / WB-S1: 16.64 s / NB-S1: 33.28 s"},
-	{0xd,	"Iu: 16 s / WB-S1: 17.92 s / NB-S1: 35.84 s"},
-	{0xe,	"Iu: 18 s / WB-S1: 19.2 s / NB-S1: 38.4 s"},
-	{0xf,	"Iu: 20 s / WB-S1: 20.48 s / NB-S1: 40.96 s"},
+	{0x0,	"Iu: 0 s / WB-S1/WB-N1: 1.28 s / NB-S1/NB-N1: 2.56 s"},
+	{0x1,	"Iu: 1 s / WB-S1/WB-N1: 2.56 s / NB-S1/NB-N1: 5.12 s"},
+	{0x2,	"Iu: 2 s / WB-S1/WB-N1: 3.84 s / NB-S1/NB-N1: 7.68 s"},
+	{0x3,	"Iu: 3 s / WB-S1/WB-N1: 5.12 s / NB-S1/NB-N1: 10.24 s"},
+	{0x4,	"Iu: 4 s / WB-S1/WB-N1: 6.4 s / NB-S1/NB-N1: 12.8 s"},
+	{0x5,	"Iu: 5 s / WB-S1/WB-N1: 7.68 s / NB-S1/NB-N1: 15.36 s"},
+	{0x6,	"Iu: 6 s / WB-S1/WB-N1: 8.96 s / NB-S1/NB-N1: 17.92 s"},
+	{0x7,	"Iu: 7 s / WB-S1/WB-N1: 10.24 s / NB-S1/NB-N1: 20.48 s"},
+	{0x8,	"Iu: 8 s / WB-S1/WB-N1: 11.52 s / NB-S1/NB-N1: 23.04 s"},
+	{0x9,	"Iu: 9 s / WB-S1/WB-N1: 12.8 s / NB-S1/NB-N1: 25.6 s"},
+	{0xa,	"Iu: 10 s / WB-S1/WB-N1: 14.08 s / NB-S1/NB-N1: 28.16 s"},
+	{0xb,	"Iu: 12 s / WB-S1/WB-N1: 15.36 s / NB-S1/NB-N1: 30.72 s"},
+	{0xc,	"Iu: 14 s / WB-S1/WB-N1: 16.64 s / NB-S1/NB-N1: 33.28 s"},
+	{0xd,	"Iu: 16 s / WB-S1/WB-N1: 17.92 s / NB-S1/NB-N1: 35.84 s"},
+	{0xe,	"Iu: 18 s / WB-S1/WB-N1: 19.2 s / NB-S1/NB-N1: 38.4 s"},
+	{0xf,	"Iu: 20 s / WB-S1/WB-N1: 20.48 s / NB-S1/NB-N1: 40.96 s"},
 	{  0,	NULL }
 };
 
@@ -3979,7 +4002,7 @@ de_gmm_mac(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offs
 }
 
 /* [13] 10.5.5.34 User Plane integrity indicator */
-const true_false_string gsm_a_gm_up_integ_ind_value = {
+static const true_false_string gsm_a_gm_up_integ_ind_value = {
 	"MS shall enable integrity protection of user plane data in LLC layer",
 	"MS shall disable integrity protection of user plane data in LLC layer"
 };
@@ -4013,7 +4036,7 @@ de_gmm_plmn_id_cn_operator(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, 
 }
 
 /* [14] 10.5.5.37 Non-3GPP NW provided policies */
-const true_false_string gsm_a_gm_n3en_ind_value = {
+static const true_false_string gsm_a_gm_n3en_ind_value = {
 	"Use of non-3GPP emergency numbers permitted",
 	"Use of non-3GPP emergency numbers not permitted"
 };
@@ -4368,29 +4391,10 @@ guint16
 de_sm_apn(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, guint len, gchar *add_string _U_, int string_len _U_)
 {
 	guint32     curr_offset;
-	guint       curr_len;
-	guint8     *str;
-	proto_item *pi;
 
 	curr_offset = offset;
 
-	str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_ASCII|ENC_NA);
-
-	curr_len = 0;
-	while (curr_len < len)
-	{
-		guint step    = str[curr_len];
-		str[curr_len] = '.';
-		curr_len     += step+1;
-	}
-
-	/* Highlight bytes including the first length byte */
-	if (str[0]) {
-		pi = proto_tree_add_string(tree, hf_gsm_a_gm_apn, tvb, curr_offset, len, str+1);
-		if (len > 100) {
-			expert_add_info(pinfo, pi, &ei_gsm_a_gm_apn_too_long);
-		}
-	}
+	proto_tree_add_item(tree, hf_gsm_a_gm_apn, tvb, curr_offset, len, ENC_APN_STR | ENC_NA);
 	curr_offset += len;
 
 	EXTRANEOUS_DATA_CHECK(len, curr_offset - offset, pinfo, &ei_gsm_a_gm_extraneous_data);
@@ -4454,6 +4458,9 @@ static const range_string gsm_a_sm_pco_ms2net_prot_vals[] = {
 	{ 0x0022, 0x0022, "5GSM cause value" },
 	{ 0x0023, 0x0023, "QoS rules with the length of two octets support indicator" },
 	{ 0x0024, 0x0024, "QoS flow descriptions with the length of two octets support indicator" },
+	{ 0x0027, 0x0027, "ACS information request" },
+	{ 0x0030, 0x0030, "ATSSS request" },
+	{ 0x0031, 0x0031, "DNS server security information indicator" },
 	{ 0xff00, 0xffff, "Operator Specific Use" },
 	{ 0, 0, NULL }
 };
@@ -4494,6 +4501,15 @@ static const range_string gsm_a_sm_pco_net2ms_prot_vals[] = {
 	{ 0x0022, 0x0022, "Reserved" },
 	{ 0x0023, 0x0023, "QoS rules with the length of two octets" },
 	{ 0x0024, 0x0024, "QoS flow descriptions with the length of two octets" },
+	{ 0x0025, 0x0025, "Small data rate control parameters" },
+	{ 0x0026, 0x0026, "Additional small data rate control for exception data parameters" },
+	{ 0x0027, 0x0027, "ACS information" },
+	{ 0x0028, 0x0028, "Initial small data rate control parameters" },
+	{ 0x0029, 0x0029, "Initial additional small data rate control for exception data parameters" },
+	{ 0x002a, 0x002a, "Initial APN rate control parameters" },
+	{ 0x002b, 0x002b, "Initial additional APN rate control for exception data parameters" },
+	{ 0x0030, 0x0030, "ATSSS response with the length of two octets" },
+	{ 0x0031, 0x0031, "DNS server security information with length of two octets" },
 	{ 0xff00, 0xffff, "Operator Specific Use" },
 	{ 0, 0, NULL }
 };
@@ -4517,7 +4533,7 @@ static const value_string gsm_a_gm_nbifom_mode_vals[] = {
 	{ 0, NULL }
 };
 
-const true_false_string gsm_a_gm_apn_rate_ctrl_params_aer_value = {
+static const true_false_string gsm_a_gm_apn_rate_ctrl_params_aer_value = {
 	"Additional exception reports at maximum rate reached are allowed",
 	"Additional exception reports at maximum rate reached are not allowed"
 };
@@ -4534,6 +4550,22 @@ static const value_string gsm_a_gm_apn_rate_ctrl_ul_time_unit_vals[] = {
 static const value_string gsm_a_gm_sm_pco_3gpp_data_off_ue_status_vals[] = {
 	{ 1, "Deactivated"},
 	{ 2, "Activated"},
+	{ 0, NULL}
+};
+
+static const value_string gsm_a_gm_sm_pco_dns_serv_sec_info_type_vals[] = {
+	{ 0, "Security protocol type"},
+	{ 1, "Port number"},
+	{ 2, "Authentication domain name"},
+	{ 3, "SPKI pin set"},
+	{ 4, "Root certificate"},
+	{ 5, "Raw public key"},
+	{ 0, NULL}
+};
+
+static const value_string gsm_a_gm_sm_pco_dns_serv_sec_info_sec_proto_vals[] = {
+	{ 0, "TLS"},
+	{ 1, "DTLS"},
 	{ 0, NULL}
 };
 
@@ -4595,7 +4627,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 
 		curr_len    -= 2;
 		curr_offset += 2;
-		if (link_dir == P2P_DIR_DL && (prot == 0x0023 || prot == 0x0024)) {
+		if (link_dir == P2P_DIR_DL && (prot == 0x0023 || prot == 0x0024 || prot == 0x0030 || prot == 0x0031)) {
 			proto_tree_add_item_ret_uint(pco_tree, hf_gsm_a_gm_sm_pco_length2, tvb, curr_offset, 2, ENC_BIG_ENDIAN, &e_len);
 			curr_len    -= 2;
 			curr_offset += 2;
@@ -4684,6 +4716,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 				}
 				break;
 			case 0x0016:
+			case 0x0025:
 				if (link_dir == P2P_DIR_DL) {
 					proto_tree_add_bits_item(pco_tree, hf_gsm_a_spare_bits, tvb, (curr_offset << 3), 4, ENC_BIG_ENDIAN);
 					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_apn_rate_ctrl_params_aer, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
@@ -4699,6 +4732,7 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 				}
 				break;
 			case 0x0019:
+			case 0x0026:
 				if (link_dir == P2P_DIR_DL) {
 					proto_tree_add_bits_item(pco_tree, hf_gsm_a_spare_bits, tvb, (curr_offset << 3), 5, ENC_BIG_ENDIAN);
 					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_add_apn_rate_ctrl_params_ul_time_unit, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
@@ -4761,6 +4795,66 @@ de_sm_pco(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 			case 0x0022:
 				if (link_dir == P2P_DIR_UL && e_len == 1) {
 					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_5gsm_cause, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
+				}
+				break;
+			case 0x0027:
+				if (link_dir == P2P_DIR_DL && e_len > 0) {
+					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_acs_info, tvb, curr_offset, e_len, ENC_NA|ENC_UTF_8);
+				}
+				break;
+			case 0x0028:
+			case 0x0029:
+			case 0x002a:
+			case 0x002b:
+				if (link_dir == P2P_DIR_DL && e_len == 7) {
+					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_init_small_data_rate_ctrl_params_max_ul_rate_allowed, tvb, curr_offset, 3, ENC_BIG_ENDIAN);
+					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_init_small_data_rate_ctrl_params_termination_timestamp, tvb, curr_offset+4, 4, ENC_TIME_SECS_NTP|ENC_BIG_ENDIAN);
+				}
+				break;
+			case 0x0030:
+				if (link_dir == P2P_DIR_DL && e_len > 0) {
+					proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_atsss_response, tvb, curr_offset, e_len, ENC_NA);
+				}
+				break;
+			case 0x0031:
+				if (link_dir == P2P_DIR_DL && e_len > 1) {
+					guint32 type;
+
+					proto_tree_add_item_ret_uint(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_type, tvb, curr_offset, 1, ENC_BIG_ENDIAN, &type);
+					switch (type) {
+						case 0:
+							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_sec_proto_type, tvb, curr_offset+1, 1, ENC_BIG_ENDIAN);
+							break;
+						case 1:
+							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_port_number, tvb, curr_offset+1, 2, ENC_BIG_ENDIAN);
+							break;
+						case 2:
+							{
+								guint8 *str = tvb_get_string_enc(pinfo->pool, tvb, curr_offset+1, e_len-1, ENC_ASCII|ENC_NA);
+								guint str_offset = 0;
+
+								while (str_offset < (e_len-1))
+								{
+									guint step = str[str_offset];
+									str[str_offset] = '.';
+									str_offset += step+1;
+								}
+								proto_tree_add_string(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_auth_domain_name, tvb, curr_offset+1, e_len-1, str+1);
+							}
+							break;
+						case 3:
+							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_spki_pin_set, tvb, curr_offset+1, e_len-1, ENC_NA);
+							break;
+						case 4:
+							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_root_certificate, tvb, curr_offset+1, e_len-1, ENC_NA);
+							break;
+						case 5:
+							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_raw_public_key, tvb, curr_offset+1, e_len-1, ENC_NA);
+							break;
+						default:
+							proto_tree_add_item(pco_tree, hf_gsm_a_gm_sm_pco_dns_serv_sec_info_value_part, tvb, curr_offset+1, e_len-1, ENC_NA);
+							break;
+					}
 				}
 				break;
 			default:
@@ -4937,7 +5031,7 @@ const value_string gsm_a_sm_qos_del_of_err_sdu_vals[] = {
 };
 
  /* Delivery order, octet 6 (see 3GPP TS 23.107) Bits 5 4 */
-const value_string gsm_a_sm_qos_del_order_vals[] = {
+static const value_string gsm_a_sm_qos_del_order_vals[] = {
 	{ 0, "Subscribed delivery order/Reserved" },
 	{ 1, "With delivery order ('yes')" },
 	{ 2, "Without delivery order ('no')" },
@@ -4994,7 +5088,7 @@ const value_string gsm_a_sm_qos_traff_hdl_pri_vals[] = {
 	{ 0, NULL }
 };
 
-const range_string gsm_a_sm_qos_peak_thr_vals[] = {
+static const range_string gsm_a_sm_qos_peak_thr_vals[] = {
 	{ 0x00, 0x00, "Subscribed peak throughput/reserved" },
 	{ 0x01, 0x01, "Up to 1 000 octet/s" },
 	{ 0x02, 0x02, "Up to 2 000 octet/s" },
@@ -5010,7 +5104,7 @@ const range_string gsm_a_sm_qos_peak_thr_vals[] = {
 	{ 0, 0, NULL }
 };
 
-const range_string gsm_a_sm_qos_mean_thr_vals[] = {
+static const range_string gsm_a_sm_qos_mean_thr_vals[] = {
 	{ 0x00, 0x00, "Subscribed peak throughput/reserved" },
 	{ 0x01, 0x01, "100 octet/h" },
 	{ 0x02, 0x02, "200 octet/h" },
@@ -5036,7 +5130,7 @@ const range_string gsm_a_sm_qos_mean_thr_vals[] = {
 	{ 0, 0, NULL }
 };
 
-const range_string gsm_a_sm_qos_prec_class_vals[] = {
+static const range_string gsm_a_sm_qos_prec_class_vals[] = {
 	{ 0x00, 0x00, "Subscribed precedence/reserved" },
 	{ 0x01, 0x01, "High priority" },
 	{ 0x02, 0x02, "Normal priority" },
@@ -5046,7 +5140,7 @@ const range_string gsm_a_sm_qos_prec_class_vals[] = {
 	{ 0, 0, NULL }
 };
 
-const true_false_string gsm_a_sm_qos_signalling_ind_value = {
+static const true_false_string gsm_a_sm_qos_signalling_ind_value = {
 	"Optimised for signalling traffic",
 	"Not optimised for signalling traffic"
 };
@@ -5157,7 +5251,7 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	{
 		case 0x00: str = "Subscribed maximum bit rate for uplink/reserved"; break;
 		case 0xff: str = "0 kbps"; break;
-		default:   str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", qos_calc_bitrate(oct));
+		default:   str = wmem_strdup_printf(pinfo->pool, "%u kbps", qos_calc_bitrate(oct));
 	}
 
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_max_bitrate_upl, tvb,
@@ -5173,7 +5267,7 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	{
 		case 0x00: str = "Subscribed maximum bit rate for downlink/reserved"; break;
 		case 0xff: str = "0 kbps"; break;
-		default:   str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", qos_calc_bitrate(oct));
+		default:   str = wmem_strdup_printf(pinfo->pool, "%u kbps", qos_calc_bitrate(oct));
 	}
 
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_max_bitrate_downl, tvb,
@@ -5204,7 +5298,7 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 				temp32 = (tmp_oct - 0x10) * 50 + 200;
 			else
 				temp32 = (tmp_oct - 0x20) * 100 + 1000;
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u ms", temp32);
+			str = wmem_strdup_printf(pinfo->pool, "%u ms", temp32);
 	}
 
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_trans_delay, tvb,
@@ -5222,7 +5316,7 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	{
 		case 0x00: str = "Subscribed guaranteed bit rate for uplink/reserved"; break;
 		case 0xff: str = "0 kbps"; break;
-		default:   str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", qos_calc_bitrate(oct));
+		default:   str = wmem_strdup_printf(pinfo->pool, "%u kbps", qos_calc_bitrate(oct));
 	}
 
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_guar_bitrate_upl, tvb,
@@ -5238,7 +5332,7 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	{
 		case 0x00: str = "Subscribed guaranteed bit rate for downlink/reserved"; break;
 		case 0xff: str = "0 kbps"; break;
-		default:   str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", qos_calc_bitrate(oct));
+		default:   str = wmem_strdup_printf(pinfo->pool, "%u kbps", qos_calc_bitrate(oct));
 	}
 
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_guar_bitrate_downl, tvb,
@@ -5273,9 +5367,9 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	{
 		temp32 = qos_calc_ext_bitrate(oct);
 		if (temp32 % 1000 == 0)
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32 / 1000);
+			str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32 / 1000);
 		else
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", temp32);
+			str = wmem_strdup_printf(pinfo->pool, "%u kbps", temp32);
 	}
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_max_bitrate_downl_ext, tvb,
 		curr_offset, 1, oct, "%s (%u)", str, oct);
@@ -5292,9 +5386,9 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	{
 		temp32 = qos_calc_ext_bitrate(oct);
 		if (temp32 % 1000 == 0)
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32 / 1000);
+			str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32 / 1000);
 		else
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", temp32);
+			str = wmem_strdup_printf(pinfo->pool, "%u kbps", temp32);
 	}
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_guar_bitrate_downl_ext, tvb,
 		curr_offset, 1, oct, "%s (%u)", str, oct);
@@ -5311,9 +5405,9 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	{
 		temp32 = qos_calc_ext_bitrate(oct);
 		if (temp32 % 1000 == 0)
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32 / 1000);
+			str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32 / 1000);
 		else
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", temp32);
+			str = wmem_strdup_printf(pinfo->pool, "%u kbps", temp32);
 	}
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_max_bitrate_upl_ext, tvb,
 		curr_offset, 1, oct, "%s (%u)", str, oct);
@@ -5330,9 +5424,9 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	{
 		temp32 = qos_calc_ext_bitrate(oct);
 		if (temp32 % 1000 == 0)
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32 / 1000);
+			str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32 / 1000);
 		else
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", temp32);
+			str = wmem_strdup_printf(pinfo->pool, "%u kbps", temp32);
 	}
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_guar_bitrate_upl_ext, tvb,
 		curr_offset, 1, oct, "%s (%u)", str, oct);
@@ -5348,7 +5442,7 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	else
 	{
 		temp32 = qos_calc_ext2_bitrate(oct);
-		str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32);
+		str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32);
 	}
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_max_bitrate_downl_ext2, tvb,
 		curr_offset, 1, oct, "%s (%u)", str, oct);
@@ -5364,7 +5458,7 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	else
 	{
 		temp32 = qos_calc_ext2_bitrate(oct);
-		str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32);
+		str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32);
 	}
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_guar_bitrate_downl_ext2, tvb,
 		curr_offset, 1, oct, "%s (%u)", str, oct);
@@ -5380,7 +5474,7 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	else
 	{
 		temp32 = qos_calc_ext2_bitrate(oct);
-		str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32);
+		str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32);
 	}
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_max_bitrate_upl_ext2, tvb,
 		curr_offset, 1, oct, "%s (%u)", str, oct);
@@ -5396,7 +5490,7 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 	else
 	{
 		temp32 = qos_calc_ext2_bitrate(oct);
-		str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32);
+		str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32);
 	}
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_guar_bitrate_upl_ext2, tvb,
 		curr_offset, 1, oct, "%s (%u)", str, oct);
@@ -5411,12 +5505,12 @@ de_sm_qos(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, g
 /*
  * [12] 10.5.6.5a Re-attempt indicator
  */
-const true_false_string gsm_a_gm_eplmnc_value = {
+static const true_false_string gsm_a_gm_eplmnc_value = {
 	"MS is not allowed to re-attempt the procedure in an equivalent PLMN",
 	"MS is allowed to re-attempt the procedure in an equivalent PLMN"
 };
 
-const true_false_string gsm_a_gm_ratc_value = {
+static const true_false_string gsm_a_gm_ratc_value = {
 	"MS is not allowed to re-attempt the procedure in S1 mode",
 	"MS is allowed to re-attempt the procedure in S1 mode"
 };
@@ -5624,7 +5718,7 @@ de_sm_sapi(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32 offs
 /*
  * [9] 10.5.6.10 Tear down indicator
  */
-const true_false_string gsm_a_sm_tdi_value = {
+static const true_false_string gsm_a_sm_tdi_value = {
 	"Tear down requested",
 	"Tear down not requested"
 };
@@ -5665,7 +5759,7 @@ de_sm_pflow_id(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offs
 	curr_offset++;
 
 	if (add_string)
-		g_snprintf(add_string, string_len, " - %s", rval_to_str(value, gsm_a_sm_packet_flow_id_vals, "Unknown"));
+		snprintf(add_string, string_len, " - %s", rval_to_str(value, gsm_a_sm_packet_flow_id_vals, "Unknown"));
 
 	EXTRANEOUS_DATA_CHECK(len, curr_offset - offset, pinfo, &ei_gsm_a_gm_extraneous_data);
 
@@ -5722,6 +5816,13 @@ static const value_string packet_filter_component_type_vals[] = {
 	{0x60,  "Security parameter index type"},
 	{0x70,  "Type of service/Traffic class type"},
 	{0x80,  "Flow label type"},
+	{0x81,  "Destination MAC address type" },
+	{0x82,  "Source MAC address type" },
+	{0x83,  "802.1Q C-TAG VID type" },
+	{0x84,  "802.1Q S-TAG VID type" },
+	{0x85,  "802.1Q C-TAG PCP/DEI type" },
+	{0x86,  "802.1Q S-TAG PCP/DEI type" },
+	{0x87,  "Ethertype type" },
 	{0, NULL}
 };
 
@@ -5950,6 +6051,38 @@ de_sm_tflow_temp(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 of
 					pf_length   -= 3;
 					break;
 
+				case 0x81:
+				case 0x82:
+					proto_tree_add_item(comp_tree, hf_gsm_a_sm_tft_mac_addr, tvb, curr_offset, 6, ENC_NA);
+					curr_offset += 6;
+					curr_len    -= 6;
+					pf_length   -= 6;
+					break;
+
+				case 0x83:
+				case 0x84:
+					proto_tree_add_item(comp_tree, hf_gsm_a_sm_tft_vlan_tag_vid, tvb, curr_offset, 2, ENC_BIG_ENDIAN);
+					curr_offset += 2;
+					curr_len    -= 2;
+					pf_length   -= 2;
+					break;
+
+				case 0x85:
+				case 0x86:
+					proto_tree_add_item(comp_tree, hf_gsm_a_sm_tft_vlan_tag_pcp, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
+					proto_tree_add_item(comp_tree, hf_gsm_a_sm_tft_vlan_tag_dei, tvb, curr_offset, 1, ENC_BIG_ENDIAN);
+					curr_offset += 1;
+					curr_len    -= 1;
+					pf_length   -= 1;
+					break;
+
+				case 0x87:
+					proto_tree_add_item(comp_tree, hf_gsm_a_sm_tft_ethertype, tvb, curr_offset, 2, ENC_BIG_ENDIAN);
+					curr_offset += 2;
+					curr_len    -= 2;
+					pf_length   -= 2;
+					break;
+
 				default:
 					curr_offset += pf_length;
 					curr_len    -= pf_length;
@@ -6046,7 +6179,7 @@ de_sm_mbms_bearer_cap(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint
 	{
 		case 0x00: str = "Subscribed maximum bit rate for downlink/reserved"; break;
 		case 0xff: str = "0 kbps"; break;
-		default:   str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", qos_calc_bitrate(oct));
+		default:   str = wmem_strdup_printf(pinfo->pool, "%u kbps", qos_calc_bitrate(oct));
 	}
 
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_max_bitrate_downl, tvb,
@@ -6063,9 +6196,9 @@ de_sm_mbms_bearer_cap(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint
 	{
 		temp32 = qos_calc_ext_bitrate(oct);
 		if (temp32 % 1000 == 0)
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32 / 1000);
+			str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32 / 1000);
 		else
-			str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", temp32);
+			str = wmem_strdup_printf(pinfo->pool, "%u kbps", temp32);
 	}
 	proto_tree_add_uint_format_value(tree, hf_gsm_a_sm_qos_max_bitrate_downl_ext, tvb,
 		curr_offset, 1, oct, "%s (%u)", str, oct);
@@ -6080,7 +6213,7 @@ de_sm_mbms_bearer_cap(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint
 /*
  * [9] 10.5.6.15 MBMS protocol configuration options
  */
-static guint16
+guint16
 de_sm_mbms_prot_conf_opt(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, guint32 offset, guint len, gchar *add_string _U_, int string_len _U_)
 {
 	guint32	curr_offset;
@@ -6108,7 +6241,7 @@ de_sm_enh_nsapi(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
 	if(oct < 0x80)
 		str = "Reserved";
 	else if (oct < 0xff)
-			str = wmem_strdup_printf(wmem_packet_scope(), "NSAPI %u for Multimedia Broadcast/Multicast Service (MBMS) Multicast mode", oct);
+			str = wmem_strdup_printf(pinfo->pool, "NSAPI %u for Multimedia Broadcast/Multicast Service (MBMS) Multicast mode", oct);
 		else
 			str = "Reserved for use by lower layers in the p2p radio bearer allocation message for MBMS Broadcast mode";
 
@@ -6126,7 +6259,7 @@ de_sm_enh_nsapi(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, guint32
 static const value_string gsm_a_sm_req_type_vals[] = {
 	{ 0x01,	"Initial request" },
 	{ 0x02, "Handover" },
-	{ 0x03, "Unused. If received, the network shall interpret this as \"Initial request\"." },
+	{ 0x03, "RLOS" },
 	{ 0x04, "Emergency" },
 	{ 0x06, "Handover of emergency bearer services" },
 	{ 0, NULL }
@@ -8184,6 +8317,32 @@ proto_register_gsm_a_gm(void)
 		    FT_UINT8, BASE_DEC, VALS(gsm_a_sm_tft_param_id_vals), 0x0,
 		    NULL, HFILL }
 		},
+		{ &hf_gsm_a_sm_tft_mac_addr,
+		  { "MAC address", "gsm_a.gm.sm.tft.mac_addr",
+		    FT_ETHER, BASE_NONE, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_sm_tft_vlan_tag_vid,
+		  { "VID", "gsm_a.gm.sm.tft.vlan_tag_vid",
+		    FT_UINT16, BASE_HEX, NULL, 0x0fff,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_sm_tft_vlan_tag_pcp,
+		  { "PCP", "gsm_a.gm.sm.tft.vlan_tag_pcp",
+		    FT_UINT8, BASE_HEX, NULL, 0x0e,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_sm_tft_vlan_tag_dei,
+		  { "DEI", "gsm_a.gm.sm.tft.vlan_tag_dei",
+		    FT_UINT8, BASE_HEX, NULL, 0x01,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_sm_tft_ethertype,
+		  { "Ethertype", "gsm_a.gm.sm.tft.ethertype",
+		    FT_UINT16, BASE_HEX, VALS(etype_vals), 0x0,
+		    NULL, HFILL }
+		},
+
 		{ &hf_gsm_a_gmm_ptmsi_sig,
 		  { "P-TMSI Signature", "gsm_a.gm.gmm.ptmsi_sig",
 		    FT_UINT24, BASE_HEX, NULL, 0x0,
@@ -9354,6 +9513,66 @@ proto_register_gsm_a_gm(void)
 		    FT_UINT8, BASE_DEC, VALS(nas_5gs_sm_cause_vals), 0x0,
 		    NULL, HFILL }
 		},
+		{ &hf_gsm_a_gm_sm_pco_acs_info,
+		  { "ACS information", "gsm_a.gm.sm.pco.acs_info",
+		    FT_STRING, BASE_NONE, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_init_small_data_rate_ctrl_params_max_ul_rate_allowed,
+		  { "Maximum uplink rate allowed", "gsm_a.gm.sm.pco.init_small_data_rate_ctrl_params.max_ul_rate_allowed",
+		    FT_UINT24, BASE_DEC, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_init_small_data_rate_ctrl_params_termination_timestamp,
+		  { "Termination timestamp", "gsm_a.gm.sm.pco.init_small_data_rate_ctrl_params.termination_timestamp",
+		    FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_atsss_response,
+		  { "ATSSS response", "gsm_a.gm.sm.pco.atsss_response",
+		    FT_BYTES, BASE_NONE, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_dns_serv_sec_info_type,
+		  { "Type", "gsm_a.gm.sm.pco.dns_serv_sec_info.type",
+		    FT_UINT8, BASE_DEC, VALS(gsm_a_gm_sm_pco_dns_serv_sec_info_type_vals), 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_dns_serv_sec_info_sec_proto_type,
+		  { "Security protocol type", "gsm_a.gm.sm.pco.dns_serv_sec_info.sec_proto_type",
+		    FT_UINT8, BASE_DEC, VALS(gsm_a_gm_sm_pco_dns_serv_sec_info_sec_proto_vals), 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_dns_serv_sec_info_port_number,
+		  { "Port number", "gsm_a.gm.sm.pco.dns_serv_sec_info.port_number",
+		    FT_UINT16, BASE_DEC, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_dns_serv_sec_info_auth_domain_name,
+		  { "Authentication domain name", "gsm_a.gm.sm.pco.dns_serv_sec_info.auth_domain_name",
+		    FT_STRING, BASE_NONE, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_dns_serv_sec_info_spki_pin_set,
+		  { "SPKI pin set", "gsm_a.gm.sm.pco.dns_serv_sec_info.spki_pin_set",
+		    FT_BYTES, BASE_NONE, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_dns_serv_sec_info_root_certificate,
+		  { "Root certificate", "gsm_a.gm.sm.pco.dns_serv_sec_info.root_certificate",
+		    FT_BYTES, BASE_NONE, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_dns_serv_sec_info_raw_public_key,
+		  { "Raw public key", "gsm_a.gm.sm.pco.dns_serv_sec_info.raw_public_key",
+		    FT_BYTES, BASE_NONE, NULL, 0x0,
+		    NULL, HFILL }
+		},
+		{ &hf_gsm_a_gm_sm_pco_dns_serv_sec_info_value_part,
+		  { "Value part", "gsm_a.gm.sm.pco.dns_serv_sec_info.value_part",
+		    FT_BYTES, BASE_NONE, NULL, 0x0,
+		    NULL, HFILL }
+		},
 		/* Generated from convert_proto_tree_add_text.pl */
 		{ &hf_gsm_a_gm_presence, { "Presence", "gsm_a.gm.gmm.presence", FT_UINT8, BASE_DEC, NULL, 0x0, NULL, HFILL }},
 		{ &hf_gsm_a_gm_8psk_power_class, { "8PSK Power Class", "gsm_a.gm.8psk_power_class", FT_UINT8, BASE_DEC, VALS(gsm_a_gm_8psk_power_class_vals), 0x0, NULL, HFILL }},
@@ -9403,7 +9622,6 @@ proto_register_gsm_a_gm(void)
 		{ &ei_gsm_a_gm_extraneous_data, { "gsm_a.gm.extraneous_data", PI_PROTOCOL, PI_NOTE, "Extraneous Data, dissector bug or later version spec (report to wireshark.org)", EXPFILL }},
 		{ &ei_gsm_a_gm_not_enough_data, { "gsm_a.gm.not_enough_data", PI_PROTOCOL, PI_WARN, "Not enough data", EXPFILL }},
 		{ &ei_gsm_a_gm_undecoded, { "gsm_a.gm.undecoded", PI_UNDECODED, PI_WARN, "Not decoded", EXPFILL }},
-		{ &ei_gsm_a_gm_apn_too_long, { "gsm_a.gm.apn_to_long", PI_PROTOCOL, PI_ERROR, "APN encoding has more than 100 octets", EXPFILL }},
 		{ &ei_gsm_a_gm_missing_mandatory_element, { "gsm_a.gm.missing_mandatory_element", PI_PROTOCOL, PI_ERROR, "Missing Mandatory element, rest of dissection is suspect", EXPFILL }},
 	};
 

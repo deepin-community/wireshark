@@ -1,4 +1,4 @@
-/* capture_filter_edit.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -24,6 +24,7 @@ class CaptureFilterEdit : public SyntaxLineEdit
     Q_OBJECT
 public:
     explicit CaptureFilterEdit(QWidget *parent = 0, bool plain = false);
+    ~CaptureFilterEdit();
     void setConflict(bool conflict = false);
     // No selections: (QString(), false)
     // Selections, same filter: (filter, false)
@@ -63,27 +64,16 @@ private:
     StockIconToolButton *clear_button_;
     StockIconToolButton *apply_button_;
     CaptureFilterSyntaxWorker *syntax_worker_;
+    QThread *syntax_thread_;
 
     void buildCompletionList(const QString& primitive_word);
 
 signals:
     void captureFilterSyntaxChanged(bool valid);
+    void captureFilterChanged(const QString filter);
     void startCapture();
     void addBookmark(const QString filter);
 
 };
 
 #endif // CAPTURE_FILTER_EDIT_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

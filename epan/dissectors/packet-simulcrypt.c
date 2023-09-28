@@ -1069,7 +1069,7 @@ dissect_eis_parameter_value (proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo
 		proto_tree_add_item(tree, hf_simulcrypt_error_information, tvb, offset, plen, ENC_NA);
 		break;
 	case SIMULCRYPT_EIS_ERROR_DESCRIPTION:
-		proto_tree_add_item(tree, hf_simulcrypt_error_description, tvb, offset, plen, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(tree, hf_simulcrypt_error_description, tvb, offset, plen, ENC_ASCII);
 		break;
 
 	default:  /* Unknown parameter type */
@@ -1289,7 +1289,7 @@ dissect_simulcrypt_data(proto_tree *simulcrypt_tree, proto_item *simulcrypt_item
 		/* Parameter  Length 2 Bytes */
 		plen = tvb_get_ntohs(tvb, offset+2); /* read 2 byte length value */
 		/* Parameter  Value plen Bytes */
-		pvalue_char = tvb_bytes_to_str(wmem_packet_scope(), tvb, offset+4, plen);
+		pvalue_char = tvb_bytes_to_str(pinfo->pool, tvb, offset+4, plen);
 
 		simulcrypt_item = proto_tree_add_item(simulcrypt_tree, hf_simulcrypt_parameter, tvb, offset, plen+2+2, ENC_NA );
 

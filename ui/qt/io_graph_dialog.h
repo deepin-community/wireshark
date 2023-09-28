@@ -1,4 +1,4 @@
-/* io_graph_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -15,6 +15,8 @@
 #include <glib.h>
 
 #include "epan/epan_dissect.h"
+#include "epan/prefs.h"
+#include "ui/preference_utils.h"
 
 #include "ui/io_graph_item.h"
 
@@ -80,6 +82,7 @@ public:
     void clearAllData();
 
     unsigned int moving_avg_period_;
+    unsigned int y_axis_factor_;
 
 public slots:
     void recalcGraphData(capture_file *cap_file, bool enable_scaling);
@@ -94,7 +97,7 @@ signals:
 private:
     // Callbacks for register_tap_listener
     static void tapReset(void *iog_ptr);
-    static tap_packet_status tapPacket(void *iog_ptr, packet_info *pinfo, epan_dissect_t *edt, const void *data);
+    static tap_packet_status tapPacket(void *iog_ptr, packet_info *pinfo, epan_dissect_t *edt, const void *data, tap_flags_t flags);
     static void tapDraw(void *iog_ptr);
 
     void calculateScaledValueUnit();
@@ -134,10 +137,10 @@ public:
     explicit IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFilter = QString());
     ~IOGraphDialog();
 
-    enum UatColumns { colEnabled = 0, colName, colDFilter, colColor, colStyle, colYAxis, colYField, colSMAPeriod, colMaxNum};
+    enum UatColumns { colEnabled = 0, colName, colDFilter, colColor, colStyle, colYAxis, colYField, colSMAPeriod, colYAxisFactor, colMaxNum};
 
     void addGraph(bool checked, QString name, QString dfilter, QRgb color_idx, IOGraph::PlotStyles style,
-                  io_graph_item_unit_t value_units, QString yfield, int moving_average);
+                  io_graph_item_unit_t value_units, QString yfield, int moving_average, int yaxisfactor);
     void addGraph(bool copy_from_current = false);
     void addDefaultGraph(bool enabled, int idx = 0);
     void syncGraphSettings(int row);
@@ -223,6 +226,7 @@ private slots:
 
     void on_resetButton_clicked();
     void on_logCheckBox_toggled(bool checked);
+    void on_automaticUpdateCheckBox_toggled(bool checked);
     void on_newToolButton_clicked();
     void on_deleteToolButton_clicked();
     void on_copyToolButton_clicked();
@@ -253,16 +257,3 @@ private slots:
 };
 
 #endif // IO_GRAPH_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

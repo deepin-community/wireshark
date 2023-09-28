@@ -19,11 +19,11 @@
 
 #include <epan/prefs.h>
 #include <epan/to_str.h>
+#include <wsutil/wslog.h>
 
 #include "ui/capture_ui_utils.h"
 #include "ui/capture_globals.h"
 #include "ui/iface_lists.h"
-#include "../log.h"
 
 /*
  * Try to populate the given device with options (like capture filter) from
@@ -76,14 +76,14 @@ get_iface_display_name(const gchar *description, const if_info_t *if_info)
          * of the device GUID, and not at all friendly.
          */
         gchar *if_string = if_info->friendly_name ? if_info->friendly_name : if_info->name;
-        return g_strdup_printf("%s: %s", description, if_string);
+        return ws_strdup_printf("%s: %s", description, if_string);
 #else
         /*
          * On UN*X, show the interface name; it's short and somewhat
          * friendly, and many UN*X users are used to interface names,
          * so we should show it.
          */
-        return g_strdup_printf("%s: %s", description, if_info->name);
+        return ws_strdup_printf("%s: %s", description, if_info->name);
 #endif
     }
 
@@ -95,7 +95,7 @@ get_iface_display_name(const gchar *description, const if_info_t *if_info)
          * don't show the name, as that's a string made out of
          * the device GUID, and not at all friendly.
          */
-        return g_strdup_printf("%s", if_info->friendly_name);
+        return ws_strdup_printf("%s", if_info->friendly_name);
 #else
         /*
          * On UN*X, if we have a friendly name, show it along
@@ -103,13 +103,13 @@ get_iface_display_name(const gchar *description, const if_info_t *if_info)
          * and somewhat friendly, and many UN*X users are used
          * to interface names, so we should show it.
          */
-        return g_strdup_printf("%s: %s", if_info->friendly_name, if_info->name);
+        return ws_strdup_printf("%s: %s", if_info->friendly_name, if_info->name);
 #endif
     }
 
     if (if_info->vendor_description) {
         /* We have a device description from libpcap. */
-        return g_strdup_printf("%s: %s", if_info->vendor_description, if_info->name);
+        return ws_strdup_printf("%s: %s", if_info->vendor_description, if_info->name);
     }
 
     /* No additional descriptions found. */
@@ -124,6 +124,17 @@ get_iface_display_name(const gchar *description, const if_info_t *if_info)
 void
 scan_local_interfaces(void (*update_cb)(void))
 {
+    scan_local_interfaces_filtered((GList *)0, update_cb);
+}
+
+/*
+ * Fetch the list of local interfaces with capture_interface_list()
+ * and set the list of "all interfaces" in *capture_opts to include
+ * those interfaces.
+ */
+void
+scan_local_interfaces_filtered(GList * allowed_types, void (*update_cb)(void))
+{
     GList             *if_entry, *lt_entry, *if_list;
     if_info_t         *if_info, temp;
     gchar             *descr;
@@ -137,7 +148,7 @@ scan_local_interfaces(void (*update_cb)(void))
     link_row          *link = NULL;
     data_link_info_t  *data_link_info;
     interface_t       device;
-    GString           *ip_str;
+    GString           *ip_str = NULL;
     interface_options *interface_opts;
     gboolean          found = FALSE;
     static gboolean   running = FALSE;
@@ -197,11 +208,18 @@ scan_local_interfaces(void (*update_cb)(void))
     for (if_entry = if_list; if_entry != NULL; if_entry = g_list_next(if_entry)) {
         memset(&device, 0, sizeof(device));
         if_info = (if_info_t *)if_entry->data;
-        ip_str = g_string_new("");
         ips = 0;
         if (strstr(if_info->name, "rpcap:")) {
             continue;
         }
+        /* Filter out all interfaces, which are not allowed to be scanned */
+        if (allowed_types != NULL)
+        {
+            if(g_list_find(allowed_types, GUINT_TO_POINTER((guint) if_info->type)) == NULL) {
+                continue;
+            }
+        }
+
         device.name = g_strdup(if_info->name);
         device.friendly_name = g_strdup(if_info->friendly_name);
         device.vendor_description = g_strdup(if_info->vendor_description);
@@ -225,9 +243,10 @@ scan_local_interfaces(void (*update_cb)(void))
         }
         device.type = if_info->type;
         monitor_mode = prefs_capture_device_monitor_mode(if_info->name);
-        caps = capture_get_if_capabilities(if_info->name, monitor_mode, NULL, NULL, update_cb);
+        caps = capture_get_if_capabilities(if_info->name, monitor_mode, NULL, NULL, NULL, update_cb);
+        ip_str = g_string_new("");
         for (; (curr_addr = g_slist_nth(if_info->addrs, ips)) != NULL; ips++) {
-            temp_addr = (if_addr_t *)g_malloc0(sizeof(if_addr_t));
+            temp_addr = g_new0(if_addr_t, 1);
             if (ips != 0) {
                 g_string_append(ip_str, "\n");
             }
@@ -262,6 +281,9 @@ scan_local_interfaces(void (*update_cb)(void))
                 temp.addrs = g_slist_append(temp.addrs, temp_addr);
             }
         }
+        device.addresses = g_strdup(ip_str->str);
+        g_string_free(ip_str, TRUE);
+
 #ifdef HAVE_PCAP_REMOTE
         device.local = TRUE;
         device.remote_opts.src_type = CAPTURE_IFLOCAL;
@@ -290,13 +312,13 @@ scan_local_interfaces(void (*update_cb)(void))
              */
             for (lt_entry = caps->data_link_types; lt_entry != NULL; lt_entry = g_list_next(lt_entry)) {
                 data_link_info = (data_link_info_t *)lt_entry->data;
-                link = (link_row *)g_malloc(sizeof(link_row));
+                link = g_new(link_row, 1);
                 if (data_link_info->description != NULL) {
                     link->dlt = data_link_info->dlt;
                     link->name = g_strdup(data_link_info->description);
                 } else {
                     link->dlt = -1;
-                    link->name = g_strdup_printf("%s (not supported)", data_link_info->name);
+                    link->name = ws_strdup_printf("%s (not supported)", data_link_info->name);
                 }
                 device.links = g_list_append(device.links, link);
                 linktype_count++;
@@ -313,7 +335,7 @@ scan_local_interfaces(void (*update_cb)(void))
 #endif
             device.active_dlt = -1;
         }
-        device.addresses = g_strdup(ip_str->str);
+
         device.no_addresses = ips;
         device.local = TRUE;
         device.if_info = temp;
@@ -355,7 +377,6 @@ scan_local_interfaces(void (*update_cb)(void))
             free_if_capabilities(caps);
         }
 
-        g_string_free(ip_str, TRUE);
         count++;
     }
     free_interface_list(if_list);
@@ -370,6 +391,12 @@ scan_local_interfaces(void (*update_cb)(void))
         found = FALSE;
         for (i = 0; i < (int)global_capture_opts.all_ifaces->len; i++) {
             device = g_array_index(global_capture_opts.all_ifaces, interface_t, i);
+
+            /* Filter out all interfaces, which are not allowed to be scanned */
+            if (allowed_types != NULL && g_list_find(allowed_types, GINT_TO_POINTER(interface_opts->if_type)) == NULL) {
+                continue;
+            }
+
             if (strcmp(device.name, interface_opts->name) == 0) {
                 found = TRUE;
                 break;
@@ -380,7 +407,7 @@ scan_local_interfaces(void (*update_cb)(void))
             device.name         = g_strdup(interface_opts->name);
             device.vendor_description = g_strdup(interface_opts->hardware);
             device.display_name = interface_opts->descr ?
-                g_strdup_printf("%s: %s", device.name, interface_opts->descr) :
+                ws_strdup_printf("%s: %s", device.name, interface_opts->descr) :
                 g_strdup(device.name);
             device.hidden       = FALSE;
             device.selected     = TRUE;
@@ -427,23 +454,34 @@ scan_local_interfaces(void (*update_cb)(void))
 void
 fill_in_local_interfaces(void(*update_cb)(void))
 {
+    fill_in_local_interfaces_filtered((GList *)0, update_cb);
+}
+
+/*
+ * Get the global interface list.  Generate it if we haven't done so
+ * already.  This can be quite time consuming the first time, so
+ * record how long it takes in the info log.
+ */
+void
+fill_in_local_interfaces_filtered(GList * filter_list, void(*update_cb)(void))
+{
     gint64 start_time;
     double elapsed;
     static gboolean initialized = FALSE;
 
     /* record the time we started, so we can log total time later */
     start_time = g_get_monotonic_time();
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "fill_in_local_interfaces() starts");
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "fill_in_local_interfaces() starts");
 
     if (!initialized) {
         /* do the actual work */
-        scan_local_interfaces(update_cb);
+        scan_local_interfaces_filtered(filter_list, update_cb);
         initialized = TRUE;
     }
     /* log how long it took */
     elapsed = (g_get_monotonic_time() - start_time) / 1e6;
 
-    g_log(LOG_DOMAIN_MAIN, G_LOG_LEVEL_INFO, "fill_in_local_interfaces() ends, taking %.3fs", elapsed);
+    ws_log(LOG_DOMAIN_MAIN, LOG_LEVEL_INFO, "fill_in_local_interfaces() ends, taking %.3fs", elapsed);
 }
 
 void
@@ -500,16 +538,3 @@ update_local_interfaces(void)
     }
 }
 #endif /* HAVE_LIBPCAP */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

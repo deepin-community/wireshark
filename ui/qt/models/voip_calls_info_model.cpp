@@ -9,6 +9,7 @@
 
 #include "voip_calls_info_model.h"
 #include <wsutil/utf8_entities.h>
+#include <wsutil/ws_assert.h>
 #include <ui/qt/utils/qt_ui_utils.h>
 
 #include <QDateTime>
@@ -49,9 +50,9 @@ QVariant VoipCallsInfoModel::data(const QModelIndex &index, int role) const
     case InitialSpeaker:
         return address_to_display_qstring(&(call_info->initial_speaker));
     case From:
-        return call_info->from_identity;
+        return QString::fromUtf8(call_info->from_identity);
     case To:
-        return call_info->to_identity;
+        return QString::fromUtf8(call_info->to_identity);
     case Protocol:
         return ((call_info->protocol == VOIP_COMMON) && call_info->protocol_name) ?
             call_info->protocol_name : voip_protocol_name[call_info->protocol];
@@ -98,10 +99,10 @@ QVariant VoipCallsInfoModel::data(const QModelIndex &index, int role) const
             break;
         case VOIP_COMMON:
         default:
-            return call_info->call_comment;
+            return QString::fromUtf8(call_info->call_comment);
         }
     case ColumnCount:
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
     return QVariant();
 }
@@ -131,7 +132,7 @@ QVariant VoipCallsInfoModel::headerData(int section, Qt::Orientation orientation
         case Comments:
            return tr("Comments");
         case ColumnCount:
-            g_assert_not_reached();
+            ws_assert_not_reached();
         }
     }
     return QVariant();
@@ -144,7 +145,7 @@ int VoipCallsInfoModel::rowCount(const QModelIndex &parent) const
         return 0;
     }
 
-    return callinfos_.size();
+    return static_cast<int>(callinfos_.size());
 }
 
 int VoipCallsInfoModel::columnCount(const QModelIndex &parent) const
@@ -160,7 +161,7 @@ int VoipCallsInfoModel::columnCount(const QModelIndex &parent) const
 QVariant VoipCallsInfoModel::timeData(nstime_t *abs_ts, nstime_t *rel_ts) const
 {
     if (mTimeOfDay_) {
-        return QDateTime::fromTime_t(nstime_to_sec(abs_ts)).toTimeSpec(Qt::LocalTime).toString("yyyy-MM-dd hh:mm:ss");
+        return QDateTime::fromMSecsSinceEpoch(nstime_to_msec(abs_ts), Qt::LocalTime).toString("yyyy-MM-dd hh:mm:ss");
     } else {
         // XXX Pull digit count from capture file precision
         return QString::number(nstime_to_sec(rel_ts), 'f', 6);
@@ -184,7 +185,23 @@ bool VoipCallsInfoModel::timeOfDay() const
 void VoipCallsInfoModel::updateCalls(GQueue *callsinfos)
 {
     if (callsinfos) {
-        GList *cur_call = g_queue_peek_nth_link(callsinfos, rowCount());
+        qsizetype calls = callinfos_.count();
+        int cnt = 0;
+        GList *cur_call;
+
+        // Iterate new callsinfos and replace data in mode if required
+        cur_call = g_queue_peek_nth_link(callsinfos, 0);
+        while (cur_call && (cnt < calls)) {
+            if (callinfos_.at(cnt) != cur_call->data) {
+                // Data changed, use it
+                callinfos_.replace(cnt, cur_call->data);
+            }
+            cur_call = gxx_list_next(cur_call);
+            cnt++;
+        }
+
+        // Add new rows
+        cur_call = g_queue_peek_nth_link(callsinfos, rowCount());
         guint extra = g_list_length(cur_call);
         if (extra > 0) {
             beginInsertRows(QModelIndex(), rowCount(), rowCount() + extra - 1);
@@ -204,7 +221,6 @@ void VoipCallsInfoModel::removeAllCalls()
     callinfos_.clear();
     endRemoveRows();
 }
-
 
 // Proxy model that allows columns to be sorted.
 VoipCallsInfoSortedModel::VoipCallsInfoSortedModel(QObject *parent) :
@@ -231,16 +247,3 @@ bool VoipCallsInfoSortedModel::lessThan(const QModelIndex &source_left, const QM
     // fallback to string cmp on other fields
     return QSortFilterProxyModel::lessThan(source_left, source_right);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -11,8 +11,9 @@
 # that way.
 #
 
-if [ "$1" = "--help" ]
-then
+set -e -u -o pipefail
+
+function print_usage() {
 	printf "\\nUtility to setup a debian-based system for Wireshark Development.\\n"
 	printf "The basic usage installs the needed software\\n\\n"
 	printf "Usage: %s [--install-optional] [--install-deb-deps] [...other options...]\\n" "$0"
@@ -20,21 +21,18 @@ then
 	printf "\\t--install-deb-deps: install packages required to build the .deb file\\n"
 	printf "\\t--install-test-deps: install packages required to run all tests\\n"
 	printf "\\t[other]: other options are passed as-is to apt\\n"
-	exit 1
-fi
-
-# Check if the user is root
-if [ "$(id -u)" -ne 0 ]
-then
-	echo "You must be root."
-	exit 1
-fi
+}
 
 ADDITIONAL=0
 DEBDEPS=0
 TESTDEPS=0
+OPTIONS=
 for arg; do
 	case $arg in
+		--help)
+			print_usage
+			exit 0
+			;;
 		--install-optional)
 			ADDITIONAL=1
 			;;
@@ -50,6 +48,13 @@ for arg; do
 	esac
 done
 
+# Check if the user is root
+if [ "$(id -u)" -ne 0 ]
+then
+	echo "You must be root."
+	exit 1
+fi
+
 BASIC_LIST="gcc \
 	g++\
 	libglib2.0-dev \
@@ -63,17 +68,15 @@ BASIC_LIST="gcc \
 	qtbase5-dev-tools \
 	libc-ares-dev \
 	libpcap-dev \
-	bison \
+	libpcre2-dev \
 	flex \
 	make \
 	python3 \
-	perl \
 	libgcrypt-dev"
 
 ADDITIONAL_LIST="libnl-3-dev \
 	libkrb5-dev \
 	libsmi2-dev \
-	asciidoctor \
 	libsbc-dev \
 	liblua5.2-dev \
 	libnl-cli-3-dev \
@@ -87,11 +90,20 @@ ADDITIONAL_LIST="libnl-3-dev \
 	libminizip-dev \
 	git \
 	ninja-build \
+	perl \
 	xsltproc \
+	ccache \
 	libspeexdsp-dev"
+
+# Uncomment to add PNG compression utilities used by compress-pngs:
+# ADDITIONAL_LIST="$ADDITIONAL_LIST \
+#	advancecomp \
+#	optipng \
+#	pngcrush"
 
 DEBDEPS_LIST="debhelper \
 	dh-python \
+	asciidoctor \
 	docbook-xml \
 	docbook-xsl \
 	libxml2-utils \
@@ -101,12 +113,13 @@ DEBDEPS_LIST="debhelper \
 	python3-ply \
 	quilt"
 
-TESTDEPS_LIST=
+TESTDEPS_LIST="python3-pytest \
+	python3-pytest-xdist"
 
 # Adds package $2 to list variable $1 if the package is found.
 # If $3 is given, then this version requirement must be satisfied.
 add_package() {
-	local list="$1" pkgname="$2" versionreq="$3" version
+	local list="$1" pkgname="$2" versionreq="${3:-}" version
 
 	version=$(apt-cache show "$pkgname" 2>/dev/null |
 		awk '/^Version:/{ print $2; exit}')

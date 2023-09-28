@@ -20,6 +20,7 @@
 
 #include <epan/packet.h>
 #include <epan/prefs.h>
+#include <epan/proto_data.h>
 #include <epan/expert.h>
 #include <epan/etypes.h>
 #include <epan/address_types.h>
@@ -181,6 +182,7 @@ static gint ett_tipc_data = -1;
 
 static expert_field ei_tipc_field_not_specified = EI_INIT;
 static expert_field ei_tipc_invalid_bundle_size = EI_INIT;
+static expert_field ei_tipc_max_recursion_depth_reached = EI_INIT;
 
 static int tipc_address_type = -1;
 
@@ -250,7 +252,7 @@ static const fragment_items tipc_msg_frag_items = {
 
 #define TIPC_LINK_PROTOCO_STATE_MSG 0
 
-const value_string tipc_user_values[] = {
+static const value_string tipc_user_values[] = {
 	{ TIPC_DATA_PRIO_0,          "DATA_PRIO_0"},
 	{ TIPC_DATA_PRIO_1,          "DATA_PRIO_1"},
 	{ TIPC_DATA_PRIO_2,          "DATA_PRIO_2"},
@@ -284,7 +286,7 @@ const value_string tipc_user_values[] = {
 #define TIPCv2_USER_FRAGMENT		1
 #define TIPCv2_USER_LAST_FRAGMENT	2
 
-const value_string tipcv2_user_values[] = {
+static const value_string tipcv2_user_values[] = {
 	{ TIPCv2_DATA_LOW,            "Low Priority Payload Data"},
 	{ TIPCv2_DATA_NORMAL,         "Normal Priority Payload Data"},
 	{ TIPCv2_DATA_HIGH,           "High Priority Payload Data"},
@@ -301,7 +303,7 @@ const value_string tipcv2_user_values[] = {
 	{ 0, NULL}
 };
 
-const value_string tipcv2_user_short_str_vals[] = {
+static const value_string tipcv2_user_short_str_vals[] = {
 	{ TIPCv2_DATA_LOW,            "Payld:Low"},
 	{ TIPCv2_DATA_NORMAL,         "Payld:Normal"},
 	{ TIPCv2_DATA_HIGH,           "Payld:High"},
@@ -427,7 +429,7 @@ static const value_string tipc_cng_prot_msg_type_values[] = {
 /* SEGMENTATION_MANAGER */
 #define TIPC_FIRST_SEGMENT	1
 #define TIPC_SEGMENT		2
-const value_string tipc_sm_msg_type_values[] = {
+static const value_string tipc_sm_msg_type_values[] = {
 	{ 1, "FIRST_SEGMENT"},
 	{ 2, "SEGMENT"},
 	{ 0, NULL}
@@ -578,7 +580,7 @@ tipc_addr_value_to_buf(guint tipc_address, gchar *buf, int buf_len)
 	tipc_address = tipc_address >> 12;
 	zone = tipc_address & 0xff;
 
-	g_snprintf(buf, buf_len, "%u.%u.%u", zone, subnetwork, processor);
+	snprintf(buf, buf_len, "%u.%u.%u", zone, subnetwork, processor);
 	return buf;
 }
 
@@ -778,7 +780,7 @@ tipc_v1_set_col_msgtype(packet_info *pinfo, guint8 user, guint8 msg_type)
 		case TIPC_DATA_PRIO_2:
 		case TIPC_DATA_NON_REJECTABLE:
 			/*
-			 * src and dest address will be found at different location depending on User ad hdr_size
+			 * src and dest address will be found at different location depending on User as hdr_size
 			 */
 			datatype_hdr = TRUE;
 			col_append_fstr(pinfo->cinfo, COL_INFO, "%s(%u) ", val_to_str_const(msg_type, tipc_data_msg_type_values, "unknown"), msg_type);
@@ -1091,7 +1093,7 @@ dissect_tipc_v2_internal_msg(tvbuff_t *tipc_tvb, proto_tree *tipc_tree, packet_i
 
 			if ((message_type == TIPCv2_RESET_MSG)
 					|| ((message_type == TIPCv2_STATE_MSG) && ((msg_size-(orig_hdr_size*4)) != 0))){ /* is allowed */
-				proto_tree_add_item(tipc_tree, hf_tipcv2_bearer_instance, tipc_tvb, offset, -1, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(tipc_tree, hf_tipcv2_bearer_instance, tipc_tvb, offset, -1, ENC_ASCII);
 				/* the bearer instance string is padded with \0 to the next word boundry */
 				b_inst_strlen = tvb_strsize(tipc_tvb, offset);
 				offset += b_inst_strlen;
@@ -2002,7 +2004,7 @@ dissect_tipc_int_prot_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tipc_tr
 
 	switch (user) {
 		case TIPC_LINK_PROTOCOL:
-			proto_tree_add_item(tipc_tree, hf_tipc_bearer_name, tvb, offset, -1, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tipc_tree, hf_tipc_bearer_name, tvb, offset, -1, ENC_ASCII);
 			break;
 		case TIPC_CHANGEOVER_PROTOCOL:
 			switch (msg_type) {
@@ -2127,6 +2129,7 @@ dissect_tipc_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, voi
 	return tvb_captured_length(tvb);
 }
 
+#define TIPC_MAX_RECURSION_DEPTH 10 // Arbitrary
 static int
 dissect_tipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
@@ -2154,6 +2157,13 @@ dissect_tipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 	hdr_size = (dword >>21) & 0xf;
 	user = (dword>>25) & 0xf;
 	msg_size = dword & 0x1ffff;
+
+	unsigned recursion_depth = p_get_proto_depth(pinfo, proto_tipc);
+	if (++recursion_depth >= TIPC_MAX_RECURSION_DEPTH) {
+		proto_tree_add_expert(tree, pinfo, &ei_tipc_max_recursion_depth_reached, tvb, 0, 0);
+		return tvb_captured_length(tvb);
+	}
+	p_set_proto_depth(pinfo, proto_tipc, recursion_depth);
 
 	if ((guint32)tvb_reported_length_remaining(tvb, offset) < msg_size) {
 		tipc_tvb = tvb;
@@ -2243,6 +2253,7 @@ dissect_tipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 	tipc_tree = proto_item_add_subtree(ti, ett_tipc);
 	if (version == TIPCv2) {
 		dissect_tipc_v2(tipc_tvb, tipc_tree, pinfo, offset, user, msg_size, hdr_size, datatype_hdr);
+		p_set_proto_depth(pinfo, proto_tipc, recursion_depth - 1);
 		return tvb_captured_length(tvb);
 	}
 
@@ -2280,6 +2291,7 @@ dissect_tipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 		case TIPC_SEGMENTATION_MANAGER:
 		case TIPC_MSG_BUNDLER:
 			dissect_tipc_int_prot_msg(tipc_tvb, pinfo, tipc_tree, offset, user, msg_size);
+			p_set_proto_depth(pinfo, proto_tipc, recursion_depth - 1);
 			return tvb_captured_length(tvb);
 		default:
 			break;
@@ -2291,7 +2303,7 @@ dissect_tipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 		proto_tree_add_item_ret_uint(tipc_tree, hf_tipc_dst_port, tipc_tvb, offset, 4, ENC_BIG_ENDIAN, &destport);
 	}
 
-	conversation_create_endpoint(pinfo, &pinfo->src, &pinfo->dst, ENDPOINT_TIPC, srcport, destport, 0);
+	conversation_set_conv_addr_port_endpoints(pinfo, &pinfo->src, &pinfo->dst, CONVERSATION_TIPC, srcport, destport);
 
 	offset = offset + 4;
 	/* 20 - 24 Bytes
@@ -2356,6 +2368,7 @@ dissect_tipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 													"TIPC_NAME_DISTRIBUTOR %u bytes User Data", (msg_size - hdr_size*4));
 				data_tvb = tvb_new_subset_remaining(tipc_tvb, offset);
 				dissect_tipc_name_dist_data(data_tvb, pinfo, tipc_data_tree, 0);
+				p_set_proto_depth(pinfo, proto_tipc, recursion_depth - 1);
 				return tvb_captured_length(tvb);
 			} else {
 				/* Port name type / Connection level sequence number */
@@ -2392,6 +2405,7 @@ dissect_tipc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 		}
 	} /*if (hdr_size <= 5) */
 
+	p_set_proto_depth(pinfo, proto_tipc, recursion_depth - 1);
 	return tvb_captured_length(tvb);
 }
 
@@ -3045,6 +3059,7 @@ proto_register_tipc(void)
 	static ei_register_info ei[] = {
 		{ &ei_tipc_field_not_specified, { "tipc.field_not_specified", PI_PROTOCOL, PI_WARN, "This field is not specified in TIPC v7", EXPFILL }},
 		{ &ei_tipc_invalid_bundle_size, { "tipc.invalid_bundle_size", PI_PROTOCOL, PI_WARN, "Invalid message bundle size", EXPFILL }},
+		{ &ei_tipc_max_recursion_depth_reached, { "tipc.max_recursion_depth_reached", PI_PROTOCOL, PI_WARN, "Maximum allowed recursion depth reached. Dissection stopped.", EXPFILL }},
 	};
 
 	module_t *tipc_module;

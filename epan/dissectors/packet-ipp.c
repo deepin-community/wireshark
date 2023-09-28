@@ -19,9 +19,8 @@
 #include <epan/strutil.h>
 #include <epan/to_str.h>
 #include <epan/conversation.h>
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 #include "packet-http.h"
-#include <stdio.h>
 
 void proto_register_ipp(void);
 void proto_reg_handoff_ipp(void);
@@ -687,14 +686,14 @@ parse_attributes(tvbuff_t *tvb, int offset, proto_tree *tree)
              */
             name_length = tvb_get_ntohs(tvb, offset + 1);
             if (name_length != 0)
-              name = tvb_format_text(tvb, offset + 1 + 2, name_length);
+              name = tvb_format_text(wmem_packet_scope(), tvb, offset + 1 + 2, name_length);
 
             /*
              * OK, get the value length.
              */
             value_length = tvb_get_ntohs(tvb, offset + 1 + 2 + name_length);
             if (tag == TAG_MEMBERATTRNAME && value_length != 0)
-              name = tvb_format_text(tvb, offset + 1 + 2 + name_length + 2, value_length);
+              name = tvb_format_text(wmem_packet_scope(), tvb, offset + 1 + 2 + name_length + 2, value_length);
 
             /*
              * OK, does the value run past the end of the
@@ -745,8 +744,8 @@ parse_attributes(tvbuff_t *tvb, int offset, proto_tree *tree)
                          */
                         attr_tree = add_octetstring_tree(as_tree, tvb, offset, name_length, name, value_length, tag);
                     }
-                    if (tag == TAG_ENDCOLLECTION && attr_tree &&  attr_tree->parent)
-                        attr_tree = attr_tree->parent;
+                    if (tag == TAG_ENDCOLLECTION)
+                        attr_tree = proto_tree_get_parent_tree(attr_tree);
                     else
                         attr_tree = add_octetstring_value(tag_desc, attr_tree, tvb, offset, name_length, name, value_length, tag);
                     break;
@@ -941,7 +940,7 @@ add_integer_value(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
     int valoffset = offset + 1 + 2 + name_length + 2;
 
     if (name_length > 0)
-        proto_tree_add_item(tree, hf_ipp_name, tvb, offset + 1 + 2, name_length, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_ipp_name, tvb, offset + 1 + 2, name_length, ENC_ASCII);
 
     switch (tag) {
         case TAG_BOOLEAN:
@@ -1020,9 +1019,9 @@ add_octetstring_tree(proto_tree *tree, tvbuff_t *tvb, int offset, int name_lengt
 
                 count ++;
                 if (value)
-                    value = wmem_strconcat(wmem_packet_scope(), value, ",'", tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2, value_length), "'", NULL);
+                    value = wmem_strconcat(wmem_packet_scope(), value, ",'", tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2, value_length), "'", NULL);
                 else
-                    value = wmem_strconcat(wmem_packet_scope(), "'", tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2, value_length), "'", NULL);
+                    value = wmem_strconcat(wmem_packet_scope(), "'", tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2, value_length), "'", NULL);
 
                /*
                 * Move to the next value...
@@ -1183,12 +1182,12 @@ add_octetstring_tree(proto_tree *tree, tvbuff_t *tvb, int offset, int name_lengt
                     if (tvb_offset_exists(tvb, valoffset + 2 + language_length)) {
                         string_length = tvb_get_ntohs(tvb, valoffset + 2 + language_length);
                         if (tvb_offset_exists(tvb, valoffset + 2 + language_length + 2 + string_length)) {
-                            temp = wmem_strdup_printf(wmem_packet_scope(), "'%s'(%s)", tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2 + 2 + language_length + 2, string_length), tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2 + 2, language_length));
+                            temp = wmem_strdup_printf(wmem_packet_scope(), "'%s'(%s)", tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2 + 2 + language_length + 2, string_length), tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2 + 2, language_length));
                         }
                     }
                 }
                 else {
-                    temp = wmem_strdup_printf(wmem_packet_scope(), "'%s'", tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2, value_length));
+                    temp = wmem_strdup_printf(wmem_packet_scope(), "'%s'", tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2, value_length));
                 }
 
                 if (value)
@@ -1250,8 +1249,9 @@ add_octetstring_tree(proto_tree *tree, tvbuff_t *tvb, int offset, int name_lengt
             break;
 
         default :
-            value = wmem_strdup(wmem_packet_scope(), tvb_bytes_to_str(wmem_packet_scope(), tvb, offset + 1 + 2 + name_length + 2, value_length));
-
+            if (value_length > 0 ) {
+                value = tvb_bytes_to_str(wmem_packet_scope(), tvb, offset + 1 + 2 + name_length + 2, value_length);
+            }
             valoffset += 1 + 2 + name_length + 2 + value_length;
             break;
     }
@@ -1269,11 +1269,11 @@ add_octetstring_value(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
     int endoffset;
 
     if (name_length > 0)
-        proto_tree_add_item(tree, hf_ipp_name, tvb, offset + 1 + 2, name_length, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_ipp_name, tvb, offset + 1 + 2, name_length, ENC_ASCII);
 
     switch (tag) {
         case TAG_OCTETSTRING :
-            proto_tree_add_item(tree, hf_ipp_octetstring_value, tvb, valoffset, value_length, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_ipp_octetstring_value, tvb, valoffset, value_length, ENC_ASCII);
             break;
 
         case TAG_DATETIME :
@@ -1329,7 +1329,7 @@ add_octetstring_value(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
                 if (tvb_offset_exists(tvb, valoffset + 2 + language_length)) {
                     int string_length = tvb_get_ntohs(tvb, valoffset + 2 + language_length);
                     if (tvb_offset_exists(tvb, valoffset + 2 + language_length + 2 + string_length)) {
-                        proto_tree_add_bytes_format(tree, tag == TAG_NAMEWITHLANGUAGE ? hf_ipp_namewithlanguage_value : hf_ipp_textwithlanguage_value, tvb, valoffset, value_length, NULL, "%s value: '%s'(%s)", tag_desc, tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2 + 2 + language_length + 2, string_length), tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2 + 2, language_length));
+                        proto_tree_add_bytes_format(tree, tag == TAG_NAMEWITHLANGUAGE ? hf_ipp_namewithlanguage_value : hf_ipp_textwithlanguage_value, tvb, valoffset, value_length, NULL, "%s value: '%s'(%s)", tag_desc, tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2 + 2 + language_length + 2, string_length), tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2 + 2, language_length));
                         break;
                     }
                 }
@@ -1381,12 +1381,12 @@ add_charstring_tree(proto_tree *tree, tvbuff_t *tvb, int offset,
             if (tvb_offset_exists(tvb, valoffset + 2 + language_length)) {
                 string_length = tvb_get_ntohs(tvb, valoffset + 2 + language_length);
                 if (tvb_offset_exists(tvb, valoffset + 2 + language_length + 2 + string_length)) {
-                    temp = wmem_strdup_printf(wmem_packet_scope(), "'%s'(%s)", tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2 + 2 + language_length + 2, string_length), tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2 + 2, language_length));
+                    temp = wmem_strdup_printf(wmem_packet_scope(), "'%s'(%s)", tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2 + 2 + language_length + 2, string_length), tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2 + 2, language_length));
                 }
             }
         }
         else {
-            temp = wmem_strdup_printf(wmem_packet_scope(), "'%s'", tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2, value_length));
+            temp = wmem_strdup_printf(wmem_packet_scope(), "'%s'", tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2, value_length));
         }
 
         if (value)
@@ -1422,12 +1422,12 @@ add_charstring_value(const gchar *tag_desc, proto_tree *tree, tvbuff_t *tvb,
     int valoffset = offset + 1 + 2 + name_length + 2;
 
     if (name_length > 0)
-        proto_tree_add_item(tree, hf_ipp_name, tvb, offset + 1 + 2, name_length, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_ipp_name, tvb, offset + 1 + 2, name_length, ENC_ASCII);
 
     if (tag == TAG_MEMBERATTRNAME)
-        proto_tree_add_item(tree, hf_ipp_memberattrname, tvb, valoffset, value_length, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_ipp_memberattrname, tvb, valoffset, value_length, ENC_ASCII);
     else
-        proto_tree_add_string_format(tree, hf_ipp_charstring_value, tvb, valoffset, value_length, NULL, "%s value: '%s'", tag_desc, tvb_format_text(tvb, valoffset, value_length));
+        proto_tree_add_string_format(tree, hf_ipp_charstring_value, tvb, valoffset, value_length, NULL, "%s value: '%s'", tag_desc, tvb_format_text(wmem_packet_scope(), tvb, valoffset, value_length));
 }
 
 static int
@@ -1460,11 +1460,11 @@ ipp_fmt_collection(tvbuff_t *tvb, int valoffset, char *buffer, int bufsize)
                 *bufptr++ = ',';
 
             if ((bufend - bufptr) < value_length) {
-                g_strlcpy(bufptr, "...", bufend - bufptr + 1);
+                (void) g_strlcpy(bufptr, "...", bufend - bufptr + 1);
                 overflow = 1;
             }
             else {
-                g_strlcpy(bufptr, tvb_format_text(tvb, valoffset + 1 + 2 + name_length + 2, value_length), bufend - bufptr + 1);
+                (void) g_strlcpy(bufptr, tvb_format_text(wmem_packet_scope(), tvb, valoffset + 1 + 2 + name_length + 2, value_length), bufend - bufptr + 1);
             }
 
             bufptr += strlen(bufptr);
@@ -1478,11 +1478,11 @@ ipp_fmt_collection(tvbuff_t *tvb, int valoffset, char *buffer, int bufsize)
             valoffset = ipp_fmt_collection(tvb, valoffset, temp, sizeof(temp));
             if (!overflow) {
                 if ((bufend - bufptr) < (int)strlen(temp)) {
-                    g_strlcpy(bufptr, "...", bufend - bufptr + 1);
+                    (void) g_strlcpy(bufptr, "...", bufend - bufptr + 1);
                     overflow = 1;
                 }
                 else {
-                    g_strlcpy(bufptr, temp, bufend - bufptr + 1);
+                    (void) g_strlcpy(bufptr, temp, bufend - bufptr + 1);
                 }
                 bufptr += strlen(bufptr);
             }
@@ -1501,7 +1501,7 @@ ipp_fmt_collection(tvbuff_t *tvb, int valoffset, char *buffer, int bufsize)
 static void
 ipp_fmt_version( gchar *result, guint32 revision )
 {
-   g_snprintf( result, ITEM_LABEL_LENGTH, "%u.%u", (guint8)(( revision & 0xFF00 ) >> 8), (guint8)(revision & 0xFF) );
+   snprintf( result, ITEM_LABEL_LENGTH, "%u.%u", (guint8)(( revision & 0xFF00 ) >> 8), (guint8)(revision & 0xFF) );
 }
 
 void

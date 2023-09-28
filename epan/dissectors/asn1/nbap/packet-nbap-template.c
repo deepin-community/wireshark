@@ -46,7 +46,7 @@
 #define DEBUG_NBAP 0
 #if DEBUG_NBAP
 #include <epan/to_str.h>
-#define nbap_debug(...) g_warning(__VA_ARGS__)
+#define nbap_debug(...) ws_warning(__VA_ARGS__)
 #else
 #define nbap_debug(...)
 #endif
@@ -182,7 +182,7 @@ typedef struct nbap_ib_segment_t {
   guint8* data;
 } nbap_ib_segment_t;
 
-static nbap_ib_segment_t* nbap_parse_ib_sg_data_var1(tvbuff_t *tvb,gboolean is_short)
+static nbap_ib_segment_t* nbap_parse_ib_sg_data_var1(packet_info *pinfo, tvbuff_t *tvb,gboolean is_short)
 {
   guint8 bit_length;
   guint8* data;
@@ -192,13 +192,13 @@ static nbap_ib_segment_t* nbap_parse_ib_sg_data_var1(tvbuff_t *tvb,gboolean is_s
   }
   if (is_short) {
     bit_length = tvb_get_guint8(tvb,0) + 1;
-    data = (guint8*)tvb_memdup(wmem_packet_scope(),tvb,1,(bit_length+7)/8);
+    data = (guint8*)tvb_memdup(pinfo->pool,tvb,1,(bit_length+7)/8);
   }
   else {
     bit_length = NBAP_MAX_IB_SEGMENT_LENGTH;
-    data = (guint8*)tvb_memdup(wmem_packet_scope(),tvb,0,(bit_length+7)/8);
+    data = (guint8*)tvb_memdup(pinfo->pool,tvb,0,(bit_length+7)/8);
   }
-  output = wmem_new(wmem_packet_scope(), nbap_ib_segment_t);
+  output = wmem_new(pinfo->pool, nbap_ib_segment_t);
   output->bit_length = bit_length;
   output->data = data;
   return output;
@@ -424,9 +424,9 @@ static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, pro
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *);
 
 static guint32 calculate_setup_conv_key(const guint32 transaction_id, const guint32 dd_mode, const guint32 channel_id);
-static void add_setup_conv(const guint32 transaction_id, const guint32 dd_mode, const guint32 channel_id, const guint32 req_frame_number,
+static void add_setup_conv(const packet_info *pinfo _U_, const guint32 transaction_id, const guint32 dd_mode, const guint32 channel_id, const guint32 req_frame_number,
            const address *addr, const guint32 port, umts_fp_conversation_info_t * umts_fp_conversation_info, conversation_t *conv);
-static nbap_setup_conv_t* find_setup_conv(const guint32 transaction_id, const guint32 dd_mode, const guint32 channel_id);
+static nbap_setup_conv_t* find_setup_conv(const packet_info *pinfo _U_, const guint32 transaction_id, const guint32 dd_mode, const guint32 channel_id);
 static void delete_setup_conv(nbap_setup_conv_t *conv);
 
 /*Easy way to add hsdhsch binds for corner cases*/
@@ -471,23 +471,25 @@ static void add_hsdsch_bind(packet_info *pinfo){
   umts_fp_conversation_info_t *umts_fp_conversation_info;
   fp_hsdsch_channel_info_t* fp_hsdsch_channel_info = NULL;
   guint32 i;
+  nbap_private_data_t* nbap_private_data;
   nbap_hsdsch_channel_info_t* nbap_hsdsch_channel_info;
 
   if (PINFO_FD_VISITED(pinfo)){
     return;
   }
 
-  nbap_hsdsch_channel_info = nbap_get_private_data(pinfo)->nbap_hsdsch_channel_info;
+  nbap_private_data = nbap_get_private_data(pinfo);
+  nbap_hsdsch_channel_info = nbap_private_data->nbap_hsdsch_channel_info;
   /* Set port to zero use that as an indication of whether we have data or not */
   clear_address(&null_addr);
   for (i = 0; i < maxNrOfMACdFlows; i++) {
     if (nbap_hsdsch_channel_info[i].crnc_port != 0){
-      conversation = find_conversation(pinfo->num, &(nbap_hsdsch_channel_info[i].crnc_address), &null_addr, ENDPOINT_UDP,
+      conversation = find_conversation(pinfo->num, &(nbap_hsdsch_channel_info[i].crnc_address), &null_addr, CONVERSATION_UDP,
                                       nbap_hsdsch_channel_info[i].crnc_port, 0, NO_ADDR_B);
 
       if (conversation == NULL) {
         /* It's not part of any conversation - create a new one. */
-        conversation = conversation_new(pinfo->num, &(nbap_hsdsch_channel_info[i].crnc_address), &null_addr, ENDPOINT_UDP,
+        conversation = conversation_new(pinfo->num, &(nbap_hsdsch_channel_info[i].crnc_address), &null_addr, CONVERSATION_UDP,
                                        nbap_hsdsch_channel_info[i].crnc_port, 0, NO_ADDR2|NO_PORT2);
 
         /* Set dissector */
@@ -508,6 +510,15 @@ static void add_hsdsch_bind(packet_info *pinfo){
           umts_fp_conversation_info->channel_specific_info = (void*)fp_hsdsch_channel_info;
           /*Added june 3, normally just the iterator variable*/
           fp_hsdsch_channel_info->hsdsch_macdflow_id = i ; /*hsdsch_macdflow_ids[i];*/ /* hsdsch_macdflow_id;*/
+
+          if (nbap_private_data->crnc_context_present) {
+            umts_fp_conversation_info->com_context_id = nbap_private_data->com_context_id;
+          } else {
+            /* XXX: This expert info doesn't get added in subsequent passes,
+             * but probably should.
+             */
+            expert_add_info(pinfo, NULL, &ei_nbap_no_set_comm_context_id);
+          }
 
           /* Cheat and use the DCH entries */
           umts_fp_conversation_info->num_dch_in_flow++;
@@ -545,14 +556,14 @@ static guint32 calculate_setup_conv_key(const guint32 transaction_id, const guin
   return key;
 }
 
-static void add_setup_conv(const guint32 transaction_id, const guint32 dd_mode, const guint32 channel_id, const guint32 req_frame_number,
+static void add_setup_conv(const packet_info *pinfo _U_, const guint32 transaction_id, const guint32 dd_mode, const guint32 channel_id, const guint32 req_frame_number,
               const address *addr, const guint32 port, umts_fp_conversation_info_t * umts_fp_conversation_info, conversation_t *conv)
 {
   nbap_setup_conv_t *new_conv = NULL;
   guint32 key;
 
   nbap_debug("Creating new setup conv\t TransactionID: %u\tddMode: %u\tChannelID: %u\t %s:%u",
-  transaction_id, dd_mode, channel_id, address_to_str(wmem_packet_scope(), addr), port);
+  transaction_id, dd_mode, channel_id, address_to_str(pinfo->pool, addr), port);
 
   new_conv = wmem_new0(wmem_file_scope(), nbap_setup_conv_t);
 
@@ -571,7 +582,7 @@ static void add_setup_conv(const guint32 transaction_id, const guint32 dd_mode, 
   wmem_map_insert(nbap_setup_conv_table, GUINT_TO_POINTER(key), new_conv);
 }
 
-static nbap_setup_conv_t* find_setup_conv(const guint32 transaction_id, const guint32 dd_mode, const guint32 channel_id)
+static nbap_setup_conv_t* find_setup_conv(const packet_info *pinfo _U_, const guint32 transaction_id, const guint32 dd_mode, const guint32 channel_id)
 {
   nbap_setup_conv_t *conv;
   guint32 key;
@@ -585,7 +596,7 @@ static nbap_setup_conv_t* find_setup_conv(const guint32 transaction_id, const gu
     nbap_debug("\tDidn't find Setup Conversation match");
   }else{
     nbap_debug("\tFOUND Setup Conversation match\t TransactionID: %u\t ddMode: %u\t ChannelID: %u\t %s:%u",
-         conv->transaction_id, conv->dd_mode, conv->channel_id, address_to_str(wmem_packet_scope(), &(conv->addr)), conv->port);
+         conv->transaction_id, conv->dd_mode, conv->channel_id, address_to_str(pinfo->pool, &(conv->addr)), conv->port);
   }
 
   return conv;

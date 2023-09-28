@@ -83,6 +83,10 @@ class case_wslua(subprocesstest.SubprocessTestCase):
         '''wslua directory functions'''
         check_lua_script(self, 'dir.lua', empty_pcap, True)
 
+    def test_wslua_util(self, check_lua_script):
+        '''wslua utility functions'''
+        check_lua_script(self, 'util.lua', empty_pcap, True)
+
     # Mode_1, mode_2, and mode_3, and fpm were all under wslua_step_dissector_test
     # in the Bash version.
     def test_wslua_dissector_mode_1(self, check_lua_script_verify):
@@ -257,15 +261,6 @@ class case_wslua(subprocesstest.SubprocessTestCase):
             '-X', 'lua_script1:' + os.path.join(dirs.lua_dir, 'globals_2.2.txt'),
         )
 
-    @unittest.skip('GRegex tests are broken since PCRE 8.34, see bug 12997.')
-    def test_wslua_gregex(self, check_lua_script, dirs):
-        '''wslua GRegex'''
-        check_lua_script(self, 'gregex.lua', empty_pcap, True,
-            '-X', 'lua_script1:' + os.path.join(dirs.lua_dir, ''),
-            '-X', 'lua_script1:glib',
-            '-X', 'lua_script1:-V',
-        )
-
     def test_wslua_struct(self, check_lua_script):
         '''wslua struct'''
         check_lua_script(self, 'struct.lua', empty_pcap, True)
@@ -277,6 +272,10 @@ class case_wslua(subprocesstest.SubprocessTestCase):
     def test_wslua_tvb_no_tree(self, check_lua_script):
         '''wslua tvb without a tree'''
         check_lua_script(self, 'tvb.lua', dns_port_pcap, True)
+
+    def test_wslua_try_heuristics(self, check_lua_script):
+        '''wslua try_heuristics'''
+        check_lua_script(self, 'try_heuristics.lua', dns_port_pcap, True)
 
 
 @fixtures.uses_fixtures

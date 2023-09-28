@@ -40,11 +40,11 @@ WSLUA_CONSTRUCTOR Dissector_get (lua_State *L) {
 
     if ((d = find_dissector(name))) {
         pushDissector(L, d);
-        WSLUA_RETURN(1); /* The <<lua_class_Dissector,`Dissector`>> reference. */
+    } else {
+        lua_pushnil(L);
     }
 
-    WSLUA_ARG_ERROR(Dissector_get,NAME,"No such dissector");
-    return 0;
+    WSLUA_RETURN(1); /* The <<lua_class_Dissector,`Dissector`>> reference if found, otherwise `nil`. */
 }
 
 /* Allow dissector key names to be sorted alphabetically. */
@@ -118,11 +118,11 @@ WSLUA_METAMETHOD Dissector__call(lua_State* L) {
 }
 
 WSLUA_METAMETHOD Dissector__tostring(lua_State* L) {
-    /* Gets the Dissector's protocol short name. */
+    /* Gets the Dissector's description. */
     Dissector d = checkDissector(L,1);
     if (!d) return 0;
-    lua_pushstring(L,dissector_handle_get_short_name(d));
-    WSLUA_RETURN(1); /* A string of the protocol's short name. */
+    lua_pushstring(L,dissector_handle_get_description(d));
+    WSLUA_RETURN(1); /* A string of the Dissector's description. */
 }
 
 /* Gets registered as metamethod automatically by WSLUA_REGISTER_CLASS/META */
@@ -286,6 +286,35 @@ WSLUA_CONSTRUCTOR DissectorTable_heuristic_list (lua_State *L) {
     WSLUA_RETURN(1); /* The array table of registered heuristic list names */
 }
 
+WSLUA_CONSTRUCTOR DissectorTable_try_heuristics (lua_State *L) {
+    /*
+     Try all the dissectors in a given heuristic dissector table.
+     */
+#define WSLUA_ARG_DissectorTable_try_heuristics_LISTNAME 1 /* The name of the heuristic dissector. */
+#define WSLUA_ARG_DissectorTable_try_heuristics_TVB 2 /* The buffer to dissect. */
+#define WSLUA_ARG_DissectorTable_try_heuristics_PINFO 3 /* The packet info. */
+#define WSLUA_ARG_DissectorTable_try_heuristics_TREE 4 /* The tree on which to add the protocol items. */
+
+    const gchar* name = luaL_checkstring(L,WSLUA_ARG_DissectorTable_try_heuristics_LISTNAME);
+    Tvb tvb = checkTvb(L,WSLUA_ARG_DissectorTable_try_heuristics_TVB);
+    Pinfo pinfo = checkPinfo(L,WSLUA_ARG_DissectorTable_try_heuristics_PINFO);
+    TreeItem tree = checkTreeItem(L,WSLUA_ARG_DissectorTable_try_heuristics_TREE);
+    heur_dissector_list_t list;
+    heur_dtbl_entry_t *entry;
+
+    if (!(name && tvb && pinfo && tree)) return 0;
+
+    list = find_heur_dissector_list(name);
+    if (!list) {
+        luaL_error(L, "Heuristic list '%s' does not exist", name);
+        return 0;
+    }
+
+    lua_pushboolean(L, dissector_try_heuristic(list, tvb->ws_tvb, pinfo->ws_pinfo, tree->tree, &entry, NULL));
+
+    WSLUA_RETURN(1); /* True if the packet was recognized by the sub-dissector (stop dissection here). */
+}
+
 WSLUA_CONSTRUCTOR DissectorTable_get (lua_State *L) {
     /*
      Obtain a reference to an existing dissector table.
@@ -303,12 +332,11 @@ WSLUA_CONSTRUCTOR DissectorTable_get (lua_State *L) {
         dt->expired = FALSE;
 
         pushDissectorTable(L, dt);
-
-        WSLUA_RETURN(1); /* The `DissectorTable`. */
+    } else {
+        lua_pushnil(L);
     }
 
-    WSLUA_ARG_ERROR(DissectorTable_get,TABLENAME,"no such dissector_table");
-    return 0;
+    WSLUA_RETURN(1); /* The <<lua_class_DissectorTable,`DissectorTable`>> reference if found, otherwise `nil`. */
 }
 
 WSLUA_METHOD DissectorTable_add (lua_State *L) {
@@ -597,11 +625,11 @@ WSLUA_METHOD DissectorTable_get_dissector (lua_State *L) {
 
     if (handle) {
         pushDissector(L,handle);
-        WSLUA_RETURN(1); /* The <<lua_class_Dissector,`Dissector`>> handle if found, otherwise `nil` */
     } else {
         lua_pushnil(L);
-        WSLUA_RETURN(1);
     }
+
+    WSLUA_RETURN(1); /* The <<lua_class_Dissector,`Dissector`>> handle if found, otherwise `nil` */
 }
 
 WSLUA_METHOD DissectorTable_add_for_decode_as (lua_State *L) {
@@ -689,6 +717,7 @@ WSLUA_METHODS DissectorTable_methods[] = {
     WSLUA_CLASS_FNREG(DissectorTable,get),
     WSLUA_CLASS_FNREG(DissectorTable,list),
     WSLUA_CLASS_FNREG(DissectorTable,heuristic_list),
+    WSLUA_CLASS_FNREG(DissectorTable,try_heuristics),
     WSLUA_CLASS_FNREG(DissectorTable,add),
     WSLUA_CLASS_FNREG(DissectorTable,set),
     WSLUA_CLASS_FNREG(DissectorTable,remove),

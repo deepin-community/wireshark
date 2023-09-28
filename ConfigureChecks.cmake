@@ -13,8 +13,6 @@ include(CMakePushCheckState)
 include(CheckIncludeFile)
 include(CheckIncludeFiles)
 check_include_file("arpa/inet.h"            HAVE_ARPA_INET_H)
-check_include_file("fcntl.h"                HAVE_FCNTL_H)
-check_include_file("getopt.h"               HAVE_GETOPT_H)
 check_include_file("grp.h"                  HAVE_GRP_H)
 #
 # This may require <sys/types.h> to be included
@@ -23,10 +21,8 @@ check_include_files("sys/types.h;ifaddrs.h" HAVE_IFADDRS_H)
 check_include_file("netinet/in.h"           HAVE_NETINET_IN_H)
 check_include_file("netdb.h"                HAVE_NETDB_H)
 check_include_file("pwd.h"                  HAVE_PWD_H)
-check_include_file("sys/ioctl.h"            HAVE_SYS_IOCTL_H)
 check_include_file("sys/select.h"           HAVE_SYS_SELECT_H)
 check_include_file("sys/socket.h"           HAVE_SYS_SOCKET_H)
-check_include_file("sys/sockio.h"           HAVE_SYS_SOCKIO_H)
 check_include_file("sys/time.h"             HAVE_SYS_TIME_H)
 check_include_file("sys/utsname.h"          HAVE_SYS_UTSNAME_H)
 check_include_file("sys/wait.h"             HAVE_SYS_WAIT_H)
@@ -84,68 +80,32 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "SunOS" AND CMAKE_SYSTEM_VERSION MATCHES "5[.]
 	check_function_exists("getexecname"     HAVE_GETEXECNAME)
 endif()
 
-#
-# Use check_symbol_exists just in case math.h does something magic
-# and there's not actually a function named floorl()
-#
-cmake_push_check_state()
-set(CMAKE_REQUIRED_INCLUDES ${M_INCLUDE_DIRS})
-set(CMAKE_REQUIRED_LIBRARIES ${M_LIBRARIES})
-check_symbol_exists("floorl" "math.h"    HAVE_FLOORL)
-cmake_pop_check_state()
-
-#
-# Check whether we have clock_gettime().
-# It's not on Windows, so don't waste time checking for it.
-# It's in newer POSIX, so some, but not all, UN*Xes have it.
-#
-if (NOT WIN32)
-	#
-	# POSIX - don't bother checking on Windows, as checks
-	# take time.
-	#
-	check_function_exists("clock_gettime"    HAVE_CLOCK_GETTIME)
-endif (NOT WIN32)
-
-check_function_exists("getopt_long"      HAVE_GETOPT_LONG)
-if(HAVE_GETOPT_LONG)
-	#
-	# The OS has getopt_long(), so it might have optreset.
-	# Do we have it?
-	#
-	if(HAVE_GETOPT_H)
-		check_symbol_exists("optreset" "getopt.h" HAVE_OPTRESET)
-	else()
-		check_symbol_exists("optreset"           HAVE_OPTRESET)
-	endif()
-else()
-	#
-	# The OS doesn't have getopt_long(), so we're using the GNU libc
-	# version that we have in wsutil.  It doesn't have optreset, so we
-	# don't need to check for it.
-	#
-	# However, it uses alloca(), so we may need to include alloca.h;
-	# check for it.
-	#
-	check_include_file("alloca.h"    HAVE_ALLOCA_H)
-endif()
+check_symbol_exists("clock_gettime"  "time.h"   HAVE_CLOCK_GETTIME)
+# Some platforms (macOS pre 10.15) are non-conformant with C11 and lack timespec_get()
+check_symbol_exists("timespec_get"   "time.h"   HAVE_TIMESPEC_GET)
 check_function_exists("getifaddrs"       HAVE_GETIFADDRS)
 check_function_exists("issetugid"        HAVE_ISSETUGID)
-check_function_exists("mkstemps"         HAVE_MKSTEMPS)
 check_function_exists("setresgid"        HAVE_SETRESGID)
 check_function_exists("setresuid"        HAVE_SETRESUID)
-check_function_exists("strptime"         HAVE_STRPTIME)
 if (APPLE)
 	cmake_push_check_state()
 	set(CMAKE_REQUIRED_LIBRARIES ${APPLE_CORE_FOUNDATION_LIBRARY})
 	check_function_exists("CFPropertyListCreateWithStream" HAVE_CFPROPERTYLISTCREATEWITHSTREAM)
 	cmake_pop_check_state()
 endif()
+if(UNIX)
+	cmake_push_check_state()
+	list(APPEND CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
+	check_symbol_exists("memmem"        "string.h"   HAVE_MEMMEM)
+	check_symbol_exists("strcasestr"    "string.h"   HAVE_STRCASESTR)
+	check_symbol_exists("strerrorname_np" "string.h" HAVE_STRERRORNAME_NP)
+	check_symbol_exists("strptime"      "time.h"     HAVE_STRPTIME)
+	check_symbol_exists("vasprintf"     "stdio.h"    HAVE_VASPRINTF)
+	cmake_pop_check_state()
+endif()
 
 #Struct members
 include(CheckStructHasMember)
-check_struct_has_member("struct sockaddr" sa_len         sys/socket.h HAVE_STRUCT_SOCKADDR_SA_LEN)
-check_struct_has_member("struct stat"     st_flags       sys/stat.h   HAVE_STRUCT_STAT_ST_FLAGS)
 check_struct_has_member("struct stat"     st_blksize     sys/stat.h   HAVE_STRUCT_STAT_ST_BLKSIZE)
 check_struct_has_member("struct stat"     st_birthtime   sys/stat.h   HAVE_STRUCT_STAT_ST_BIRTHTIME)
 check_struct_has_member("struct stat"     __st_birthtime sys/stat.h   HAVE_STRUCT_STAT___ST_BIRTHTIME)
@@ -154,7 +114,35 @@ check_struct_has_member("struct tm"       tm_zone        time.h       HAVE_STRUC
 #Symbols but NOT enums or types
 check_symbol_exists(tzname "time.h" HAVE_TZNAME)
 
-# Check for stuff that isn't testable via the tests above
+# Types
+include(CheckTypeSize)
+check_type_size("ssize_t"       SSIZE_T)
+
+#
+# Check if the libc vsnprintf() conforms to C99. If this fails we may
+# need to fall-back on GLib I/O.
+#
+check_c_source_runs("
+	#include <stdio.h>
+	int main(void)
+	{
+		/* Check that snprintf() and vsnprintf() don't return
+		 * -1 if the buffer is too small. C99 says this value
+		 * is the length that would be written not including
+		 * the nul byte. */
+		char buf[3];
+		return snprintf(buf, sizeof(buf), \"%s\", \"ABCDEF\") > 0 ? 0 : 1;
+	}"
+	HAVE_C99_VSNPRINTF
+)
+if (NOT HAVE_C99_VSNPRINTF)
+	message(FATAL_ERROR
+"Building Wireshark requires a C99 compliant vsnprintf() and this \
+target does not meet that requirement. Compiling for ${CMAKE_SYSTEM} \
+using ${CMAKE_C_COMPILER_ID}. Please report this issue to the Wireshark \
+developers at wireshark-dev@wireshark.org."
+	)
+endif()
 
 #
 # *If* we found libnl, check if we can use nl80211 stuff with it.

@@ -17,6 +17,7 @@
 #include <glib.h>
 
 #include <epan/stat_tap_ui.h>
+#include <wsutil/ws_assert.h>
 
 /* structure to keep track of what stats have registered command-line
    arguments.
@@ -97,7 +98,7 @@ process_stat_cmd_arg(const char *optstr)
     for (entry = wmem_list_tail(stat_cmd_arg_list); entry; entry = wmem_list_frame_prev(entry)) {
         sca = (stat_cmd_arg*)wmem_list_frame_data(entry);
         if (!strncmp(sca->cmd, stat_command, strlen(sca->cmd))) {
-            tr=(stat_requested *)g_malloc(sizeof (stat_requested));
+            tr=g_new(stat_requested, 1);
             tr->sca = sca;
             tr->arg = stat_command;
             stats_requested = g_slist_append(stats_requested, tr);
@@ -192,6 +193,24 @@ stat_tap_table* stat_tap_init_table(const char *name, int num_fields, int num_el
     return new_table;
 }
 
+stat_tap_table *stat_tap_find_table(stat_tap_table_ui *ui, const char *name)
+{
+    guint i = 0;
+    stat_tap_table *stat_table;
+
+    if (ui->tables == NULL)
+        return NULL;
+
+    for (i = 0; i < ui->tables->len; i++) {
+        stat_table = g_array_index(ui->tables, stat_tap_table *, i);
+        if (!g_strcmp0(stat_table->title, name)) {
+            return stat_table;
+        }
+    }
+
+    return NULL;
+}
+
 void stat_tap_add_table(stat_tap_table_ui* new_stat, stat_tap_table* table)
 {
     if (new_stat->tables == NULL)
@@ -220,11 +239,11 @@ void stat_tap_init_table_row(stat_tap_table *stat_table, guint table_index, guin
 stat_tap_table_item_type* stat_tap_get_field_data(const stat_tap_table *stat_table, guint table_index, guint field_index)
 {
     stat_tap_table_item_type* field_value;
-    g_assert(table_index < stat_table->num_elements);
+    ws_assert(table_index < stat_table->num_elements);
 
     field_value = stat_table->elements[table_index];
 
-    g_assert(field_index < stat_table->num_fields);
+    ws_assert(field_index < stat_table->num_fields);
 
     return &field_value[field_index];
 }
@@ -232,11 +251,11 @@ stat_tap_table_item_type* stat_tap_get_field_data(const stat_tap_table *stat_tab
 void stat_tap_set_field_data(stat_tap_table *stat_table, guint table_index, guint field_index, stat_tap_table_item_type* field_data)
 {
     stat_tap_table_item_type* field_value;
-    g_assert(table_index < stat_table->num_elements);
+    ws_assert(table_index < stat_table->num_elements);
 
     field_value = stat_table->elements[table_index];
 
-    g_assert(field_index < stat_table->num_fields);
+    ws_assert(field_index < stat_table->num_fields);
 
     field_value[field_index] = *field_data;
 }

@@ -1,4 +1,5 @@
-/* filter_filess.h
+/** @file
+ *
  * Declarations of routines for reading and writing the filters file.
  *
  * Wireshark - Network traffic analyzer
@@ -34,16 +35,16 @@ extern "C" {
  * Filter lists.
  */
 typedef enum {
-  CFILTER_LIST,        /* capture filter list - saved */
-  DFILTER_LIST        /* display filter list - saved */
+    CFILTER_LIST,        /* capture filter list - saved */
+    DFILTER_LIST        /* display filter list - saved */
 } filter_list_type_t;
 
 /*
  * Item in a list of filters.
  */
 typedef struct {
-  char *name;          /* filter name */
-  char *strval;        /* filter expression */
+    char *name;          /* filter name */
+    char *strval;        /* filter expression */
 } filter_def;
 
 /*
@@ -87,16 +88,3 @@ void free_filter_lists(void);
 #endif /* __cplusplus */
 
 #endif /* __UI_FILTERS_H__ */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

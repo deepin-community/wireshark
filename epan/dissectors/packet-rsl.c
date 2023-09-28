@@ -56,6 +56,7 @@ static int hf_rsl_timing_adv           = -1;
 static int hf_rsl_ho_ref               = -1;
 static int hf_rsl_l1inf_power_lev      = -1;
 static int hf_rsl_l1inf_fpc            = -1;
+static int hf_rsl_l1inf_srr            = -1;
 static int hf_rsl_ms_power_lev         = -1;
 static int hf_rsl_ms_fpc               = -1;
 static int hf_rsl_act_timing_adv       = -1;
@@ -163,6 +164,20 @@ static int hf_rsl_phy_ctx_ab_rx_lvl            = -1;
 static int hf_rsl_phy_ctx_ab_err_bits          = -1;
 static int hf_rsl_phy_ctx_rx_lvl_ext           = -1;
 
+/* Osmocom specific IEs */
+static int hf_rsl_osmo_rep_acch_rxqual = -1;
+static int hf_rsl_osmo_rep_acch_ul_sacch = -1;
+static int hf_rsl_osmo_rep_acch_dl_sacch = -1;
+static int hf_rsl_osmo_rep_acch_dl_facch_all = -1;
+static int hf_rsl_osmo_rep_acch_dl_facch_cmd = -1;
+static int hf_rsl_osmo_top_acch_val = -1;
+static int hf_rsl_osmo_top_acch_sacch = -1;
+static int hf_rsl_osmo_top_acch_facch = -1;
+static int hf_rsl_osmo_top_acch_rxqual = -1;
+static int hf_rsl_osmo_tsc_set = -1;
+static int hf_rsl_osmo_tsc_val = -1;
+static int hf_rsl_osmo_osmux_cid = -1;
+
 /* Initialize the subtree pointers */
 static int ett_rsl = -1;
 static int ett_ie_link_id = -1;
@@ -230,6 +245,9 @@ static int ett_ie_local_port = -1;
 static int ett_ie_local_ip = -1;
 static int ett_ie_rtp_payload = -1;
 static int ett_ie_etws_pn = -1;
+static int ett_ie_osmo_rep_acch_cap = -1;
+static int ett_ie_osmo_top_acch_cap = -1;
+static int ett_ie_osmo_training_seq = -1;
 
 /* Encapsulating paging messages into a packet REF: EP2192796 - proprietor Huawei */
 static int ett_ie_paging_package               = -1;
@@ -260,6 +278,9 @@ static dissector_handle_t gsm_a_sacch_handle;
 
 /* Decode things as nanoBTS traces */
 static gboolean global_rsl_use_nano_bts = FALSE;
+
+/* Decode Osmocom specific messages and IEs */
+static gboolean global_rsl_use_osmo_bts = FALSE;
 
 /* Decode things in Physical Context Information field. */
 static gboolean global_rsl_dissect_phy_ctx_inf = TRUE;
@@ -414,6 +435,12 @@ static const value_string rsl_msg_disc_vals[] = {
 #define RSL_IE_IPAC_RTP_PAYLOAD2          0xfc
 #define RSL_IE_IPAC_RTP_MPLEX             0xfd
 #define RSL_IE_IPAC_RTP_MPLEX_ID          0xfe
+
+/* Osmocom specific RSL IEs */
+#define RSL_IE_OSMO_REP_ACCH_CAP          0x60
+#define RSL_IE_OSMO_TRAINING_SEQUENCE     0x61
+#define RSL_IE_OSMO_TOP_ACCH_CAP          0x62
+#define RSL_IE_OSMO_OSMUX_CID             0x63
 
 static const value_string rsl_msg_type_vals[] = {
       /*    0 0 0 0 - - - - Radio Link Layer Management messages: */
@@ -653,6 +680,10 @@ static const value_string rsl_ie_type_vals[] = {
             Not used
 
     */
+/* 0x60 */    { RSL_IE_OSMO_REP_ACCH_CAP, "Repeated ACCH Capabilities" },
+/* 0x61 */    { RSL_IE_OSMO_TRAINING_SEQUENCE, "Training Sequence Code/Set" },
+/* 0x62 */    { RSL_IE_OSMO_TOP_ACCH_CAP, "Temporary ACCH Overpower Capabilities" },
+/* 0x63 */    { RSL_IE_OSMO_OSMUX_CID, "Osmux CID" },
 /* 0xe0 */    { RSL_IE_IPAC_SRTP_CONFIG,"SRTP Configuration" },
 /* 0xe1 */    { RSL_IE_IPAC_PROXY_UDP,  "BSC Proxy UDP Port" },
 /* 0xe2 */    { RSL_IE_IPAC_BSCMPL_TOUT,"BSC Multiplex Timeout" },
@@ -1084,6 +1115,9 @@ static const value_string rsl_ch_rate_and_type_vals[] = {
     {  0x1a,    "Full rate TCH channel uni-directional downlink Bm, Multislot configuration" },
     {  0x28,    "Full rate TCH channel Bm Broadcast call channel" },
     {  0x29,    "PHalf rate TCH channel Lm Broadcast call channel" },
+    /* Osmocom specific extensions: */
+    {  0x88,    "Full rate TCH channel Bm in VAMOS mode" },
+    {  0x89,    "Half rate TCH channel Lm in VAMOS mode" },
     { 0,            NULL }
 };
 static value_string_ext rsl_ch_rate_and_type_vals_ext = VALUE_STRING_EXT_INIT(rsl_ch_rate_and_type_vals);
@@ -1121,7 +1155,7 @@ static const value_string rsl_ra_if_data_rte_vals[] = {
 #if 0
 static const value_string rsl_data_rte_vals[] = {
     {  0x38,    "32 kbit/s" },
-    {  0x22,    "39 kbit/s" },
+    {  0x39,    "29 kbit/s" },
     {  0x18,    "14.4 kbit/s" },
     {  0x10,    "9.6 kbit/s" },
     {  0x11,    "4.8 kbit/s" },
@@ -1352,6 +1386,8 @@ dissect_rsl_ie_l1_inf(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, i
     proto_tree_add_item(ie_tree, hf_rsl_l1inf_power_lev, tvb, offset, 1, ENC_BIG_ENDIAN);
     /* FPC */
     proto_tree_add_item(ie_tree, hf_rsl_l1inf_fpc, tvb, offset, 1, ENC_BIG_ENDIAN);
+    /* SRR (SACCH Repetition Request) bit */
+    proto_tree_add_item(ie_tree, hf_rsl_l1inf_srr, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset++;
     /* Actual Timing Advance */
     proto_tree_add_item(ie_tree, hf_rsl_act_timing_adv, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -1977,6 +2013,9 @@ dissect_rsl_ie_rlm_cause(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree
     proto_tree_add_item(ie_tree, hf_rsl_ie_length, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset++;
 
+    if (length == 0)
+        return offset;
+
     /* The Cause Value is a one octet field if the extension bit is set to 0.
      * If the extension bit is set to 1, the Cause Value is a two octet field.
      */
@@ -2264,13 +2303,13 @@ dissect_rsl_ie_message_id(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tre
             return offset;
     }
 
-    ie_tree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_ie_message_id, NULL, "Message Identifier IE");
+    ie_tree = proto_tree_add_subtree(tree, tvb, offset, 2, ett_ie_message_id, NULL, "Message Identifier IE");
 
     /* Element identifier */
     proto_tree_add_item(ie_tree, hf_rsl_ie_id, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset++;
     /* Message Type */
-    proto_tree_add_item(tree, hf_rsl_msg_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item(ie_tree, hf_rsl_msg_type, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset++;
     return offset;
 }
@@ -2502,7 +2541,7 @@ dissect_rsl_ie_ms_timing_offset(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tre
             return offset;
     }
 
-    ie_tree = proto_tree_add_subtree(tree, tvb, offset, 0, ett_ie_ms_timing_offset, NULL, "MS Timing Offset IE");
+    ie_tree = proto_tree_add_subtree(tree, tvb, offset, 2, ett_ie_ms_timing_offset, NULL, "MS Timing Offset IE");
 
     /* Element identifier */
     proto_tree_add_item(ie_tree, hf_rsl_ie_id, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -3560,6 +3599,114 @@ dissect_rsl_paging_package_number(tvbuff_t *tvb, packet_info *pinfo _U_, proto_t
     return package_number;
 }
 
+static int
+dissect_rsl_ie_osmo_rep_acch_cap(tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 proto_tree *tree, int offset,
+                                 gboolean is_mandatory)
+{
+    proto_item *ti;
+    proto_tree *ie_tree;
+    guint32     length;
+    guint8      ie_id;
+
+    if (is_mandatory == FALSE) {
+        ie_id = tvb_get_guint8(tvb, offset);
+        if (ie_id != RSL_IE_OSMO_REP_ACCH_CAP)
+            return offset;
+    }
+    ie_tree = proto_tree_add_subtree(tree, tvb, offset, 0,
+                                     ett_ie_osmo_rep_acch_cap, &ti,
+                                     "Osmocom Repeated ACCH Capabilities IE");
+
+    /* Element identifier */
+    proto_tree_add_item(ie_tree, hf_rsl_ie_id, tvb, offset++, 1, ENC_NA);
+    /* Length */
+    proto_tree_add_item_ret_uint(ie_tree, hf_rsl_ie_length, tvb, offset++, 1, ENC_NA, &length);
+    proto_item_set_len(ti, length + 2);
+
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_rep_acch_rxqual, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_rep_acch_ul_sacch, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_rep_acch_dl_sacch, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_rep_acch_dl_facch_all, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_rep_acch_dl_facch_cmd, tvb, offset, 1, ENC_NA);
+    offset++;
+
+    return offset;
+}
+
+static int
+dissect_rsl_ie_osmo_top_acch_cap(tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 proto_tree *tree, int offset,
+                                 gboolean is_mandatory)
+{
+    proto_item *ti;
+    proto_tree *ie_tree;
+    guint32     length;
+    guint8      ie_id;
+
+    if (is_mandatory == FALSE) {
+        ie_id = tvb_get_guint8(tvb, offset);
+        if (ie_id != RSL_IE_OSMO_TOP_ACCH_CAP)
+            return offset;
+    }
+    ie_tree = proto_tree_add_subtree(tree, tvb, offset, 0,
+                                     ett_ie_osmo_top_acch_cap, &ti,
+                                     "Osmocom Temporary ACCH Overpower Capabilities IE");
+
+    /* Element identifier */
+    proto_tree_add_item(ie_tree, hf_rsl_ie_id, tvb, offset++, 1, ENC_NA);
+    /* Length */
+    proto_tree_add_item_ret_uint(ie_tree, hf_rsl_ie_length, tvb, offset++, 1, ENC_NA, &length);
+    proto_item_set_len(ti, length + 2);
+
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_top_acch_sacch, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_top_acch_facch, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_top_acch_rxqual, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_top_acch_val, tvb, offset, 1, ENC_NA);
+    offset++;
+
+    return offset;
+}
+
+static const value_string rsl_osmo_tsc_set_vals[] = {
+    { 0, "TSC Set 1" },
+    { 1, "TSC Set 2" },
+    { 2, "TSC Set 3" },
+    { 3, "TSC Set 4" },
+    { 0, NULL }
+};
+
+static int
+dissect_rsl_ie_osmo_training_seq(tvbuff_t *tvb, packet_info *pinfo _U_,
+                                 proto_tree *tree, int offset,
+                                 gboolean is_mandatory)
+{
+    proto_item *ti;
+    proto_tree *ie_tree;
+    guint32     length;
+    guint8      ie_id;
+
+    if (is_mandatory == FALSE) {
+        ie_id = tvb_get_guint8(tvb, offset);
+        if (ie_id != RSL_IE_OSMO_TRAINING_SEQUENCE)
+            return offset;
+    }
+    ie_tree = proto_tree_add_subtree(tree, tvb, offset, 0,
+                                     ett_ie_osmo_training_seq, &ti,
+                                     "Osmocom Training Sequence IE");
+
+    /* Element identifier */
+    proto_tree_add_item(ie_tree, hf_rsl_ie_id, tvb, offset++, 1, ENC_NA);
+    /* Length */
+    proto_tree_add_item_ret_uint(ie_tree, hf_rsl_ie_length, tvb, offset++, 1, ENC_NA, &length);
+    proto_item_set_len(ti, length + 2);
+
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_tsc_set, tvb, offset++, 1, ENC_NA);
+    proto_tree_add_item(ie_tree, hf_rsl_osmo_tsc_val, tvb, offset++, 1, ENC_NA);
+
+    return offset;
+}
+
 struct dyn_pl_info_t {
     guint8 rtp_codec;
     guint8 rtp_pt;
@@ -3576,6 +3723,7 @@ dissct_rsl_ipaccess_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
     rtp_dyn_payload_t *dyn_pl = NULL;
     struct dyn_pl_info_t *dyn_pl_info;
     conversation_t *conv;
+    gboolean use_osmux = FALSE;
 
     msg_type = tvb_get_guint8(tvb, offset) & 0x7f;
     offset++;
@@ -3628,6 +3776,15 @@ dissct_rsl_ipaccess_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
             break;
         case RSL_IE_MS_POW:
             dissect_rsl_ie_ms_pow(tvb, pinfo, tree, offset, FALSE);
+            break;
+        case RSL_IE_BS_POW:
+            dissect_rsl_ie_bs_power(tvb, pinfo, tree, offset, FALSE);
+            break;
+        case RSL_IE_MS_POWER_PARAM:
+            dissect_rsl_ie_ms_pow_params(tvb, pinfo, tree, offset, FALSE);
+            break;
+        case RSL_IE_BS_POWER_PARAM:
+            dissect_rsl_ie_bs_power_params(tvb, pinfo, tree, offset, FALSE);
             break;
         case RSL_IE_CAUSE:
             dissect_rsl_ie_cause(tvb, pinfo, tree, offset, FALSE);
@@ -3713,29 +3870,38 @@ dissct_rsl_ipaccess_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int
             proto_tree_add_item(ie_tree, hf_rsl_cstat_avg_tx_dly, tvb,
                                 offset+24, 4, ENC_BIG_ENDIAN);
             break;
+        case RSL_IE_OSMO_OSMUX_CID:
+            if (global_rsl_use_osmo_bts) {
+                proto_tree_add_item(ie_tree, hf_rsl_osmo_osmux_cid, tvb,
+                                    offset, len, ENC_BIG_ENDIAN);
+                use_osmux = TRUE;
+            }
+            break;
         }
         offset += len;
     }
 
     switch (msg_type) {
     case RSL_MSG_TYPE_IPAC_CRCX_ACK:
-        /* Notify the RTP and RTCP dissectors about a new RTP stream */
-        src_addr.type = AT_IPv4;
-        src_addr.len = 4;
-        src_addr.data = (guint8 *)&local_addr;
+        if (!use_osmux) {
+            /* Notify the RTP and RTCP dissectors about a new RTP stream */
+            src_addr.type = AT_IPv4;
+            src_addr.len = 4;
+            src_addr.data = (guint8 *)&local_addr;
 
-        conv = find_or_create_conversation(pinfo);
-        dyn_pl_info = (struct dyn_pl_info_t *)conversation_get_proto_data(conv, proto_rsl);
-        if (dyn_pl_info && (dyn_pl_info->rtp_codec == 2 || dyn_pl_info->rtp_codec == 5)) {
-            dyn_pl = rtp_dyn_payload_new();
-            rtp_dyn_payload_insert(dyn_pl, dyn_pl_info->rtp_pt, "AMR", 8000);
+            conv = find_or_create_conversation(pinfo);
+            dyn_pl_info = (struct dyn_pl_info_t *)conversation_get_proto_data(conv, proto_rsl);
+            if (dyn_pl_info && (dyn_pl_info->rtp_codec == 2 || dyn_pl_info->rtp_codec == 5)) {
+                dyn_pl = rtp_dyn_payload_new();
+                rtp_dyn_payload_insert(dyn_pl, dyn_pl_info->rtp_pt, "AMR", 8000);
+            }
+            conversation_delete_proto_data(conv, proto_rsl);
+            wmem_free(wmem_file_scope(), dyn_pl_info);
+            rtp_add_address(pinfo, PT_UDP, &src_addr, local_port, 0,
+                            "GSM A-bis/IP", pinfo->num, 0, dyn_pl);
+            rtcp_add_address(pinfo, &src_addr, local_port+1, 0,
+                             "GSM A-bis/IP", pinfo->num);
         }
-        conversation_delete_proto_data(conv, proto_rsl);
-        wmem_free(wmem_file_scope(), dyn_pl_info);
-        rtp_add_address(pinfo, PT_UDP, &src_addr, local_port, 0,
-                        "GSM A-bis/IP", pinfo->num, 0, dyn_pl);
-        rtcp_add_address(pinfo, &src_addr, local_port+1, 0,
-                         "GSM A-bis/IP", pinfo->num);
         break;
     }
     return offset;
@@ -4059,6 +4225,18 @@ dissct_rsl_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
         /* TFO transparent container 9.3.59 O 12) TLV >=3   */
         if (tvb_reported_length_remaining(tvb, offset) > 0)
             offset = dissect_rsl_ie_tfo_transp_cont(tvb, pinfo, tree, offset, FALSE);
+        /* Osmocom specific IEs */
+        if (global_rsl_use_osmo_bts) {
+            /* Repeated ACCH Capabilities O TLV */
+            if (tvb_reported_length_remaining(tvb, offset) > 0)
+                offset = dissect_rsl_ie_osmo_rep_acch_cap(tvb, pinfo, tree, offset, FALSE);
+            /* Temporary ACCH Overpower Capabilities O TLV */
+            if (tvb_reported_length_remaining(tvb, offset) > 0)
+                offset = dissect_rsl_ie_osmo_top_acch_cap(tvb, pinfo, tree, offset, FALSE);
+            /* Training Sequence O TLV 2 */
+            if (tvb_reported_length_remaining(tvb, offset) > 0)
+                offset = dissect_rsl_ie_osmo_training_seq(tvb, pinfo, tree, offset, FALSE);
+        }
         break;
 
     /* 8.4.2 CHANNEL ACTIVATION ACKNOWLEDGE 34*/
@@ -4105,6 +4283,12 @@ dissct_rsl_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
         /* Access Delay             9.3.17 O 1) TV 2        */
         if (tvb_reported_length_remaining(tvb, offset) > 0)
             offset = dissect_rsl_ie_access_delay(tvb, pinfo, tree, offset, FALSE);
+        /* Osmocom specific IEs */
+        if (global_rsl_use_osmo_bts) {
+            /* Training Sequence O TLV 2 */
+            if (tvb_reported_length_remaining(tvb, offset) > 0)
+                offset = dissect_rsl_ie_osmo_training_seq(tvb, pinfo, tree, offset, FALSE);
+        }
         break;
     /* 8.4.8 MEASUREMENT RESULT 40 */
     case RSL_MSG_MEAS_RES:
@@ -4120,7 +4304,7 @@ dissct_rsl_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
         if (tvb_reported_length_remaining(tvb, offset) > 0)
             offset = dissect_rsl_ie_l1_inf(tvb, pinfo, tree, offset, FALSE);
         /* L3 Info (MEAS REP, EXT MEAS REP or ENH MEAS REP) 9.3.11 O 1) TLV 21 */
-        if (tvb_reported_length_remaining(tvb, offset) > 0){
+        if (tvb_reported_length_remaining(tvb, offset) > 3){
             /* Try to figure out of we have (MEAS REP, EXT MEAS REP or ENH MEAS REP) */
             if ( ( tvb_get_guint8(tvb, offset+3) & 0xFE ) == 0x10 ) {
                 /* ENH MEAS REP */
@@ -4157,6 +4341,18 @@ dissct_rsl_msg(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offset)
         /* TFO transparent container 9.3.59 O 4) TLV */
         if (tvb_reported_length_remaining(tvb, offset) > 0)
             offset = dissect_rsl_ie_tfo_transp_cont(tvb, pinfo, tree, offset, FALSE);
+        /* Osmocom specific IEs */
+        if (global_rsl_use_osmo_bts) {
+            /* Repeated ACCH Capabilities O TLV */
+            if (tvb_reported_length_remaining(tvb, offset) > 0)
+                offset = dissect_rsl_ie_osmo_rep_acch_cap(tvb, pinfo, tree, offset, FALSE);
+            /* Temporary ACCH Overpower Capabilities O TLV */
+            if (tvb_reported_length_remaining(tvb, offset) > 0)
+                offset = dissect_rsl_ie_osmo_top_acch_cap(tvb, pinfo, tree, offset, FALSE);
+            /* Training Sequence O TLV 2 */
+            if (tvb_reported_length_remaining(tvb, offset) > 0)
+                offset = dissect_rsl_ie_osmo_training_seq(tvb, pinfo, tree, offset, FALSE);
+        }
         break;
     /* 8.4.10 MODE MODIFY ACKNOWLEDGE */
     case RSL_MSG_MODE_MODIFY_ACK:   /*  42  8.4.10 */
@@ -4480,11 +4676,11 @@ req_ref_ra_est_cause_convert(gchar *result, guint32 ra)
         goto found;
     }
 
-    g_snprintf(result, ITEM_LABEL_LENGTH, "unknown ra %u", ra);
+    snprintf(result, ITEM_LABEL_LENGTH, "unknown ra %u", ra);
     return;
 
 found:
-    g_snprintf(result, ITEM_LABEL_LENGTH, "%s", str);
+    snprintf(result, ITEM_LABEL_LENGTH, "%s", str);
 }
 
 static int
@@ -4623,6 +4819,11 @@ void proto_register_rsl(void)
         { &hf_rsl_l1inf_fpc,
           { "FPC/EPC",           "gsm_abis_rsl.ms_fpc",
             FT_BOOLEAN, 8, TFS(&tfs_inuse_not_inuse), 0x04,
+            NULL, HFILL }
+        },
+        { &hf_rsl_l1inf_srr,
+          { "SRR (SACCH Repetition)",           "gsm_abis_rsl.srr",
+            FT_BOOLEAN, 8, TFS(&tfs_required_not_required), 0x02,
             NULL, HFILL }
         },
         { &hf_rsl_ms_power_lev,
@@ -5053,6 +5254,68 @@ void proto_register_rsl(void)
             FT_BYTES, BASE_NONE, NULL, 0,
             NULL, HFILL }
         },
+        { &hf_rsl_osmo_rep_acch_rxqual,
+          { "RxQual Threshold", "gsm_abis_rsl.osmo_rep_acch.rxqual",
+            FT_UINT8, BASE_DEC, VALS(gsm_a_rr_rxqual_vals), 0x70,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_rep_acch_ul_sacch,
+          { "Uplink SACCH", "gsm_abis_rsl.osmo_rep_acch.ul_sacch",
+            FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x08,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_rep_acch_dl_sacch,
+          { "Downlink SACCH", "gsm_abis_rsl.osmo_rep_acch.dl_sacch",
+            FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x04,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_rep_acch_dl_facch_all,
+          { "Downlink FACCH (all LDPDm message types)",
+            "gsm_abis_rsl.osmo_rep_acch.dl_facch_all",
+            FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x02,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_rep_acch_dl_facch_cmd,
+          { "Downlink FACCH (LAPDm commands only)",
+            "gsm_abis_rsl.osmo_rep_acch.dl_facch_cmd",
+            FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x01,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_top_acch_val,
+          { "Overpower value", "gsm_abis_rsl.osmo_top_acch.val",
+            FT_UINT8, BASE_DEC | BASE_UNIT_STRING, &units_decibels, 0x07,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_top_acch_rxqual,
+          { "Uplink RxQual threshold", "gsm_abis_rsl.osmo_top_acch.rxqual",
+            FT_UINT8, BASE_DEC, VALS(gsm_a_rr_rxqual_vals), 0x38,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_top_acch_facch,
+          { "FACCH Overpower", "gsm_abis_rsl.osmo_top_acch.facch",
+            FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x40,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_top_acch_sacch,
+          { "SACCH Overpower", "gsm_abis_rsl.osmo_top_acch.sacch",
+            FT_BOOLEAN, 8, TFS(&tfs_enabled_disabled), 0x80,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_tsc_set,
+          { "Training Sequence Set", "gsm_abis_rsl.osmo_tsc_set",
+            FT_UINT8, BASE_DEC, VALS(rsl_osmo_tsc_set_vals), 0,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_tsc_val,
+          { "Training Sequence Code", "gsm_abis_rsl.osmo_tsc_val",
+            FT_UINT8, BASE_DEC, NULL, 0,
+            NULL, HFILL }
+        },
+        { &hf_rsl_osmo_osmux_cid,
+          { "Osmux CID", "gsm_abis_rsl.osmo_osmux_cid",
+            FT_UINT8, BASE_DEC, NULL, 0,
+            NULL, HFILL }
+        },
       /* Generated from convert_proto_tree_add_text.pl */
       { &hf_rsl_channel_description_tag, { "Channel Description Tag", "gsm_abis_rsl.channel_description_tag", FT_NONE, BASE_NONE, NULL, 0x0, NULL, HFILL }},
       { &hf_rsl_mobile_allocation_tag, { "Mobile Allocation Tag", "gsm_abis_rsl.mobile_allocation_tag", FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL }},
@@ -5145,6 +5408,9 @@ void proto_register_rsl(void)
         &ett_phy_ctx_ab_rx_lvl_err_bits,
         &ett_phy_ctx_rxlvl_ext,
         &ett_ie_etws_pn,
+        &ett_ie_osmo_rep_acch_cap,
+        &ett_ie_osmo_top_acch_cap,
+        &ett_ie_osmo_training_seq,
     };
     static ei_register_info ei[] = {
       /* Generated from convert_proto_tree_add_text.pl */
@@ -5237,6 +5503,8 @@ void proto_register_rsl(void)
     RSL_ATT_TLVDEF(RSL_IE_IPAC_RTP_PAYLOAD2, TLV_TYPE_TV,            0);
     RSL_ATT_TLVDEF(RSL_IE_IPAC_RTP_PAYLOAD,  TLV_TYPE_TV,            0);
     RSL_ATT_TLVDEF(RSL_IE_IPAC_RTP_CSD_FMT,  TLV_TYPE_TV,            0);
+    RSL_ATT_TLVDEF(RSL_IE_OSMO_TRAINING_SEQUENCE, TLV_TYPE_TLV,      0);
+    RSL_ATT_TLVDEF(RSL_IE_OSMO_OSMUX_CID,    TLV_TYPE_TLV,           0);
 
     /* Register the protocol name and description */
     proto_rsl = proto_register_protocol("Radio Signalling Link (RSL)", "RSL", "gsm_abis_rsl");
@@ -5248,11 +5516,15 @@ void proto_register_rsl(void)
 
     rsl_handle = register_dissector("gsm_abis_rsl", dissect_rsl, proto_rsl);
 
-    rsl_module = prefs_register_protocol(proto_rsl, proto_reg_handoff_rsl);
+    rsl_module = prefs_register_protocol(proto_rsl, NULL);
     prefs_register_bool_preference(rsl_module, "use_ipaccess_rsl",
                                    "Use nanoBTS definitions",
                                    "Use ipaccess nanoBTS specific definitions for RSL",
                                    &global_rsl_use_nano_bts);
+    prefs_register_bool_preference(rsl_module, "use_osmocom_rsl",
+                                   "Use Osmocom definitions",
+                                   "Use Osmocom specific definitions for RSL",
+                                   &global_rsl_use_osmo_bts);
     prefs_register_bool_preference(rsl_module, "dissect_phy_ctx_inf",
                                    "Decode Physical Context Information field",
                                    "The Physical Context Information field is not specified "

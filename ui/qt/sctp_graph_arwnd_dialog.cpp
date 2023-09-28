@@ -134,7 +134,7 @@ void SCTPGraphArwndDialog::drawGraph(const sctp_assoc_info_t *selected_assoc)
     ui->sctpPlot->setInteractions(QCP::iRangeZoom | QCP::iRangeDrag | QCP::iSelectPlottables);
     ui->sctpPlot->axisRect(0)->setRangeZoomAxes(ui->sctpPlot->xAxis, ui->sctpPlot->yAxis);
     ui->sctpPlot->axisRect(0)->setRangeZoom(Qt::Horizontal);
-    connect(ui->sctpPlot, SIGNAL(plottableClick(QCPAbstractPlottable*,QMouseEvent*)), this, SLOT(graphClicked(QCPAbstractPlottable*, QMouseEvent*)));
+    connect(ui->sctpPlot, &QCustomPlot::plottableClick, this, &SCTPGraphArwndDialog::graphClicked);
     ui->sctpPlot->replot();
 }
 
@@ -149,7 +149,7 @@ void SCTPGraphArwndDialog::on_pushButton_4_clicked()
     ui->sctpPlot->replot();
 }
 
-void SCTPGraphArwndDialog::graphClicked(QCPAbstractPlottable* plottable, QMouseEvent* event)
+void SCTPGraphArwndDialog::graphClicked(QCPAbstractPlottable* plottable, int, QMouseEvent* event)
 {
     if (plottable->name().contains("Arwnd", Qt::CaseInsensitive)) {
         double times = ui->sctpPlot->xAxis->pixelToCoord(event->pos().x());
@@ -176,16 +176,3 @@ void SCTPGraphArwndDialog::on_saveButton_clicked()
 {
     SCTPGraphDialog::save_graph(this, ui->sctpPlot);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

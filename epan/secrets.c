@@ -11,11 +11,12 @@
 
 #include "config.h"
 
-/* Start with G_MESSAGES_DEBUG=secrets to see messages. */
-#define G_LOG_DOMAIN "secrets"
+#define WS_LOG_DOMAIN LOG_DOMAIN_EPAN
 
 #include "secrets.h"
 #include <wiretap/wtap.h>
+#include <wsutil/glib-compat.h>
+#include <wsutil/wslog.h>
 
 #include <string.h>
 #ifdef HAVE_LIBGNUTLS
@@ -27,10 +28,11 @@
 # include <wsutil/report_message.h>
 # include <wsutil/file_util.h>
 # include <errno.h>
-# if GNUTLS_VERSION_NUMBER < 0x030401
-#   define GNUTLS_KEYID_USE_SHA1 0
-# endif
 #endif  /* HAVE_LIBGNUTLS */
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 /** Maps guint32 secrets_type -> secrets_block_callback_t. */
 static GHashTable *secrets_callbacks;
@@ -135,10 +137,10 @@ privkey_hash_table_new(void)
 static void
 rsa_privkey_add(const cert_key_id_t *key_id, gnutls_privkey_t pkey)
 {
-    void *ht_key = g_memdup(key_id->key_id, sizeof(cert_key_id_t));
+    void *ht_key = g_memdup2(key_id->key_id, sizeof(cert_key_id_t));
     const guint32 *dw = (const guint32 *)key_id->key_id;
     g_hash_table_insert(rsa_privkeys, ht_key, pkey);
-    g_debug("Adding RSA private, Key ID %08x%08x%08x%08x%08x", g_htonl(dw[0]),
+    ws_debug("Adding RSA private, Key ID %08x%08x%08x%08x%08x", g_htonl(dw[0]),
             g_htonl(dw[1]), g_htonl(dw[2]), g_htonl(dw[3]), g_htonl(dw[4]));
 }
 
@@ -175,26 +177,22 @@ get_pkcs11_token_uris(void)
         }
 
         if (ret < 0) {
-            g_debug("Failed to query token %u: %s\n", i, gnutls_strerror(ret));
+            ws_debug("Failed to query token %u: %s\n", i, gnutls_strerror(ret));
             break;
         }
 
         ret = gnutls_pkcs11_token_get_flags(uri, &flags);
         if (ret < 0) {
-            g_debug("Failed to query token flags for %s: %s\n", uri, gnutls_strerror(ret));
+            ws_debug("Failed to query token flags for %s: %s\n", uri, gnutls_strerror(ret));
             gnutls_free(uri);
             continue;
         }
 
-#if GNUTLS_VERSION_NUMBER >= 0x030300
         // The "Trust module" is useless for decryption, so do not return it.
-        // We can only check this in GnuTLS 3.3.0, older versions lack this flag
-        // and thus we will just return some useless keys.
         if ((flags & GNUTLS_PKCS11_TOKEN_TRUSTED)) {
             gnutls_free(uri);
             continue;
         }
-#endif
 
         tokens = g_slist_prepend(tokens, g_strdup(uri));
         gnutls_free(uri);
@@ -264,7 +262,7 @@ pkcs11_load_keys_from_token(const char *token_uri, const char *pin, char **err)
     ret = gnutls_pkcs11_obj_list_import_url4(&list, &nlist, token_uri,
             GNUTLS_PKCS11_OBJ_FLAG_PRIVKEY|GNUTLS_PKCS11_OBJ_FLAG_LOGIN);
     if (ret < 0) {
-        *err = g_strdup_printf("Failed to iterate through objects for %s: %s", token_uri, gnutls_strerror(ret));
+        *err = ws_strdup_printf("Failed to iterate through objects for %s: %s", token_uri, gnutls_strerror(ret));
         goto cleanup;
     }
 
@@ -301,12 +299,12 @@ pkcs11_load_keys_from_token(const char *token_uri, const char *pin, char **err)
         ret = gnutls_privkey_import_url(privkey, obj_uri, 0);
         if (ret < 0) {
             /* Bad PIN or some other system error? */
-            g_debug("Failed to import private key %s: %s", obj_uri, gnutls_strerror(ret));
+            ws_debug("Failed to import private key %s: %s", obj_uri, gnutls_strerror(ret));
             goto cont;
         }
 
         if (gnutls_privkey_get_pk_algorithm(privkey, NULL) != GNUTLS_PK_RSA) {
-            g_debug("Skipping private key %s, not RSA.", obj_uri);
+            ws_debug("Skipping private key %s, not RSA.", obj_uri);
             goto cont;
         }
 
@@ -319,14 +317,14 @@ pkcs11_load_keys_from_token(const char *token_uri, const char *pin, char **err)
         /* This requires GnuTLS 3.4.0 and will fail on older versions. */
         ret = gnutls_pubkey_import_privkey(pubkey, privkey, 0, 0);
         if (ret < 0) {
-            g_debug("Failed to import public key %s: %s", obj_uri, gnutls_strerror(ret));
+            ws_debug("Failed to import public key %s: %s", obj_uri, gnutls_strerror(ret));
             goto cont;
         }
 
         size = sizeof(key_id);
         ret = gnutls_pubkey_get_key_id(pubkey, GNUTLS_KEYID_USE_SHA1, key_id.key_id, &size);
         if (ret < 0 || size != sizeof(key_id)) {
-            g_debug("Failed to calculate Key ID for %s: %s", obj_uri, gnutls_strerror(ret));
+            ws_debug("Failed to calculate Key ID for %s: %s", obj_uri, gnutls_strerror(ret));
             goto cont;
         }
 
@@ -366,7 +364,7 @@ uat_pkcs11_libs_load_all(void)
     for (guint i = 0; i < uat_num_pkcs11_libs; i++) {
         const pkcs11_lib_record_t *rec = &uat_pkcs11_libs[i];
         const char *libname = rec->library_path;
-#ifdef WIN32
+#ifdef _MSC_VER
         // Work around a bug in p11-kit < 0.23.16 on Windows
         HMODULE provider_lib = LoadLibraryA(libname);
         if (! provider_lib || ! GetProcAddress(provider_lib, "C_GetFunctionList")) {
@@ -375,7 +373,7 @@ uat_pkcs11_libs_load_all(void)
 #endif
         /* Note: should return success for already loaded libraries.  */
         ret = gnutls_pkcs11_add_provider(libname, NULL);
-#ifdef WIN32
+#ifdef _MSC_VER
         }
         if (provider_lib) {
             FreeLibrary(provider_lib);
@@ -446,7 +444,7 @@ load_rsa_keyfile(const char *filename, const char *password, gboolean save_key, 
 
     FILE *fp = ws_fopen(filename, "rb");
     if (!fp) {
-        *err = g_strdup_printf("Error loading RSA key file %s: %s", filename, g_strerror(errno));
+        *err = ws_strdup_printf("Error loading RSA key file %s: %s", filename, g_strerror(errno));
         return;
     }
 
@@ -458,7 +456,7 @@ load_rsa_keyfile(const char *filename, const char *password, gboolean save_key, 
     }
     fclose(fp);
     if (!x509_priv_key) {
-        *err = g_strdup_printf("Error loading RSA key file %s: %s", filename, errmsg);
+        *err = ws_strdup_printf("Error loading RSA key file %s: %s", filename, errmsg);
         g_free(errmsg);
         return;
     }
@@ -467,12 +465,12 @@ load_rsa_keyfile(const char *filename, const char *password, gboolean save_key, 
     ret = gnutls_privkey_import_x509(privkey, x509_priv_key,
             GNUTLS_PRIVKEY_IMPORT_AUTO_RELEASE|GNUTLS_PRIVKEY_IMPORT_COPY);
     if (ret < 0) {
-        *err = g_strdup_printf("Error importing private key %s: %s", filename, gnutls_strerror(ret));
+        *err = ws_strdup_printf("Error importing private key %s: %s", filename, gnutls_strerror(ret));
         goto end;
     }
     ret = gnutls_x509_privkey_get_key_id(x509_priv_key, GNUTLS_KEYID_USE_SHA1, key_id.key_id, &size);
     if (ret < 0 || size != sizeof(key_id)) {
-        *err = g_strdup_printf("Error calculating Key ID for %s: %s", filename, gnutls_strerror(ret));
+        *err = ws_strdup_printf("Error calculating Key ID for %s: %s", filename, gnutls_strerror(ret));
         goto end;
     }
 
@@ -643,7 +641,7 @@ secrets_rsa_decrypt(const cert_key_id_t *key_id, const guint8 *encr, int encr_le
 
     ret = gnutls_privkey_decrypt_data(pkey, 0, &ciphertext, &plain);
     if (ret == 0) {
-        *out = (guint8 *)g_memdup(plain.data, plain.size);
+        *out = (guint8 *)g_memdup2(plain.data, plain.size);
         *out_len = plain.size;
         gnutls_free(plain.data);
     }

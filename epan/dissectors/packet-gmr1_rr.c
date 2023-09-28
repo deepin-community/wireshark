@@ -262,7 +262,7 @@ static const value_string rr_gen_ie_presence_vals[] = {
 static void
 rr_gen_ie_seconds_fmt(gchar *s, guint32 v)
 {
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%u seconds", v);
+	snprintf(s, ITEM_LABEL_LENGTH, "%u seconds", v);
 }
 
 
@@ -477,7 +477,7 @@ rr_timing_ofs_value_fmt(gchar *s, guint32 v)
 {
 	gint32 sv = (signed)v;
 
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%.3f symbols ( ~ %.3f ms )",
+	snprintf(s, ITEM_LABEL_LENGTH, "%.3f symbols ( ~ %.3f ms )",
 		sv / 40.0f, (sv / 40.0f) * (10.0f / 234.0f));
 }
 
@@ -577,7 +577,7 @@ rr_freq_ofs_value_fmt(gchar *s, guint32 v)
 {
 	gint32 sv = (signed)v;
 
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%d Hz", sv);
+	snprintf(s, ITEM_LABEL_LENGTH, "%d Hz", sv);
 }
 
 GMR1_IE_FUNC(gmr1_ie_rr_freq_ofs)
@@ -644,15 +644,17 @@ GMR1_IE_FUNC(gmr1_ie_rr_pos_display)
 	                    tvb, offset, 1, ENC_BIG_ENDIAN);
 
 	/* Get text in an aligned tvbuff */
+	/* Do not use tvb_new_octet_aligned(), GSM 7bit packing bit parsing
+	   goes from LSB to MSB so a trick is applied here for the last byte */
 	txt_raw = tvb_get_ptr(tvb, offset, 11);
-	txt_packed = (gchar*)wmem_alloc(wmem_packet_scope(), 11);
+	txt_packed = (gchar*)wmem_alloc(pinfo->pool, 11);
 	for (i=0; i<10; i++)
 		txt_packed[i] = (txt_raw[i] << 4) | (txt_raw[i+1] >> 4);
 	txt_packed[10] = txt_raw[10];
 	txt_packed_tvb = tvb_new_real_data(txt_packed, 11, 11);
 
 	/* Unpack text */
-	txt_unpacked = tvb_get_ts_23_038_7bits_string_packed(wmem_packet_scope(), txt_packed_tvb, 0, 12);
+	txt_unpacked = tvb_get_ts_23_038_7bits_string_packed(pinfo->pool, txt_packed_tvb, 0, 12);
 	tvb_free(txt_packed_tvb);
 
 	/* Display it */
@@ -672,13 +674,13 @@ static const value_string rr_pos_upd_info_v_vals[] = {
 static void
 rr_pos_upd_info_dist_fmt(gchar *s, guint32 v)
 {
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%d km", v);
+	snprintf(s, ITEM_LABEL_LENGTH, "%d km", v);
 }
 
 static void
 rr_pos_upd_info_time_fmt(gchar *s, guint32 v)
 {
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%d minutes", v);
+	snprintf(s, ITEM_LABEL_LENGTH, "%d minutes", v);
 }
 
 GMR1_IE_FUNC(gmr1_ie_rr_pos_upd_info)
@@ -773,9 +775,9 @@ static void
 rr_gps_timestamp_fmt(gchar *s, guint32 v)
 {
 	if (v == 0xffff)
-		g_snprintf(s, ITEM_LABEL_LENGTH, "> 65535 minutes or N/A");
+		snprintf(s, ITEM_LABEL_LENGTH, "> 65535 minutes or N/A");
 	else
-		g_snprintf(s, ITEM_LABEL_LENGTH, "%d minutes", v);
+		snprintf(s, ITEM_LABEL_LENGTH, "%d minutes", v);
 }
 
 GMR1_IE_FUNC(gmr1_ie_rr_gps_timestamp)
@@ -814,7 +816,7 @@ GMR1_IE_FUNC(gmr1_ie_rr_tmsi_avail_msk)
 static void
 rr_gps_almanac_pn_fmt(gchar *s, guint32 v)
 {
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%d", v+1);
+	snprintf(s, ITEM_LABEL_LENGTH, "%d", v+1);
 }
 
 static const value_string rr_gps_almanac_sfn_vals[] = {
@@ -938,7 +940,7 @@ static const crumb_spec_t rr_pkt_freq_prm_ul_freq_dist_crumbs[] = {
 static void
 rr_pkt_freq_prm_xx_bw_fmt(gchar *s, guint32 v)
 {
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%d * 31.25 kHz = %.2f kHz (%d)", v, 31.25f*v, v);
+	snprintf(s, ITEM_LABEL_LENGTH, "%d * 31.25 kHz = %.2f kHz (%d)", v, 31.25f*v, v);
 }
 
 GMR1_IE_FUNC(gmr1_ie_rr_pkt_freq_prm)
@@ -1133,11 +1135,11 @@ static void
 rr_pkt_pwr_ctrl_prm_par_fmt(gchar *s, guint32 v)
 {
 	if (v >= 61) {
-		g_snprintf(s, ITEM_LABEL_LENGTH, "Escape %d (%d)", v-60, v);
+		snprintf(s, ITEM_LABEL_LENGTH, "Escape %d (%d)", v-60, v);
 		return;
 	}
 
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%.1f dB (%d)", v*0.4f, v);
+	snprintf(s, ITEM_LABEL_LENGTH, "%.1f dB (%d)", v*0.4f, v);
 }
 
 GMR1_IE_FUNC(gmr1_ie_rr_pkt_pwr_ctrl_prm)
@@ -1619,8 +1621,69 @@ static const value_string gmr1_msg_rr_strings[] = {
 	{ 0x3f, "Immediate Assignment" },
 	{ 0x3a, "Immediate Assignment Reject Type 1" },
 	{ 0x3b, "Immediate Assignment Reject Type 2" },
-	{ 0x13e, "Extended Immediate Assignment" },	/* Conflict ... add 0x100 */
-	{ 0x13b, "Extended Imm. Assignment Reject" },	/* Conflict ... add 0x100 */
+	/*
+	 * XXX - [3] 11.4.1 - Table 11.1 ([3] is ETSI TS 101 376-4-8
+	 * V3.1.1, which is GMR-1 3G 44.008) has 0x3e meaning both
+	 * "Extended Immediate Assignment" and "Immediate Assignment Type 2"
+	 * and has 0x3b meaning both "Immediate Asignment Reject Type 2"
+	 * and "Extended Imm. Assignment Reject".
+	 *
+	 * [3] makes some references to [1] ([1] is ETSI TS 101 376-4-8
+	 * V1.3.1, which is GMR-1 04.008, not to be confused with GMR-1
+	 * 3G 44.008), saying some messages are the same as in GMR-1
+	 * 04.008.  [1]:
+	 *
+	 *    says, in 10.1.18.2, that "Extended immediate assignment"
+	 *    "is sent on the main signalling link by the network to
+	 *    the MES in response to an EXTENDED CHANNEL REQUEST message
+	 *    by the MES";
+	 *
+	 *    says, in 10.1.20.2, that "Immediate assignment reject type 2"
+	 *    "may be sent to the MES by the network on the CCCH to indicate
+	 *    that no channel is available for assignment or that the MES
+	 *    cannot be allowed access";
+	 *
+	 *    says, in 10.1.20.3, that "Extended immediate assignment
+	 *    reject" "message is sent by the network on the DCCH to
+	 *    indicate that no channel is available for assignment or
+	 *    that the MES cannot be allowed access";
+	 *
+	 *    does not mention "Immediate assignment type 2" anywhere
+	 *    that I can see.
+	 *
+	 * [3]:
+	 *
+	 *    says, in 10.1.18.2, that "Extended immediate assignment
+	 *    (A/Gb mode only)" is "Same as clause 10.1.18.2 of
+	 *    GMR-1 04.008";
+	 *
+	 *    says, in 10.1.18.3, that "Intermediate assignment Type
+	 *    2 (A/Gb mode only)" "is sent on the CCCH by the network
+	 *    to the MES to change the channel configuration to a
+	 *    dedicated configuration while staying in the same cell";
+	 *
+	 *    says, in 10.1.20.2, that "Immediate assignment reject
+	 *    type 2" is "Same as clause 10.1.20.2 of GMR-1 04.008";
+	 *
+	 *    says, in 10.1.20.3, that "Extended immediate assignment
+	 *    reject" is "Same as clause 10.1.20.3 of GMR-1 04.008".
+	 *
+	 * This is currently handled by ORing 0x100 into the values
+	 * for the DCCH, and, in gmr1_get_msg_rr_params(), if the dcch
+	 * parameter is set (which it is if called from gmr1_get_msg_params()
+	 * in packet-gmr1_common.c), 0x100 is ORed into the value
+	 * passed to try_val_to_str_idx().  If that returns NULL, or
+	 * isn't called in the first placee, it calls try_val_to_str_idx()
+	 * without ORing in 0x100.
+	 *
+	 * So that's why a 1-byte field has, in a value_string used with
+	 * it, two values that don't fit into 1 byte.
+	 *
+	 * It Would Be Nice if this could be done in a somewhat less
+	 * hackish and opaque fashion.
+	 */
+	{ 0x13e, "Extended Immediate Assignment" },
+	{ 0x13b, "Extended Imm. Assignment Reject" },
 	{ 0x39, "Position Verification Notify" },
 	{ 0x3c, "Immediate Assignment Reject Type 3" },
 	{ 0x3e, "Immediate Assignment Type 2" },
@@ -1750,6 +1813,10 @@ gmr1_get_msg_rr_params(guint8 oct, int dcch, const gchar **msg_str,
 	const gchar *m = NULL;
 	gint idx;
 
+	/*
+	 * See the large comment in gmr1_msg_rr_strings[] for an
+	 * explanation of why we're doing this.
+	 */
 	if (dcch)
 		m = try_val_to_str_idx((guint32)oct | 0x100, gmr1_msg_rr_strings, &idx);
 
@@ -2068,7 +2135,7 @@ proto_register_gmr1_rr(void)
 		},
 		{ &hf_rr_pos_display_text,
 		  { "Country and Region name", "gmr1.rr.pos_display.text",
-		    FT_STRING, STR_UNICODE, NULL, 0x00,
+		    FT_STRING, BASE_NONE, NULL, 0x00,
 		    NULL, HFILL }
 		},
 		{ &hf_rr_pos_upd_info_v,

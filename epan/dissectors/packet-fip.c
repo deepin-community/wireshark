@@ -30,6 +30,8 @@
 void proto_register_fip(void);
 void proto_reg_handoff_fip(void);
 
+static dissector_handle_t fip_handle;
+
 /*
  * FIP protocol information.
  */
@@ -166,7 +168,7 @@ static const value_string fip_desc_types[] = {
     { FIP_DT_FC4F,      "FC-4 features" },
     { 0,    NULL }
 };
-value_string_ext fip_desc_types_ext = VALUE_STRING_EXT_INIT(fip_desc_types);
+static value_string_ext fip_desc_types_ext = VALUE_STRING_EXT_INIT(fip_desc_types);
 
 /*
  * flags in header fip_flags.
@@ -444,18 +446,18 @@ dissect_fip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
             proto_tree_add_item(subtree, hf_fip_desc_mac, desc_tvb,
                     2, 6, ENC_NA);
             proto_item_append_text(item, "%s",
-                    tvb_bytes_to_str_punct(wmem_packet_scope(), desc_tvb, 2, 6, ':'));
+                    tvb_bytes_to_str_punct(pinfo->pool, desc_tvb, 2, 6, ':'));
             break;
         case FIP_DT_MAP_OUI:
             subtree = fip_desc_type_len(fip_tree, desc_tvb, dtype, ett_fip_dt_map, &item);
             proto_tree_add_item(subtree, hf_fip_desc_map, desc_tvb,
                     5, 3, ENC_NA);
-            proto_item_append_text(item, "%s", tvb_fc_to_str(desc_tvb, 5));
+            proto_item_append_text(item, "%s", tvb_fc_to_str(pinfo->pool, desc_tvb, 5));
             break;
         case FIP_DT_NAME:
             subtree = fip_desc_type_len(fip_tree, desc_tvb, dtype, ett_fip_dt_name, &item);
             proto_tree_add_item(subtree, hf_fip_desc_name, desc_tvb, 4, 8, ENC_NA);
-            proto_item_append_text(item, "%s", tvb_fcwwn_to_str(desc_tvb, 4));
+            proto_item_append_text(item, "%s", tvb_fcwwn_to_str(pinfo->pool, desc_tvb, 4));
             break;
         case FIP_DT_FAB:
             subtree = fip_desc_type_len(fip_tree, desc_tvb, dtype, ett_fip_dt_fab, &item);
@@ -464,7 +466,7 @@ dissect_fip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
             proto_tree_add_item(subtree, hf_fip_desc_fab_map, desc_tvb,
                     5, 3, ENC_NA);
             proto_tree_add_item(subtree, hf_fip_desc_fab_name, desc_tvb, 8, 8, ENC_NA);
-            proto_item_append_text(item, "%s", tvb_fcwwn_to_str(desc_tvb, 8));
+            proto_item_append_text(item, "%s", tvb_fcwwn_to_str(pinfo->pool, desc_tvb, 8));
             break;
         case FIP_DT_FCOE_SIZE:
             subtree = fip_desc_type_len(fip_tree, desc_tvb, dtype, ett_fip_dt_mdl, &item);
@@ -494,7 +496,7 @@ dissect_fip(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
             proto_tree_add_item(subtree, hf_fip_desc_vn_wwpn,
                     desc_tvb, 12, 8, ENC_NA);
             proto_item_append_text(item, "MAC %s  FC_ID %6.6x",
-                    tvb_bytes_to_str_punct(wmem_packet_scope(), desc_tvb, 2, 6, ':'),
+                    tvb_bytes_to_str_punct(pinfo->pool, desc_tvb, 2, 6, ':'),
                     tvb_get_ntoh24(desc_tvb, 9));
             break;
         case FIP_DT_FKA:
@@ -794,6 +796,7 @@ proto_register_fip(void)
     /* Register the protocol name and description */
     proto_fip = proto_register_protocol("FCoE Initialization Protocol",
         "FIP", "fip");
+    fip_handle = register_dissector("fip", dissect_fip, proto_fip);
 
     /* Required function calls to register the header fields and
      * subtrees used */
@@ -810,9 +813,6 @@ proto_register_fip(void)
 void
 proto_reg_handoff_fip(void)
 {
-    dissector_handle_t fip_handle;
-
-    fip_handle = create_dissector_handle(dissect_fip, proto_fip);
     dissector_add_uint("ethertype", ETHERTYPE_FIP, fip_handle);
     fc_handle = find_dissector_add_dependency("fc", proto_fip);
 }

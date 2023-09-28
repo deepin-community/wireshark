@@ -16,13 +16,15 @@
 #include <epan/decode_as.h>
 #include <ui/language.h>
 #include <ui/preference_utils.h>
+#include <cfile.h>
+#include <ui/commandline.h>
 #include <ui/simple_dialog.h>
 #include <ui/recent.h>
 #include <main_window.h>
 
 #include <ui/qt/utils/qt_ui_utils.h>
 
-#include "wireshark_application.h"
+#include "main_application.h"
 
 extern "C" {
 // Callbacks prefs routines
@@ -43,6 +45,7 @@ module_prefs_unstash(module_t *module, gpointer data)
 
         unstashed_data.module = module;
         pref_unstash(pref, &unstashed_data);
+        commandline_options_drop(module->name, prefs_get_name(pref));
     }
 
     /* If any of them changed, indicate that we must redissect and refilter
@@ -98,7 +101,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) :
     pd_ui_->setupUi(this);
     loadGeometry();
 
-    setWindowTitle(wsApp->windowTitleString(tr("Preferences")));
+    setWindowTitle(mainApp->windowTitleString(tr("Preferences")));
 
     pd_ui_->advancedView->setModel(&advancedPrefsModel_);
     pd_ui_->advancedView->setItemDelegate(&advancedPrefsDelegate_);
@@ -129,12 +132,19 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) :
     pd_ui_->filterExpressonsFrame->setUat(uat_get_table_by_name("Display expressions"));
     pd_ui_->expertFrame->setUat(uat_get_table_by_name("Expert Info Severity Level Configuration"));
 
-    connect(pd_ui_->prefsView, SIGNAL(goToPane(QString)), this, SLOT(selectPane(QString)));
+    connect(pd_ui_->prefsView, &PrefModuleTreeView::goToPane, this, &PreferencesDialog::selectPane);
+
+    /* Create a single-shot timer for debouncing calls to
+     * updateSearchLineEdit() */
+    searchLineEditTimer = new QTimer(this);
+    searchLineEditTimer->setSingleShot(true);
+    connect(searchLineEditTimer, &QTimer::timeout, this, &PreferencesDialog::updateSearchLineEdit);
 }
 
 PreferencesDialog::~PreferencesDialog()
 {
     delete pd_ui_;
+    delete searchLineEditTimer;
     prefs_modules_foreach_submodules(NULL, module_prefs_clean_stash, NULL);
 }
 
@@ -194,12 +204,27 @@ void PreferencesDialog::selectPane(QString pane)
     }
 }
 
-void PreferencesDialog::on_advancedSearchLineEdit_textEdited(const QString &search_re)
+void PreferencesDialog::updateSearchLineEdit()
 {
-    advancedPrefsModel_.setFilter(search_re);
-    /* If items are filtered out, then filtered back in, the tree remains colapsed
+    advancedPrefsModel_.setFilter(searchLineEditText);
+    /* If items are filtered out, then filtered back in, the tree remains collapsed
        Force an expansion */
     pd_ui_->advancedView->expandAll();
+}
+
+void PreferencesDialog::on_advancedSearchLineEdit_textEdited(const QString &text)
+{
+    /* As running pd_ui_->advancedView->expandAll() takes a noticeable amount
+     * of time and so would introduce significant lag while typing a string
+     * into the Search box, we instead debounce the call to
+     * updateSearchLineEdit(), so that it doesn't run until a set amount of
+     * time has elapsed with no updates to the Search field.
+     *
+     * If the user types something before the timer elapses, the timer restarts
+     * the countdown.
+     */
+    searchLineEditText = text;
+    searchLineEditTimer->start(200);
 }
 
 void PreferencesDialog::on_buttonBox_accepted()
@@ -227,7 +252,7 @@ void PreferencesDialog::on_buttonBox_accepted()
     //Filter expressions don't affect dissection, so there is no need to
     //send any events to that effect.  However, the app needs to know
     //about any button changes.
-    wsApp->emitAppSignal(WiresharkApplication::FilterExpressionsChanged);
+    mainApp->emitAppSignal(MainApplication::FilterExpressionsChanged);
 
     prefs_main_write();
     if (save_decode_as_entries(&err) < 0)
@@ -237,7 +262,7 @@ void PreferencesDialog::on_buttonBox_accepted()
     }
 
     write_language_prefs();
-    wsApp->loadLanguage(QString(language));
+    mainApp->loadLanguage(QString(language));
 
 #ifdef HAVE_AIRPCAP
   /*
@@ -262,24 +287,24 @@ void PreferencesDialog::on_buttonBox_accepted()
 //    prefs_airpcap_update();
 #endif
 
-    wsApp->setMonospaceFont(prefs.gui_qt_font_name);
+    mainApp->setMonospaceFont(prefs.gui_qt_font_name);
 
     if (redissect_flags & PREF_EFFECT_FIELDS) {
-        wsApp->queueAppSignal(WiresharkApplication::FieldsChanged);
+        mainApp->queueAppSignal(MainApplication::FieldsChanged);
     }
 
     if (redissect_flags & PREF_EFFECT_DISSECTION) {
         /* Redissect all the packets, and re-evaluate the display filter. */
-        wsApp->queueAppSignal(WiresharkApplication::PacketDissectionChanged);
+        mainApp->queueAppSignal(MainApplication::PacketDissectionChanged);
     }
-    wsApp->queueAppSignal(WiresharkApplication::PreferencesChanged);
+    mainApp->queueAppSignal(MainApplication::PreferencesChanged);
 
     if (redissect_flags & PREF_EFFECT_GUI_LAYOUT) {
-        wsApp->queueAppSignal(WiresharkApplication::RecentPreferencesRead);
+        mainApp->queueAppSignal(MainApplication::RecentPreferencesRead);
     }
 
     if (prefs.capture_no_extcap != saved_capture_no_extcap_)
-        wsApp->refreshLocalInterfaces();
+        mainApp->refreshLocalInterfaces();
 }
 
 void PreferencesDialog::on_buttonBox_rejected()
@@ -294,18 +319,5 @@ void PreferencesDialog::on_buttonBox_rejected()
 
 void PreferencesDialog::on_buttonBox_helpRequested()
 {
-    wsApp->helpTopicAction(HELP_PREFERENCES_DIALOG);
+    mainApp->helpTopicAction(HELP_PREFERENCES_DIALOG);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

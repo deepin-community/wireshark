@@ -1,6 +1,7 @@
 %top {
 /* Include this before everything else, for various large-file definitions */
 #include "config.h"
+#include <wireshark.h>
 }
 
 /*
@@ -190,6 +191,10 @@ typedef struct {
 #define k12text_realloc(ptr, size, yyscanner)	(void *)realloc((char *)(ptr), (size))
 #define k12text_free(ptr, yyscanner)		free((char *)ptr)
 
+static int k12text_file_type_subtype = -1;
+
+void register_k12text(void);
+
 %}
 start_timestamp \053[\055]{9}\053[\055]{15,100}\053[\055]{10,100}\053
 oneormoredigits [0-9]+:
@@ -249,6 +254,7 @@ k12text_set_headers(wtap_rec *rec, k12text_state_t *state,
     int *err, gchar **err_info)
 {
 	rec->rec_type = REC_TYPE_PACKET;
+	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 	rec->presence_flags = WTAP_HAS_TS|WTAP_HAS_CAP_LEN;
 
 	rec->ts.secs = 946681200 + (3600*state->g_h) + (60*state->g_m) + state->g_s;
@@ -452,10 +458,10 @@ k12text_open(wtap *wth, int *err, gchar **err_info)
 		return WTAP_OPEN_ERROR;
 	}
 
-	k12text = (k12text_t *)g_malloc(sizeof(k12text_t));
+	k12text = g_new(k12text_t, 1);
 	wth->priv = (void *)k12text;
 	k12text->next_frame_offset = 0;
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_K12TEXT;
+	wth->file_type_subtype = k12text_file_type_subtype;
 	wth->file_encap = WTAP_ENCAP_PER_PACKET;
 	wth->snapshot_length = 0;
 	wth->subtype_read = k12text_read;
@@ -521,24 +527,24 @@ k12text_dump(wtap_dumper *wdh, const wtap_rec *rec,
 
 	tmp = gmtime(&rec->ts.secs);
 	if (tmp == NULL)
-		g_snprintf(p, 90, "+---------+---------------+----------+\r\nXX:XX:XX,");
+		snprintf(p, 90, "+---------+---------------+----------+\r\nXX:XX:XX,");
 	else
 		strftime(p, 90, "+---------+---------------+----------+\r\n%H:%M:%S,", tmp);
 	wl = strlen(p);
 	p += wl;
 	left -= wl;
 
-	wl = g_snprintf(p, (gulong)left, "%.3d,%.3d   %s\r\n|0   |", ms, ns, str_enc);
+	wl = snprintf(p, (gulong)left, "%.3d,%.3d   %s\r\n|0   |", ms, ns, str_enc);
 	p += wl;
 	left -= wl;
 
 	for(i = 0; i < rec->rec_header.packet_header.caplen && left > 2; i++) {
-		wl = g_snprintf(p, (gulong)left, "%.2x|", pd[i]);
+		wl = snprintf(p, (gulong)left, "%.2x|", pd[i]);
 		p += wl;
 		left -= wl;
 	}
 
-	wl = g_snprintf(p, (gulong)left, "\r\n\r\n");
+	wl = snprintf(p, (gulong)left, "\r\n\r\n");
 	left -= wl;
 
 	ret = wtap_dump_file_write(wdh, buf, K12BUF_SIZE - left, err);
@@ -548,7 +554,7 @@ k12text_dump(wtap_dumper *wdh, const wtap_rec *rec,
 }
 
 
-gboolean
+static gboolean
 k12text_dump_open(wtap_dumper *wdh, int *err _U_, gchar **err_info _U_)
 {
     wdh->subtype_write = k12text_dump;
@@ -556,7 +562,7 @@ k12text_dump_open(wtap_dumper *wdh, int *err _U_, gchar **err_info _U_)
     return TRUE;
 }
 
-int
+static int
 k12text_dump_can_write_encap(int encap)
 {
     switch (encap) {
@@ -570,4 +576,29 @@ k12text_dump_can_write_encap(int encap)
 	default:
 		return WTAP_ERR_UNWRITABLE_ENCAP;
     }
+}
+
+static const struct supported_block_type k12text_blocks_supported[] = {
+    /*
+     * We support packet blocks, with no comments or other options.
+     */
+    { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info k12text_info = {
+    "K12 text file", "k12text", "txt", NULL,
+    FALSE, BLOCKS_SUPPORTED(k12text_blocks_supported),
+    k12text_dump_can_write_encap, k12text_dump_open, NULL
+};
+
+void register_k12text(void)
+{
+    k12text_file_type_subtype = wtap_register_file_type_subtype(&k12text_info);
+
+    /*
+     * Register name for backwards compatibility with the
+     * wtap_filetypes table in Lua.
+     */
+    wtap_register_backwards_compatibility_lua_name("K12TEXT",
+                                                   k12text_file_type_subtype);
 }

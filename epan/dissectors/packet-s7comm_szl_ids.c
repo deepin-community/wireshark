@@ -1499,7 +1499,7 @@ static const value_string szl_bart_sch_names[] = {
 };
 static gint hf_s7comm_szl_0132_0004_crst_wrst = -1;
 static const value_string szl_crst_wrst_names[] = {
-    { 0,                                    "undefined, does not exist or cannot be be ascertained" },
+    { 0,                                    "undefined, does not exist or cannot be ascertained" },
     { 1,                                    "CRST" },
     { 2,                                    "WRST" },
     { 0,                                    NULL }
@@ -2201,7 +2201,7 @@ s7comm_decode_szl_id_0111_idx_0001(tvbuff_t *tvb,
 {
     proto_tree_add_item(tree, hf_s7comm_szl_xy11_0001_index, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset += 2;
-    proto_tree_add_item(tree, hf_s7comm_szl_xy11_0001_mlfb, tvb, offset, 20, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_s7comm_szl_xy11_0001_mlfb, tvb, offset, 20, ENC_ASCII);
     offset += 20;
     proto_tree_add_item(tree, hf_s7comm_szl_xy11_0001_bgtyp, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset += 2;
@@ -2743,10 +2743,10 @@ s7comm_szl_0131_0003_register(int proto)
         { "anz (Maximum number of cyclic read jobs)", "s7comm.szl.0131.0003.anz", FT_UINT16, BASE_DEC, NULL, 0x0,
           NULL, HFILL }},
         { &hf_s7comm_szl_0131_0003_per_min,
-        { "per min (Minimum period for cyclic read jobs (n x 100 ms)", "s7comm.szl.0131.0003.per_min", FT_UINT16, BASE_DEC, NULL, 0x0,
+        { "per min (Minimum period for cyclic read jobs (n x 100 ms))", "s7comm.szl.0131.0003.per_min", FT_UINT16, BASE_DEC, NULL, 0x0,
           NULL, HFILL }},
         { &hf_s7comm_szl_0131_0003_per_max,
-        { "per max (Maximum period for cyclic read jobs (n x 100 ms)", "s7comm.szl.0131.0003.per_max", FT_UINT16, BASE_DEC, NULL, 0x0,
+        { "per max (Maximum period for cyclic read jobs (n x 100 ms))", "s7comm.szl.0131.0003.per_max", FT_UINT16, BASE_DEC, NULL, 0x0,
           NULL, HFILL }},
         { &hf_s7comm_szl_0131_0003_res,
         { "res (Reserved)", "s7comm.szl.0131.0003.res", FT_BYTES, BASE_NONE, NULL, 0x0,
@@ -3598,7 +3598,7 @@ s7comm_decode_szl_id_0131_idx_0006(tvbuff_t *tvb,
  * Index:   0x0007
  * Content:
  *  The partial list extract with SZL-ID W#16#0131 and the index W#16#0007
- *  contains information about the functions available available for global data
+ *  contains information about the functions available for global data
  *  communication on the module.
  *
  *******************************************************************************************************/
@@ -4387,7 +4387,7 @@ s7comm_szl_0132_0004_register(int proto)
         { "key (Protection level for the key switch, possible values: 1,2 or 3)", "s7comm.szl.0132.0004.key", FT_UINT16, BASE_DEC, NULL, 0x0,
           NULL, HFILL }},
         { &hf_s7comm_szl_0132_0004_param,
-        { "param (Assigned protection level (possible values: 0, 1, 2 or 3)", "s7comm.szl.0132.0004.param", FT_UINT16, BASE_DEC, NULL, 0x0,
+        { "param (Assigned protection level, possible values: 0, 1, 2 or 3)", "s7comm.szl.0132.0004.param", FT_UINT16, BASE_DEC, NULL, 0x0,
           "param (Assigned protection level (possible values: 0, 1, 2 or 3;0 means: no password assigned, assigned protection level is not valid)", HFILL }},
         { &hf_s7comm_szl_0132_0004_real,
         { "real (Valid protection level of the CPU, possible values: 1, 2 or 3)", "s7comm.szl.0132.0004.real", FT_UINT16, BASE_DEC, NULL, 0x0,
@@ -5072,39 +5072,39 @@ s7comm_decode_szl_id_xy1c_idx_000x(tvbuff_t *tvb,
     /* For redundant H-CPUs there may be some upper bits set to identify the CPU */
     switch (idx & 0x000f) {
         case 0x0001:
-            proto_tree_add_item(tree, hf_s7comm_szl_001c_0001_name, tvb, offset, 24, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_s7comm_szl_001c_0001_name, tvb, offset, 24, ENC_ASCII);
             offset += 24;
             proto_tree_add_item(tree, hf_s7comm_szl_001c_000x_res, tvb, offset, 8, ENC_NA);
             offset += 8;
             break;
         case 0x0002:
-            proto_tree_add_item(tree, hf_s7comm_szl_001c_0002_name, tvb, offset, 24, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_s7comm_szl_001c_0002_name, tvb, offset, 24, ENC_ASCII);
             offset += 24;
             proto_tree_add_item(tree, hf_s7comm_szl_001c_000x_res, tvb, offset, 8, ENC_NA);
             offset += 8;
             break;
         case 0x0003:
-            proto_tree_add_item(tree, hf_s7comm_szl_001c_0003_tag, tvb, offset, 32, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_s7comm_szl_001c_0003_tag, tvb, offset, 32, ENC_ASCII);
             offset += 32;
             break;
         case 0x0004:
-            proto_tree_add_item(tree, hf_s7comm_szl_001c_0004_copyright, tvb, offset, 26, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_s7comm_szl_001c_0004_copyright, tvb, offset, 26, ENC_ASCII);
             offset += 26;
             proto_tree_add_item(tree, hf_s7comm_szl_001c_000x_res, tvb, offset, 6, ENC_NA);
             offset += 6;
             break;
         case 0x0005:
-            proto_tree_add_item(tree, hf_s7comm_szl_001c_0005_serialn, tvb, offset, 24, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_s7comm_szl_001c_0005_serialn, tvb, offset, 24, ENC_ASCII);
             offset += 24;
             proto_tree_add_item(tree, hf_s7comm_szl_001c_000x_res, tvb, offset, 8, ENC_NA);
             offset += 8;
             break;
         case 0x0007:
-            proto_tree_add_item(tree, hf_s7comm_szl_001c_0007_cputypname, tvb, offset, 32, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_s7comm_szl_001c_0007_cputypname, tvb, offset, 32, ENC_ASCII);
             offset += 32;
             break;
         case 0x0008:
-            proto_tree_add_item(tree, hf_s7comm_szl_001c_0008_snmcmmc, tvb, offset, 32, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_s7comm_szl_001c_0008_snmcmmc, tvb, offset, 32, ENC_ASCII);
             offset += 32;
             break;
         case 0x0009:
@@ -5118,7 +5118,7 @@ s7comm_decode_szl_id_xy1c_idx_000x(tvbuff_t *tvb,
             offset += 26;
             break;
         case 0x000a:
-            proto_tree_add_item(tree, hf_s7comm_szl_001c_000a_oem_copyright_string, tvb, offset, 26, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_s7comm_szl_001c_000a_oem_copyright_string, tvb, offset, 26, ENC_ASCII);
             offset += 26;
             proto_tree_add_item(tree, hf_s7comm_szl_001c_000a_oem_id, tvb, offset, 2, ENC_BIG_ENDIAN);
             offset += 2;
@@ -5126,7 +5126,7 @@ s7comm_decode_szl_id_xy1c_idx_000x(tvbuff_t *tvb,
             offset += 4;
             break;
         case 0x000b:
-            proto_tree_add_item(tree, hf_s7comm_szl_001c_000b_loc_id, tvb, offset, 32, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_s7comm_szl_001c_000b_loc_id, tvb, offset, 32, ENC_ASCII);
             offset += 32;
             break;
         default:

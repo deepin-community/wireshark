@@ -2428,7 +2428,7 @@ get_mac_lte_ue_simult_pucch_pusch(mac_lte_info *p_mac_lte_info)
 }
 
 /* Forward declarations */
-int dissect_mac_lte(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void*);
+static int dissect_mac_lte(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void*);
 
 static guint8 get_mac_lte_channel_priority(guint16 ueid _U_, guint8 lcid,
                                            guint8 direction);
@@ -2766,7 +2766,7 @@ static void write_pdu_label_and_info(proto_item *ti1, proto_item *ti2,
     }
 
     va_start(ap, format);
-    g_vsnprintf(info_buffer, MAX_INFO_BUFFER, format, ap);
+    vsnprintf(info_buffer, MAX_INFO_BUFFER, format, ap);
     va_end(ap);
 
     /* Add to indicated places */
@@ -2781,7 +2781,7 @@ static void write_pdu_label_and_info(proto_item *ti1, proto_item *ti2,
     }
 }
 
-/* Version of function above, where no g_vsnprintf() call needed */
+/* Version of function above, where no vsnprintf() call needed */
 static void write_pdu_label_and_info_literal(proto_item *ti1, proto_item *ti2,
                                              packet_info *pinfo, const char *info_buffer)
 {
@@ -2989,7 +2989,7 @@ static gint dissect_rar_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     /* Create tree for this Body */
     rar_body_ti = proto_tree_add_item(tree,
                                       hf_mac_lte_rar_body,
-                                      tvb, offset, 0, ENC_ASCII|ENC_NA);
+                                      tvb, offset, 0, ENC_ASCII);
     rar_body_tree = proto_item_add_subtree(rar_body_ti, ett_mac_lte_rar_body);
 
     /* Dissect an RAR entry */
@@ -3210,7 +3210,7 @@ static void dissect_rar(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, pro
                         gint offset, mac_lte_info *p_mac_lte_info, mac_lte_tap_info *tap_info)
 {
     guint       number_of_rars         = 0; /* No of RAR bodies expected following headers */
-    guint8     *rapids                 = (guint8 *)wmem_alloc(wmem_packet_scope(), MAX_RAR_PDUS * sizeof(guint8));
+    guint8     *rapids                 = (guint8 *)wmem_alloc(pinfo->pool, MAX_RAR_PDUS * sizeof(guint8));
     gboolean    backoff_indicator_seen = FALSE;
     guint8      backoff_indicator      = 0;
     guint8      extension;
@@ -3232,7 +3232,7 @@ static void dissect_rar(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, pro
     /* Create headers tree */
     rar_headers_ti = proto_tree_add_item(tree,
                                          hf_mac_lte_rar_headers,
-                                         tvb, offset, 0, ENC_ASCII|ENC_NA);
+                                         tvb, offset, 0, ENC_ASCII);
     rar_headers_tree = proto_item_add_subtree(rar_headers_ti, ett_mac_lte_rar_headers);
 
 
@@ -3248,7 +3248,7 @@ static void dissect_rar(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, pro
         /* Create tree for this header */
         rar_header_ti = proto_tree_add_item(rar_headers_tree,
                                             hf_mac_lte_rar_header,
-                                            tvb, offset, 0, ENC_ASCII|ENC_NA);
+                                            tvb, offset, 0, ENC_ASCII);
         rar_header_tree = proto_item_add_subtree(rar_header_ti, ett_mac_lte_rar_header);
 
         /* Extension */
@@ -4778,7 +4778,7 @@ static void dissect_ulsch_or_dlsch(tvbuff_t *tvb, packet_info *pinfo, proto_tree
             lcid_str = val_to_str_const(initial_lcid, (p_mac_lte_info->direction == DIRECTION_UPLINK) ?
                                         ulsch_lcid_vals : dlsch_lcid_vals, "Unknown");
         } else {
-            lcid_str = wmem_strdup_printf(wmem_packet_scope(), "%u", elcids[number_of_headers]);
+            lcid_str = wmem_strdup_printf(pinfo->pool, "%u", elcids[number_of_headers]);
         }
 
         /* Append summary to subheader root */
@@ -6229,12 +6229,12 @@ static void dissect_ulsch_or_dlsch(tvbuff_t *tvb, packet_info *pinfo, proto_tree
         if (!rlc_called_for_sdu) {
             if (pdu_lengths[n] >= 30)
             {
-                proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, 30));
+                proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(pinfo->pool, tvb, offset, 30));
                 proto_item_append_text(sdu_ti, "...");
             }
             else
             {
-                proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, data_length));
+                proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(pinfo->pool, tvb, offset, data_length));
             }
         }
 
@@ -6691,12 +6691,12 @@ static void dissect_mch(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, pro
                                                  data_length);
             if (pdu_lengths[n] >= 30)
             {
-                proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, 30));
+                proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(pinfo->pool, tvb, offset, 30));
                 proto_item_append_text(sdu_ti, "...");
             }
             else
             {
-                proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, data_length));
+                proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(pinfo->pool, tvb, offset, data_length));
             }
         }
 
@@ -7050,10 +7050,10 @@ static void dissect_slsch(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
         /* Show bytes too, if won't be hidden (slow). There must be a nicer way of doing this! */
         if (pdu_lengths[n] >= 30) {
-            proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, 30));
+            proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(pinfo->pool, tvb, offset, 30));
             proto_item_append_text(sdu_ti, "...");
         } else {
-            proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, data_length));
+            proto_item_append_text(sdu_ti, "%s", tvb_bytes_to_str(pinfo->pool, tvb, offset, data_length));
         }
 
         offset += data_length;
@@ -7101,7 +7101,7 @@ static void dissect_slsch(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
    multiple MAC PDUs logged in the same frame (e.g. in the LTE eNB LI API definition from
    the Small Cell Forum)
 */
-int dissect_mac_lte(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
+static int dissect_mac_lte(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
 {
     proto_tree          *mac_lte_tree;
     proto_item          *pdu_ti;
@@ -7200,7 +7200,7 @@ int dissect_mac_lte(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
         switch (p_mac_lte_info->oob_event) {
             case ltemac_send_preamble:
                 preamble_ti = proto_tree_add_item(mac_lte_tree, hf_mac_lte_oob_send_preamble,
-                                                  tvb, 0, 0, ENC_ASCII|ENC_NA);
+                                                  tvb, 0, 0, ENC_ASCII);
                 preamble_tree = proto_item_add_subtree(preamble_ti, ett_mac_lte_oob);
                 proto_item_set_generated(ti);
 
@@ -8614,7 +8614,7 @@ void proto_register_mac_lte(void)
         },
         { &hf_mac_lte_rar_ul_grant_tcsp,
             { "TPC command for scheduled PUSCH",
-              "mac-lte.rar.ul-grant.tcsp", FT_UINT8, BASE_DEC, VALS(rar_ul_grant_tcsp_vals), 0x01c,
+              "mac-lte.rar.ul-grant.tcsp", FT_UINT8, BASE_DEC, VALS(rar_ul_grant_tcsp_vals), 0x1c,
               "PUSCH power offset in dB" , HFILL
             }
         },

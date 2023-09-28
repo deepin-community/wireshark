@@ -109,47 +109,65 @@ ProtocolIE-Field/value ie_field_value
 #.ASSIGN_VALUE_TO_TYPE  # F1AP does not have constants assigned to types, they are pure INTEGER
 # ProcedureCode
 
-id-Reset                             ProcedureCode
-id-F1Setup                           ProcedureCode
-id-ErrorIndication                   ProcedureCode
-id-gNBDUConfigurationUpdate          ProcedureCode
-id-gNBCUConfigurationUpdate          ProcedureCode
-id-UEContextSetup                    ProcedureCode
-id-UEContextRelease                  ProcedureCode
-id-UEContextModification             ProcedureCode
-id-UEContextModificationRequired     ProcedureCode
-id-UEMobilityCommand                 ProcedureCode
-id-UEContextReleaseRequest           ProcedureCode
-id-InitialULRRCMessageTransfer       ProcedureCode
-id-DLRRCMessageTransfer              ProcedureCode
-id-ULRRCMessageTransfer              ProcedureCode
-id-privateMessage                    ProcedureCode
-id-UEInactivityNotification          ProcedureCode
-id-GNBDUResourceCoordination         ProcedureCode
-id-SystemInformationDeliveryCommand  ProcedureCode
-id-Paging                            ProcedureCode
-id-Notify                            ProcedureCode
-id-WriteReplaceWarning               ProcedureCode
-id-PWSCancel                         ProcedureCode
-id-PWSRestartIndication              ProcedureCode
-id-PWSFailureIndication              ProcedureCode
-id-GNBDUStatusIndication             ProcedureCode
-id-RRCDeliveryReport                 ProcedureCode
-id-F1Removal                         ProcedureCode
-id-NetworkAccessRateReduction        ProcedureCode
-id-TraceStart                        ProcedureCode
-id-DeactivateTrace                   ProcedureCode
-id-DUCURadioInformationTransfer      ProcedureCode
-id-CUDURadioInformationTransfer      ProcedureCode
-id-BAPMappingConfiguration           ProcedureCode
-id-GNBDUResourceConfiguration        ProcedureCode
-id-IABTNLAddressAllocation           ProcedureCode
-id-IABUPConfigurationUpdate          ProcedureCode
-id-resourceStatusReportingInitiation ProcedureCode
-id-resourceStatusReporting           ProcedureCode
-id-accessAndMobilityIndication       ProcedureCode
-id-accessSuccess                     ProcedureCode
-id-cellTrafficTrace                  ProcedureCode
+id-Reset                                    ProcedureCode
+id-F1Setup                                  ProcedureCode
+id-ErrorIndication                          ProcedureCode
+id-gNBDUConfigurationUpdate                 ProcedureCode
+id-gNBCUConfigurationUpdate                 ProcedureCode
+id-UEContextSetup                           ProcedureCode
+id-UEContextRelease                         ProcedureCode
+id-UEContextModification                    ProcedureCode
+id-UEContextModificationRequired            ProcedureCode
+id-UEMobilityCommand                        ProcedureCode
+id-UEContextReleaseRequest                  ProcedureCode
+id-InitialULRRCMessageTransfer              ProcedureCode
+id-DLRRCMessageTransfer                     ProcedureCode
+id-ULRRCMessageTransfer                     ProcedureCode
+id-privateMessage                           ProcedureCode
+id-UEInactivityNotification                 ProcedureCode
+id-GNBDUResourceCoordination                ProcedureCode
+id-SystemInformationDeliveryCommand         ProcedureCode
+id-Paging                                   ProcedureCode
+id-Notify                                   ProcedureCode
+id-WriteReplaceWarning                      ProcedureCode
+id-PWSCancel                                ProcedureCode
+id-PWSRestartIndication                     ProcedureCode
+id-PWSFailureIndication                     ProcedureCode
+id-GNBDUStatusIndication                    ProcedureCode
+id-RRCDeliveryReport                        ProcedureCode
+id-F1Removal                                ProcedureCode
+id-NetworkAccessRateReduction               ProcedureCode
+id-TraceStart                               ProcedureCode
+id-DeactivateTrace                          ProcedureCode
+id-DUCURadioInformationTransfer             ProcedureCode
+id-CUDURadioInformationTransfer             ProcedureCode
+id-BAPMappingConfiguration                  ProcedureCode
+id-GNBDUResourceConfiguration               ProcedureCode
+id-IABTNLAddressAllocation                  ProcedureCode
+id-IABUPConfigurationUpdate                 ProcedureCode
+id-resourceStatusReportingInitiation        ProcedureCode
+id-resourceStatusReporting                  ProcedureCode
+id-accessAndMobilityIndication              ProcedureCode
+id-accessSuccess                            ProcedureCode
+id-cellTrafficTrace                         ProcedureCode
+id-PositioningMeasurementExchange           ProcedureCode
+id-PositioningAssistanceInformationControl  ProcedureCode
+id-PositioningAssistanceInformationFeedback ProcedureCode
+id-PositioningMeasurementReport             ProcedureCode
+id-PositioningMeasurementAbort              ProcedureCode
+id-PositioningMeasurementFailureIndication  ProcedureCode
+id-PositioningMeasurementUpdate             ProcedureCode
+id-TRPInformationExchange                   ProcedureCode
+id-PositioningInformationExchange           ProcedureCode
+id-PositioningActivation                    ProcedureCode
+id-PositioningDeactivation                  ProcedureCode
+id-E-CIDMeasurementInitiation               ProcedureCode
+id-E-CIDMeasurementFailureIndication        ProcedureCode
+id-E-CIDMeasurementReport                   ProcedureCode
+id-E-CIDMeasurementTermination              ProcedureCode
+id-PositioningInformationUpdate             ProcedureCode
+id-ReferenceTimeInformationReport           ProcedureCode
+id-ReferenceTimeInformationReportingControl ProcedureCode
 
 # ProtocolIE-ID
 id-Cause                                             ProtocolIE-ID
@@ -483,7 +501,7 @@ id-SLDRBs-ModifiedConf-Item                          ProtocolIE-ID
 id-UEAssistanceInformationEUTRA                      ProtocolIE-ID
 id-PC5LinkAMBR                                       ProtocolIE-ID
 id-SL-PHY-MAC-RLC-Config                             ProtocolIE-ID
-id-SL-ConfigDedicatedEUTRA                           ProtocolIE-ID
+id-SL-ConfigDedicatedEUTRA-Info                      ProtocolIE-ID
 id-AlternativeQoSParaSetList                         ProtocolIE-ID
 id-CurrentQoSParaSetIndex                            ProtocolIE-ID
 id-gNBCUMeasurementID                                ProtocolIE-ID
@@ -508,8 +526,6 @@ id-ExtendedPacketDelayBudget                         ProtocolIE-ID
 id-TSCTrafficCharacteristics                         ProtocolIE-ID
 id-ReportingRequestType                              ProtocolIE-ID
 id-TimeReferenceInformation                          ProtocolIE-ID
-id-ReferenceTimeInformationReport                    ProtocolIE-ID
-id-ReferenceTimeInformationReportingControl          ProtocolIE-ID
 id-CNPacketDelayBudgetUplink                         ProtocolIE-ID
 id-AdditionalPDCPDuplicationTNL-List                 ProtocolIE-ID
 id-RLCDuplicationInformation                         ProtocolIE-ID
@@ -531,6 +547,56 @@ id-AvailableSNPN-ID-List                             ProtocolIE-ID
 id-SIB10-message                                     ProtocolIE-ID
 id-DLCarrierList                                     ProtocolIE-ID
 id-ExtendedTAISliceSupportList                       ProtocolIE-ID
+id-RequestedSRSTransmissionCharacteristics           ProtocolIE-ID
+id-PosAssistance-Information                         ProtocolIE-ID
+id-PosBroadcast                                      ProtocolIE-ID
+id-RoutingID                                         ProtocolIE-ID
+id-PosAssistanceInformationFailureList               ProtocolIE-ID
+id-PosMeasurementQuantities                          ProtocolIE-ID
+id-PosMeasurementResultList                          ProtocolIE-ID
+id-TRPInformationTypeListTRPReq                      ProtocolIE-ID
+id-TRPInformationTypeItem                            ProtocolIE-ID
+id-TRPInformationListTRPResp                         ProtocolIE-ID
+id-TRPInformationItem                                ProtocolIE-ID
+id-LMF-MeasurementID                                 ProtocolIE-ID
+id-SRSType                                           ProtocolIE-ID
+id-ActivationTime                                    ProtocolIE-ID
+id-AbortTransmission                                 ProtocolIE-ID
+id-PositioningBroadcastCells                         ProtocolIE-ID
+id-SRSConfiguration                                  ProtocolIE-ID
+id-PosReportCharacteristics                          ProtocolIE-ID
+id-PosMeasurementPeriodicity                         ProtocolIE-ID
+id-TRPList                                           ProtocolIE-ID
+id-RAN-MeasurementID                                 ProtocolIE-ID
+id-LMF-UE-MeasurementID                              ProtocolIE-ID
+id-RAN-UE-MeasurementID                              ProtocolIE-ID
+id-E-CID-MeasurementQuantities                       ProtocolIE-ID
+id-E-CID-MeasurementQuantities-Item                  ProtocolIE-ID
+id-E-CID-MeasurementPeriodicity                      ProtocolIE-ID
+id-E-CID-MeasurementResult                           ProtocolIE-ID
+id-Cell-Portion-ID                                   ProtocolIE-ID
+id-SFNInitialisationTime                             ProtocolIE-ID
+id-SystemFrameNumber                                 ProtocolIE-ID
+id-SlotNumber                                        ProtocolIE-ID
+id-TRP-MeasurementRequestList                        ProtocolIE-ID
+id-MeasurementBeamInfoRequest                        ProtocolIE-ID
+id-E-CID-ReportCharacteristics                       ProtocolIE-ID
+id-ConfiguredTACIndication                           ProtocolIE-ID
+id-Extended-GNB-DU-Name                              ProtocolIE-ID
+id-Extended-GNB-CU-Name                              ProtocolIE-ID
+id-F1CTransferPath                                   ProtocolIE-ID
+id-SFN-Offset                                        ProtocolIE-ID
+id-TransmissionStopIndicator                         ProtocolIE-ID
+id-SrsFrequency                                      ProtocolIE-ID
+id-SCGIndicator                                      ProtocolIE-ID
+id-EstimatedArrivalProbability                       ProtocolIE-ID
+id-TRPType                                           ProtocolIE-ID
+id-SRSSpatialRelationPerSRSResource                  ProtocolIE-ID
+id-PDCPTerminatingNodeDLTNLAddrInfo                  ProtocolIE-ID
+id-ENBDLTNLAddress                                   ProtocolIE-ID
+id-PosMeasurementPeriodicityExtended                 ProtocolIE-ID
+id-PRS-Resource-ID                                   ProtocolIE-ID
+id-LocationMeasurementInformation                    ProtocolIE-ID
 #.END
 
 #.REGISTER
@@ -712,6 +778,7 @@ PagingOrigin                                      N f1ap.ies id-PagingOrigin
 GNB-CU-UE-F1AP-ID                                 N f1ap.ies id-new-gNB-CU-UE-F1AP-ID
 RedirectedRRCmessage                              N f1ap.ies id-RedirectedRRCmessage
 GNB-DU-UE-F1AP-ID                                 N f1ap.ies id-new-gNB-DU-UE-F1AP-ID
+NotificationInformation                           N f1ap.ies id-NotificationInformation
 PLMN-Identity                                     N f1ap.ies id-PLMNAssistanceInfoForNetShar
 UEContextNotRetrievable                           N f1ap.ies id-UEContextNotRetrievable
 PLMN-Identity                                     N f1ap.ies id-SelectedPLMNID
@@ -826,6 +893,46 @@ TransportLayerAddress                             N f1ap.ies id-TraceCollectionE
 PrivacyIndicator                                  N f1ap.ies id-PrivacyIndicator
 URI-address                                       N f1ap.ies id-TraceCollectionEntityURI
 NID                                               N f1ap.ies id-ServingNID
+RequestedSRSTransmissionCharacteristics           N f1ap.ies id-RequestedSRSTransmissionCharacteristics
+PosAssistance-Information                         N f1ap.ies id-PosAssistance-Information
+PosBroadcast                                      N f1ap.ies id-PosBroadcast
+RoutingID                                         N f1ap.ies id-RoutingID
+PosAssistanceInformationFailureList               N f1ap.ies id-PosAssistanceInformationFailureList
+PosMeasurementQuantities                          N f1ap.ies id-PosMeasurementQuantities
+PosMeasurementResultList                          N f1ap.ies id-PosMeasurementResultList
+TRPInformationTypeListTRPReq                      N f1ap.ies id-TRPInformationTypeListTRPReq
+TRPInformationTypeItem                            N f1ap.ies id-TRPInformationTypeItem
+TRPInformationListTRPResp                         N f1ap.ies id-TRPInformationListTRPResp
+TRPInformationItem                                N f1ap.ies id-TRPInformationItem
+LMF-MeasurementID                                 N f1ap.ies id-LMF-MeasurementID
+SRSType                                           N f1ap.ies id-SRSType
+RelativeTime1900                                  N f1ap.ies id-ActivationTime
+AbortTransmission                                 N f1ap.ies id-AbortTransmission
+PositioningBroadcastCells                         N f1ap.ies id-PositioningBroadcastCells
+SRSConfiguration                                  N f1ap.ies id-SRSConfiguration
+PosReportCharacteristics                          N f1ap.ies id-PosReportCharacteristics
+MeasurementPeriodicity                            N f1ap.ies id-PosMeasurementPeriodicity
+TRPList                                           N f1ap.ies id-TRPList
+RAN-MeasurementID                                 N f1ap.ies id-RAN-MeasurementID
+LMF-UE-MeasurementID                              N f1ap.ies id-LMF-UE-MeasurementID
+RAN-UE-MeasurementID                              N f1ap.ies id-RAN-UE-MeasurementID
+E-CID-MeasurementQuantities                       N f1ap.ies id-E-CID-MeasurementQuantities
+E-CID-MeasurementQuantities-Item                  N f1ap.ies id-E-CID-MeasurementQuantities-Item
+MeasurementPeriodicity                            N f1ap.ies id-E-CID-MeasurementPeriodicity
+E-CID-MeasurementResult                           N f1ap.ies id-E-CID-MeasurementResult
+Cell-Portion-ID                                   N f1ap.ies id-Cell-Portion-ID
+RelativeTime1900                                  N f1ap.ies id-SFNInitialisationTime
+SystemFrameNumber                                 N f1ap.ies id-SystemFrameNumber
+SlotNumber                                        N f1ap.ies id-SlotNumber
+TRP-MeasurementRequestList                        N f1ap.ies id-TRP-MeasurementRequestList
+MeasurementBeamInfoRequest                        N f1ap.ies id-MeasurementBeamInfoRequest
+E-CID-ReportCharacteristics                       N f1ap.ies id-E-CID-ReportCharacteristics
+Extended-GNB-DU-Name                              N f1ap.ies id-Extended-GNB-DU-Name
+Extended-GNB-CU-Name                              N f1ap.ies id-Extended-GNB-CU-Name
+F1CTransferPath                                   N f1ap.ies id-F1CTransferPath
+SCGIndicator                                      N f1ap.ies id-SCGIndicator
+TRPType                                           N f1ap.ies id-TRPType
+MeasurementPeriodicityExtended                    N f1ap.ies id-PosMeasurementPeriodicityExtended
 
 #F1AP-PROTOCOL-EXTENSION
 GNB-CUSystemInformation                           N f1ap.extension id-gNB-CUSystemInformation
@@ -861,7 +968,6 @@ RequestedFeatureSetEntryIndex                     N f1ap.extension id-RequestedF
 RequestedP-MaxFR2                                 N f1ap.extension id-RequestedP-MaxFR2
 DRX-Config                                        N f1ap.extension id-DRX-Config
 UEAssistanceInformation                           N f1ap.extension id-UEAssistanceInformation
-NotificationInformation                           N f1ap.extension id-NotificationInformation
 BPLMN-ID-Info-List                                N f1ap.extension id-BPLMN-ID-Info-List
 CP-TransportLayerAddress                          N f1ap.extension id-TNLAssociationTransportLayerAddressgNBDU
 PortNumber                                        N f1ap.extension id-portNumber
@@ -888,7 +994,7 @@ SIB13-message                                     N f1ap.extension id-SIB13-mess
 SIB14-message                                     N f1ap.extension id-SIB14-message
 UEAssistanceInformationEUTRA                      N f1ap.extension id-UEAssistanceInformationEUTRA
 SL-PHY-MAC-RLC-Config                             N f1ap.extension id-SL-PHY-MAC-RLC-Config
-SL-ConfigDedicatedEUTRA                           N f1ap.extension id-SL-ConfigDedicatedEUTRA
+SL-ConfigDedicatedEUTRA-Info                      N f1ap.extension id-SL-ConfigDedicatedEUTRA-Info
 AlternativeQoSParaSetList                         N f1ap.extension id-AlternativeQoSParaSetList
 QoSParaSetNotifyIndex                             N f1ap.extension id-CurrentQoSParaSetIndex
 NRCarrierList                                     N f1ap.extension id-CarrierList
@@ -913,6 +1019,17 @@ AvailableSNPN-ID-List                             N f1ap.extension id-AvailableS
 SIB10-message                                     N f1ap.extension id-SIB10-message
 NRCarrierList                                     N f1ap.extension id-DLCarrierList
 ExtendedSliceSupportList                          N f1ap.extension id-ExtendedTAISliceSupportList
+ConfiguredTACIndication                           N f1ap.extension id-ConfiguredTACIndication
+NRCGI                                             N f1ap.extension id-NRCGI
+SFN-Offset                                        N f1ap.extension id-SFN-Offset
+TransmissionStopIndicator                         N f1ap.extension id-TransmissionStopIndicator
+SrsFrequency                                      N f1ap.extension id-SrsFrequency
+CHO-Probability                                   N f1ap.extension id-EstimatedArrivalProbability
+SpatialRelationPerSRSResource                     N f1ap.extension id-SRSSpatialRelationPerSRSResource
+TransportLayerAddress                             N f1ap.extension id-PDCPTerminatingNodeDLTNLAddrInfo
+TransportLayerAddress                             N f1ap.extension id-ENBDLTNLAddress
+PRS-Resource-ID                                   N f1ap.extension id-PRS-Resource-ID
+LocationMeasurementInformation                    N f1ap.extension id-LocationMeasurementInformation
 
 #F1AP-ELEMENTARY-PROCEDURE
 Reset                                    N f1ap.proc.imsg id-Reset
@@ -998,12 +1115,15 @@ CUDURadioInformationTransfer             N f1ap.proc.imsg id-CUDURadioInformatio
 
 BAPMappingConfiguration                  N f1ap.proc.imsg id-BAPMappingConfiguration
 BAPMappingConfigurationAcknowledge       N f1ap.proc.sout id-BAPMappingConfiguration
+BAPMappingConfigurationFailure           N f1ap.proc.uout id-BAPMappingConfiguration
 
 GNBDUResourceConfiguration               N f1ap.proc.imsg id-GNBDUResourceConfiguration
 GNBDUResourceConfigurationAcknowledge    N f1ap.proc.sout id-GNBDUResourceConfiguration
+GNBDUResourceConfigurationFailure        N f1ap.proc.uout id-GNBDUResourceConfiguration
 
 IABTNLAddressRequest                     N f1ap.proc.imsg id-IABTNLAddressAllocation
 IABTNLAddressResponse                    N f1ap.proc.sout id-IABTNLAddressAllocation
+IABTNLAddressFailure                     N f1ap.proc.uout id-IABTNLAddressAllocation
 
 IABUPConfigurationUpdateRequest          N f1ap.proc.imsg id-IABUPConfigurationUpdate
 IABUPConfigurationUpdateResponse         N f1ap.proc.sout id-IABUPConfigurationUpdate
@@ -1024,6 +1144,48 @@ ReferenceTimeInformationReport           N f1ap.proc.imsg id-ReferenceTimeInform
 AccessSuccess                            N f1ap.proc.imsg id-accessSuccess
 
 CellTrafficTrace                         N f1ap.proc.imsg id-cellTrafficTrace
+
+PositioningAssistanceInformationControl  N f1ap.proc.imsg id-PositioningAssistanceInformationControl
+
+PositioningAssistanceInformationFeedback N f1ap.proc.imsg id-PositioningAssistanceInformationFeedback
+
+PositioningMeasurementRequest            N f1ap.proc.imsg id-PositioningMeasurementExchange
+PositioningMeasurementResponse           N f1ap.proc.sout id-PositioningMeasurementExchange
+PositioningMeasurementFailure            N f1ap.proc.uout id-PositioningMeasurementExchange
+
+PositioningMeasurementReport             N f1ap.proc.imsg id-PositioningMeasurementReport
+
+PositioningMeasurementAbort              N f1ap.proc.imsg id-PositioningMeasurementAbort
+
+PositioningMeasurementFailureIndication  N f1ap.proc.imsg id-PositioningMeasurementFailureIndication
+
+PositioningMeasurementUpdate             N f1ap.proc.imsg id-PositioningMeasurementUpdate
+
+TRPInformationRequest                    N f1ap.proc.imsg id-TRPInformationExchange
+TRPInformationResponse                   N f1ap.proc.sout id-TRPInformationExchange
+TRPInformationFailure                    N f1ap.proc.uout id-TRPInformationExchange
+
+PositioningInformationRequest            N f1ap.proc.imsg id-PositioningInformationExchange
+PositioningInformationResponse           N f1ap.proc.sout id-PositioningInformationExchange
+PositioningInformationFailure            N f1ap.proc.uout id-PositioningInformationExchange
+
+PositioningActivationRequest             N f1ap.proc.imsg id-PositioningActivation
+PositioningActivationResponse            N f1ap.proc.sout id-PositioningActivation
+PositioningActivationFailure             N f1ap.proc.uout id-PositioningActivation
+
+PositioningDeactivation                  N f1ap.proc.imsg id-PositioningDeactivation
+
+E-CIDMeasurementInitiationRequest        N f1ap.proc.imsg id-E-CIDMeasurementInitiation
+E-CIDMeasurementInitiationResponse       N f1ap.proc.sout id-E-CIDMeasurementInitiation
+E-CIDMeasurementInitiationFailure        N f1ap.proc.uout id-E-CIDMeasurementInitiation
+
+E-CIDMeasurementFailureIndication        N f1ap.proc.imsg id-E-CIDMeasurementFailureIndication
+
+E-CIDMeasurementReport                   N f1ap.proc.imsg id-E-CIDMeasurementReport
+
+E-CIDMeasurementTerminationCommand       N f1ap.proc.imsg id-E-CIDMeasurementTermination
+
+PositioningInformationUpdate             N f1ap.proc.imsg id-PositioningInformationUpdate
 
 #.FN_BODY AdditionalSIBMessageList-Item/additionalSIB VAL_PTR = &param_tvb
   tvbuff_t *param_tvb = NULL;
@@ -1116,6 +1278,7 @@ CellTrafficTrace                         N f1ap.proc.imsg id-cellTrafficTrace
       case id_InitialULRRCMessageTransfer:
         col_append_str(actx->pinfo->cinfo, COL_PROTOCOL, "/");
         col_set_fence(actx->pinfo->cinfo, COL_PROTOCOL);
+        col_set_fence(actx->pinfo->cinfo, COL_INFO);
         call_dissector(nr_rrc_ul_ccch_handle, param_tvb, actx->pinfo, subtree);
         break;
       case id_ULRRCMessageTransfer:
@@ -1125,6 +1288,7 @@ CellTrafficTrace                         N f1ap.proc.imsg id-cellTrafficTrace
         case 3:
           col_append_str(actx->pinfo->cinfo, COL_PROTOCOL, "/");
           col_set_fence(actx->pinfo->cinfo, COL_PROTOCOL);
+          col_set_fence(actx->pinfo->cinfo, COL_INFO);
           add_nr_pdcp_meta_data(actx->pinfo, PDCP_NR_DIRECTION_UPLINK, f1ap_data->srb_id);
           call_dissector(nr_pdcp_handle, param_tvb, actx->pinfo, subtree);
           break;
@@ -1138,6 +1302,7 @@ CellTrafficTrace                         N f1ap.proc.imsg id-cellTrafficTrace
         case 0:
           col_append_str(actx->pinfo->cinfo, COL_PROTOCOL, "/");
           col_set_fence(actx->pinfo->cinfo, COL_PROTOCOL);
+          col_set_fence(actx->pinfo->cinfo, COL_INFO);
           call_dissector(nr_rrc_dl_ccch_handle, param_tvb, actx->pinfo, subtree);
           break;
         case 1:
@@ -1145,12 +1310,34 @@ CellTrafficTrace                         N f1ap.proc.imsg id-cellTrafficTrace
         case 3:
           col_append_str(actx->pinfo->cinfo, COL_PROTOCOL, "/");
           col_set_fence(actx->pinfo->cinfo, COL_PROTOCOL);
+          col_set_fence(actx->pinfo->cinfo, COL_INFO);
           add_nr_pdcp_meta_data(actx->pinfo, PDCP_NR_DIRECTION_DOWNLINK, f1ap_data->srb_id);
           call_dissector(nr_pdcp_handle, param_tvb, actx->pinfo, subtree);
           break;
         default:
           break;
         }
+        break;
+      case id_UEContextSetup:
+      case id_UEContextModification:
+        col_append_str(actx->pinfo->cinfo, COL_PROTOCOL, "/");
+        col_set_fence(actx->pinfo->cinfo, COL_PROTOCOL);
+        col_set_fence(actx->pinfo->cinfo, COL_INFO);
+        add_nr_pdcp_meta_data(actx->pinfo, PDCP_NR_DIRECTION_DOWNLINK, 1);
+        call_dissector(nr_pdcp_handle, param_tvb, actx->pinfo, subtree);
+        break;
+      default:
+        break;
+      }
+      break;
+    case SUCCESSFUL_OUTCOME:
+      switch (f1ap_data->procedure_code) {
+      case id_UEContextModificationRequired:
+        col_append_str(actx->pinfo->cinfo, COL_PROTOCOL, "/");
+        col_set_fence(actx->pinfo->cinfo, COL_PROTOCOL);
+        col_set_fence(actx->pinfo->cinfo, COL_INFO);
+        add_nr_pdcp_meta_data(actx->pinfo, PDCP_NR_DIRECTION_DOWNLINK, 1);
+        call_dissector(nr_pdcp_handle, param_tvb, actx->pinfo, subtree);
         break;
       default:
         break;
@@ -1173,6 +1360,7 @@ CellTrafficTrace                         N f1ap.proc.imsg id-cellTrafficTrace
     subtree = proto_item_add_subtree(actx->created_item, ett_f1ap_RRCContainer_RRCSetupComplete);
     col_append_str(actx->pinfo->cinfo, COL_PROTOCOL, "/");
     col_set_fence(actx->pinfo->cinfo, COL_PROTOCOL);
+    col_set_fence(actx->pinfo->cinfo, COL_INFO);
     call_dissector(nr_rrc_ul_dcch_handle, param_tvb, actx->pinfo, subtree);
   }
 
@@ -1194,11 +1382,19 @@ CellTrafficTrace                         N f1ap.proc.imsg id-cellTrafficTrace
 
 #.FN_BODY PLMN-Identity  VAL_PTR = &param_tvb
   tvbuff_t *param_tvb = NULL;
+  f1ap_private_data_t *f1ap_data = f1ap_get_private_data(actx->pinfo);
+  e212_number_type_t number_type = f1ap_data->number_type;
+  f1ap_data->number_type = E212_NONE;
 %(DEFAULT_BODY)s
   if (param_tvb) {
     proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_f1ap_PLMN_Identity);
-    dissect_e212_mcc_mnc(param_tvb, actx->pinfo, subtree, 0, E212_NONE, FALSE);
+    dissect_e212_mcc_mnc(param_tvb, actx->pinfo, subtree, 0, number_type, FALSE);
   }
+
+#.FN_BODY NRCGI
+  f1ap_private_data_t *f1ap_data = f1ap_get_private_data(actx->pinfo);
+  f1ap_data->number_type = E212_NRCGI;
+%(DEFAULT_BODY)s
 
 #.TYPE_ATTR
 PortNumber TYPE = FT_UINT16 DISPLAY = BASE_DEC
@@ -1753,13 +1949,13 @@ Periodicity DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&units_microseconds
     dissect_nr_rrc_SL_PHY_MAC_RLC_Config_r16_PDU(param_tvb, actx->pinfo, subtree, NULL);
   }
 
-#.FN_BODY SL-ConfigDedicatedEUTRA VAL_PTR = &param_tvb
+#.FN_BODY SL-ConfigDedicatedEUTRA-Info VAL_PTR = &param_tvb
   tvbuff_t *param_tvb = NULL;
   proto_tree *subtree;
 %(DEFAULT_BODY)s
   if (param_tvb && lte_rrc_conn_reconf_handle) {
-    subtree = proto_item_add_subtree(actx->created_item, ett_f1ap_SL_ConfigDedicatedEUTRA);
-    call_dissector(lte_rrc_conn_reconf_handle, param_tvb, actx->pinfo, subtree);
+    subtree = proto_item_add_subtree(actx->created_item, ett_f1ap_SL_ConfigDedicatedEUTRA_Info);
+    dissect_nr_rrc_SL_ConfigDedicatedEUTRA_Info_r16_PDU(param_tvb, actx->pinfo, subtree, NULL);
   }
 
 #.FN_BODY TDD-UL-DLConfigCommonNR VAL_PTR = &param_tvb
@@ -1779,167 +1975,375 @@ Periodicity DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&units_microseconds
     dissect_lte_rrc_UEAssistanceInformation_r11_PDU(param_tvb, actx->pinfo, subtree, NULL);
   }
 
+#.FN_BODY PosAssistance-Information VAL_PTR = &param_tvb
+  tvbuff_t *param_tvb = NULL;
+%(DEFAULT_BODY)s
+  if (param_tvb) {
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_f1ap_PosAssistance_Information);
+    dissect_nrppa_Assistance_Information_PDU(param_tvb, actx->pinfo, subtree, NULL);
+  }
+
+#.FN_BODY PosAssistanceInformationFailureList VAL_PTR = &param_tvb
+  tvbuff_t *param_tvb = NULL;
+%(DEFAULT_BODY)s
+  if (param_tvb) {
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_f1ap_PosAssistance_Information);
+    dissect_nrppa_Assistance_Information_PDU(param_tvb, actx->pinfo, subtree, NULL);
+  }
+
+#.FN_BODY LocationMeasurementInformation VAL_PTR = &param_tvb
+  tvbuff_t *param_tvb = NULL;
+%(DEFAULT_BODY)s
+  if (param_tvb) {
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_f1ap_LocationMeasurementInformation);
+    dissect_nr_rrc_LocationMeasurementInfo_PDU(param_tvb, actx->pinfo, subtree, NULL);
+  }
+
 #.FN_HDR Reset
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "Reset");
+  set_message_label(actx, MTYPE_RESET);
+  set_stats_message_type(actx->pinfo, MTYPE_RESET);
 #.FN_HDR ResetAcknowledge
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ResetAcknowledge");
+  set_message_label(actx, MTYPE_RESET_ACK);
+  set_stats_message_type(actx->pinfo, MTYPE_RESET_ACK);
 #.FN_HDR F1SetupRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "F1SetupRequest");
+  set_message_label(actx, MTYPE_F1_SETUP_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_F1_SETUP_REQUEST);
 #.FN_HDR F1SetupResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "F1SetupResponse");
+  set_message_label(actx, MTYPE_F1_SETUP_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_F1_SETUP_RESPONSE);
 #.FN_HDR F1SetupFailure
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "F1SetupFailure");
+  set_message_label(actx, MTYPE_F1_SETUP_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_F1_SETUP_FAILURE);
 #.FN_HDR GNBDUConfigurationUpdate
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBDUConfigurationUpdate");
+  set_message_label(actx, MTYPE_GNB_DU_CONFIGURATION_UPDATE);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_DU_CONFIGURATION_UPDATE);
 #.FN_HDR GNBDUConfigurationUpdateAcknowledge
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBDUConfigurationUpdateAcknowledge");
+  set_message_label(actx, MTYPE_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_DU_CONFIGURATION_UPDATE_ACKNOWLEDGE);
 #.FN_HDR GNBDUConfigurationUpdateFailure
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBDUConfigurationUpdateFailure");
+  set_message_label(actx, MTYPE_GNB_DU_CONFIGURATION_UPDATE_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_DU_CONFIGURATION_UPDATE_FAILURE);
 #.FN_HDR GNBCUConfigurationUpdate
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBCUConfigurationUpdate");
+  set_message_label(actx, MTYPE_GNB_CU_CONFIGURATION_UPDATE);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_CU_CONFIGURATION_UPDATE);
 #.FN_HDR GNBCUConfigurationUpdateAcknowledge
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBCUConfigurationUpdateAcknowledge");
+  set_message_label(actx, MTYPE_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_CU_CONFIGURATION_UPDATE_ACKNOWLEDGE);
 #.FN_HDR GNBCUConfigurationUpdateFailure
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBCUConfigurationUpdateFailure");
+  set_message_label(actx, MTYPE_GNB_CU_CONFIGURATION_UPDATE_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_CU_CONFIGURATION_UPDATE_FAILURE);
 #.FN_HDR UEContextSetupRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextSetupRequest");
+  set_message_label(actx, MTYPE_UE_CONTEXT_SETUP_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_SETUP_REQUEST);
 #.FN_HDR UEContextSetupResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextSetupResponse");
+  set_message_label(actx, MTYPE_UE_CONTEXT_SETUP_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_SETUP_RESPONSE);
 #.FN_HDR UEContextSetupFailure
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextSetupFailure");
+  set_message_label(actx, MTYPE_UE_CONTEXT_SETUP_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_SETUP_FAILURE);
 #.FN_HDR UEContextReleaseCommand
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextReleaseCommand");
+  set_message_label(actx, MTYPE_UE_CONTEXT_RELEASE_COMMAND);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_RELEASE_COMMAND);
 #.FN_HDR UEContextReleaseComplete
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextReleaseComplete");
+  set_message_label(actx, MTYPE_UE_CONTEXT_RELEASE_COMPLETE);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_RELEASE_COMPLETE);
 #.FN_HDR UEContextModificationRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextModificationRequest");
+  set_message_label(actx, MTYPE_UE_CONTEXT_MODIFICATION_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_MODIFICATION_REQUEST);
 #.FN_HDR UEContextModificationResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextModificationResponse");
+  set_message_label(actx, MTYPE_UE_CONTEXT_MODIFICATION_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_MODIFICATION_RESPONSE);
 #.FN_HDR UEContextModificationFailure
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextModificationFailure");
+  set_message_label(actx, MTYPE_UE_CONTEXT_MODIFICATION_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_MODIFICATION_FAILURE);
 #.FN_HDR UEContextModificationRequired
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextModificationRequired");
+  set_message_label(actx, MTYPE_UE_CONTEXT_MODIFICATION_REQUIRED);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_MODIFICATION_REQUIRED);
 #.FN_HDR UEContextModificationConfirm
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextModificationConfirm");
+  set_message_label(actx, MTYPE_UE_CONTEXT_MODIFICATION_CONFIRM);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_MODIFICATION_CONFIRM);
 #.FN_HDR UEContextModificationRefuse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextModificationRefuse");
+  set_message_label(actx, MTYPE_UE_CONTEXT_MODIFICATION_REFUSE);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_MODIFICATION_REFUSE);
 #.FN_HDR WriteReplaceWarningRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "WriteReplaceWarningRequest");
+  set_message_label(actx, MTYPE_WRITE_REPLACE_WARNING_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_WRITE_REPLACE_WARNING_REQUEST);
 #.FN_HDR WriteReplaceWarningResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "WriteReplaceWarningResponse");
+  set_message_label(actx, MTYPE_WRITE_REPLACE_WARNING_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_WRITE_REPLACE_WARNING_RESPONSE);
 #.FN_HDR PWSCancelRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "PWSCancelRequest");
+  set_message_label(actx, MTYPE_PWS_CANCEL_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_PWS_CANCEL_REQUEST);
 #.FN_HDR PWSCancelResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "PWSCancelResponse");
+  set_message_label(actx, MTYPE_PWS_CANCEL_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_PWS_CANCEL_RESPONSE);
 #.FN_HDR ErrorIndication
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ErrorIndication");
+  set_message_label(actx, MTYPE_ERROR_INDICATION);
+  set_stats_message_type(actx->pinfo, MTYPE_ERROR_INDICATION);
 #.FN_HDR UEContextReleaseRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEContextReleaseRequest");
+  set_message_label(actx, MTYPE_UE_CONTEXT_RELEASE_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_CONTEXT_RELEASE_REQUEST);
 #.FN_HDR InitialULRRCMessageTransfer
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "InitialULRRCMessageTransfer");
+  set_message_label(actx, MTYPE_INITIAL_UL_RRC_MESSAGE_TRANSFER);
+  set_stats_message_type(actx->pinfo, MTYPE_INITIAL_UL_RRC_MESSAGE_TRANSFER);
 #.FN_HDR DLRRCMessageTransfer
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "DLRRCMessageTransfer");
+  set_message_label(actx, MTYPE_DL_RRC_MESSAGE_TRANSFER);
+  set_stats_message_type(actx->pinfo, MTYPE_DL_RRC_MESSAGE_TRANSFER);
 #.FN_HDR ULRRCMessageTransfer
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ULRRCMessageTransfer");
+  set_message_label(actx, MTYPE_UL_RRC_MESSAGE_TRANSFER);
+  set_stats_message_type(actx->pinfo, MTYPE_UL_RRC_MESSAGE_TRANSFER);
 #.FN_HDR UEInactivityNotification
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "UEInactivityNotification");
+  set_message_label(actx, MTYPE_UE_INACTIVITY_NOTIFICATION);
+  set_stats_message_type(actx->pinfo, MTYPE_UE_INACTIVITY_NOTIFICATION);
 #.FN_HDR GNBDUResourceCoordinationRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBDUResourceCoordinationRequest");
+  set_message_label(actx, MTYPE_GNB_DU_RESOURCE_COORDINATION_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_DU_RESOURCE_COORDINATION_REQUEST);
 #.FN_HDR GNBDUResourceCoordinationResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBDUResourceCoordinationResponse");
+  set_message_label(actx, MTYPE_GNB_DU_RESOURCE_COORDINATION_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_DU_RESOURCE_COORDINATION_RESPONSE);
 #.FN_HDR PrivateMessage
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "PrivateMessage");
+  set_message_label(actx, MTYPE_PRIVATE_MESSAGE);
+  set_stats_message_type(actx->pinfo, MTYPE_PRIVATE_MESSAGE);
 #.FN_HDR SystemInformationDeliveryCommand
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "SystemInformationDeliveryCommand");
+  set_message_label(actx, MTYPE_SYSTEM_INFORMATION_DELIVERY_COMMAND);
+  set_stats_message_type(actx->pinfo, MTYPE_SYSTEM_INFORMATION_DELIVERY_COMMAND);
 #.FN_HDR Paging
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "Paging");
+  set_message_label(actx, MTYPE_PAGING);
+  set_stats_message_type(actx->pinfo, MTYPE_PAGING);
 #.FN_HDR Notify
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "Notify");
+  set_message_label(actx, MTYPE_NOTIFY);
+  set_stats_message_type(actx->pinfo, MTYPE_NOTIFY);
 #.FN_HDR NetworkAccessRateReduction
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "NetworkAccessRateReduction");
+  set_message_label(actx, MTYPE_NETWORK_ACCESS_RATE_REDUCTION);
+  set_stats_message_type(actx->pinfo, MTYPE_NETWORK_ACCESS_RATE_REDUCTION);
 #.FN_HDR PWSRestartIndication
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "PWSRestartIndication");
+  set_message_label(actx, MTYPE_PWS_RESTART_INDICATION);
+  set_stats_message_type(actx->pinfo, MTYPE_PWS_RESTART_INDICATION);
 #.FN_HDR PWSFailureIndication
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "PWSFailureIndication");
+  set_message_label(actx, MTYPE_PWS_FAILURE_INDICATION);
+  set_stats_message_type(actx->pinfo, MTYPE_PWS_FAILURE_INDICATION);
 #.FN_HDR GNBDUStatusIndication
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBDUStatusIndication");
+  set_message_label(actx, MTYPE_GNB_DU_STATUS_INDICATION);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_DU_STATUS_INDICATION);
 #.FN_HDR RRCDeliveryReport
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "RRCDeliveryReport");
+  set_message_label(actx, MTYPE_RRC_DELIVERY_REPORT);
+  set_stats_message_type(actx->pinfo, MTYPE_RRC_DELIVERY_REPORT);
 #.END
 #.FN_HDR F1RemovalRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "F1RemovalRequest");
+  set_message_label(actx, MTYPE_F1_REMOVAL_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_F1_REMOVAL_REQUEST);
 #.END
 #.FN_HDR F1RemovalResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "F1RemovalResponse");
+  set_message_label(actx, MTYPE_F1_REMOVAL_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_F1_REMOVAL_RESPONSE);
 #.END
 #.FN_HDR F1RemovalFailure
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "F1RemovalFailure");
+  set_message_label(actx, MTYPE_F1_REMOVAL_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_F1_REMOVAL_FAILURE);
 #.END
 #.FN_HDR TraceStart
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "TraceStart");
+  set_message_label(actx, MTYPE_TRACE_START);
+  set_stats_message_type(actx->pinfo, MTYPE_TRACE_START);
 #.END
 #.FN_HDR DeactivateTrace
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "DeactivateTrace");
+  set_message_label(actx, MTYPE_DEACTIVATE_TRACE);
+  set_stats_message_type(actx->pinfo, MTYPE_DEACTIVATE_TRACE);
 #.END
 #.FN_HDR DUCURadioInformationTransfer
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "DUCURadioInformationTransfer");
+  set_message_label(actx, MTYPE_DU_CU_RADIO_INFORMATION_TRANSFER);
+  set_stats_message_type(actx->pinfo, MTYPE_DU_CU_RADIO_INFORMATION_TRANSFER);
 #.END
 #.FN_HDR CUDURadioInformationTransfer
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "CUDURadioInformationTransfer");
+  set_message_label(actx, MTYPE_CU_DU_RADIO_INFORMATION_TRANSFER);
+  set_stats_message_type(actx->pinfo, MTYPE_CU_DU_RADIO_INFORMATION_TRANSFER);
 #.END
 #.FN_HDR BAPMappingConfiguration
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "BAPMappingConfiguration");
+  set_message_label(actx, MTYPE_BAP_MAPPING_CONFIGURATION);
+  set_stats_message_type(actx->pinfo, MTYPE_BAP_MAPPING_CONFIGURATION);
 #.END
 #.FN_HDR BAPMappingConfigurationAcknowledge
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "BAPMappingConfigurationAcknowledge");
+  set_message_label(actx, MTYPE_BAP_MAPPING_CONFIGURATION_ACKNOWLEDGE);
+  set_stats_message_type(actx->pinfo, MTYPE_BAP_MAPPING_CONFIGURATION_ACKNOWLEDGE);
+#.END
+#.FN_HDR BAPMappingConfigurationFailure
+  set_message_label(actx, MTYPE_BAP_MAPPING_CONFIGURATION_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_BAP_MAPPING_CONFIGURATION_FAILURE);
 #.END
 #.FN_HDR GNBDUResourceConfiguration
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBDUResourceConfiguration");
+  set_message_label(actx, MTYPE_GNB_DU_RESOURCE_CONFIGURATION);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_DU_RESOURCE_CONFIGURATION);
 #.END
 #.FN_HDR GNBDUResourceConfigurationAcknowledge
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "GNBDUResourceConfigurationAcknowledge");
+  set_message_label(actx, MTYPE_GNB_DU_RESOURCE_CONFIGURATION_ACKNOWLEDGE);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_DU_RESOURCE_CONFIGURATION_ACKNOWLEDGE);
+#.END
+#.FN_HDR GNBDUResourceConfigurationFailure
+  set_message_label(actx, MTYPE_GNB_DU_RESOURCE_CONFIGURATION_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_GNB_DU_RESOURCE_CONFIGURATION_FAILURE);
 #.END
 #.FN_HDR IABTNLAddressRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "IABTNLAddressRequest");
+  set_message_label(actx, MTYPE_IAB_TNL_ADDRESS_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_IAB_TNL_ADDRESS_REQUEST);
 #.END
 #.FN_HDR IABTNLAddressResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "IABTNLAddressResponse");
+  set_message_label(actx, MTYPE_IAB_TNL_ADDRESS_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_IAB_TNL_ADDRESS_RESPONSE);
+#.END
+#.FN_HDR IABTNLAddressFailure
+  set_message_label(actx, MTYPE_IAB_TNL_ADDRESS_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_IAB_TNL_ADDRESS_FAILURE);
 #.END
 #.FN_HDR IABUPConfigurationUpdateRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "IABUPConfigurationUpdateRequest");
+  set_message_label(actx, MTYPE_IAB_UP_CONFIGURATION_UPDATE_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_IAB_UP_CONFIGURATION_UPDATE_REQUEST);
 #.END
 #.FN_HDR IABUPConfigurationUpdateResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "IABUPConfigurationUpdateResponse");
+  set_message_label(actx, MTYPE_IAB_UP_CONFIGURATION_UPDATE_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_IAB_UP_CONFIGURATION_UPDATE_RESPONSE);
 #.END
 #.FN_HDR IABUPConfigurationUpdateFailure
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "IABUPConfigurationUpdateFailure");
+  set_message_label(actx, MTYPE_IAB_UP_CONFIGURATION_UPDATE_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_IAB_UP_CONFIGURATION_UPDATE_FAILURE);
 #.END
 #.FN_HDR ResourceStatusRequest
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ResourceStatusRequest");
+  set_message_label(actx, MTYPE_RESOURCE_STATUS_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_RESOURCE_STATUS_REQUEST);
 #.END
 #.FN_HDR ResourceStatusResponse
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ResourceStatusResponse");
+  set_message_label(actx, MTYPE_RESOURCE_STATUS_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_RESOURCE_STATUS_RESPONSE);
 #.END
 #.FN_HDR ResourceStatusFailure
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ResourceStatusFailure");
+  set_message_label(actx, MTYPE_RESOURCE_STATUS_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_RESOURCE_STATUS_FAILURE);
 #.END
 #.FN_HDR ResourceStatusUpdate
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ResourceStatusUpdate");
+  set_message_label(actx, MTYPE_RESOURCE_STATUS_UPDATE);
+  set_stats_message_type(actx->pinfo, MTYPE_RESOURCE_STATUS_UPDATE);
 #.END
 #.FN_HDR AccessAndMobilityIndication
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "AccessAndMobilityIndication");
+  set_message_label(actx, MTYPE_ACCESS_AND_MOBILITY_INDICATION);
+  set_stats_message_type(actx->pinfo, MTYPE_ACCESS_AND_MOBILITY_INDICATION);
 #.END
 #.FN_HDR ReferenceTimeInformationReportingControl
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ReferenceTimeInformationReportingControl");
+  set_message_label(actx, MTYPE_REFERENCE_TIME_INFORMATION_REPORTING_CONTROL);
+  set_stats_message_type(actx->pinfo, MTYPE_REFERENCE_TIME_INFORMATION_REPORTING_CONTROL);
 #.END
 #.FN_HDR ReferenceTimeInformationReport
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "ReferenceTimeInformationReport");
+  set_message_label(actx, MTYPE_REFERENCE_TIME_INFORMATION_REPORT);
+  set_stats_message_type(actx->pinfo, MTYPE_REFERENCE_TIME_INFORMATION_REPORT);
 #.END
 #.FN_HDR AccessSuccess
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "AccessSuccess");
+  set_message_label(actx, MTYPE_ACCESS_SUCCESS);
+  set_stats_message_type(actx->pinfo, MTYPE_ACCESS_SUCCESS);
 #.END
 #.FN_HDR CellTrafficTrace
-  col_append_sep_str(actx->pinfo->cinfo, COL_INFO, NULL, "CellTrafficTrace");
+  set_message_label(actx, MTYPE_CELL_TRAFFIC_TRACE);
+  set_stats_message_type(actx->pinfo, MTYPE_CELL_TRAFFIC_TRACE);
+#.END
+#.FN_HDR PositioningAssistanceInformationControl
+  set_message_label(actx, MTYPE_POSITIONING_ASSISTANCE_INFORMATION_CONTROL);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_ASSISTANCE_INFORMATION_CONTROL);
+#.END
+#.FN_HDR PositioningAssistanceInformationFeedback
+  set_message_label(actx, MTYPE_POSITIONING_ASSISTANCE_INFORMATION_FEEDBACK);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_ASSISTANCE_INFORMATION_FEEDBACK);
+#.END
+#.FN_HDR PositioningMeasurementRequest
+  set_message_label(actx, MTYPE_POSITIONING_MEASUREMENT_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_MEASUREMENT_REQUEST);
+#.END
+#.FN_HDR PositioningMeasurementResponse
+  set_message_label(actx, MTYPE_POSITIONING_MEASUREMENT_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_MEASUREMENT_RESPONSE);
+#.END
+#.FN_HDR PositioningMeasurementFailure
+  set_message_label(actx, MTYPE_POSITIONING_MEASUREMENT_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_MEASUREMENT_FAILURE);
+#.END
+#.FN_HDR PositioningMeasurementReport
+  set_message_label(actx, MTYPE_POSITIONING_MEASUREMENT_REPORT);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_MEASUREMENT_REPORT);
+#.END
+#.FN_HDR PositioningMeasurementAbort
+  set_message_label(actx, MTYPE_POSITIONING_MEASUREMENT_ABORT);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_MEASUREMENT_ABORT);
+#.END
+#.FN_HDR PositioningMeasurementFailureIndication
+  set_message_label(actx, MTYPE_POSITIONING_MEASUREMENT_FAILURE_INDICATION);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_MEASUREMENT_FAILURE_INDICATION);
+#.END
+#.FN_HDR PositioningMeasurementUpdate
+  set_message_label(actx, MTYPE_POSITIONING_MEASUREMENT_UPDATE);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_MEASUREMENT_UPDATE);
+#.END
+#.FN_HDR TRPInformationRequest
+  set_message_label(actx, MTYPE_TRP_INFORMATION_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_TRP_INFORMATION_REQUEST);
+#.END
+#.FN_HDR TRPInformationResponse
+  set_message_label(actx, MTYPE_TRP_INFORMATION_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_TRP_INFORMATION_RESPONSE);
+#.END
+#.FN_HDR TRPInformationFailure
+  set_message_label(actx, MTYPE_TRP_INFORMATION_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_TRP_INFORMATION_FAILURE);
+#.END
+#.FN_HDR PositioningInformationRequest
+  set_message_label(actx, MTYPE_POSITIONING_INFORMATION_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_INFORMATION_REQUEST);
+#.END
+#.FN_HDR PositioningInformationResponse
+  set_message_label(actx, MTYPE_POSITIONING_INFORMATION_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_INFORMATION_RESPONSE);
+#.END
+#.FN_HDR PositioningInformationFailure
+  set_message_label(actx, MTYPE_POSITIONING_INFORMATION_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_INFORMATION_FAILURE);
+#.END
+#.FN_HDR PositioningActivationRequest
+  set_message_label(actx, MTYPE_POSITIONING_ACTIVATION_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_ACTIVATION_REQUEST);
+#.END
+#.FN_HDR PositioningActivationResponse
+  set_message_label(actx, MTYPE_POSITIONING_ACTIVATION_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_ACTIVATION_RESPONSE);
+#.END
+#.FN_HDR PositioningActivationFailure
+  set_message_label(actx, MTYPE_POSITIONING_ACTIVATION_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_ACTIVATION_FAILURE);
+#.END
+#.FN_HDR PositioningDeactivation
+  set_message_label(actx, MTYPE_POSITIONING_DEACTIVATION);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_DEACTIVATION);
+#.END
+#.FN_HDR E-CIDMeasurementInitiationRequest
+  set_message_label(actx, MTYPE_E_CID_MEASUREMENT_INITIATION_REQUEST);
+  set_stats_message_type(actx->pinfo, MTYPE_E_CID_MEASUREMENT_INITIATION_REQUEST);
+#.END
+#.FN_HDR E-CIDMeasurementInitiationResponse
+  set_message_label(actx, MTYPE_E_CID_MEASUREMENT_INITIATION_RESPONSE);
+  set_stats_message_type(actx->pinfo, MTYPE_E_CID_MEASUREMENT_INITIATION_RESPONSE);
+#.END
+#.FN_HDR E-CIDMeasurementInitiationFailure
+  set_message_label(actx, MTYPE_E_CID_MEASUREMENT_INITIATION_FAILURE);
+  set_stats_message_type(actx->pinfo, MTYPE_E_CID_MEASUREMENT_INITIATION_FAILURE);
+#.END
+#.FN_HDR E-CIDMeasurementFailureIndication
+  set_message_label(actx, MTYPE_E_CID_MEASUREMENT_FAILURE_INDICATION);
+  set_stats_message_type(actx->pinfo, MTYPE_E_CID_MEASUREMENT_FAILURE_INDICATION);
+#.END
+#.FN_HDR E-CIDMeasurementReport
+  set_message_label(actx, MTYPE_E_CID_MEASUREMENT_REPORT);
+  set_stats_message_type(actx->pinfo, MTYPE_E_CID_MEASUREMENT_REPORT);
+#.END
+#.FN_HDR E-CIDMeasurementTerminationCommand
+  set_message_label(actx, MTYPE_E_CID_MEASUREMENT_TERMINATION_COMMAND);
+  set_stats_message_type(actx->pinfo, MTYPE_E_CID_MEASUREMENT_TERMINATION_COMMAND);
+#.END
+#.FN_HDR PositioningInformationUpdate
+  set_message_label(actx, MTYPE_POSITIONING_INFORMATION_UPDATE);
+  set_stats_message_type(actx->pinfo, MTYPE_POSITIONING_INFORMATION_UPDATE);
 #.END
 
 #

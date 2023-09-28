@@ -9,30 +9,25 @@
 
 
 #include "config.h"
+#define WS_LOG_DOMAIN LOG_DOMAIN_DFILTER
 
 #ifdef DUMP_DFILTER_MACRO
 #include <stdio.h>
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
 #endif
 #include <string.h>
 
 #include "dfilter-int.h"
 #include "dfilter.h"
 #include "dfilter-macro.h"
-#include <ftypes/ftypes-int.h>
+#include <ftypes/ftypes.h>
 #include <epan/uat-int.h>
 #include <epan/proto.h>
+#include <wsutil/glib-compat.h>
 
-typedef struct {
-	const char* name;
-	gboolean usable;
-	char* repr;
-} fvt_cache_entry_t;
 
 static uat_t* dfilter_macro_uat = NULL;
 static dfilter_macro_t* macros = NULL;
 static guint num_macros;
-static GHashTable* fvt_cache = NULL;
 
 /* #define DUMP_DFILTER_MACRO */
 #ifdef DUMP_DFILTER_MACRO
@@ -42,48 +37,10 @@ void dump_dfilter_macro_t(const dfilter_macro_t *m, const char *function, const 
 #define DUMP_MACRO(m)
 #endif
 
-static gboolean fvt_cache_cb(proto_node * node, gpointer data _U_) {
-	field_info* finfo = PNODE_FINFO(node);
-	fvt_cache_entry_t* e;
-
-	if (!finfo) return FALSE;
-
-	if ((e = (fvt_cache_entry_t*)g_hash_table_lookup(fvt_cache,finfo->hfinfo->abbrev))) {
-		e->usable = FALSE;
-	} else if (finfo->value.ftype->val_to_string_repr) {
-		switch (finfo->hfinfo->type) {
-			case FT_NONE:
-			case FT_PROTOCOL:
-				return FALSE;
-			default:
-				break;
-		}
-		e = g_new(fvt_cache_entry_t,1);
-		e->name = finfo->hfinfo->abbrev;
-		e->repr = fvalue_to_string_repr(NULL, &(finfo->value), FTREPR_DFILTER, finfo->hfinfo->display);
-		e->usable = TRUE;
-		g_hash_table_insert(fvt_cache,(void*)finfo->hfinfo->abbrev,e);
-	}
-	return FALSE;
-}
-
-static void dfilter_free_fvt_entry(gpointer v)
-{
-	fvt_cache_entry_t* e = (fvt_cache_entry_t*)v;
-	wmem_free(NULL, e->repr);
-	g_free(e);
-}
-
-void dfilter_macro_build_ftv_cache(void* tree_root) {
-	g_hash_table_remove_all(fvt_cache);
-	proto_tree_traverse_post_order((proto_tree *)tree_root, fvt_cache_cb, NULL);
-}
-
 static gchar* dfilter_macro_resolve(gchar* name, gchar** args, gchar** error) {
 	GString* text;
 	int argc = 0;
 	dfilter_macro_t* m = NULL;
-	fvt_cache_entry_t* e;
 	int* arg_pos_p;
 	gchar** parts;
 	gchar* ret;
@@ -98,20 +55,9 @@ static gchar* dfilter_macro_resolve(gchar* name, gchar** args, gchar** error) {
 	}
 
 	if (!m) {
-		if (fvt_cache &&
-		    (e = (fvt_cache_entry_t  *)g_hash_table_lookup(fvt_cache,name)) != NULL) {
-			if(e->usable) {
-				return wmem_strdup(NULL, e->repr);
-			} else {
-				if (error != NULL)
-					*error = g_strdup_printf("macro '%s' is unusable", name);
-				return NULL;
-			}
-		} else {
-			if (error != NULL)
-				*error = g_strdup_printf("macro '%s' does not exist", name);
-			return NULL;
-		}
+		if (error != NULL)
+			*error = g_strdup_printf("macro '%s' does not exist", name);
+		return NULL;
 	}
 
 	DUMP_MACRO(m);
@@ -122,7 +68,7 @@ static gchar* dfilter_macro_resolve(gchar* name, gchar** args, gchar** error) {
 
 	if (argc != m->argc) {
 		if (error != NULL) {
-			*error = g_strdup_printf("wrong number of arguments for macro '%s', expecting %d instead of %d",
+			*error = ws_strdup_printf("wrong number of arguments for macro '%s', expecting %d instead of %d",
 									  name, m->argc, argc);
 		}
 		return NULL;
@@ -148,6 +94,39 @@ static gchar* dfilter_macro_resolve(gchar* name, gchar** args, gchar** error) {
 	return ret;
 }
 
+/* Start points to the first character after "${" */
+static gboolean start_is_field_reference(const char *start)
+{
+	const char *end;
+	char saved_c;
+	const header_field_info *hfinfo;
+
+	end = strchr(start, '#');
+	if (end == NULL)
+		end = strchr(start, '}');
+	if (end == NULL)
+		return FALSE;
+
+	saved_c = *end;
+	/* This violates constness but we will restore the original string. */
+	*(char *)end = '\0';
+	/* Search for name in registered fields. */
+	hfinfo = dfilter_resolve_unparsed(NULL, start);
+	/* Restore mangled string. */
+	*(char *)end = saved_c;
+
+	if (hfinfo == NULL)
+		return FALSE;
+
+	if (hfinfo->type == FT_PROTOCOL || hfinfo->type == FT_NONE) {
+		/* Ignore these? */
+		return FALSE;
+	}
+
+	/* It's a field reference so ignore it as a macro. */
+	ws_noisy("Ignore field reference ${%s}", start);
+	return TRUE;
+}
 
 static gchar* dfilter_macro_apply_recurse(const gchar* text, guint depth, gchar** error) {
 	enum { OUTSIDE, STARTING, NAME, ARGS } state = OUTSIDE;
@@ -202,6 +181,14 @@ static gchar* dfilter_macro_apply_recurse(const gchar* text, guint depth, gchar*
 			} case STARTING: {
 				switch (c) {
 					case '{': {
+						if (start_is_field_reference(r)) {
+							/* We have a field reference, preserve the name with ${} and bail. */
+							g_string_append(out,"${");
+							state = OUTSIDE;
+							break;
+						}
+
+						/* We have a macro, continue. */
 						args = g_ptr_array_new();
 						arg = g_string_sized_new(32);
 						name = g_string_sized_new(32);
@@ -486,7 +473,7 @@ static void* macro_copy(void* dest, const void* orig, size_t len _U_) {
 		 */
 
 		do nparts++; while (m->parts[nparts]);
-		d->parts = (gchar **)g_memdup(m->parts,(nparts+1)*(guint)sizeof(void*));
+		d->parts = (gchar **)g_memdup2(m->parts,(nparts+1)*(guint)sizeof(void*));
 		nparts = 0;
 		while(m->parts[nparts]) {
 			if(nparts) {
@@ -501,7 +488,7 @@ static void* macro_copy(void* dest, const void* orig, size_t len _U_) {
 		 * Clone the contents of m->args_pos into d->args_pos.
 		 */
 
-		d->args_pos = (int *)g_memdup(m->args_pos,(--nparts)*(guint)sizeof(int));
+		d->args_pos = (int *)g_memdup2(m->args_pos,(--nparts)*(guint)sizeof(int));
 	}
 
 	DUMP_MACRO(d);
@@ -535,7 +522,7 @@ static gboolean macro_name_chk(void *mp, const char *in_name, guint name_len,
 			/* This a string field which is always NUL-terminated,
 			 * so no need to check name_len. */
 			if (!g_strcmp0(in_name, macros[i].name)) {
-				*error = g_strdup_printf("macro '%s' already exists",
+				*error = ws_strdup_printf("macro '%s' already exists",
 							 in_name);
 				return FALSE;
 			}
@@ -564,7 +551,7 @@ void dfilter_macro_init(void) {
 				    TRUE,
 				    &macros,
 				    &num_macros,
-				    0, /* doesn't affect anything that requires a GUI update */
+				    UAT_AFFECTS_FIELDS,
 				    "ChDisplayFilterMacrosSection",
 				    macro_copy,
 				    macro_update,
@@ -572,8 +559,6 @@ void dfilter_macro_init(void) {
 				    NULL, /* Note: This is set in macros_init () */
 				    NULL,
 				    uat_fields);
-
-	fvt_cache = g_hash_table_new_full(g_str_hash,g_str_equal, NULL, dfilter_free_fvt_entry);
 }
 
 void dfilter_macro_get_uat(uat_t **dfmu_ptr_ptr) {
@@ -608,76 +593,75 @@ void dfilter_macro_get_uat(uat_t **dfmu_ptr_ptr) {
 
 void dump_dfilter_macro_t(const dfilter_macro_t *m, const char *function, const char *file, int line)
 {
-	ws_debug_printf("\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
+	printf("\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
 
 	if(m == NULL) {
-		ws_debug_printf("  dfilter_macro_t * == NULL! (via: %s(): %s:%d)\n", function, file, line);
-		ws_debug_printf("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+		printf("  dfilter_macro_t * == NULL! (via: %s(): %s:%d)\n", function, file, line);
+		printf("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
 		return;
 	}
 
-	ws_debug_printf("DUMP of dfilter_macro_t: %p (via: %s(): %s:%d)\n", m, function, file, line);
+	printf("DUMP of dfilter_macro_t: %p (via: %s(): %s:%d)\n", m, function, file, line);
 
-	ws_debug_printf("  &dfilter_macro->name     == %p\n", &m->name);
+	printf("  &dfilter_macro->name     == %p\n", &m->name);
 	if(m->name == NULL) {
-		ws_debug_printf("                ->name     == NULL\n");
+		printf("                ->name     == NULL\n");
 	} else {
-		ws_debug_printf("                ->name     == %p\n", m->name);
-		ws_debug_printf("                ->name     == <%s>\n", m->name);
+		printf("                ->name     == %p\n", m->name);
+		printf("                ->name     == <%s>\n", m->name);
 	}
 
-	ws_debug_printf("  &dfilter_macro->text     == %p\n", &m->text);
+	printf("  &dfilter_macro->text     == %p\n", &m->text);
 	if(m->text == NULL) {
-		ws_debug_printf("                ->text     == NULL\n");
+		printf("                ->text     == NULL\n");
 	} else {
-		ws_debug_printf("                ->text     == %p\n", m->text);
-		ws_debug_printf("                ->text     == <%s>\n", m->text);
+		printf("                ->text     == %p\n", m->text);
+		printf("                ->text     == <%s>\n", m->text);
 	}
 
-	ws_debug_printf("  &dfilter_macro->usable   == %p\n", &m->usable);
-	ws_debug_printf("                ->usable   == %u\n", m->usable);
+	printf("  &dfilter_macro->usable   == %p\n", &m->usable);
+	printf("                ->usable   == %u\n", m->usable);
 
-	ws_debug_printf("  &dfilter_macro->parts    == %p\n", &m->parts);
+	printf("  &dfilter_macro->parts    == %p\n", &m->parts);
 
 	if(m->parts == NULL) {
-		ws_debug_printf("                ->parts    == NULL\n");
+		printf("                ->parts    == NULL\n");
 	} else {
 		int i = 0;
 
 		while (m->parts[i]) {
-			ws_debug_printf("                ->parts[%d] == %p\n", i, m->parts[i]);
-			ws_debug_printf("                ->parts[%d] == <%s>\n", i, m->parts[i]);
+			printf("                ->parts[%d] == %p\n", i, m->parts[i]);
+			printf("                ->parts[%d] == <%s>\n", i, m->parts[i]);
 			i++;
 		}
-		ws_debug_printf("                ->parts[%d] == NULL\n", i);
+		printf("                ->parts[%d] == NULL\n", i);
 	}
 
-	ws_debug_printf("  &dfilter_macro->args_pos == %p\n", &m->args_pos);
+	printf("  &dfilter_macro->args_pos == %p\n", &m->args_pos);
 	if(m->args_pos == NULL) {
-		ws_debug_printf("                ->args_pos == NULL\n");
+		printf("                ->args_pos == NULL\n");
 	} else {
-		ws_debug_printf("                ->args_pos == %p\n", m->args_pos);
-		/*ws_debug_printf("                ->args_pos == <%?>\n", m->args_pos);*/
+		printf("                ->args_pos == %p\n", m->args_pos);
+		/*printf("                ->args_pos == <%?>\n", m->args_pos);*/
 	}
 
-	ws_debug_printf("  &dfilter_macro->argc     == %p\n", &m->argc);
-	ws_debug_printf("                ->argc     == %d\n", m->argc);
+	printf("  &dfilter_macro->argc     == %p\n", &m->argc);
+	printf("                ->argc     == %d\n", m->argc);
 
-	ws_debug_printf("  &dfilter_macro->priv     == %p\n", &m->priv);
+	printf("  &dfilter_macro->priv     == %p\n", &m->priv);
 	if(m->priv == NULL) {
-		ws_debug_printf("                ->priv     == NULL\n");
+		printf("                ->priv     == NULL\n");
 	} else {
-		ws_debug_printf("                ->priv     == %p\n", m->priv);
-		ws_debug_printf("                ->priv     == <%s>\n", (char *)m->priv);
+		printf("                ->priv     == %p\n", m->priv);
+		printf("                ->priv     == <%s>\n", (char *)m->priv);
 	}
 
-	ws_debug_printf("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+	printf("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
 }
 #endif
 
 void dfilter_macro_cleanup(void)
 {
-	g_hash_table_destroy(fvt_cache);
 }
 
 /*

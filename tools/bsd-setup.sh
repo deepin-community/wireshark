@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 # Setup development environment on BSD-like platforms.
 #
 # Tested on: FreeBSD, OpenBSD, NetBSD.
@@ -12,16 +12,34 @@
 # We drag in tools that might not be needed by all users; it's easier
 # that way.
 #
+# We do not use Bash as the shell for this script, and use the POSIX
+# syntax for function definition rather than the
+# "function <name>() { ... }" syntax, as FreeBSD 13, at least, does
+# not have Bash, and its /bin/sh doesn't support the other syntax.
+#
 
-if [ "$1" = "--help" ]
-then
+print_usage() {
 	echo "\nUtility to setup a bsd-based system for Wireshark Development.\n"
 	echo "The basic usage installs the needed software\n\n"
 	echo "Usage: $0 [--install-optional] [...other options...]\n"
 	echo "\t--install-optional: install optional software as well"
 	echo "\t[other]: other options are passed as-is to pkg manager.\n"
-	exit 1
-fi
+}
+
+OPTIONS=
+for op
+do
+	if [ "$op" = "--install-optional" ]
+	then
+		ADDITIONAL=1
+	elif [ "$op" = "--help" ]
+	then
+		print_usage
+		exit 0
+	else
+		OPTIONS="$OPTIONS $op"
+	fi
+done
 
 # Check if the user is root
 if [ $(id -u) -ne 0 ]
@@ -30,20 +48,11 @@ then
 	exit 1
 fi
 
-for op
-do
-	if [ "$op" = "--install-optional" ]
-	then
-		ADDITIONAL=1
-	else
-		OPTIONS="$OPTIONS $op"
-	fi
-done
-
 BASIC_LIST="\
 	cmake \
 	qt5 \
-	git"
+	git \
+	pcre2"
 
 ADDITIONAL_LIST="\
 	gettext-tools \
@@ -57,6 +66,12 @@ ADDITIONAL_LIST="\
 	zstd \
 	lua52 \
 	"
+
+# Uncomment to add PNG compression utilities used by compress-pngs:
+# ADDITIONAL_LIST="$ADDITIONAL_LIST \
+#	advancecomp \
+#	optipng \
+#	pngcrush"
 
 # Guess which package manager we will use
 PM=`which pkgin 2> /dev/null || which pkg 2> /dev/null || which pkg_add 2> /dev/null`
@@ -152,9 +167,6 @@ echo "libilbc is unavailable"
 # Add OS-specific required/optional packages
 # Those not listed don't require additions.
 case `uname` in
-	OpenBSD)
-		add_package ADDITIONAL_LIST bison || echo "bison is unavailable"
-		;;
 	NetBSD)
 		add_package ADDITIONAL_LIST libgcrypt || echo "libgcrypt is unavailable"
 		;;

@@ -17,7 +17,7 @@
 #include "file.h"
 
 #include <ui/qt/utils/qt_ui_utils.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 
 #include <QClipboard>
 #include <QMessageBox>
@@ -332,8 +332,7 @@ LBMStreamDialog::LBMStreamDialog(QWidget * parent, capture_file * cfile) :
 {
     m_ui->setupUi(this);
     m_dialog_info = new LBMStreamDialogInfo();
-    connect(this, SIGNAL(accepted()), this, SLOT(closeDialog()));
-    connect(this, SIGNAL(rejected()), this, SLOT(closeDialog()));
+    setAttribute(Qt::WA_DeleteOnClose, true);
     fillTree();
 }
 
@@ -399,7 +398,7 @@ void LBMStreamDialog::resetTap(void * tap_data)
     dialog->m_ui->lbm_stream_TreeWidget->clear();
 }
 
-tap_packet_status LBMStreamDialog::tapPacket(void * tap_data, packet_info * pinfo, epan_dissect_t *, const void * stream_info)
+tap_packet_status LBMStreamDialog::tapPacket(void * tap_data, packet_info * pinfo, epan_dissect_t *, const void * stream_info, tap_flags_t)
 {
     if (pinfo->fd->passed_dfilter == 1)
     {
@@ -419,21 +418,3 @@ void LBMStreamDialog::on_applyFilterButton_clicked(void)
 {
     fillTree();
 }
-
-void LBMStreamDialog::closeDialog(void)
-{
-    delete this;
-}
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

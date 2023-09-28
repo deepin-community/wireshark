@@ -506,6 +506,8 @@ static gint default_protocol_version;
 
 static dissector_handle_t mqtt_handle;
 
+static heur_dissector_list_t mqtt_topic_subdissector;
+
 /* Initialize the protocol and registered fields */
 static int proto_mqtt = -1;
 
@@ -658,7 +660,7 @@ static gboolean mqtt_message_decode_update_cb(void *record, char **error)
     u->topic_regex = g_regex_new(u->topic_pattern, (GRegexCompileFlags) G_REGEX_OPTIMIZE, (GRegexMatchFlags) 0, NULL);
     if (!u->topic_regex)
     {
-      *error = g_strdup_printf("Invalid regex: %s", u->topic_pattern);
+      *error = ws_strdup_printf("Invalid regex: %s", u->topic_pattern);
       return FALSE;
     }
   }
@@ -683,7 +685,7 @@ UAT_CSTRING_CB_DEF(message_decode, topic_pattern, mqtt_message_decode_t)
 UAT_VS_DEF(message_decode, msg_decoding, mqtt_message_decode_t, guint, MSG_DECODING_NONE, "none")
 UAT_PROTO_DEF(message_decode, payload_proto, payload_proto, payload_proto_name, mqtt_message_decode_t)
 
-static void mqtt_user_decode_message(proto_tree *tree, proto_tree *mqtt_tree, packet_info *pinfo, const guint8 *topic_str, tvbuff_t *msg_tvb)
+static gboolean mqtt_user_decode_message(proto_tree *tree, proto_tree *mqtt_tree, packet_info *pinfo, const guint8 *topic_str, tvbuff_t *msg_tvb)
 {
   mqtt_message_decode_t *message_decode_entry = NULL;
   size_t topic_str_len = strlen(topic_str);
@@ -693,7 +695,7 @@ static void mqtt_user_decode_message(proto_tree *tree, proto_tree *mqtt_tree, pa
   if (topic_str_len == 0)
   {
     /* No topic to match */
-    return;
+    return FALSE;
   }
 
   for (guint i = 0; i < num_mqtt_message_decodes && !match_found; i++)
@@ -753,6 +755,8 @@ static void mqtt_user_decode_message(proto_tree *tree, proto_tree *mqtt_tree, pa
       call_dissector(message_decode_entry->payload_proto, msg_tvb, pinfo, tree);
     }
   }
+
+  return match_found;
 }
 
 static guint dissect_string(tvbuff_t *tvb, proto_tree *tree, guint offset, int hf_len, int hf_value)
@@ -895,7 +899,7 @@ static guint dissect_mqtt_properties(tvbuff_t *tvb, proto_tree *mqtt_tree, guint
         break;
 
       default:
-        proto_tree_add_item(mqtt_prop_tree, hf_mqtt_prop_unknown, tvb, offset, bytes_to_read - offset, ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(mqtt_prop_tree, hf_mqtt_prop_unknown, tvb, offset, bytes_to_read - offset, ENC_UTF_8);
         offset += (bytes_to_read - offset);
         break;
     }
@@ -925,6 +929,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
   mqtt_properties_t mqtt_properties = { 0 };
   mqtt_properties_t mqtt_will_properties = { 0 };
   guint       offset = 0;
+  gboolean    msg_handled = FALSE;
 
   static int * const publish_fields[] = {
     &hf_mqtt_msg_type,
@@ -1036,7 +1041,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
       proto_tree_add_item_ret_uint(mqtt_tree, hf_mqtt_proto_len, tvb, offset, 2, ENC_BIG_ENDIAN, &mqtt_str_len);
       offset += 2;
 
-      proto_tree_add_item(mqtt_tree, hf_mqtt_proto_name, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA);
+      proto_tree_add_item(mqtt_tree, hf_mqtt_proto_name, tvb, offset, mqtt_str_len, ENC_UTF_8);
       offset += mqtt_str_len;
 
       mqtt->runtime_proto_version = tvb_get_guint8(tvb, offset);
@@ -1059,7 +1064,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
       proto_tree_add_item_ret_uint(mqtt_tree, hf_mqtt_client_id_len, tvb, offset, 2, ENC_BIG_ENDIAN, &mqtt_str_len);
       offset += 2;
 
-      proto_tree_add_item(mqtt_tree, hf_mqtt_client_id, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA);
+      proto_tree_add_item(mqtt_tree, hf_mqtt_client_id, tvb, offset, mqtt_str_len, ENC_UTF_8);
       offset += mqtt_str_len;
 
       if (mqtt_con_flags & MQTT_CONMASK_WILLFLAG)
@@ -1074,7 +1079,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
         if (mqtt_str_len > 0)
         {
-          proto_tree_add_item(mqtt_tree, hf_mqtt_will_topic, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA);
+          proto_tree_add_item(mqtt_tree, hf_mqtt_will_topic, tvb, offset, mqtt_str_len, ENC_UTF_8);
           offset += mqtt_str_len;
         }
         else
@@ -1087,7 +1092,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
         if (show_msg_as_text)
         {
-          proto_tree_add_item(mqtt_tree, hf_mqtt_will_msg_text, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA);
+          proto_tree_add_item(mqtt_tree, hf_mqtt_will_msg_text, tvb, offset, mqtt_str_len, ENC_UTF_8);
         }
         else
         {
@@ -1101,7 +1106,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
         proto_tree_add_item_ret_uint(mqtt_tree, hf_mqtt_username_len, tvb, offset, 2, ENC_BIG_ENDIAN, &mqtt_str_len);
         offset += 2;
 
-        proto_tree_add_item(mqtt_tree, hf_mqtt_username, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(mqtt_tree, hf_mqtt_username, tvb, offset, mqtt_str_len, ENC_UTF_8);
         offset += mqtt_str_len;
       }
 
@@ -1110,7 +1115,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
         proto_tree_add_item_ret_uint(mqtt_tree, hf_mqtt_passwd_len, tvb, offset, 2, ENC_BIG_ENDIAN, &mqtt_str_len);
         offset += 2;
 
-        proto_tree_add_item(mqtt_tree, hf_mqtt_passwd, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(mqtt_tree, hf_mqtt_passwd, tvb, offset, mqtt_str_len, ENC_UTF_8);
       }
       break;
 
@@ -1186,7 +1191,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
             }
 
             ti = proto_tree_add_string(mqtt_tree, hf_mqtt_topic, tvb, offset, 0, topic_str);
-            PROTO_ITEM_SET_GENERATED(ti);
+            proto_item_set_generated(ti);
 
             if (topic == NULL)
             {
@@ -1206,7 +1211,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
       mqtt_payload_len = tvb_reported_length(tvb) - offset;
       if (show_msg_as_text)
       {
-        proto_tree_add_item(mqtt_tree, hf_mqtt_pubmsg_text, tvb, offset, mqtt_payload_len, ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(mqtt_tree, hf_mqtt_pubmsg_text, tvb, offset, mqtt_payload_len, ENC_UTF_8);
       }
       else
       {
@@ -1216,14 +1221,24 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
       if (num_mqtt_message_decodes > 0)
       {
         tvbuff_t *msg_tvb = tvb_new_subset_length(tvb, offset, mqtt_payload_len);
-        mqtt_user_decode_message(tree, mqtt_tree, pinfo, topic_str, msg_tvb);
+        msg_handled = mqtt_user_decode_message(tree, mqtt_tree, pinfo, topic_str, msg_tvb);
       }
 
       if (mqtt_properties.content_type)
       {
         tvbuff_t *msg_tvb = tvb_new_subset_length(tvb, offset, mqtt_payload_len);
-        dissector_try_string(media_type_dissector_table, mqtt_properties.content_type,
-                             msg_tvb, pinfo, tree, NULL);
+        int bytes_read = dissector_try_string(media_type_dissector_table, mqtt_properties.content_type,
+                                              msg_tvb, pinfo, tree, NULL);
+
+        msg_handled = msg_handled | (bytes_read != 0);
+      }
+
+      /* No UAT or content property match, try the heuristic dissectors, pass the topic string as data */
+      if (!msg_handled) {
+        heur_dtbl_entry_t *hdtbl_entry;
+        tvbuff_t *msg_tvb = tvb_new_subset_length(tvb, offset, mqtt_payload_len);
+        gchar *sub_data = wmem_strdup(wmem_packet_scope(), (const gchar*)topic_str);
+        dissector_try_heuristic(mqtt_topic_subdissector, msg_tvb, pinfo, tree, &hdtbl_entry, sub_data);
       }
       break;
 
@@ -1293,7 +1308,7 @@ static int dissect_mqtt(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
         if (mqtt_str_len > 0)
         {
-          proto_tree_add_item(mqtt_tree, hf_mqtt_topic, tvb, offset, mqtt_str_len, ENC_UTF_8|ENC_NA);
+          proto_tree_add_item(mqtt_tree, hf_mqtt_topic, tvb, offset, mqtt_str_len, ENC_UTF_8);
           offset += mqtt_str_len;
         }
         else
@@ -1805,6 +1820,8 @@ void proto_register_mqtt(void)
 
   proto_register_field_array(proto_mqtt, hf_mqtt, array_length(hf_mqtt));
   proto_register_subtree_array(ett_mqtt, array_length(ett_mqtt));
+
+  mqtt_topic_subdissector = register_heur_dissector_list("mqtt.topic", proto_mqtt);
 
   expert_mqtt = expert_register_protocol(proto_mqtt);
   expert_register_field_array(expert_mqtt, ei, array_length(ei));

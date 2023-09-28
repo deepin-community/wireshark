@@ -11,6 +11,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN LOG_DOMAIN_EXTCAP
 
 #include "extcap-base.h"
 
@@ -18,14 +19,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <wsutil/wslog.h>
 
-#ifdef HAVE_GETOPT_H
-    #include <getopt.h>
-#endif
+#include <wsutil/ws_assert.h>
 
-#ifndef HAVE_GETOPT_LONG
-    #include "wsutil/wsgetopt.h"
-#endif
 #include "ws_attributes.h"
 
 enum extcap_options {
@@ -47,7 +44,9 @@ typedef struct _extcap_option {
     char * optdesc;
 } extcap_option_t;
 
-FILE* custom_log = NULL;
+static FILE *custom_log = NULL;
+
+static void extcap_init_log_file(const char *filename);
 
 void extcap_base_register_interface(extcap_parameters * extcap, const char * interface, const char * ifdescription, uint16_t dlt, const char * dltdescription )
 {
@@ -79,11 +78,11 @@ void extcap_base_set_util_info(extcap_parameters * extcap, const char * exename,
 {
     extcap->exename = g_path_get_basename(exename);
 
-    g_assert(major);
+    ws_assert(major);
     if (!minor)
-        g_assert(!release);
+        ws_assert(!release);
 
-    extcap->version = g_strdup_printf("%s%s%s%s%s",
+    extcap->version = ws_strdup_printf("%s%s%s%s%s",
         major,
         minor ? "." : "",
         minor ? minor : "",
@@ -97,7 +96,7 @@ void extcap_base_set_compiled_with(extcap_parameters * extcap, const char *fmt, 
     va_list ap;
 
     va_start(ap, fmt);
-    extcap->compiled_with = g_strdup_vprintf(fmt, ap);
+    extcap->compiled_with = ws_strdup_vprintf(fmt, ap);
     va_end(ap);
 }
 
@@ -106,41 +105,35 @@ void extcap_base_set_running_with(extcap_parameters * extcap, const char *fmt, .
     va_list ap;
 
     va_start(ap, fmt);
-    extcap->running_with = g_strdup_vprintf(fmt, ap);
+    extcap->running_with = ws_strdup_vprintf(fmt, ap);
     va_end(ap);
 }
 
-static void extcap_custom_log(const gchar *log_domain,
-             GLogLevelFlags log_level,
-             const gchar *message,
-             gpointer user_data)
+void extcap_log_init(const char *progname)
 {
-    if (log_level & G_LOG_LEVEL_DEBUG) {
-        if (!custom_log)
-            return;
-        fprintf(custom_log, "%s\n", message);
-        fflush(custom_log);
-    } else {
-        g_log_default_handler(log_domain, log_level, message, user_data);
-    }
+    ws_log_init(progname, NULL);
+    /* extcaps cannot write debug information to parent on stderr. */
+    ws_log_console_writer_set_use_stdout(TRUE);
 }
 
 uint8_t extcap_base_parse_options(extcap_parameters * extcap, int result, char * optargument)
 {
     uint8_t ret = 1;
+    enum ws_log_level level;
 
     switch (result) {
-        case EXTCAP_OPT_DEBUG:
-#ifdef _WIN32
-            _putenv_s("G_MESSAGES_DEBUG", "all");
-#else
-            setenv("G_MESSAGES_DEBUG", "all", 1);
-#endif
-            extcap->debug = TRUE;
+        case EXTCAP_OPT_LOG_LEVEL:
+            level = ws_log_set_level_str(optargument);
+            if (level == LOG_LEVEL_NONE) {
+                /* Invalid log level string. */
+                ret = 0;
+            }
+            else if (level <= LOG_LEVEL_DEBUG) {
+                extcap->debug = TRUE;
+            }
             break;
-        case EXTCAP_OPT_DEBUG_FILE:
-            extcap_init_custom_log(optargument);
-            g_log_set_default_handler(extcap_custom_log, NULL);
+        case EXTCAP_OPT_LOG_FILE:
+            extcap_init_log_file(optargument);
             break;
         case EXTCAP_OPT_LIST_INTERFACES:
             extcap->do_list_interfaces = 1;
@@ -231,7 +224,7 @@ uint8_t extcap_base_handle_interface(extcap_parameters * extcap)
     /* A fifo must be provided for capture */
     if (extcap->capture && (extcap->fifo == NULL || strlen(extcap->fifo) <= 0)) {
         extcap->capture = 0;
-        g_error("Extcap Error: No FIFO pipe provided");
+        ws_error("Extcap Error: No FIFO pipe provided");
         return 0;
     }
 
@@ -325,26 +318,32 @@ void extcap_help_add_header(extcap_parameters * extcap, char * help_header)
     extcap_help_add_option(extcap, "--extcap-capture-filter <filter>", "the capture filter");
     extcap_help_add_option(extcap, "--fifo <file>", "dump data to file or fifo");
     extcap_help_add_option(extcap, "--extcap-version", "print tool version");
-    extcap_help_add_option(extcap, "--debug", "print additional messages");
-    extcap_help_add_option(extcap, "--debug-file", "print debug messages to file");
+    extcap_help_add_option(extcap, "--log-level", "Set the log level");
+    extcap_help_add_option(extcap, "--log-file", "Set a log file to log messages in addition to the console");
 }
 
-void extcap_init_custom_log(const char* filename)
+static void extcap_init_log_file(const char* filename)
 {
     if (!filename || strlen(filename) == 0)
-        return;
+        ws_error("Missing log file name");
     custom_log = fopen(filename, "w");
     if (!custom_log)
-        g_error("Can't open custom log file: %s (%s)", filename, strerror(errno));
+        ws_error("Can't open custom log file: %s (%s)", filename, strerror(errno));
+    ws_log_add_custom_file(custom_log);
 }
 
 void extcap_config_debug(unsigned* count)
 {
-    printf("arg {number=%u}{call=--debug}{display=Run in debug mode}"
-    "{type=boolflag}{default=false}{tooltip=Print debug messages}{required=false}"
-    "{group=Debug}\n", (*count)++);
-    printf("arg {number=%u}{call=--debug-file}{display=Use a file for debug}"
-    "{type=string}{tooltip=Set a file where the debug messages are written}{required=false}"
+    printf("arg {number=%u}{call=--log-level}{display=Set the log level}"
+    "{type=selector}{tooltip=Set the log level}{required=false}"
+    "{group=Debug}\n", *count);
+    printf("value {arg=%u}{value=message}{display=Message}{default=true}\n", *count);
+    printf("value {arg=%u}{value=info}{display=Info}\n", *count);
+    printf("value {arg=%u}{value=debug}{display=Debug}\n", *count);
+    printf("value {arg=%u}{value=noisy}{display=Noisy}\n", *count);
+    (*count)++;
+    printf("arg {number=%u}{call=--log-file}{display=Use a file for logging}"
+    "{type=fileselect}{tooltip=Set a file where log messages are written}{required=false}"
     "{group=Debug}\n", (*count)++);
 }
 
@@ -354,7 +353,7 @@ void extcap_cmdline_debug(char** ar, const unsigned n)
     unsigned i;
     for (i = 0; i < n; i++)
         g_string_append_printf(cmdline, "%s ", ar[i]);
-    g_debug("%s", cmdline->str);
+    ws_debug("%s", cmdline->str);
     g_string_free(cmdline, TRUE);
 }
 

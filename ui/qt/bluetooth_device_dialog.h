@@ -1,4 +1,4 @@
-/* bluetooth_device_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -67,6 +67,7 @@ signals:
 
 protected:
     void keyPressEvent(QKeyEvent *event);
+    void captureFileClosing();
 
 protected slots:
     void changeEvent(QEvent* event);
@@ -79,12 +80,11 @@ private:
     guint        changes_;
 
     static void     tapReset(void *tapinfo_ptr);
-    static tap_packet_status tapPacket(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *, const void *data);
+    static tap_packet_status tapPacket(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *, const void *data, tap_flags_t flags);
     static void updateChanges(QTableWidget *tableWidget, QString value, const int row, guint *changes, packet_info *pinfo);
     static void saveItemData(QTableWidgetItem *item, bluetooth_device_tap_t *tap_device, packet_info *pinfo);
 
 private slots:
-    void captureFileClosing();
     void setTitle(QString bdAddr, QString name);
     void on_tableWidget_itemActivated(QTableWidgetItem *item);
     void on_buttonBox_clicked(QAbstractButton *button);
@@ -100,16 +100,3 @@ private slots:
 };
 
 #endif // BLUETOOTH_DEVICE_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

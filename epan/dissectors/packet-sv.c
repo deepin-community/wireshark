@@ -24,6 +24,7 @@
 #include <epan/etypes.h>
 #include <epan/expert.h>
 #include <epan/prefs.h>
+#include <epan/addr_resolv.h>
 
 #include "packet-ber.h"
 #include "packet-acse.h"
@@ -61,6 +62,10 @@
 /* see UCA Implementation Guideline for IEC 61850-9-2 */
 #define Q_DERIVED			(1U << 13)
 
+/* Bit fields in the Reserved attributes */
+#define F_RESERVE1_S_BIT  0x8000
+
+
 void proto_register_sv(void);
 void proto_reg_handoff_sv(void);
 
@@ -73,6 +78,7 @@ static int proto_sv = -1;
 static int hf_sv_appid = -1;
 static int hf_sv_length = -1;
 static int hf_sv_reserve1 = -1;
+static int hf_sv_reserve1_s_bit = -1;
 static int hf_sv_reserve2 = -1;
 static int hf_sv_phmeas_instmag_i = -1;
 static int hf_sv_phsmeas_q = -1;
@@ -89,6 +95,8 @@ static int hf_sv_phsmeas_q_source = -1;
 static int hf_sv_phsmeas_q_test = -1;
 static int hf_sv_phsmeas_q_operatorblocked = -1;
 static int hf_sv_phsmeas_q_derived = -1;
+static int hf_sv_gmidentity = -1;
+static int hf_sv_gmidentity_manuf = -1;
 
 
 /*--- Included file: packet-sv-hf.c ---*/
@@ -100,20 +108,24 @@ static int hf_sv_seqASDU_item = -1;               /* ASDU */
 static int hf_sv_svID = -1;                       /* VisibleString */
 static int hf_sv_datSet = -1;                     /* VisibleString */
 static int hf_sv_smpCnt = -1;                     /* T_smpCnt */
-static int hf_sv_confRef = -1;                    /* INTEGER_0_4294967295 */
+static int hf_sv_confRev = -1;                    /* INTEGER_0_4294967295 */
 static int hf_sv_refrTm = -1;                     /* UtcTime */
 static int hf_sv_smpSynch = -1;                   /* T_smpSynch */
 static int hf_sv_smpRate = -1;                    /* INTEGER_0_65535 */
 static int hf_sv_seqData = -1;                    /* Data */
 static int hf_sv_smpMod = -1;                     /* T_smpMod */
+static int hf_sv_gmidData = -1;                   /* GmidData */
 
 /*--- End of included file: packet-sv-hf.c ---*/
-#line 86 "./asn1/sv/packet-sv-template.c"
+#line 94 "./asn1/sv/packet-sv-template.c"
 
 /* Initialize the subtree pointers */
 static int ett_sv = -1;
 static int ett_phsmeas = -1;
 static int ett_phsmeas_q = -1;
+static int ett_gmidentity = -1;
+static int ett_reserve1 = -1;
+
 
 
 /*--- Included file: packet-sv-ett.c ---*/
@@ -124,10 +136,11 @@ static gint ett_sv_SEQUENCE_OF_ASDU = -1;
 static gint ett_sv_ASDU = -1;
 
 /*--- End of included file: packet-sv-ett.c ---*/
-#line 93 "./asn1/sv/packet-sv-template.c"
+#line 104 "./asn1/sv/packet-sv-template.c"
 
 static expert_field ei_sv_mal_utctime = EI_INIT;
 static expert_field ei_sv_zero_pdu = EI_INIT;
+static expert_field ei_sv_mal_gmidentity = EI_INIT;
 
 static gboolean sv_decode_data_as_phsmeas = FALSE;
 
@@ -287,7 +300,7 @@ dissect_sv_UtcTime(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_,
 	ts.secs = seconds;
 	ts.nsecs = nanoseconds;
 
-	ptime = abs_time_to_str(wmem_packet_scope(), &ts, ABSOLUTE_TIME_UTC, TRUE);
+	ptime = abs_time_to_str(actx->pinfo->pool, &ts, ABSOLUTE_TIME_UTC, TRUE);
 
 	if(hf_index >= 0)
 	{
@@ -360,16 +373,56 @@ dissect_sv_T_smpMod(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_
 }
 
 
+
+static int
+dissect_sv_GmidData(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+#line 85 "./asn1/sv/sv.cnf"
+	guint32 len;
+	proto_item  *gmidentity_ti;
+	proto_tree  *gmidentity_tree;
+	const gchar *manuf_name;
+
+	len = tvb_reported_length_remaining(tvb, offset);
+
+	if(len != 8)
+	{
+		proto_tree_add_expert_format(tree, actx->pinfo, &ei_sv_mal_gmidentity, tvb, offset, len,
+				"BER Error: malformed gmIdentity encoding, length must be 8 bytes");
+		if(hf_index >= 0)
+		{
+			proto_tree_add_string(tree, hf_index, tvb, offset, len, "????");
+		}
+		return offset;
+	}
+
+	gmidentity_ti = proto_tree_add_item(tree, hf_sv_gmidentity, tvb, offset, 8, ENC_BIG_ENDIAN);
+
+	/* EUI-64: vendor ID | 0xFF - 0xFE | card ID */
+	if (tvb_get_ntohs(tvb, offset + 3) == 0xFFFE) {
+		gmidentity_tree = proto_item_add_subtree(gmidentity_ti, ett_gmidentity);
+
+		manuf_name = tvb_get_manuf_name(tvb, offset);
+		proto_tree_add_bytes_format_value(gmidentity_tree, hf_sv_gmidentity_manuf, tvb, offset, 3, NULL, "%s", manuf_name);
+	}
+
+	offset += 8;
+
+
+  return offset;
+}
+
+
 static const ber_sequence_t ASDU_sequence[] = {
   { &hf_sv_svID             , BER_CLASS_CON, 0, BER_FLAGS_IMPLTAG, dissect_sv_VisibleString },
   { &hf_sv_datSet           , BER_CLASS_CON, 1, BER_FLAGS_OPTIONAL|BER_FLAGS_IMPLTAG, dissect_sv_VisibleString },
   { &hf_sv_smpCnt           , BER_CLASS_CON, 2, BER_FLAGS_IMPLTAG, dissect_sv_T_smpCnt },
-  { &hf_sv_confRef          , BER_CLASS_CON, 3, BER_FLAGS_IMPLTAG, dissect_sv_INTEGER_0_4294967295 },
+  { &hf_sv_confRev          , BER_CLASS_CON, 3, BER_FLAGS_IMPLTAG, dissect_sv_INTEGER_0_4294967295 },
   { &hf_sv_refrTm           , BER_CLASS_CON, 4, BER_FLAGS_OPTIONAL|BER_FLAGS_IMPLTAG, dissect_sv_UtcTime },
   { &hf_sv_smpSynch         , BER_CLASS_CON, 5, BER_FLAGS_OPTIONAL|BER_FLAGS_IMPLTAG, dissect_sv_T_smpSynch },
   { &hf_sv_smpRate          , BER_CLASS_CON, 6, BER_FLAGS_OPTIONAL|BER_FLAGS_IMPLTAG, dissect_sv_INTEGER_0_65535 },
   { &hf_sv_seqData          , BER_CLASS_CON, 7, BER_FLAGS_IMPLTAG, dissect_sv_Data },
   { &hf_sv_smpMod           , BER_CLASS_CON, 8, BER_FLAGS_OPTIONAL|BER_FLAGS_IMPLTAG, dissect_sv_T_smpMod },
+  { &hf_sv_gmidData         , BER_CLASS_CON, 9, BER_FLAGS_OPTIONAL|BER_FLAGS_IMPLTAG, dissect_sv_GmidData },
   { NULL, 0, 0, 0, NULL }
 };
 
@@ -426,7 +479,7 @@ dissect_sv_SampledValues(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offse
 
 
 /*--- End of included file: packet-sv-fn.c ---*/
-#line 175 "./asn1/sv/packet-sv-template.c"
+#line 187 "./asn1/sv/packet-sv-template.c"
 
 /*
 * Dissect SV PDUs inside a PPDU.
@@ -439,6 +492,12 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* dat
 	guint sv_length = 0;
 	proto_item *item;
 	proto_tree *tree;
+
+	static int * const reserve1_flags[] = {
+		&hf_sv_reserve1_s_bit,
+		NULL
+	};
+
 	asn1_ctx_t asn1_ctx;
 
 	asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
@@ -456,13 +515,16 @@ dissect_sv(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* dat
 	proto_tree_add_item_ret_uint(tree, hf_sv_length, tvb, offset + 2, 2, ENC_BIG_ENDIAN, &sv_length);
 
 	/* Reserved 1 */
-	proto_tree_add_item(tree, hf_sv_reserve1, tvb, offset + 4, 2, ENC_BIG_ENDIAN);
+	proto_tree_add_bitmask(tree, tvb, offset + 4, hf_sv_reserve1, ett_reserve1,
+						reserve1_flags, ENC_BIG_ENDIAN);
+
 
 	/* Reserved 2 */
 	proto_tree_add_item(tree, hf_sv_reserve2, tvb, offset + 6, 2, ENC_BIG_ENDIAN);
 
 	offset = 8;
-	while ((tvb_reported_length_remaining(tvb, offset) > 0) && ((guint)offset < sv_length)) {
+	set_actual_length(tvb, sv_length);
+	while (tvb_reported_length_remaining(tvb, offset) > 0) {
 		old_offset = offset;
 		offset = dissect_sv_SampledValues(FALSE, tvb, offset, &asn1_ctx , tree, -1);
 		if (offset == old_offset) {
@@ -489,6 +551,10 @@ void proto_register_sv(void) {
 
 		{ &hf_sv_reserve1,
 		{ "Reserved 1",	"sv.reserve1", FT_UINT16, BASE_HEX_DEC, NULL, 0x0, NULL, HFILL }},
+
+		{ &hf_sv_reserve1_s_bit,
+		{ "Simulated",	"sv.reserve1.s_bit",
+		  FT_BOOLEAN, 16, NULL, F_RESERVE1_S_BIT, NULL, HFILL } },
 
 		{ &hf_sv_reserve2,
 		{ "Reserved 2",	"sv.reserve2", FT_UINT16, BASE_HEX_DEC, NULL, 0x0, NULL, HFILL }},
@@ -530,13 +596,19 @@ void proto_register_sv(void) {
 		{ "source", "sv.meas_quality.source", FT_UINT32, BASE_HEX, VALS(sv_q_source_vals), Q_SOURCE_MASK, NULL, HFILL}},
 
 		{ &hf_sv_phsmeas_q_test,
-		{ "test", "sv.meas_quality.teset", FT_BOOLEAN, 32, NULL, Q_TEST, NULL, HFILL}},
+		{ "test", "sv.meas_quality.test", FT_BOOLEAN, 32, NULL, Q_TEST, NULL, HFILL}},
 
 		{ &hf_sv_phsmeas_q_operatorblocked,
 		{ "operator blocked", "sv.meas_quality.operatorblocked", FT_BOOLEAN, 32, NULL, Q_OPERATORBLOCKED, NULL, HFILL}},
 
 		{ &hf_sv_phsmeas_q_derived,
 		{ "derived", "sv.meas_quality.derived", FT_BOOLEAN, 32, NULL, Q_DERIVED, NULL, HFILL}},
+
+		{ &hf_sv_gmidentity,
+		{ "gmIdentity", "sv.gmidentity", FT_UINT64, BASE_HEX, NULL, 0x00, NULL, HFILL}},
+
+		{ &hf_sv_gmidentity_manuf,
+		{ "MAC Vendor", "sv.gmidentity_manuf", FT_BYTES, BASE_NONE, NULL, 0x00, NULL, HFILL}},
 
 
 
@@ -570,8 +642,8 @@ void proto_register_sv(void) {
       { "smpCnt", "sv.smpCnt",
         FT_UINT32, BASE_DEC, NULL, 0,
         NULL, HFILL }},
-    { &hf_sv_confRef,
-      { "confRef", "sv.confRef",
+    { &hf_sv_confRev,
+      { "confRev", "sv.confRev",
         FT_UINT32, BASE_DEC, NULL, 0,
         "INTEGER_0_4294967295", HFILL }},
     { &hf_sv_refrTm,
@@ -594,9 +666,13 @@ void proto_register_sv(void) {
       { "smpMod", "sv.smpMod",
         FT_INT32, BASE_DEC, VALS(sv_T_smpMod_vals), 0,
         NULL, HFILL }},
+    { &hf_sv_gmidData,
+      { "gmidData", "sv.gmidData",
+        FT_BYTES, BASE_NONE, NULL, 0,
+        NULL, HFILL }},
 
 /*--- End of included file: packet-sv-hfarr.c ---*/
-#line 288 "./asn1/sv/packet-sv-template.c"
+#line 319 "./asn1/sv/packet-sv-template.c"
 	};
 
 	/* List of subtrees */
@@ -604,6 +680,8 @@ void proto_register_sv(void) {
 		&ett_sv,
 		&ett_phsmeas,
 		&ett_phsmeas_q,
+		&ett_gmidentity,
+		&ett_reserve1,
 
 /*--- Included file: packet-sv-ettarr.c ---*/
 #line 1 "./asn1/sv/packet-sv-ettarr.c"
@@ -613,12 +691,13 @@ void proto_register_sv(void) {
     &ett_sv_ASDU,
 
 /*--- End of included file: packet-sv-ettarr.c ---*/
-#line 296 "./asn1/sv/packet-sv-template.c"
+#line 329 "./asn1/sv/packet-sv-template.c"
 	};
 
 	static ei_register_info ei[] = {
 		{ &ei_sv_mal_utctime, { "sv.malformed.utctime", PI_MALFORMED, PI_WARN, "BER Error: malformed UTCTime encoding", EXPFILL }},
 		{ &ei_sv_zero_pdu, { "sv.zero_pdu", PI_PROTOCOL, PI_ERROR, "Internal error, zero-byte SV PDU", EXPFILL }},
+		{ &ei_sv_mal_gmidentity, { "sv.malformed.gmidentity", PI_MALFORMED, PI_WARN, "BER Error: malformed gmIdentity encoding", EXPFILL }},
 	};
 
 	expert_module_t* expert_sv;

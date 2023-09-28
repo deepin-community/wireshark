@@ -19,7 +19,7 @@
 
 #include "epan/prefs.h"
 #include "epan/ex-opt.h"
-#include "caputils/capture_ifinfo.h"
+#include "capture/capture_ifinfo.h"
 #include "ui/capture_ui_utils.h"
 #include "ui/capture_globals.h"
 #include "wiretap/wtap.h"
@@ -336,14 +336,14 @@ build_capture_combo_list(GList *if_list, gboolean do_hide)
                 descr = capture_dev_user_descr_find(if_info->name);
                 if (descr != NULL) {
                     /* Yes, we have a user-supplied description; use it. */
-                    if_string = g_strdup_printf("%s: %s", descr, if_info->name);
+                    if_string = ws_strdup_printf("%s: %s", descr, if_info->name);
                     g_free(descr);
                 } else {
                     /* No, we don't have a user-supplied description; did we get
                        one from the OS or libpcap? */
                     if (if_info->vendor_description != NULL) {
                         /* Yes - use it. */
-                        if_string = g_strdup_printf("%s: %s",
+                        if_string = ws_strdup_printf("%s: %s",
                                 if_info->vendor_description,
                                 if_info->name);
                     } else {
@@ -574,16 +574,3 @@ get_iface_list_string(capture_options *capture_opts, guint32 style)
     return iface_list_string;
 }
 #endif /* HAVE_LIBPCAP */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

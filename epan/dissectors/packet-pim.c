@@ -42,6 +42,7 @@ void proto_reg_handoff_pim(void);
 #define PIM_TYPE_STATE_REFRESH 9    /* State Refresh [RFC3973] */
 #define PIM_TYPE_DF_ELECT 10        /* DF Election [RFC5015] */
 #define PIM_TYPE_ECMP_REDIR 11      /* ECMP Redirect [RFC6754] */
+#define PIM_TYPE_PFM 12             /* PIM PFM [RFC8364] */
 
 /* PIM Message hello options */
 
@@ -70,6 +71,11 @@ void proto_reg_handoff_pim(void);
 #define PIM_HELLO_ADDR_LST 65001    /* Address list, old implementation */
 #define PIM_HELLO_RPF_PROXY 65004   /* RPF Proxy Vector (Cisco proprietary) */
 
+/* PIM PFM message */
+
+#define PIM_PFM_GROUP_SOURCE 1 /* Source Group Holdtime [RFC8364] */
+
+
 /* PIM BIDIR DF election messages */
 
 #define PIM_BDIR_DF_OFFER 1
@@ -81,6 +87,9 @@ void proto_reg_handoff_pim(void);
 
 #define PIM_ADDR_ET_NATIVE    0  /* RFC7761 */
 #define PIM_ADDR_ET_NATIVE_JA 1  /* RFC5384 */
+
+#define PIM_TRANSPORT_MODE_MULTICAST 0           /*RFC8059*/
+#define PIM_TRANSPORT_MODE_UNICAST_REPLICATION 1 /*RFC8059*/
 
 #define PIM_JOIN_ATTRIBUTE_TYPE_RPF    0 /* RFC5496 */
 #define PIM_JOIN_ATTRIBUTE_TYPE_MVPN   1 /* RFC6513 */
@@ -116,6 +125,7 @@ static const value_string pimtypevals[] = {
     { PIM_TYPE_STATE_REFRESH, "State-Refresh" },
     { PIM_TYPE_DF_ELECT, "DF election"},
     { PIM_TYPE_ECMP_REDIR, "ECMP redirect" },
+    { PIM_TYPE_PFM, "PFM source discovery"},
     { 0, NULL }
 };
 
@@ -155,11 +165,23 @@ static const value_string pim_opt_vals[] = {
     { 0, NULL }
 };
 
+static const value_string pim_opt_vals1[] = {
+    { PIM_PFM_GROUP_SOURCE,          "Group Source Holdtime TLV" },
+    { 0, NULL }
+};
+
+
+
 static const value_string pim_addr_et_vals[] = {
     { PIM_ADDR_ET_NATIVE,    "Native"},
     { PIM_ADDR_ET_NATIVE_JA, "Native with Join Attribute"},
     { 0, NULL }
 };
+
+static const value_string attribute_transport_mode[] = {
+    {PIM_TRANSPORT_MODE_UNICAST_REPLICATION, "Unicast Replication"},
+    {PIM_TRANSPORT_MODE_MULTICAST, "Multicast"},
+    {0, NULL}};
 
 static const value_string pim_join_attribute_type_vals[] = {
     { PIM_JOIN_ATTRIBUTE_TYPE_RPF,    "RPF Vector TLV"},
@@ -265,6 +287,9 @@ static int hf_pim_addr_af = -1;
 static int hf_pim_addr_et = -1;
 static int hf_pim_unicast_addr_ipv4 = -1;
 static int hf_pim_unicast_addr_ipv6 = -1;
+static int hf_pim_rloc_addr_ipv4 = -1;
+static int hf_pim_rloc_addr_ipv6 = -1;
+static int hf_pim_attribute_transport_mode = -1;
 static int hf_pim_group = -1;
 static int hf_pim_group_addr_flags = -1;
 static int hf_pim_group_addr_flags_b = -1;
@@ -284,6 +309,11 @@ static int hf_pim_source_ja_length = -1;
 static int hf_pim_source_ja_value = -1;
 static int hf_pim_ttl = -1;
 static int hf_pim_interval = -1;
+static int hf_pim_srcount = -1;
+static int hf_pim_srcholdt = -1;
+static int hf_pim_transitivetype = -1;
+static int hf_pim_optiontype1 = -1;
+static int hf_pfm_no_forward_bit = -1;
 
 static gint ett_pim = -1;
 static gint ett_pim_opts = -1;
@@ -649,12 +679,12 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
              * and the group mask the length "mask_len"?
              */
             tigroup = proto_tree_add_ipv4_format(pimopt_tree, hf_pim_group_ip4, tvb, offset, 4,
-                                tvb_get_ipv4(tvb, offset), "Group %d: %s", i, tvb_ip_to_str(tvb, offset));
+                                tvb_get_ipv4(tvb, offset), "Group %d: %s", i, tvb_ip_to_str(pinfo->pool, tvb, offset));
             grouptree = proto_item_add_subtree(tigroup, ett_pim);
             offset += 4;
 
             proto_tree_add_ipv4_format(grouptree, hf_pim_group_mask_ip4, tvb, offset, 4,
-                                tvb_get_ipv4(tvb, offset), "Group %d Mask: %s", i, tvb_ip_to_str(tvb, offset));
+                                tvb_get_ipv4(tvb, offset), "Group %d Mask: %s", i, tvb_ip_to_str(pinfo->pool, tvb, offset));
             offset += 4;
 
             njoin = tvb_get_ntohs(tvb, offset);
@@ -729,11 +759,13 @@ dissect_pimv1(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
 static gboolean
 dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtype at,
                  const char* label, proto_item** ret_item, int hf_ip4, int hf_ip6, int *advance) {
-    guint8 af, et, flags, mask_len;
+    guint8 af, et, flags, mask_len, ja_af;
     ws_in6_addr ipv6;
-    guint32 ipv4;
+    guint32 ipv4 = 0;
     proto_item* ti = NULL;
     proto_tree* addr_tree = NULL;
+    proto_item *rloc_tree = NULL;
+    proto_tree *rloc_sub_tree = NULL;
     proto_tree* ja_tree = NULL;
     int len = 0;
     int ja_offset = 0;
@@ -771,7 +803,7 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
             if (label)
             {
                 ti = proto_tree_add_ipv4_format(tree, hf_ip4, tvb, offset, 2 + len,
-                                ipv4, "%s: %s", label, tvb_ip_to_str(tvb, offset + 2));
+                                ipv4, "%s: %s", label, tvb_ip_to_str(wmem_packet_scope(), tvb, offset + 2));
             }
             else
             {
@@ -785,7 +817,7 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
             if (label)
             {
                 ti = proto_tree_add_ipv6_format(tree, hf_ip6, tvb, offset, 2 + len,
-                        &ipv6, "%s: %s", label, tvb_ip6_to_str(tvb, offset + 2));
+                        &ipv6, "%s: %s", label, tvb_ip6_to_str(wmem_packet_scope(), tvb, offset + 2));
             }
             else
             {
@@ -804,6 +836,51 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
             proto_tree_add_item(addr_tree, hf_pim_unicast_addr_ipv6, tvb, offset+2, 16, ENC_NA);
             break;
         }
+        if (et == PIM_ADDR_ET_NATIVE_JA){
+            ja_offset = offset + len + 2;
+            while (((ja_eos_type & 0x40) != 0x40) && (tvb_reported_length_remaining(tvb, ja_offset) >= 2)){
+                ja_length = tvb_get_guint8(tvb, ja_offset+1);
+                ti = proto_tree_add_item(addr_tree, hf_pim_source_join_attribute, tvb, ja_offset, ja_length + 2, ENC_NA);
+                ja_tree = proto_item_add_subtree(ti, ett_pim);
+                ja_eos_type = tvb_get_guint8(tvb, ja_offset);
+                proto_tree_add_bitmask(ja_tree, tvb, ja_offset, hf_pim_source_ja_flags,
+                                       ett_pim_addr_flags, pim_source_ja_flags, ENC_BIG_ENDIAN);
+                proto_item_append_text(ti, ": %s", val_to_str(ja_eos_type & 0x3F, pim_join_attribute_type_vals, "Unknown"));
+                ja_offset += 1;
+                proto_tree_add_item(ja_tree, hf_pim_source_ja_length, tvb, ja_offset, 1, ENC_BIG_ENDIAN);
+                ja_offset += 1;
+                switch(ja_eos_type & 0x3F){
+                    case PIM_JOIN_ATTRIBUTE_TYPE_TA:
+                        proto_tree_add_item(ja_tree, hf_pim_attribute_transport_mode, tvb, ja_offset, 1, ENC_NA);
+                        break;
+                    case PIM_JOIN_ATTRIBUTE_TYPE_RLOC:
+                        ja_af = tvb_get_guint8(tvb, offset);
+                        switch(ja_af) {
+                            case AFNUM_INET:
+                                rloc_tree = proto_tree_add_ipv4_format(ja_tree, hf_ip4, tvb, ja_offset, ja_length,
+                                                                       ipv4, "RLOC: %s", tvb_ip_to_str(wmem_packet_scope(), tvb, ja_offset+ 1));
+                                rloc_sub_tree = proto_item_add_subtree(rloc_tree, ett_pim);
+                                proto_tree_add_item(rloc_sub_tree, hf_pim_addr_af, tvb, ja_offset, 1, ENC_NA);
+                                proto_tree_add_item(rloc_sub_tree, hf_pim_rloc_addr_ipv4, tvb, ja_offset + 1, 4, ENC_BIG_ENDIAN);
+                                break;
+                            case AFNUM_INET6:
+                                rloc_tree = proto_tree_add_ipv6_format(ja_tree, hf_ip6, tvb, ja_offset, ja_length,
+                                                                       &ipv6, "RLOC: %s", tvb_ip_to_str(wmem_packet_scope(), tvb, ja_offset+ 1));
+                                rloc_sub_tree = proto_item_add_subtree(rloc_tree, ett_pim);
+                                proto_tree_add_item(rloc_sub_tree, hf_pim_addr_af, tvb, ja_offset, 1, ENC_NA);
+                                proto_tree_add_item(rloc_sub_tree, hf_pim_rloc_addr_ipv6, tvb, ja_offset + 1, 16, ENC_NA);
+                                break;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                ja_offset += ja_length;
+                ja_length_sum += (2 + (int)ja_length);
+            }
+            *advance = 2 + len + ja_length_sum;
+            break;
+        }
         *advance = 2 + len;
         break;
 
@@ -816,7 +893,7 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
             if (label)
             {
                 ti = proto_tree_add_ipv4_format(tree, hf_ip4, tvb, offset, 4 + len,
-                                ipv4, "%s: %s", label, tvb_ip_to_str(tvb, offset + 4));
+                                ipv4, "%s: %s", label, tvb_ip_to_str(wmem_packet_scope(), tvb, offset + 4));
             }
             else
             {
@@ -832,7 +909,7 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
             if (label)
             {
                 ti = proto_tree_add_ipv6_format(tree, hf_ip6, tvb, offset, 4 + len,
-                        &ipv6, "%s: %s", label, tvb_ip6_to_str(tvb, offset + 4));
+                        &ipv6, "%s: %s", label, tvb_ip6_to_str(wmem_packet_scope(), tvb, offset + 4));
             }
             else
             {
@@ -868,12 +945,12 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
             if (label)
             {
                 ti = proto_tree_add_ipv4_format(tree, hf_ip4, tvb, offset, 4 + len,
-                                ipv4, "%s: %s", label, tvb_ip_to_str(tvb, offset + 4));
+                                ipv4, "%s: %s", label, tvb_ip_to_str(wmem_packet_scope(), tvb, offset + 4));
             }
             else
             {
                 ti = proto_tree_add_ipv4_format_value(tree, hf_ip4, tvb, offset, 4 + len, ipv4,
-                                                      "%s", tvb_ip_to_str(tvb, offset + 4));
+                                                      "%s", tvb_ip_to_str(wmem_packet_scope(), tvb, offset + 4));
             }
             proto_item_append_text(ti, "/%u", mask_len);
             break;
@@ -884,12 +961,12 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
             if (label)
             {
                 ti = proto_tree_add_ipv6_format(tree, hf_ip6, tvb, offset, 4 + len,
-                        &ipv6, "%s: %s", label, tvb_ip6_to_str(tvb, offset + 4));
+                        &ipv6, "%s: %s", label, tvb_ip6_to_str(wmem_packet_scope(), tvb, offset + 4));
             }
             else
             {
                 ti = proto_tree_add_ipv6_format_value(tree, hf_ip6, tvb, offset, 4 + len, &ipv6,
-                                                      "%s", tvb_ip6_to_str(tvb, offset + 4));
+                                                      "%s", tvb_ip6_to_str(wmem_packet_scope(), tvb, offset + 4));
             }
             proto_item_append_text(ti, "/%u", mask_len);
             break;
@@ -937,6 +1014,25 @@ dissect_pim_addr(proto_tree* tree, tvbuff_t *tvb, int offset, enum pimv2_addrtyp
                                 break;
                         } else {
                             proto_tree_add_item(ja_tree, hf_pim_source_ja_value, tvb, ja_offset, ja_length, ENC_NA);
+                        }
+                        break;
+                    case PIM_JOIN_ATTRIBUTE_TYPE_RLOC:
+                        ja_af = tvb_get_guint8(tvb, offset);
+                        switch(ja_af) {
+                            case AFNUM_INET:
+                                rloc_tree = proto_tree_add_ipv4_format(ja_tree, hf_ip4, tvb, ja_offset, ja_length,
+                                                                       ipv4, "RLOC: %s", tvb_ip_to_str(wmem_packet_scope(), tvb, ja_offset+ 1));
+                                rloc_sub_tree = proto_item_add_subtree(rloc_tree, ett_pim);
+                                proto_tree_add_item(rloc_sub_tree, hf_pim_addr_af, tvb, ja_offset, 1, ENC_NA);
+                                proto_tree_add_item(rloc_sub_tree, hf_pim_rloc_addr_ipv4, tvb, ja_offset + 1, 4, ENC_BIG_ENDIAN);
+                                break;
+                            case AFNUM_INET6:
+                                rloc_tree = proto_tree_add_ipv6_format(ja_tree, hf_ip6, tvb, ja_offset, ja_length,
+                                                                       &ipv6, "RLOC: %s", tvb_ip_to_str(wmem_packet_scope(), tvb, ja_offset+ 1));
+                                rloc_sub_tree = proto_item_add_subtree(rloc_tree, ett_pim);
+                                proto_tree_add_item(rloc_sub_tree, hf_pim_addr_af, tvb, ja_offset, 1, ENC_NA);
+                                proto_tree_add_item(rloc_sub_tree, hf_pim_rloc_addr_ipv6, tvb, ja_offset + 1, 16, ENC_NA);
+                                break;
                         }
                         break;
                     default:
@@ -1003,6 +1099,9 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
     proto_tree_add_item(pim_tree, hf_pim_version, tvb, offset, 1, ENC_BIG_ENDIAN);
     proto_tree_add_item(pim_tree, hf_pim_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    if (PIM_TYPE(pim_typever) == PIM_TYPE_PFM) {
+        proto_tree_add_item(pim_tree, hf_pfm_no_forward_bit, tvb, offset+1, 1, ENC_BIG_ENDIAN);
+    }
     if (PIM_TYPE(pim_typever) == PIM_TYPE_DF_ELECT) {
         proto_tree_add_item(pim_tree, hf_pim_df_elect_subtype, tvb, offset + 1, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(pim_tree, hf_pim_df_elect_rsvd, tvb, offset + 1, 1, ENC_BIG_ENDIAN);
@@ -1291,7 +1390,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
             tigroup=proto_tree_add_string_format(pimopt_tree, hf_pim_group, tvb, offset, -1, "", "Group %d", i);
             grouptree = proto_item_add_subtree(tigroup, ett_pim);
             if (!dissect_pim_addr(grouptree, tvb, offset, pimv2_group,
-                                   wmem_strdup_printf(wmem_packet_scope(), "Group %d", i), NULL,
+                                   wmem_strdup_printf(pinfo->pool, "Group %d", i), NULL,
                                    hf_pim_group_ip4, hf_pim_group_ip6, &advance))
                 goto breakbreak3;
 
@@ -1351,7 +1450,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
         for (i = 0; tvb_reported_length_remaining(tvb, offset) > 0; i++) {
             if (!dissect_pim_addr(pimopt_tree, tvb, offset, pimv2_group,
-                                   wmem_strdup_printf(wmem_packet_scope(), "Group %d", i), &tigroup,
+                                   wmem_strdup_printf(pinfo->pool, "Group %d", i), &tigroup,
                                    hf_pim_group_ip4, hf_pim_group_ip6, &advance))
                 goto breakbreak4;
 
@@ -1366,7 +1465,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
             for (j = 0; j < frpcnt; j++) {
                 if (!dissect_pim_addr(pimopt_tree, tvb, offset, pimv2_unicast,
-                                       wmem_strdup_printf(wmem_packet_scope(), "RP %d", j), NULL,
+                                       wmem_strdup_printf(pinfo->pool, "RP %d", j), NULL,
                                        hf_pim_rp_ip4, hf_pim_rp_ip6, &advance))
 
                     goto breakbreak4;
@@ -1436,7 +1535,7 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
         for (i = 0; i < pfxcnt; i++) {
             if (!dissect_pim_addr(pimopt_tree, tvb, offset, pimv2_group,
-                                   wmem_strdup_printf(wmem_packet_scope(), "Group %d", i), NULL,
+                                   wmem_strdup_printf(pinfo->pool, "Group %d", i), NULL,
                                    hf_pim_group_ip4, hf_pim_group_ip6, &advance))
                 goto breakbreak8;
             offset += advance;
@@ -1531,8 +1630,68 @@ dissect_pim(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
                 proto_tree_add_item(pimopt_tree, hf_pim_bd_pass_metric, tvb, offset, 4, ENC_BIG_ENDIAN);
                 break;
         }
+        break;
     }
 
+    case PIM_TYPE_PFM:     /*pfm*/
+    {
+        int opt_count = 0;
+        int advance;
+
+        if (!dissect_pim_addr(pimopt_tree, tvb, offset, pimv2_unicast, NULL, NULL,
+                                    hf_pim_originator_ip4, hf_pim_originator_ip6, &advance))
+            break;
+        offset += advance;
+        while (tvb_reported_length_remaining(tvb, offset) >= 2) {
+            guint16 pfm, pfm_opt, opt_len;
+            proto_item *opt_item;
+            proto_tree *opt_tree;
+
+            opt_count++;
+            pfm = tvb_get_ntohs(tvb, offset);
+            opt_len = tvb_get_ntohs(tvb, offset + 2);
+            pfm_opt = pfm & 0x7FFF;
+            opt_tree = proto_tree_add_subtree_format(pimopt_tree, tvb, offset, 4 + opt_len,
+                                           ett_pim_opt, &opt_item, "Option %u: %s", pfm_opt,
+                                           val_to_str(pfm_opt, pim_opt_vals1, "Unknown: %u"));
+            proto_tree_add_item(opt_tree, hf_pim_transitivetype, tvb, offset, 1, ENC_BIG_ENDIAN);
+            proto_tree_add_item(opt_tree, hf_pim_optiontype1, tvb, offset, 2, ENC_BIG_ENDIAN);
+            proto_tree_add_item(opt_tree, hf_pim_optionlength, tvb, offset + 2, 2, ENC_BIG_ENDIAN);
+            offset += 4;
+            switch(pfm_opt){
+                case PIM_PFM_GROUP_SOURCE:
+                {
+                    if (!dissect_pim_addr(pimopt_tree, tvb, offset, pimv2_group, NULL, NULL,
+                                            hf_pim_group_ip4, hf_pim_group_ip6, &advance))
+                        break;
+                    offset += advance;
+                    guint16 src_count;
+                    src_count=tvb_get_ntohs(tvb, offset);
+                    proto_tree_add_item(pimopt_tree, hf_pim_srcount, tvb, offset, 2, ENC_BIG_ENDIAN);
+                    offset += 2;
+                    proto_tree_add_item(pimopt_tree, hf_pim_srcholdt, tvb, offset, 2, ENC_BIG_ENDIAN);
+                    offset += 2;
+                    while(src_count>0){
+                        if (!dissect_pim_addr(pimopt_tree, tvb, offset, pimv2_unicast, NULL, NULL,
+                                            hf_pim_source_ip4, hf_pim_source_ip6, &advance))
+                            goto breakbreak12;
+                        offset+=advance;
+                        src_count--;
+                    }
+                        break;
+                }
+                default:
+                    if (opt_len)
+                        proto_tree_add_item(opt_tree, hf_pim_optionvalue, tvb,
+                                            offset, opt_len, ENC_NA);
+                    offset += opt_len;
+                    break;
+            }
+        }
+        proto_item_append_text(tiopt, ": %u", opt_count);
+    breakbreak12:
+        break;
+    }
     default:
         break;
     }
@@ -1598,6 +1757,11 @@ proto_register_pim(void)
             { &hf_pim_optiontype,
               { "Type", "pim.optiontype",
                 FT_UINT16, BASE_DEC, NULL, 0x0,
+                NULL, HFILL }
+            },
+            { &hf_pim_optiontype1,
+              { "Type", "pim.optiontype",
+                FT_UINT16, BASE_DEC, NULL, 0x7fff,
                 NULL, HFILL }
             },
             { &hf_pim_optionlength,
@@ -1666,7 +1830,7 @@ proto_register_pim(void)
             },
             { &hf_pim_propagation_delay,
               { "Propagation Delay", "pim.propagation_delay",
-                FT_UINT16, BASE_DEC, NULL, 0x07fff,
+                FT_UINT16, BASE_DEC, NULL, 0x7fff,
                 "Units are milli-seconds", HFILL }
             },
             { &hf_pim_override_interval,
@@ -1990,6 +2154,21 @@ proto_register_pim(void)
                 FT_IPv6, BASE_NONE, NULL, 0x0,
                 NULL, HFILL }
             },
+            { &hf_pim_attribute_transport_mode,
+              { "Attribute Transport Mode", "pim.attribute_transport_mode",
+                FT_UINT8, BASE_DEC, VALS(attribute_transport_mode), 0x0,
+                NULL, HFILL }
+            },
+            { &hf_pim_rloc_addr_ipv4,
+              { "RLOC", "pim.rloc",
+                FT_IPv4, BASE_NONE, NULL, 0x0,
+                NULL, HFILL }
+            },
+            { &hf_pim_rloc_addr_ipv6,
+              { "RLOC", "pim.rloc_ipv6",
+                FT_IPv6, BASE_NONE, NULL, 0x0,
+                NULL, HFILL }
+            },
             { &hf_pim_group,
               { "Group", "pim.group_set",
                 FT_STRING, BASE_NONE, NULL, 0x0,
@@ -2075,6 +2254,26 @@ proto_register_pim(void)
                 FT_BYTES, BASE_NONE, NULL, 0x0,
                 NULL, HFILL }
             },
+            { &hf_pim_srcount,
+              { "Source Count", "pim.srccount",
+                FT_UINT16, BASE_DEC, NULL, 0x0,
+                "Number of sources.", HFILL }
+            },
+            { &hf_pim_srcholdt,
+              { "Source Holdtime", "pim.srcholdtime",
+                FT_UINT16, BASE_DEC|BASE_SPECIAL_VALS, VALS(unique_infinity_t), 0x0,
+                "The amount of time a receiver must keep the source reachable, in seconds.", HFILL }
+            },
+            { &hf_pim_transitivetype,
+              { "Transitive Type", "pim.transitivetype",
+                FT_BOOLEAN, 8, NULL, 0x80,
+                "Set to 1 if this type is to be forwarded even if a router does not support it.", HFILL }
+            },
+            { &hf_pfm_no_forward_bit,
+              { "Pfm no forward bit", "pim.pfmnoforwardbit",
+                FT_BOOLEAN, 8, NULL, 0x80,
+                "When set, this bit means that the PFM message is not to be forwarded.", HFILL }
+            }
         };
 
     static gint *ett[] = {

@@ -10,10 +10,12 @@
  */
 
 #include <config.h>
+#define WS_LOG_DOMAIN LOG_DOMAIN_EPAN
 
 #include <glib.h>
 
 #include <string.h>
+#include <wsutil/glib-compat.h>
 
 #ifdef HAVE_ZLIB
 #define ZLIB_CONST
@@ -21,9 +23,7 @@
 #endif
 
 #include "tvbuff.h"
-#ifdef TVB_Z_DEBUG
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
-#endif
+#include <wsutil/wslog.h>
 
 #ifdef HAVE_ZLIB
 /*
@@ -33,8 +33,6 @@
  */
 #define TVB_Z_MIN_BUFSIZ 32768
 #define TVB_Z_MAX_BUFSIZ 1048576 * 10
-/* #define TVB_Z_DEBUG 1 */
-#undef TVB_Z_DEBUG
 
 tvbuff_t *
 tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
@@ -50,10 +48,8 @@ tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
 	gint       wbits          = MAX_WBITS;
 	guint8    *next;
 	guint      bufsiz;
-#ifdef TVB_Z_DEBUG
 	guint      inflate_passes = 0;
 	guint      bytes_in       = tvb_captured_length_remaining(tvb, offset);
-#endif
 
 	if (tvb == NULL || comprlen <= 0) {
 		return NULL;
@@ -71,9 +67,7 @@ tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
 	bufsiz = tvb_captured_length_remaining(tvb, offset) * 2;
 	bufsiz = CLAMP(bufsiz, TVB_Z_MIN_BUFSIZ, TVB_Z_MAX_BUFSIZ);
 
-#ifdef TVB_Z_DEBUG
-	ws_debug_printf("bufsiz: %u bytes\n", bufsiz);
-#endif
+	ws_debug("bufsiz: %u bytes\n", bufsiz);
 
 	next = compr;
 
@@ -105,21 +99,19 @@ tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
 		if (err == Z_OK || err == Z_STREAM_END) {
 			guint bytes_pass = bufsiz - strm->avail_out;
 
-#ifdef TVB_Z_DEBUG
 			++inflate_passes;
-#endif
 
 			if (uncompr == NULL) {
 				/*
 				 * This is ugly workaround for bug #6480
 				 * (https://gitlab.com/wireshark/wireshark/-/issues/6480)
 				 *
-				 * g_memdup(..., 0) returns NULL (g_malloc(0) also)
+				 * g_memdup2(..., 0) returns NULL (g_malloc(0) also)
 				 * when uncompr is NULL logic below doesn't create tvb
 				 * which is later interpreted as decompression failed.
 				 */
 				uncompr = (guint8 *)((bytes_pass || err != Z_STREAM_END) ?
-						g_memdup(strmbuf, bytes_pass) :
+						g_memdup2(strmbuf, bytes_pass) :
 						g_strdup(""));
 			} else {
 				guint8 *new_data = (guint8 *)g_malloc0(bytes_out + bytes_pass);
@@ -304,10 +296,8 @@ tvb_uncompress(tvbuff_t *tvb, const int offset, int comprlen)
 		}
 	}
 
-#ifdef TVB_Z_DEBUG
-	ws_debug_printf("inflate() total passes: %u\n", inflate_passes);
-	ws_debug_printf("bytes  in: %u\nbytes out: %u\n\n", bytes_in, bytes_out);
-#endif
+	ws_debug("inflate() total passes: %u\n", inflate_passes);
+	ws_debug("bytes  in: %u\nbytes out: %u\n\n", bytes_in, bytes_out);
 
 	if (uncompr != NULL) {
 		uncompr_tvb =  tvb_new_real_data(uncompr, bytes_out, bytes_out);

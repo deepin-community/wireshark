@@ -1,4 +1,5 @@
-/* recent.h
+/** @file
+ *
  * Definitions for recent "preference" handling routines
  * Copyright 2004, Ulf Lamping <ulf.lamping@web.de>
  *
@@ -100,6 +101,7 @@ typedef struct recent_settings_tag {
     bytes_view_type gui_bytes_view;
     bytes_encoding_type gui_bytes_encoding;
     gboolean    gui_packet_diagram_field_values;
+    gboolean    gui_allow_hover_selection;
 
     search_in_type  gui_search_in;
     search_char_set_type gui_search_char_set;
@@ -126,7 +128,9 @@ typedef struct recent_settings_tag {
     gboolean    sys_warn_if_no_capture;
     GList      *col_width_list;                     /* column widths */
     GList      *conversation_tabs;                  /* enabled conversation dialog tabs */
+    GList      *conversation_tabs_columns;          /* save the columns for conversation dialogs */
     GList      *endpoint_tabs;                      /* enabled endpoint dialog tabs */
+    GList      *endpoint_tabs_columns;              /* save the columns for endpoint dialogs */
     gchar      *gui_fileopen_remembered_dir;        /* folder of last capture loaded in File Open dialog */
     gboolean    gui_rlc_use_pdus_from_mac;
     GList      *custom_colors;
@@ -281,16 +285,3 @@ extern void recent_add_remote_host(gchar *host, struct remote_host *rh);
 #endif /* __cplusplus */
 
 #endif /* recent.h */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

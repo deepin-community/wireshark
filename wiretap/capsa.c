@@ -12,6 +12,7 @@
 #include "wtap-int.h"
 #include "file_wrappers.h"
 #include "capsa.h"
+#include <wsutil/ws_assert.h>
 
 /*
  * A file begins with a header containing:
@@ -113,6 +114,11 @@ static gboolean capsa_seek_read(wtap *wth, gint64 seek_off,
 static int capsa_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
     Buffer *buf, int *err, gchar **err_info);
 
+static int capsa_file_type_subtype = -1;
+static int packet_builder_file_type_subtype = -1;
+
+void register_capsa(void);
+
 wtap_open_return_val capsa_open(wtap *wth, int *err, gchar **err_info)
 {
 	char magic[sizeof capsa_magic];
@@ -144,16 +150,16 @@ wtap_open_return_val capsa_open(wtap *wth, int *err, gchar **err_info)
 	switch (format_indicator) {
 
 	case 1:		/* Capsa */
-		file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_COLASOFT_CAPSA;
+		file_type_subtype = capsa_file_type_subtype;
 		break;
 
 	case 2:		/* Packet Builder */
-		file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_COLASOFT_PACKET_BUILDER;
+		file_type_subtype = packet_builder_file_type_subtype;
 		break;
 
 	default:
 		*err = WTAP_ERR_UNSUPPORTED;
-		*err_info = g_strdup_printf("capsa: format indicator %u unsupported",
+		*err_info = ws_strdup_printf("capsa: format indicator %u unsupported",
 		    format_indicator);
 		return WTAP_OPEN_ERROR;
 	}
@@ -199,7 +205,7 @@ wtap_open_return_val capsa_open(wtap *wth, int *err, gchar **err_info)
 		return WTAP_OPEN_ERROR;
 
 	wth->file_type_subtype = file_type_subtype;
-	capsa = (capsa_t *)g_malloc(sizeof(capsa_t));
+	capsa = g_new(capsa_t, 1);
 	capsa->format_indicator = format_indicator;
 	capsa->number_of_frames = number_of_frames;
 	capsa->frame_count = 0;
@@ -363,9 +369,9 @@ capsa_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
 		break;
 
 	default:
-		g_assert_not_reached();
+		ws_assert_not_reached();
 		*err = WTAP_ERR_INTERNAL;
-		*err_info = g_strdup_printf("capsa: format indicator is %u", capsa->format_indicator);
+		*err_info = ws_strdup_printf("capsa: format indicator is %u", capsa->format_indicator);
 		return -1;
 	}
 	if (orig_size > WTAP_MAX_PACKET_SIZE_STANDARD) {
@@ -374,7 +380,7 @@ capsa_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
 		 * to allocate space for an immensely-large packet.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("capsa: File has %u-byte original length, bigger than maximum of %u",
+		*err_info = ws_strdup_printf("capsa: File has %u-byte original length, bigger than maximum of %u",
 		    orig_size, WTAP_MAX_PACKET_SIZE_STANDARD);
 		return -1;
 	}
@@ -384,7 +390,7 @@ capsa_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
 		 * to allocate space for an immensely-large packet.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("capsa: File has %u-byte packet, bigger than maximum of %u",
+		*err_info = ws_strdup_printf("capsa: File has %u-byte packet, bigger than maximum of %u",
 		    packet_size, WTAP_MAX_PACKET_SIZE_STANDARD);
 		return -1;
 	}
@@ -393,7 +399,7 @@ capsa_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
 		 * Probably a corrupt capture file.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("capsa: File has %u-byte packet with %u-byte record header, bigger than record size %u",
+		*err_info = ws_strdup_printf("capsa: File has %u-byte packet with %u-byte record header, bigger than record size %u",
 		    packet_size, header_size, rec_size);
 		return -1;
 	}
@@ -414,6 +420,7 @@ capsa_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
 	rec->rec_header.packet_header.pseudo_header.eth.fcs_len = 0;
 
 	rec->rec_type = REC_TYPE_PACKET;
+	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 	rec->rec_header.packet_header.caplen = packet_size;
 	rec->rec_header.packet_header.len = orig_size;
 	rec->presence_flags = WTAP_HAS_CAP_LEN|WTAP_HAS_TS;
@@ -427,6 +434,47 @@ capsa_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
 		return -1;	/* failed */
 
 	return rec_size - (header_size + packet_size);
+}
+
+static const struct supported_block_type capsa_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info capsa_info = {
+	"Colasoft Capsa format", "capsa", "cscpkt", NULL,
+	FALSE, BLOCKS_SUPPORTED(capsa_blocks_supported),
+	NULL, NULL, NULL
+};
+
+static const struct supported_block_type packet_builder_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info packet_builder_info = {
+	"Colasoft Packet Builder format", "colasoft-pb", "cscpkt", NULL,
+	FALSE, BLOCKS_SUPPORTED(packet_builder_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_capsa(void)
+{
+	capsa_file_type_subtype = wtap_register_file_type_subtype(&capsa_info);
+	packet_builder_file_type_subtype = wtap_register_file_type_subtype(&packet_builder_info);
+
+	/*
+	 * Register names for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("COLASOFT_CAPSA",
+	    capsa_file_type_subtype);
+	wtap_register_backwards_compatibility_lua_name("COLASOFT_PACKET_BUILDER",
+	    packet_builder_file_type_subtype);
 }
 
 /*

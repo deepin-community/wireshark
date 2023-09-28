@@ -12,19 +12,21 @@
 
 #include "config.h"
 
-#include <glib.h>
+#include <wireshark.h>
 #include <sbc/sbc.h>
 
 #include "wsutil/codecs.h"
 
 #define SBC_BUFFER 8192
 
+void codec_register_sbc(void);
+
 static void *
 codec_sbc_init(void)
 {
     sbc_t *sbc;
 
-    sbc = (sbc_t *) g_malloc(sizeof(sbc_t));
+    sbc = g_new(sbc_t, 1);
     sbc_init(sbc, 0L);
 
     return sbc;

@@ -23,7 +23,7 @@ void proto_register_sasp(void);
 void proto_reg_handoff_sasp(void);
 
 static void dissect_reg_req(tvbuff_t *tvb, proto_tree *tree, guint32 offset);
-static void dissect_dereg_req(tvbuff_t *tvb, proto_tree *tree, guint32 offset);
+static void dissect_dereg_req(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset);
 static void dissect_reg_rep(tvbuff_t *tvb, proto_tree *tree, guint32 offset);
 static void dissect_dereg_rep(tvbuff_t *tvb, proto_tree *tree, guint32 offset);
 static void dissect_sendwt(tvbuff_t *tvb, proto_tree *tree, guint32 offset);
@@ -391,7 +391,7 @@ dissect_sasp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
         case 0x1020:
             /* Deregistration Request */
             col_set_str(pinfo->cinfo, COL_INFO, "Deregistration Request");
-            dissect_dereg_req(tvb, pay_load, offset);
+            dissect_dereg_req(tvb, pinfo, pay_load, offset);
             break;
 
         case 0x1025:
@@ -504,7 +504,7 @@ static void dissect_reg_rep(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
 }
 
 
-static void dissect_dereg_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 offset)
+static void dissect_dereg_req(tvbuff_t *tvb, packet_info *pinfo, proto_tree *pay_load, guint32 offset)
 {
     /*proto_item *dereg_req_reason_flag;*/
     /*proto_tree *dereg_req_reason_flag_tree;*/
@@ -512,7 +512,7 @@ static void dissect_dereg_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 offse
     proto_tree      *dereg_req_data;
     guint8           reason_flag;
     static gboolean  first_flag         = TRUE;
-    wmem_strbuf_t   *reasonflags_strbuf = wmem_strbuf_new_label(wmem_packet_scope());
+    wmem_strbuf_t   *reasonflags_strbuf = wmem_strbuf_new_label(pinfo->pool);
     static const gchar *fstr[] = {"No Reason", "Learned & Purposeful" };
 
     dereg_req_data = proto_tree_add_subtree(pay_load, tvb, offset, -1, ett_sasp_dereg_req_sz, NULL, "DeReg Request");
@@ -641,7 +641,7 @@ static guint32 dissect_memdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 
     ws_in6_addr ipv6_address;
 
     tvb_get_ipv6(tvb, offset+7, &ipv6_address);
-    ip_str = tvb_ip6_to_str(tvb, offset+7);
+    ip_str = tvb_ip6_to_str(wmem_packet_scope(), tvb, offset+7);
 
     lab_len = tvb_get_guint8(tvb, offset+23);
 
@@ -676,7 +676,7 @@ static guint32 dissect_memdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 
     offset += 1;
 
     /*Label*/
-    proto_tree_add_item(memdatacomp_tree, hf_sasp_memdatacomp_label, tvb, offset, lab_len, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(memdatacomp_tree, hf_sasp_memdatacomp_label, tvb, offset, lab_len, ENC_ASCII);
     offset += lab_len;
 
     if (mdct_p != NULL)
@@ -710,7 +710,7 @@ static guint32 dissect_grpdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 
     offset += 1;
 
     proto_tree_add_item(grpdatacomp_tree, hf_sasp_grpdatacomp_LB_uid,
-        tvb, offset, LB_uid_len, ENC_ASCII|ENC_NA);
+        tvb, offset, LB_uid_len, ENC_ASCII);
     offset += (guint8)LB_uid_len;
 
     grp_name_len = tvb_get_guint8(tvb, offset);
@@ -722,7 +722,7 @@ static guint32 dissect_grpdatacomp(tvbuff_t *tvb, proto_tree *pay_load, guint32 
 
     /*Group Name*/
     proto_tree_add_item(grpdatacomp_tree, hf_sasp_grpdatacomp_grp_name,
-        tvb, offset, grp_name_len, ENC_ASCII|ENC_NA);
+        tvb, offset, grp_name_len, ENC_ASCII);
     offset += grp_name_len;
 
     return offset;
@@ -842,7 +842,7 @@ static void dissect_setlbstate_req(tvbuff_t *tvb, proto_tree *pay_load, guint32 
 
     /*LB UID*/
     proto_tree_add_item(setlbstate_req_tree, hf_sasp_setlbstate_req_LB_uid,
-        tvb, offset, LB_uid_len, ENC_ASCII|ENC_NA);
+        tvb, offset, LB_uid_len, ENC_ASCII);
     offset += (guint8)LB_uid_len;
 
     /*LB Health*/
@@ -1237,7 +1237,7 @@ void proto_register_sasp(void)
 
         { &hf_sasp_wt_rep_interval,
           { "Get Wt Rep-Interval", "sasp.getwt-rep.interval",
-            FT_UINT8, BASE_DEC, NULL, 0x0,
+            FT_UINT16, BASE_DEC, NULL, 0x0,
             "SASP Get Wt Rep Interval", HFILL } },
 
         { &hf_sasp_wt_rep_gwed_cnt,

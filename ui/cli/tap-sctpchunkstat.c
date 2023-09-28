@@ -93,7 +93,7 @@ alloc_sctp_ep(const struct _sctp_info *si)
 
 
 static tap_packet_status
-sctpstat_packet(void *phs, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *phi)
+sctpstat_packet(void *phs, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *phi, tap_flags_t flags _U_)
 {
 
 	sctpstat_t *hs = (sctpstat_t *)phs;
@@ -190,7 +190,7 @@ sctpstat_init(const char *opt_arg, void *userdata _U_)
 	sctpstat_t *hs;
 	GString	   *error_string;
 
-	hs = (sctpstat_t *)g_malloc(sizeof(sctpstat_t));
+	hs = g_new(sctpstat_t, 1);
 	if (!strncmp(opt_arg, "sctp,stat,", 11)) {
 		hs->filter = g_strdup(opt_arg+11);
 	} else {

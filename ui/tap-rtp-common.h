@@ -1,4 +1,5 @@
-/* tap-rtp-common.h
+/** @file
+ *
  * RTP streams handler functions used by tshark and wireshark
  *
  * Copyright 2008, Ericsson AB
@@ -56,6 +57,9 @@ typedef struct _rtpstream_info_calc {
     gint32 lost_num;
     double lost_perc;
     double max_delta;
+    double min_delta;
+    double mean_delta;
+    double min_jitter;
     double max_jitter;
     double max_skew;
     double mean_jitter;
@@ -126,7 +130,7 @@ void rtpstream_reset(rtpstream_tapinfo_t *tapinfo);
 
 void rtpstream_reset_cb(void*);
 void rtp_write_header(rtpstream_info_t*, FILE*);
-tap_packet_status rtpstream_packet_cb(void*, packet_info*, epan_dissect_t *, const void *);
+tap_packet_status rtpstream_packet_cb(void*, packet_info*, epan_dissect_t *, const void *, tap_flags_t);
 
 /**
  * Evaluate rtpstream_info_t calculations
@@ -138,21 +142,38 @@ void rtpstream_info_calculate(const rtpstream_info_t *strinfo, rtpstream_info_ca
  */
 void rtpstream_info_calc_free(rtpstream_info_calc_t *calc);
 
+/**
+ * Init analyse counters in rtpstream_info_t from pinfo
+ */
+void rtpstream_info_analyse_init(rtpstream_info_t *stream_info, const packet_info *pinfo, const struct _rtp_info *rtpinfo);
+
+/**
+ * Update analyse counters in rtpstream_info_t from pinfo
+ */
+void rtpstream_info_analyse_process(rtpstream_info_t *stream_info, const packet_info *pinfo, const struct _rtp_info *rtpinfo);
+
+/**
+ * Get hash key for rtpstream_info_t
+ */
+guint rtpstream_to_hash(gconstpointer key);
+
+/**
+ * Insert new_stream_info into multihash
+ */
+void rtpstream_info_multihash_insert(GHashTable *multihash, rtpstream_info_t *new_stream_info);
+
+/**
+ * Lookup stream_info in stream_info multihash
+ */
+rtpstream_info_t *rtpstream_info_multihash_lookup(GHashTable *multihash, rtpstream_id_t *stream_id);
+
+/**
+ * GHFunc () for destroying GList in multihash
+ */
+void rtpstream_info_multihash_destroy_value(gpointer key, gpointer value, gpointer user_data);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
 #endif /* __TAP_RTP_COMMON_H__ */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

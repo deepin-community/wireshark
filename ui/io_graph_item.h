@@ -1,4 +1,5 @@
-/* io_graph_item.h
+/** @file
+ *
  * Definitions and functions for I/O graph items
  *
  * Copied from gtk/io_stat.c, (c) 2002 Ronnie Sahlberg
@@ -14,6 +15,7 @@
 #define __IO_GRAPH_ITEM_H__
 
 #include "cfile.h"
+#include <wsutil/ws_assert.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -166,7 +168,7 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
             guint64 new_uint64;
             float new_float;
             double new_double;
-            nstime_t *new_time;
+            const nstime_t *new_time;
 
             switch (proto_registrar_get_ftype(hf_index)) {
             case FT_UINT8:
@@ -297,7 +299,7 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
                 item->fields++;
                 break;
             case FT_RELATIVE_TIME:
-                new_time = (nstime_t *)fvalue_get(&((field_info *)gp->pdata[i])->value);
+                new_time = fvalue_get_time(&((field_info *)gp->pdata[i])->value);
 
                 switch (item_unit) {
                 case IOG_ITEM_UNIT_CALC_LOAD:
@@ -381,7 +383,7 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
                      * type is compatible" check in
                      * filter_callback().
                      */
-                    g_assert_not_reached();
+                    ws_assert_not_reached();
                 }
                 break;
             }
@@ -400,16 +402,3 @@ update_io_graph_item(io_graph_item_t *items, int idx, packet_info *pinfo, epan_d
 #endif /* __cplusplus */
 
 #endif /* __IO_GRAPH_ITEM_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

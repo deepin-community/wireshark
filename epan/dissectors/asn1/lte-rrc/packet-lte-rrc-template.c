@@ -1,9 +1,9 @@
 /* packet-lte-rrc-template.c
  * Routines for Evolved Universal Terrestrial Radio Access (E-UTRA);
  * Radio Resource Control (RRC) protocol specification
- * (3GPP TS 36.331 V16.2.0 Release 16) packet dissection
+ * (3GPP TS 36.331 V17.1.0 Release 17) packet dissection
  * Copyright 2008, Vincent Helfre
- * Copyright 2009-2020, Pascal Quantin
+ * Copyright 2009-2022, Pascal Quantin
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -17,6 +17,7 @@
 #include <stdlib.h>
 
 #include <epan/packet.h>
+#include <epan/prefs.h>
 #include <epan/to_str.h>
 #include <epan/asn1.h>
 #include <epan/expert.h>
@@ -48,6 +49,7 @@ void proto_register_lte_rrc(void);
 void proto_reg_handoff_lte_rrc(void);
 
 static dissector_handle_t nas_eps_handle = NULL;
+static dissector_handle_t nas_5gs_handle = NULL;
 static dissector_handle_t rrc_irat_ho_to_utran_cmd_handle = NULL;
 static dissector_handle_t rrc_sys_info_cont_handle = NULL;
 static dissector_handle_t gsm_a_dtap_handle = NULL;
@@ -63,6 +65,7 @@ static wmem_map_t *lte_rrc_system_info_value_changed_hash = NULL;
 static guint8     system_info_value_current;
 static gboolean   system_info_value_current_set;
 
+static gboolean lte_rrc_nas_in_root_tree;
 
 extern int proto_mac_lte;
 extern int proto_rlc_lte;
@@ -321,6 +324,10 @@ static gint ett_lte_rrc_ueAssistanceInformationNR_r16 = -1;
 static gint ett_lte_rrc_sl_ParameterNR_r16 = -1;
 static gint ett_lte_rrc_v2x_BandParametersNR_r16 = -1;
 static gint ett_lte_rrc_ueAssistanceInformationNR_SCG_r16 = -1;
+static gint ett_lte_rrc_assistanceDataSIB_Element_r15 = -1;
+static gint ett_lte_rrc_overheatingAssistanceForSCG_r16 = -1;
+static gint ett_lte_rrc_overheatingAssistanceForSCG_FR2_2_r17 = -1;
+static gint ett_lte_rrc_triggerConditionSN_r17 = -1;
 
 static expert_field ei_lte_rrc_number_pages_le15 = EI_INIT;
 static expert_field ei_lte_rrc_si_info_value_changed = EI_INIT;
@@ -937,7 +944,7 @@ static value_string_ext lte_rrc_messageSize_r14_vals_ext = VALUE_STRING_EXT_INIT
 static void
 lte_rrc_timeConnFailure_r10_fmt(gchar *s, guint32 v)
 {
-  g_snprintf(s, ITEM_LABEL_LENGTH, "%ums (%u)", 100*v, v);
+  snprintf(s, ITEM_LABEL_LENGTH, "%ums (%u)", 100*v, v);
 }
 
 static const value_string lte_rrc_n_r12_vals[] = {
@@ -956,9 +963,9 @@ static void
 lte_rrc_m_r12_fmt(gchar *s, guint32 v)
 {
   if (v == 255) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "255 <= f(Nr) (255)");
+    snprintf(s, ITEM_LABEL_LENGTH, "255 <= f(Nr) (255)");
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%u <= f(Nr) < %u (%u)", v, v+1, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%u <= f(Nr) < %u (%u)", v, v+1, v);
   }
 }
 
@@ -2164,13 +2171,13 @@ static void
 lte_rrc_RSRP_RangeNR_r15_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "SS-RSRP < -156dBm (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "SS-RSRP < -156dBm (0)");
   } else if (v == 126) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "-31dBm <= SS-RSRP (126)");
+    snprintf(s, ITEM_LABEL_LENGTH, "-31dBm <= SS-RSRP (126)");
   } else if (v == 127) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "Infinity (127)");
+    snprintf(s, ITEM_LABEL_LENGTH, "Infinity (127)");
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%ddBm <= SS-RSRP < %ddBm (%u)", -157+v, -156+v, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%ddBm <= SS-RSRP < %ddBm (%u)", -157+v, -156+v, v);
   }
 }
 
@@ -2264,11 +2271,11 @@ static void
 lte_rrc_RSRQ_RangeNR_r15_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "SS-RSRQ < -43dB (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "SS-RSRQ < -43dB (0)");
   } else if (v == 127) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "20dB < SS-RSRQ (127)");
+    snprintf(s, ITEM_LABEL_LENGTH, "20dB < SS-RSRQ (127)");
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= SS-RSRQ < %.1fdB (%u)", (((float)v-1)/2)-43, ((float)v/2)-43, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= SS-RSRQ < %.1fdB (%u)", (((float)v-1)/2)-43, ((float)v/2)-43, v);
   }
 }
 
@@ -2312,20 +2319,20 @@ static value_string_ext lte_rrc_MBSFN_RSRQ_Range_vals_ext = VALUE_STRING_EXT_INI
 static void
 lte_rrc_availableAdmissionCapacityWLAN_fmt(gchar *s, guint32 v)
 {
-  g_snprintf(s, ITEM_LABEL_LENGTH, "%uus/s (%u)", 32*v, v);
+  snprintf(s, ITEM_LABEL_LENGTH, "%uus/s (%u)", 32*v, v);
 }
 
 static void
 lte_rrc_ue_RxTxTimeDiffResult_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "T < 2Ts (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "T < 2Ts (0)");
   } else if (v < 2048) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%uTs <= T < %uTs (%u)", v*2, (v+1)*2, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%uTs <= T < %uTs (%u)", v*2, (v+1)*2, v);
   } else if (v < 4095) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%uTs <= T < %uTs (%u)", (v*8)-12288, ((v+1)*8)-12288, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%uTs <= T < %uTs (%u)", (v*8)-12288, ((v+1)*8)-12288, v);
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "20472Ts <= T (4095)");
+    snprintf(s, ITEM_LABEL_LENGTH, "20472Ts <= T (4095)");
   }
 }
 
@@ -2530,18 +2537,18 @@ static value_string_ext lte_rrc_excessDelay_r13_vals_ext = VALUE_STRING_EXT_INIT
 static void
 lte_rrc_averageDelay_r16_fmt(gchar *s, guint32 v)
 {
-  g_snprintf(s, ITEM_LABEL_LENGTH, "%.1fms (%u)", (float)v/10, v);
+  snprintf(s, ITEM_LABEL_LENGTH, "%.1fms (%u)", (float)v/10, v);
 }
 
 static void
 lte_rrc_subframeBoundaryOffsetResult_r13_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "abs(deltaZ) < 700Ts (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "abs(deltaZ) < 700Ts (0)");
   } else if (v == 63) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "1320Ts < abs(deltaZ) (63)");
+    snprintf(s, ITEM_LABEL_LENGTH, "1320Ts < abs(deltaZ) (63)");
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%uTs < abs(deltaZ) <= %uTs (%u)", 700+(v-1)*10, 700+v*10, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%uTs < abs(deltaZ) <= %uTs (%u)", 700+(v-1)*10, 700+v*10, v);
   }
 }
 
@@ -2549,11 +2556,11 @@ static void
 lte_rrc_RS_SINR_Range_r13_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "RS-SINR < -23dB (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "RS-SINR < -23dB (0)");
   } else if (v == 127) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "40dB <= RS-SINR (127)");
+    snprintf(s, ITEM_LABEL_LENGTH, "40dB <= RS-SINR (127)");
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= RS-SINR < %.1fdB (%u)", (((float)v-1)/2)-23, ((float)v/2)-23, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= RS-SINR < %.1fdB (%u)", (((float)v-1)/2)-23, ((float)v/2)-23, v);
   }
 }
 
@@ -2561,11 +2568,11 @@ static void
 lte_rrc_RS_SINR_RangeNR_r15_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "SS-SINR < -23dB (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "SS-SINR < -23dB (0)");
   } else if (v == 127) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "40dB < SS-SINR (127)");
+    snprintf(s, ITEM_LABEL_LENGTH, "40dB < SS-SINR (127)");
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= SS-SINR < %.1fdB (%u)", (((float)v-1)/2)-23, ((float)v/2)-23, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= SS-SINR < %.1fdB (%u)", (((float)v-1)/2)-23, ((float)v/2)-23, v);
   }
 }
 
@@ -2573,47 +2580,47 @@ static void
 lte_rrc_RSSI_Range_r13_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "RSSI < -100dBm (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "RSSI < -100dBm (0)");
   } else if (v == 76) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "-25dBm <= RSSI (76)");
+    snprintf(s, ITEM_LABEL_LENGTH, "-25dBm <= RSSI (76)");
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%ddBm <= RSSI < %ddBm (%u)", -100+(v-1), -100+v, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%ddBm <= RSSI < %ddBm (%u)", -100+(v-1), -100+v, v);
   }
 }
 
 static void
 lte_rrc_scptm_FreqOffset_r14_fmt(gchar *s, guint32 v)
 {
-  g_snprintf(s, ITEM_LABEL_LENGTH, "%udB (%u)", 2*v, v);
+  snprintf(s, ITEM_LABEL_LENGTH, "%udB (%u)", 2*v, v);
 }
 
 static void
 lte_rrc_offsetDFN_r14_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "0ms (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "0ms (0)");
   } else if (v < 1000) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%.3fms (%u)", ((float)v)/1000, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%.3fms (%u)", ((float)v)/1000, v);
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "1ms (1000)");
+    snprintf(s, ITEM_LABEL_LENGTH, "1ms (1000)");
   }
 }
 
 static void
 lte_rrc_thresholdWLAN_RSSI_fmt(gchar *s, guint32 v)
 {
-  g_snprintf(s, ITEM_LABEL_LENGTH, "%ddBm (%u)", -128+v, v);
+  snprintf(s, ITEM_LABEL_LENGTH, "%ddBm (%u)", -128+v, v);
 }
 
 static void
 lte_rrc_cr_Limit_r14_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "0 (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "0 (0)");
   } else if (v < 10000) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%.4f (%u)", ((float)v)/10000, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%.4f (%u)", ((float)v)/10000, v);
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "1 (10000)");
+    snprintf(s, ITEM_LABEL_LENGTH, "1 (10000)");
   }
 }
 
@@ -2621,18 +2628,18 @@ static void
 lte_rrc_SL_CBR_r14_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "0 (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "0 (0)");
   } else if (v < 100) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%.2f (%u)", ((float)v)/100, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2f (%u)", ((float)v)/100, v);
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "1 (100)");
+    snprintf(s, ITEM_LABEL_LENGTH, "1 (100)");
   }
 }
 
 static void
 lte_rrc_threshS_RSSI_CBR_r14_fmt(gchar *s, guint32 v)
 {
-  g_snprintf(s, ITEM_LABEL_LENGTH, "%ddBm (%u)", -112+(2*v), v);
+  snprintf(s, ITEM_LABEL_LENGTH, "%ddBm (%u)", -112+(2*v), v);
 }
 
 static const value_string lte_rrc_schedulingInfoSIB1_NB_r13_vals[] = {
@@ -2656,11 +2663,11 @@ static void
 lte_rrc_NRSRP_Range_NB_r14_fmt(gchar *s, guint32 v)
 {
   if (v == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "NRSRP < -156dBm (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "NRSRP < -156dBm (0)");
   } else if (v < 113) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%ddBm <= NRSRP < %ddBm (%u)", v-157, v-156, v);
+    snprintf(s, ITEM_LABEL_LENGTH, "%ddBm <= NRSRP < %ddBm (%u)", v-157, v-156, v);
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "-44dBm <= NRSRP (97)");
+    snprintf(s, ITEM_LABEL_LENGTH, "-44dBm <= NRSRP (97)");
   }
 }
 
@@ -2669,32 +2676,32 @@ lte_rrc_NRSRQ_Range_NB_r14_fmt(gchar *s, guint32 v)
 {
   gint32 rsrq = (guint32)v;
   if (rsrq == -30) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "NRSRQ < -34dB (-30)");
+    snprintf(s, ITEM_LABEL_LENGTH, "NRSRQ < -34dB (-30)");
   } else if (rsrq < 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= NRSRQ < %.1fdB (%d)", (((float)rsrq-1)/2)-19, ((float)rsrq/2)-19, rsrq);
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= NRSRQ < %.1fdB (%d)", (((float)rsrq-1)/2)-19, ((float)rsrq/2)-19, rsrq);
   } else if (rsrq == 0) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "NRSRQ < -19.5dB (0)");
+    snprintf(s, ITEM_LABEL_LENGTH, "NRSRQ < -19.5dB (0)");
   } else if (rsrq < 34) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= NRSRQ < %.1fdB (%d)", (((float)rsrq-1)/2)-19.5, ((float)rsrq/2)-19.5, rsrq);
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= NRSRQ < %.1fdB (%d)", (((float)rsrq-1)/2)-19.5, ((float)rsrq/2)-19.5, rsrq);
   } else if (rsrq == 34) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "-3 <= NRSRQ (34)");
+    snprintf(s, ITEM_LABEL_LENGTH, "-3 <= NRSRQ (34)");
   } else if (rsrq < 46) {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= NRSRQ < %.1fdB (%d)", (((float)rsrq-1)/2)-20, ((float)rsrq/2)-20, rsrq);
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fdB <= NRSRQ < %.1fdB (%d)", (((float)rsrq-1)/2)-20, ((float)rsrq/2)-20, rsrq);
   } else {
-    g_snprintf(s, ITEM_LABEL_LENGTH, "2.5dB <= NRSRQ (46)");
+    snprintf(s, ITEM_LABEL_LENGTH, "2.5dB <= NRSRQ (46)");
   }
 }
 
 static void
 lte_rrc_mbms_MaxBW_r14_fmt(gchar *s, guint32 v)
 {
-  g_snprintf(s, ITEM_LABEL_LENGTH, "%u MHz (%u)", 40*v, v);
+  snprintf(s, ITEM_LABEL_LENGTH, "%u MHz (%u)", 40*v, v);
 }
 
 static void
 lte_rrc_dl_1024QAM_TotalWeightedLayers_r15_fmt(gchar *s, guint32 v)
 {
-  g_snprintf(s, ITEM_LABEL_LENGTH, "%u (%u)", 10+(2*v), v);
+  snprintf(s, ITEM_LABEL_LENGTH, "%u (%u)", 10+(2*v), v);
 }
 
 static void
@@ -2736,10 +2743,11 @@ typedef struct lte_rrc_private_data_t
   guint8 warning_message_segment_number;
   drb_mapping_t drb_mapping;
   drx_config_t  drx_config;
-  pdcp_security_info_t pdcp_security;
+  pdcp_lte_security_info_t pdcp_security;
   meas_capabilities_item_band_mappings_t meas_capabilities_item_band_mappings;
   simult_pucch_pusch_cell_type cell_type;
   gboolean bcch_dl_sch_msg;
+  lpp_pos_sib_type_t pos_sib_type;
 } lte_rrc_private_data_t;
 
 /* Helper function to get or create a struct that will be actx->private_data */
@@ -2750,7 +2758,7 @@ static lte_rrc_private_data_t* lte_rrc_get_private_data(asn1_ctx_t *actx)
   }
   else {
     lte_rrc_private_data_t* new_struct =
-      wmem_new0(wmem_packet_scope(), lte_rrc_private_data_t);
+      wmem_new0(actx->pinfo->pool, lte_rrc_private_data_t);
     actx->private_data = new_struct;
     return new_struct;
   }
@@ -2871,7 +2879,7 @@ static void private_data_set_ra_preambles(asn1_ctx_t *actx, guint8 ra_preambles)
 
 
 /* PDCP Security info */
-static pdcp_security_info_t* private_data_pdcp_security_algorithms(asn1_ctx_t *actx)
+static pdcp_lte_security_info_t* private_data_pdcp_security_algorithms(asn1_ctx_t *actx)
 {
   lte_rrc_private_data_t *private_data = (lte_rrc_private_data_t*)lte_rrc_get_private_data(actx);
   return &private_data->pdcp_security;
@@ -2928,6 +2936,18 @@ static void private_data_set_bcch_dl_sch_msg(asn1_ctx_t *actx, gboolean is_bcch_
   private_data->bcch_dl_sch_msg = is_bcch_dl_sch;
 }
 
+static lpp_pos_sib_type_t private_data_get_pos_sib_type(asn1_ctx_t *actx)
+{
+  lte_rrc_private_data_t *private_data = (lte_rrc_private_data_t*)lte_rrc_get_private_data(actx);
+  return private_data->pos_sib_type;
+}
+
+static void private_data_set_pos_sib_type(asn1_ctx_t *actx, lpp_pos_sib_type_t pos_sib_type)
+{
+  lte_rrc_private_data_t *private_data = (lte_rrc_private_data_t*)lte_rrc_get_private_data(actx);
+  private_data->pos_sib_type = pos_sib_type;
+}
+
 /*****************************************************************************/
 
 
@@ -2936,7 +2956,7 @@ lte_rrc_localTimeOffset_fmt(gchar *s, guint32 v)
 {
   gint32 time_offset = (gint32) v;
 
-  g_snprintf(s, ITEM_LABEL_LENGTH, "UTC time %c %dhr %dmin (%d)",
+  snprintf(s, ITEM_LABEL_LENGTH, "UTC time %c %dhr %dmin (%d)",
              (time_offset < 0) ? '-':'+', abs(time_offset) >> 2,
              (abs(time_offset) & 0x03) * 15, time_offset);
 }
@@ -2962,7 +2982,7 @@ dissect_lte_rrc_warningMessageSegment(tvbuff_t *warning_msg_seg_tvb, proto_tree 
     cb_data_page_tvb = tvb_new_subset_length(warning_msg_seg_tvb, offset, length);
     cb_data_tvb = dissect_cbs_data(dataCodingScheme, cb_data_page_tvb, tree, pinfo, 0);
     if (cb_data_tvb) {
-      str = tvb_get_string_enc(wmem_packet_scope(), cb_data_tvb, 0, tvb_reported_length(cb_data_tvb), ENC_UTF_8|ENC_NA);
+      str = tvb_get_string_enc(pinfo->pool, cb_data_tvb, 0, tvb_reported_length(cb_data_tvb), ENC_UTF_8|ENC_NA);
       proto_tree_add_string_format(tree, hf_lte_rrc_warningMessageSegment_decoded_page, warning_msg_seg_tvb, offset, 83,
                                    str, "Decoded Page %u: %s", i+1, str);
     }
@@ -3596,6 +3616,53 @@ dissect_lte_rrc_BCCH_DL_SCH_MBMS(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
   return tvb_captured_length(tvb);
 }
 
+static int
+dissect_lte_rrc_ue_eutra_capability_msg(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U_)
+{
+    proto_item* ti;
+    proto_tree* lte_rrc_tree;
+
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "LTE RRC UE EUTRA Capability");
+    col_clear(pinfo->cinfo, COL_INFO);
+
+    ti = proto_tree_add_item(tree, proto_lte_rrc, tvb, 0, -1, ENC_NA);
+    lte_rrc_tree = proto_item_add_subtree(ti, ett_lte_rrc);
+    dissect_lte_rrc_UE_EUTRA_Capability_PDU(tvb, pinfo, lte_rrc_tree, NULL);
+    return tvb_captured_length(tvb);
+}
+
+static int
+dissect_lte_rrc_ueradioaccesscapabilityinformation_msg(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U_)
+{
+    proto_item* ti;
+    proto_tree* lte_rrc_tree;
+
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "LTE RRC UERadioAccessCapabilityInformation");
+    col_clear(pinfo->cinfo, COL_INFO);
+
+    ti = proto_tree_add_item(tree, proto_lte_rrc, tvb, 0, -1, ENC_NA);
+    lte_rrc_tree = proto_item_add_subtree(ti, ett_lte_rrc);
+    dissect_lte_rrc_UERadioAccessCapabilityInformation_PDU(tvb, pinfo, lte_rrc_tree, NULL);
+    return tvb_captured_length(tvb);
+}
+
+static int
+dissect_lte_rrc_dissect_SystemInformationBlockType1_v890_IEs(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, void* data _U_)
+{
+    proto_item* ti;
+    proto_tree* lte_rrc_tree;
+
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "LTE RRC SystemInformationBlockType1-v890-IEs");
+    col_set_str(pinfo->cinfo, COL_INFO, "LTE RRC SystemInformationBlockType1-v890-IEs");
+
+    ti = proto_tree_add_item(tree, proto_lte_rrc, tvb, 0, -1, ENC_NA);
+    lte_rrc_tree = proto_item_add_subtree(ti, ett_lte_rrc);
+    dissect_SystemInformationBlockType1_v890_IEs_PDU(tvb, pinfo, lte_rrc_tree, NULL);
+    return tvb_captured_length(tvb);
+}
+
+
+
 /*--- proto_register_rrc -------------------------------------------*/
 void proto_register_lte_rrc(void) {
 
@@ -4018,7 +4085,7 @@ void proto_register_lte_rrc(void) {
         NULL, HFILL }},
     { &hf_lte_rrc_warningMessageSegment_decoded_page,
       { "Decoded Page", "lte-rrc.warningMessageSegment.decoded_page",
-        FT_STRING, STR_UNICODE, NULL, 0,
+        FT_STRING, BASE_NONE, NULL, 0,
         NULL, HFILL }},
     { &hf_lte_rrc_interBandTDD_CA_WithDifferentConfig_bit1,
       { "Bit 1", "lte-rrc.interBandTDD_CA_WithDifferentConfig.bit1",
@@ -4412,7 +4479,11 @@ void proto_register_lte_rrc(void) {
     &ett_lte_rrc_ueAssistanceInformationNR_r16,
     &ett_lte_rrc_sl_ParameterNR_r16,
     &ett_lte_rrc_v2x_BandParametersNR_r16,
-    &ett_lte_rrc_ueAssistanceInformationNR_SCG_r16
+    &ett_lte_rrc_ueAssistanceInformationNR_SCG_r16,
+    &ett_lte_rrc_assistanceDataSIB_Element_r15,
+    &ett_lte_rrc_overheatingAssistanceForSCG_r16,
+    &ett_lte_rrc_overheatingAssistanceForSCG_FR2_2_r17,
+    &ett_lte_rrc_triggerConditionSN_r17
   };
 
   static ei_register_info ei[] = {
@@ -4429,6 +4500,7 @@ void proto_register_lte_rrc(void) {
   };
 
   expert_module_t* expert_lte_rrc;
+  module_t *lte_rrc_module;
 
   /* Register protocol */
   proto_lte_rrc = proto_register_protocol(PNAME, PSNAME, PFNAME);
@@ -4458,6 +4530,9 @@ void proto_register_lte_rrc(void) {
   register_dissector("lte_rrc.sc_mcch.nb", dissect_lte_rrc_SC_MCCH_NB, proto_lte_rrc);
   register_dissector("lte_rrc.bcch_bch.mbms", dissect_lte_rrc_BCCH_BCH_MBMS, proto_lte_rrc);
   register_dissector("lte_rrc.bcch_dl_sch.mbms", dissect_lte_rrc_BCCH_DL_SCH_MBMS, proto_lte_rrc);
+  register_dissector("lte-rrc.ue_eutra_cap.msg", dissect_lte_rrc_ue_eutra_capability_msg, proto_lte_rrc);
+  register_dissector("lte-rrc.ue_radio_access_cap_info.msg", dissect_lte_rrc_ueradioaccesscapabilityinformation_msg, proto_lte_rrc);
+  register_dissector("lte-rrc.systeminformationblocktype1_v890_ies", dissect_lte_rrc_dissect_SystemInformationBlockType1_v890_IEs, proto_lte_rrc);
 
   /* Register fields and subtrees */
   proto_register_field_array(proto_lte_rrc, hf, array_length(hf));
@@ -4476,6 +4551,12 @@ void proto_register_lte_rrc(void) {
   reassembly_table_register(&lte_rrc_sib12_reassembly_table,
                         &addresses_reassembly_table_functions);
 
+  /* Register configuration preferences */
+  lte_rrc_module = prefs_register_protocol(proto_lte_rrc, NULL);
+  prefs_register_bool_preference(lte_rrc_module, "nas_in_root_tree",
+                                 "Show NAS PDU in root packet details",
+                                 "Whether the NAS PDU should be shown in the root packet details tree",
+                                 &lte_rrc_nas_in_root_tree);
 }
 
 
@@ -4485,6 +4566,7 @@ proto_reg_handoff_lte_rrc(void)
 {
   dissector_add_for_decode_as_with_preference("udp.port", lte_rrc_dl_ccch_handle);
   nas_eps_handle = find_dissector("nas-eps");
+  nas_5gs_handle = find_dissector("nas-5gs");
   rrc_irat_ho_to_utran_cmd_handle = find_dissector("rrc.irat.ho_to_utran_cmd");
   rrc_sys_info_cont_handle = find_dissector("rrc.sysinfo.cont");
   gsm_a_dtap_handle = find_dissector("gsm_a_dtap");

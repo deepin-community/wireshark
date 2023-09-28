@@ -65,6 +65,10 @@ static gboolean dct3trace_read(wtap *wth, wtap_rec *rec,
 static gboolean dct3trace_seek_read(wtap *wth, gint64 seek_off,
 	wtap_rec *rec, Buffer *buf, int *err, gchar **err_info);
 
+static int dct3trace_file_type_subtype = -1;
+
+void register_dct3trace(void);
+
 /*
  * Following 3 functions taken from gsmdecode-0.7bis, with permission:
  *
@@ -127,7 +131,7 @@ xml_get_int(int *val, const char *str, const char *pattern, int *err, gchar **er
 	ptr = strstr(str, pattern);
 	if (ptr == NULL) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("dct3trace: %s not found", pattern);
+		*err_info = ws_strdup_printf("dct3trace: %s not found", pattern);
 		return FALSE;
 	}
 	/*
@@ -136,7 +140,7 @@ xml_get_int(int *val, const char *str, const char *pattern, int *err, gchar **er
 	start = strchr(ptr, '"');
 	if (start == NULL) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("dct3trace: opening quote for %s not found", pattern);
+		*err_info = ws_strdup_printf("dct3trace: opening quote for %s not found", pattern);
 		return FALSE;
 	}
 	start++;
@@ -147,12 +151,12 @@ xml_get_int(int *val, const char *str, const char *pattern, int *err, gchar **er
 	end = strchr(start, '"');
 	if (end == NULL) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("dct3trace: closing quote for %s not found", pattern);
+		*err_info = ws_strdup_printf("dct3trace: closing quote for %s not found", pattern);
 		return FALSE;
 	}
 	if (end - start > 31) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("dct3trace: %s value is too long", pattern);
+		*err_info = ws_strdup_printf("dct3trace: %s value is too long", pattern);
 		return FALSE;
 	}
 
@@ -166,16 +170,16 @@ xml_get_int(int *val, const char *str, const char *pattern, int *err, gchar **er
 		*err = WTAP_ERR_BAD_FILE;
 		if (errno == ERANGE) {
 			if (*val < 0)
-				*err_info = g_strdup_printf("dct3trace: %s value is too small, minimum is %d", pattern, *val);
+				*err_info = ws_strdup_printf("dct3trace: %s value is too small, minimum is %d", pattern, *val);
 			else
-				*err_info = g_strdup_printf("dct3trace: %s value is too large, maximum is %d", pattern, *val);
+				*err_info = ws_strdup_printf("dct3trace: %s value is too large, maximum is %d", pattern, *val);
 		} else
-			*err_info = g_strdup_printf("dct3trace: %s value \"%s\" not a number", pattern, buf);
+			*err_info = ws_strdup_printf("dct3trace: %s value \"%s\" not a number", pattern, buf);
 		return FALSE;
 	}
 	if (*endptr != '\0') {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("dct3trace: %s value \"%s\" not a number", pattern, buf);
+		*err_info = ws_strdup_printf("dct3trace: %s value \"%s\" not a number", pattern, buf);
 		return FALSE;
 	}
 	return TRUE;
@@ -204,7 +208,7 @@ wtap_open_return_val dct3trace_open(wtap *wth, int *err, gchar **err_info)
 	}
 
 	wth->file_encap = WTAP_ENCAP_GSM_UM;
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_DCT3TRACE;
+	wth->file_type_subtype = dct3trace_file_type_subtype;
 	wth->snapshot_length = 0; /* not known */
 	wth->subtype_read = dct3trace_read;
 	wth->subtype_seek_read = dct3trace_seek_read;
@@ -246,6 +250,7 @@ static gboolean dct3trace_get_packet(FILE_T fh, wtap_rec *rec,
 			{
 				/* We've got a full packet! */
 				rec->rec_type = REC_TYPE_PACKET;
+				rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 				rec->presence_flags = 0; /* no time stamp, no separate "on the wire" length */
 				rec->ts.secs = 0;
 				rec->ts.nsecs = 0;
@@ -317,7 +322,7 @@ static gboolean dct3trace_get_packet(FILE_T fh, wtap_rec *rec,
 				if (len == -1)
 				{
 					*err = WTAP_ERR_BAD_FILE;
-					*err_info = g_strdup_printf("dct3trace: record length %d too long", rec->rec_header.packet_header.caplen);
+					*err_info = ws_strdup_printf("dct3trace: record length %d too long", rec->rec_header.packet_header.caplen);
 					return FALSE;
 				}
 			}
@@ -357,7 +362,7 @@ static gboolean dct3trace_get_packet(FILE_T fh, wtap_rec *rec,
 			if (data_len == -1)
 			{
 				*err = WTAP_ERR_BAD_FILE;
-				*err_info = g_strdup_printf("dct3trace: record length %d too long", rec->rec_header.packet_header.caplen);
+				*err_info = ws_strdup_printf("dct3trace: record length %d too long", rec->rec_header.packet_header.caplen);
 				return FALSE;
 			}
 			len += data_len;
@@ -396,6 +401,31 @@ static gboolean dct3trace_seek_read(wtap *wth, gint64 seek_off,
 	}
 
 	return dct3trace_get_packet(wth->random_fh, rec, buf, err, err_info);
+}
+
+static const struct supported_block_type dct3trace_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info dct3trace_info = {
+	"Gammu DCT3 trace", "dct3trace", "xml", NULL,
+	FALSE, BLOCKS_SUPPORTED(dct3trace_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_dct3trace(void)
+{
+	dct3trace_file_type_subtype = wtap_register_file_type_subtype(&dct3trace_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("DCT3TRACE",
+	    dct3trace_file_type_subtype);
 }
 
 /*

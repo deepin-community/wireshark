@@ -1,7 +1,7 @@
 /* packet-selfm.c
  * Routines for Schweitzer Engineering Laboratories (SEL) Protocols Dissection
  * By Chris Bontje (cbontje[AT]gmail.com
- * Copyright 2012-2018,
+ * Copyright 2012-2021,
  *
  ************************************************************************************************
  * Wireshark - Network traffic analyzer
@@ -54,13 +54,12 @@
 #include "packet-tcp.h"
 #include <epan/prefs.h>
 #include <epan/to_str.h>
+#include <epan/strutil.h>
 #include <epan/reassemble.h>
 #include <epan/expert.h>
 #include <epan/crc16-tvb.h>
 #include <epan/proto_data.h>
-#if 0
-#include <stdio.h>
-#endif
+
 void proto_register_selfm(void);
 
 /* Initialize the protocol and registered fields */
@@ -1117,7 +1116,7 @@ dissect_relaydef_frame(tvbuff_t *tvb, proto_tree *tree, int offset)
 /* Code to dissect Fast Meter Configuration Frames */
 /******************************************************************************************************/
 static int
-dissect_fmconfig_frame(tvbuff_t *tvb, proto_tree *tree, int offset)
+dissect_fmconfig_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int offset)
 {
     /* Set up structures needed to add the protocol subtree and manage it */
     proto_tree    *fmconfig_tree, *fmconfig_ai_tree=NULL, *fmconfig_calc_tree=NULL;
@@ -1159,13 +1158,13 @@ dissect_fmconfig_frame(tvbuff_t *tvb, proto_tree *tree, int offset)
 
     /* Get AI Channel Details */
     for (count = 0; count < num_ai; count++) {
-        ai_name = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 6, ENC_ASCII);
+        ai_name = tvb_get_string_enc(pinfo->pool, tvb, offset, 6, ENC_ASCII);
 
         fmconfig_ai_tree = proto_tree_add_subtree_format(fmconfig_tree, tvb, offset, 10,
                     ett_selfm_fmconfig_ai, NULL, "Analog Channel: %s", ai_name);
 
         /* Add Channel Name, Channel Data Type, Scale Factor Type and Scale Factor Offset to tree */
-        proto_tree_add_item(fmconfig_ai_tree, hf_selfm_fmconfig_ai_channel, tvb, offset, 6, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(fmconfig_ai_tree, hf_selfm_fmconfig_ai_channel, tvb, offset, 6, ENC_ASCII);
         proto_tree_add_item(fmconfig_ai_tree, hf_selfm_fmconfig_ai_type, tvb, offset+6, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(fmconfig_ai_tree, hf_selfm_fmconfig_ai_sf_type, tvb, offset+7, 1, ENC_BIG_ENDIAN);
         proto_tree_add_item(fmconfig_ai_tree, hf_selfm_fmconfig_ai_sf_ofs, tvb, offset+8, 2, ENC_BIG_ENDIAN);
@@ -1230,14 +1229,16 @@ dissect_fmdata_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int of
     proto_item       *fmdata_item, *fmdata_dig_ch_item;
     proto_item       *fmdata_ai_sf_item;
     proto_tree       *fmdata_tree, *fmdata_ai_tree=NULL, *fmdata_dig_tree=NULL, *fmdata_ai_ch_tree=NULL, *fmdata_dig_ch_tree=NULL;
-    guint8           len, idx=0, j=0, ts_mon, ts_day, ts_year, ts_hour, ts_min, ts_sec;
-    guint16          config_cmd, ts_msec;
+    guint8           len, idx=0, j=0;
+    guint16          config_cmd;
     gint16           ai_int16val;
     gint             cnt = 0, ch_size=0;
     gfloat           ai_sf_fp;
     gboolean         config_found = FALSE;
     fm_conversation  *conv;
     fm_config_frame  *cfg_data = NULL;
+    nstime_t  datetime;
+    struct tm tm;
 
     len = tvb_get_guint8(tvb, offset);
 
@@ -1260,7 +1261,7 @@ dissect_fmdata_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int of
 
                 /* If the stored config_cmd matches the expected one we are looking for, mark that the config data was found */
                 if (config_cmd == config_cmd_match) {
-                    proto_item_append_text(fmdata_item, ", using frame number %"G_GUINT32_FORMAT" as Configuration Frame",
+                    proto_item_append_text(fmdata_item, ", using frame number %"PRIu32" as Configuration Frame",
                                    cfg_data->fnum);
                     config_found = TRUE;
                 }
@@ -1379,15 +1380,18 @@ dissect_fmdata_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int of
                 if (cfg_data->offset_ts != 0xFFFF) {
                     /* Retrieve timestamp from 8-byte format                         */
                     /* Stored as: month, day, year (xx), hr, min, sec, msec (16-bit) */
-                    ts_mon  = tvb_get_guint8(tvb, offset);
-                    ts_day  = tvb_get_guint8(tvb, offset+1);
-                    ts_year = tvb_get_guint8(tvb, offset+2);
-                    ts_hour = tvb_get_guint8(tvb, offset+3);
-                    ts_min  = tvb_get_guint8(tvb, offset+4);
-                    ts_sec  = tvb_get_guint8(tvb, offset+5);
-                    ts_msec = tvb_get_ntohs(tvb, offset+6);
-                    proto_tree_add_bytes_format_value(fmdata_tree, hf_selfm_fmdata_timestamp, tvb, offset, 8, NULL,
-                            "%.2d/%.2d/%.2d %.2d:%.2d:%.2d.%.3d", ts_mon, ts_day, ts_year, ts_hour, ts_min, ts_sec, ts_msec);
+                    tm.tm_mon = tvb_get_guint8(tvb, offset) - 1;
+                    tm.tm_mday = tvb_get_guint8(tvb, offset+1);
+                    tm.tm_year = tvb_get_guint8(tvb, offset+2) + 100;
+                    tm.tm_hour = tvb_get_guint8(tvb, offset+3);
+                    tm.tm_min = tvb_get_guint8(tvb, offset+4);
+                    tm.tm_sec = tvb_get_guint8(tvb, offset+5);
+                    tm.tm_isdst = 0;
+
+                    datetime.nsecs = (tvb_get_ntohs(tvb, offset+6) % 1000) * 1000000;
+                    datetime.secs = mktime(&tm);
+
+                    proto_tree_add_time(fmdata_tree, hf_selfm_fmdata_timestamp, tvb, offset, 8, &datetime);
 
                     offset += 8;
                 }
@@ -1835,7 +1839,7 @@ dissect_fastmsg_readresp_frame(tvbuff_t *tvb, proto_tree *fastmsg_tree, packet_i
 
                         case FAST_MSG_TAGTYPE_CHAR8:
                         case FAST_MSG_TAGTYPE_CHAR16:
-                            proto_tree_add_item(fastmsg_tag_tree, hf_selfm_fmdata_ai_value_string, payload_tvb, payload_offset, data_size, ENC_ASCII|ENC_NA);
+                            proto_tree_add_item(fastmsg_tag_tree, hf_selfm_fmdata_ai_value_string, payload_tvb, payload_offset, data_size, ENC_ASCII);
                             payload_offset += data_size;
                             break;
 
@@ -2055,7 +2059,7 @@ dissect_fastmsg_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int o
             proto_tree_add_item(fastmsg_tree, hf_selfm_fastmsg_unsresp_doy, tvb, offset, 2, ENC_BIG_ENDIAN);
             proto_tree_add_item(fastmsg_tree, hf_selfm_fastmsg_unsresp_year, tvb, offset+2, 2, ENC_BIG_ENDIAN);
             proto_tree_add_uint_format_value(fastmsg_tree, hf_selfm_fastmsg_unsresp_todms, tvb, offset+4, 4,
-                                        tod_ms, "%s", signed_time_msecs_to_str(wmem_packet_scope(), tod_ms));
+                                        tod_ms, "%s", signed_time_msecs_to_str(pinfo->pool, tod_ms));
             offset += 8;
 
             /* Build element tree */
@@ -2096,7 +2100,7 @@ dissect_fastmsg_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int o
                 proto_tree_add_item(fastmsg_element_tree, hf_selfm_fastmsg_unsresp_elmt_idx, tvb, offset, 1, ENC_BIG_ENDIAN);
                 proto_tree_add_item(fastmsg_element_tree, hf_selfm_fastmsg_unsresp_elmt_ts_ofs, tvb, offset+1, 3, ENC_BIG_ENDIAN);
                 proto_tree_add_uint_format_value(fastmsg_element_tree, hf_selfm_fastmsg_unsresp_elmt_ts_ofs_decoded, tvb, offset+1, 3,
-                                     tod_ms + (elmt_ts_offset/1000), "%s", signed_time_msecs_to_str(wmem_packet_scope(), tod_ms + (elmt_ts_offset/1000)));
+                                     tod_ms + (elmt_ts_offset/1000), "%s", signed_time_msecs_to_str(pinfo->pool, tod_ms + (elmt_ts_offset/1000)));
                 proto_tree_add_uint(fastmsg_element_tree, hf_selfm_fastmsg_unsresp_elmt_status, tvb, elmt_status32_ofs, 4, elmt_status);
 
                 offset += 4;
@@ -2256,8 +2260,8 @@ dissect_fastmsg_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int o
         case FAST_MSG_DEVDESC_RESP:  /* 0xB0 (resp to 0x30) - Device Description Response */
 
             /* Add FID / RID ASCII data to tree */
-            proto_tree_add_item(fastmsg_tree, hf_selfm_fid, tvb, offset, 50, ENC_ASCII|ENC_NA);
-            proto_tree_add_item(fastmsg_tree, hf_selfm_rid, tvb, offset+50, 40, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(fastmsg_tree, hf_selfm_fid, tvb, offset, 50, ENC_ASCII);
+            proto_tree_add_item(fastmsg_tree, hf_selfm_rid, tvb, offset+50, 40, ENC_ASCII);
             offset += 90;
 
             /* 16-bit field with number of data areas */
@@ -2286,7 +2290,7 @@ dissect_fastmsg_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int o
                                 ett_selfm_fastmsg_datareg, NULL, "Fast Message Data Region #%d", cnt+1);
 
                 /* 10-Byte Region description */
-                proto_tree_add_item(fastmsg_datareg_tree, hf_selfm_fastmsg_data_region_name, tvb, offset, 10, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(fastmsg_datareg_tree, hf_selfm_fastmsg_data_region_name, tvb, offset, 10, ENC_ASCII);
                 offset += 10;
 
                 /* 32-bit field with base address of data region */
@@ -2333,7 +2337,7 @@ dissect_fastmsg_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int o
 
             while ((tvb_reported_length_remaining(tvb, offset)) > 2) {
                 /* Data Item record name 10 bytes */
-                tag_name_ptr = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 10, ENC_ASCII);
+                tag_name_ptr = tvb_get_string_enc(pinfo->pool, tvb, offset, 10, ENC_ASCII);
                 fastmsg_tag_tree = proto_tree_add_subtree_format(fastmsg_tree, tvb, offset, 14, ett_selfm_fastmsg_tag, NULL, "Data Item Record Name: %s", tag_name_ptr);
 
                 /* Data item qty and type */
@@ -2353,7 +2357,7 @@ dissect_fastmsg_frame(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int o
             /* find the null separators and add the bit label text strings to the tree */
             for (null_offset = offset; null_offset < len; null_offset++) {
                 if ((tvb_memeql(tvb, null_offset, "\x00", 1) == 0) && (tvb_reported_length_remaining(tvb, offset) > 2)) {
-                    gchar* str = tvb_format_text(tvb, offset, (null_offset-offset));
+                    gchar* str = tvb_format_text(pinfo->pool, tvb, offset, (null_offset-offset));
                     proto_tree_add_string_format(fastmsg_tree, hf_selfm_fastmsg_bit_label_name, tvb, offset, (null_offset-offset), str,
                             "Bit Label #%d Name: %s", cnt, str);
                     offset = null_offset+1; /* skip the null */
@@ -2431,7 +2435,7 @@ dissect_selfm(tvbuff_t *selfm_tvb, packet_info *pinfo, proto_tree *tree, void* d
             fm_conv_data->fastser_uns_wordbits = wmem_tree_new(wmem_file_scope());
             conversation_add_proto_data(conversation, proto_selfm, (void *)fm_conv_data);
 
-            uns_ser_split_str = wmem_strsplit(wmem_packet_scope(), selfm_ser_list, ",", -1);
+            uns_ser_split_str = wmem_strsplit(pinfo->pool, selfm_ser_list, ",", -1);
 
             for (cnt = 0; (uns_ser_split_str[cnt] != NULL); cnt++) {
                 fastser_uns_wordbit *wordbit_ptr = fastser_uns_wordbit_save(cnt, uns_ser_split_str[cnt]);
@@ -2569,7 +2573,7 @@ dissect_selfm(tvbuff_t *selfm_tvb, packet_info *pinfo, proto_tree *tree, void* d
                     case CMD_FM_CONFIG:
                     case CMD_DFM_CONFIG:
                     case CMD_PDFM_CONFIG:
-                        consumed_bytes = dissect_fmconfig_frame(selfm_tvb, selfm_tree, offset);
+                        consumed_bytes = dissect_fmconfig_frame(selfm_tvb, selfm_tree, pinfo, offset);
                         break;
                     case CMD_FM_DATA:
                         consumed_bytes = dissect_fmdata_frame(selfm_tvb, selfm_tree, pinfo, offset, CMD_FM_CONFIG);
@@ -3024,7 +3028,7 @@ proto_register_selfm(void)
         { &hf_selfm_fid, { "FID", "selfm.fid", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
         { &hf_selfm_rid, { "RID", "selfm.rid", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
         { &hf_selfm_fastmsg_data_region_name, { "Data Region Name", "selfm.fastmsg.data_region_name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
-        { &hf_selfm_fmdata_timestamp, { "Timestamp", "selfm.fmdata.timestamp", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL }},
+        { &hf_selfm_fmdata_timestamp, { "Timestamp", "selfm.fmdata.timestamp", FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0x0, NULL, HFILL }},
         { &hf_selfm_fmdata_frame_data_format_reference, { "Frame Data Format Reference", "selfm.fmdata.frame_data_format_reference", FT_FRAMENUM, BASE_NONE, NULL, 0x0, NULL, HFILL }},
         { &hf_selfm_fastmsg_bit_label_name, { "Bit Label Name", "selfm.fastmsg.bit_label_name", FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
     };

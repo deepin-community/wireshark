@@ -306,7 +306,7 @@ ldapstat_init(struct register_srt* srt _U_, GArray* srt_array)
 }
 
 static tap_packet_status
-ldapstat_packet(void *pldap, packet_info *pinfo, epan_dissect_t *edt _U_, const void *psi)
+ldapstat_packet(void *pldap, packet_info *pinfo, epan_dissect_t *edt _U_, const void *psi, tap_flags_t flags _U_)
 {
   guint i = 0;
   srt_stat_table *ldap_srt_table;
@@ -483,7 +483,7 @@ attribute_types_update_cb(void *r, char **err)
    */
   c = proto_check_field_name(rec->attribute_type);
   if (c) {
-    *err = g_strdup_printf("Attribute type can't contain '%c'", c);
+    *err = ws_strdup_printf("Attribute type can't contain '%c'", c);
     return FALSE;
   }
 
@@ -576,7 +576,7 @@ attribute_types_post_update_cb(void)
 
       dynamic_hf[i].p_id = hf_id;
       dynamic_hf[i].hfinfo.name = attribute_type;
-      dynamic_hf[i].hfinfo.abbrev = g_strdup_printf("ldap.AttributeValue.%s", attribute_type);
+      dynamic_hf[i].hfinfo.abbrev = ws_strdup_printf("ldap.AttributeValue.%s", attribute_type);
       dynamic_hf[i].hfinfo.type = FT_STRING;
       dynamic_hf[i].hfinfo.display = BASE_NONE;
       dynamic_hf[i].hfinfo.strings = NULL;
@@ -676,8 +676,8 @@ dissect_ldap_AssertionValue(gboolean implicit_tag, tvbuff_t *tvb, int offset, as
     /* This octet string contained a GUID */
     dissect_dcerpc_uuid_t(tvb, offset, actx->pinfo, tree, drep, hf_ldap_guid, &uuid);
 
-    ldapvalue_string=(char*)wmem_alloc(wmem_packet_scope(), 1024);
-    g_snprintf(ldapvalue_string, 1023, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+    ldapvalue_string=(char*)wmem_alloc(actx->pinfo->pool, 1024);
+    snprintf(ldapvalue_string, 1023, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
                uuid.data1, uuid.data2, uuid.data3, uuid.data4[0], uuid.data4[1],
                uuid.data4[2], uuid.data4[3], uuid.data4[4], uuid.data4[5],
                uuid.data4[6], uuid.data4[7]);
@@ -690,8 +690,8 @@ dissect_ldap_AssertionValue(gboolean implicit_tag, tvbuff_t *tvb, int offset, as
     /* get flag value to populate ldapvalue_string */
     flags=tvb_get_letohl(tvb, offset);
 
-    ldapvalue_string=(char*)wmem_alloc(wmem_packet_scope(), 1024);
-    g_snprintf(ldapvalue_string, 1023, "0x%08x",flags);
+    ldapvalue_string=(char*)wmem_alloc(actx->pinfo->pool, 1024);
+    snprintf(ldapvalue_string, 1023, "0x%08x",flags);
 
     /* populate bitmask subtree */
     offset = dissect_mscldap_ntver_flags(tree, tvb, offset);
@@ -717,9 +717,9 @@ dissect_ldap_AssertionValue(gboolean implicit_tag, tvbuff_t *tvb, int offset, as
 
   /* convert the string into a printable string */
   if(is_ascii){
-    ldapvalue_string= tvb_get_string_enc(wmem_packet_scope(), tvb, offset, len, ENC_UTF_8|ENC_NA);
+    ldapvalue_string= tvb_get_string_enc(actx->pinfo->pool, tvb, offset, len, ENC_UTF_8|ENC_NA);
   } else {
-    ldapvalue_string= tvb_bytes_to_str_punct(wmem_packet_scope(), tvb, offset, len, ':');
+    ldapvalue_string= tvb_bytes_to_str_punct(actx->pinfo->pool, tvb, offset, len, ':');
   }
 
   proto_tree_add_string(tree, hf_index, tvb, offset, len, ldapvalue_string);
@@ -830,7 +830,7 @@ ldap_match_call_response(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gu
       case LDAP_REQ_COMPARE:
       case LDAP_REQ_EXTENDED:
 
-        /* this a a request - add it to the unmatched list */
+        /* this is a request - add it to the unmatched list */
 
         /* check that we don't already have one of those in the
            unmatched list and if so remove it */
@@ -1056,6 +1056,10 @@ static void
   ldap_conv_info_t *ldap_info = NULL;
   proto_item *ldap_item = NULL;
   proto_tree *ldap_tree = NULL;
+  guint32 sasl_length = 0;
+  guint32 remaining_length = 0;
+  guint8 sasl_start[2] = { 0, };
+  gboolean detected_sasl_security = FALSE;
 
   ldm_tree = NULL;
 
@@ -1094,12 +1098,29 @@ static void
   * check if it looks like it could be a SASL blob here
   * and in that case just assume it is GSS-SPNEGO
   */
-  if(!doing_sasl_security && (tvb_bytes_exist(tvb, offset, 5))
-    &&(tvb_get_ntohl(tvb, offset)<=(guint)(tvb_reported_length_remaining(tvb, offset)-4))
-    &&(tvb_get_guint8(tvb, offset+4)==0x60) ){
+  if(!doing_sasl_security && tvb_bytes_exist(tvb, offset, 6)) {
+      sasl_length = tvb_get_ntohl(tvb, offset);
+      remaining_length = tvb_reported_length_remaining(tvb, offset);
+      sasl_start[0] = tvb_get_guint8(tvb, offset+4);
+      sasl_start[1] = tvb_get_guint8(tvb, offset+5);
+  }
+  if ((sasl_length + 4) <= remaining_length) {
+      if (sasl_start[0] == 0x05 && sasl_start[1] == 0x04) {
+        /*
+         * Likely modern kerberos signing
+         */
+        detected_sasl_security = TRUE;
+      } else if (sasl_start[0] == 0x60) {
+        /*
+         * Likely ASN.1 based kerberos
+         */
+        detected_sasl_security = TRUE;
+      }
+  }
+  if (detected_sasl_security) {
       ldap_info->auth_type=LDAP_AUTH_SASL;
       ldap_info->first_auth_frame=pinfo->num;
-      ldap_info->auth_mech=wmem_strdup(wmem_file_scope(), "GSS-SPNEGO");
+      ldap_info->auth_mech=wmem_strdup(wmem_file_scope(), "UNKNOWN");
       doing_sasl_security=TRUE;
   }
 
@@ -1302,7 +1323,7 @@ int dissect_mscldap_string(tvbuff_t *tvb, int offset, char *str, int max_len, gb
 
   /* The name data MUST start at offset 0 of the tvb */
   compr_len = get_dns_name(tvb, offset, max_len, 0, &name, &name_len);
-  g_strlcpy(str, name, max_len);
+  (void) g_strlcpy(str, name, max_len);
   return offset + compr_len;
 }
 
@@ -1654,12 +1675,12 @@ dissect_ldap_oid(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void* 
    *       proto_tree_add_oid() instead.
    */
 
-  oid=tvb_get_string_enc(wmem_packet_scope(), tvb, 0, tvb_reported_length(tvb), ENC_UTF_8|ENC_NA);
+  oid=tvb_get_string_enc(pinfo->pool, tvb, 0, tvb_reported_length(tvb), ENC_UTF_8|ENC_NA);
   if(!oid){
     return tvb_captured_length(tvb);
   }
 
-  oidname=oid_resolved_from_string(wmem_packet_scope(), oid);
+  oidname=oid_resolved_from_string(pinfo->pool, oid);
 
   if(oidname){
     proto_tree_add_string_format_value(tree, hf_ldap_oid, tvb, 0, tvb_reported_length(tvb), oid, "%s (%s)",oid,oidname);
@@ -1731,8 +1752,8 @@ dissect_ldap_guid(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
   /* This octet string contained a GUID */
   dissect_dcerpc_uuid_t(tvb, 0, pinfo, tree, drep, hf_ldap_guid, &uuid);
 
-  ldapvalue_string=(char*)wmem_alloc(wmem_packet_scope(), 1024);
-  g_snprintf(ldapvalue_string, 1023, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+  ldapvalue_string=(char*)wmem_alloc(pinfo->pool, 1024);
+  snprintf(ldapvalue_string, 1023, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
              uuid.data1, uuid.data2, uuid.data3, uuid.data4[0], uuid.data4[1],
              uuid.data4[2], uuid.data4[3], uuid.data4[4], uuid.data4[5],
              uuid.data4[6], uuid.data4[7]);
@@ -2097,7 +2118,7 @@ void proto_register_ldap(void) {
 
     { &hf_mscldap_netlogon_flags_fnc,
       { "FDC", "mscldap.netlogon.flags.forestnc", FT_BOOLEAN, 32,
-        TFS(&tfs_ads_fnc), 0x80000000, "Is the the NC the default forest root(Windows 2008)?", HFILL }},
+        TFS(&tfs_ads_fnc), 0x80000000, "Is the NC the default forest root(Windows 2008)?", HFILL }},
 
     { &hf_ldap_guid,
       { "GUID", "ldap.guid", FT_GUID, BASE_NONE,

@@ -12,7 +12,7 @@
 #include "config.h"
 #include <epan/packet.h>
 #include <epan/to_str.h>
-
+#include <wsutil/ws_roundup.h>
 
 #define PATHPORT_UDP_PORT  3792 /* Not IANA registered */
 #define PATHPORT_MIN_LENGTH 24 /* HEADER + 1 PDU */
@@ -26,7 +26,7 @@
 #define PATHPORT_HEADER_END (PATHPORT_HEADER_OFFSET + PATHPORT_HEADER_LENGTH)
 
 /** Rounds the specified integer up to the next multiple of four. */
-#define roof4(a) (((a)+3)&~3)
+#define roof4(a) WS_ROUNDUP_4(a)
 
 void proto_reg_handoff_pathport(void);
 void proto_register_pathport(void);
@@ -331,7 +331,7 @@ static const value_string pp_pid_vals[] = {
     {0, NULL}
 };
 
-value_string_ext pp_pid_vals_ext = VALUE_STRING_EXT_INIT(pp_pid_vals);
+static value_string_ext pp_pid_vals_ext = VALUE_STRING_EXT_INIT(pp_pid_vals);
 
 /** Unknown type format. */
 #define TYPE_UNKNOWN "Unknown (%04x)"
@@ -572,7 +572,7 @@ static int dissect_pathport_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree
         if((type == PP_ARP_REPLY) && (len >= 36))
         {
             guint32 id = tvb_get_ntohl(tvb, 24);
-            col_add_fstr(pinfo->cinfo, COL_INFO, "%s is at %s", resolve_pp_id(id), tvb_ip_to_str(tvb, 28));
+            col_add_fstr(pinfo->cinfo, COL_INFO, "%s is at %s", resolve_pp_id(id), tvb_ip_to_str(pinfo->pool, tvb, 28));
         }
         else if((type == PP_DATA) && (len >= 32))
         {

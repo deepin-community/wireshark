@@ -77,7 +77,6 @@ static int
 dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* data)
 {
 	proto_item  *volatile ti = NULL;
-	guint	     cap_len = 0, frame_len = 0;
 	proto_tree  *volatile fh_tree = NULL;
 	proto_tree  *volatile tree;
 	proto_item  *item;
@@ -94,6 +93,8 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 	if(!proto_field_is_referenced(tree, proto_file)) {
 		tree=NULL;
 	} else {
+		guint	     cap_len, frame_len;
+
 		/* Put in frame header information. */
 		cap_len = tvb_captured_length(tvb);
 		frame_len = tvb_reported_length(tvb);
@@ -140,7 +141,7 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 		if (show_file_off) {
 			proto_tree_add_int64_format_value(fh_tree, hf_frame_file_off, tvb,
 						    0, 0, pinfo->fd->file_off,
-						    "%" G_GINT64_MODIFIER "d (0x%" G_GINT64_MODIFIER "x)",
+						    "%" PRId64 " (0x%" PRIx64 ")",
 						    pinfo->fd->file_off, pinfo->fd->file_off);
 		}
 #endif
@@ -195,7 +196,7 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 				/* XXX - add other hardware exception codes as required */
 			default:
 				show_exception(tvb, pinfo, parent_tree, DissectorError,
-					       g_strdup_printf("dissector caused an unknown exception: 0x%x", GetExceptionCode()));
+					       ws_strdup_printf("dissector caused an unknown exception: 0x%x", GetExceptionCode()));
 			}
 		}
 #endif
@@ -206,7 +207,7 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 	ENDTRY;
 
 	if(proto_field_is_referenced(tree, hf_file_protocols)) {
-		wmem_strbuf_t *val = wmem_strbuf_new(wmem_packet_scope(), "");
+		wmem_strbuf_t *val = wmem_strbuf_new(pinfo->pool, "");
 		wmem_list_frame_t *frame;
 		/* skip the first entry, it's always the "frame" protocol */
 		frame = wmem_list_frame_next(wmem_list_head(pinfo->layers));
@@ -260,7 +261,7 @@ dissect_file_record(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, 
 					/* XXX - add other hardware exception codes as required */
 				default:
 					show_exception(tvb, pinfo, parent_tree, DissectorError,
-						       g_strdup_printf("dissector caused an unknown exception: 0x%x", GetExceptionCode()));
+						       ws_strdup_printf("dissector caused an unknown exception: 0x%x", GetExceptionCode()));
 				}
 			}
 #endif

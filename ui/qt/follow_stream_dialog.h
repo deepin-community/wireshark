@@ -1,4 +1,4 @@
-/* follow_stream_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -29,6 +29,7 @@
 #include <QFile>
 #include <QMap>
 #include <QPushButton>
+#include <QTextCodec>
 
 namespace Ui {
 class FollowStreamDialog;
@@ -45,12 +46,10 @@ public:
     void addCodecs(const QMap<QString, QTextCodec *> &codecMap);
     bool follow(QString previous_filter = QString(), bool use_stream_index = false, guint stream_num = 0, guint sub_stream_num = 0);
 
-public slots:
-    void captureEvent(CaptureEvent e);
-
 protected:
     bool eventFilter(QObject *obj, QEvent *event);
     void keyPressEvent(QKeyEvent *event);
+    void captureFileClosed();
 
 private slots:
     void on_cbCharset_currentIndexChanged(int idx);
@@ -85,14 +84,14 @@ private:
     void updateWidgets() { updateWidgets(false); } // Needed for WiresharkDialog?
     frs_return_t
     showBuffer(char *buffer, size_t nchars, gboolean is_from_server,
-                guint32 packet_num, guint32 *global_pos);
+                guint32 packet_num, nstime_t abs_ts, guint32 *global_pos);
 
     frs_return_t readStream();
     frs_return_t readFollowStream();
     frs_return_t readSslStream();
 
     void followStream();
-    void addText(QString text, gboolean is_from_server, guint32 packet_num);
+    void addText(QString text, gboolean is_from_server, guint32 packet_num, gboolean colorize = true);
 
     Ui::FollowStreamDialog  *ui;
 
@@ -129,16 +128,3 @@ private:
 };
 
 #endif // FOLLOW_STREAM_DIALOG_H
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

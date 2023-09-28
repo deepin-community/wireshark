@@ -1080,7 +1080,7 @@ dissect_cat(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 		ti = proto_tree_add_bytes_format(cat_tree, hf_cat_tlv, tvb, pos,
 					    len, ptr, "%s: %s",
 					    val_to_str_ext(tag, &comp_tlv_tag_vals_ext, "%02x"),
-					    (len > 0) ? tvb_bytes_to_str(wmem_packet_scope(), tvb, pos, len) : "");
+					    (len > 0) ? tvb_bytes_to_str(pinfo->pool, tvb, pos, len) : "");
 #else
 		ti = proto_tree_add_bytes_format(cat_tree, hf_cat_tlv, tvb, pos,
 					    len, ptr, "%s:   ",
@@ -1233,7 +1233,7 @@ dissect_cat(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 				break;
 			case 0x04: /* 8bit */
 				/* XXX - ASCII, or some extended ASCII? */
-				proto_tree_add_item(elem_tree, hf_ctlv_text_string, tvb, pos+1, len-1, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(elem_tree, hf_ctlv_text_string, tvb, pos+1, len-1, ENC_ASCII);
 				break;
 			case 0x08: /* UCS2 */
 				proto_tree_add_item(elem_tree, hf_ctlv_text_string, tvb, pos+1, len-1, ENC_UCS_2|ENC_BIG_ENDIAN);
@@ -1341,16 +1341,16 @@ dissect_cat(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 			}
 			break;
 		case 0x28:	/* AT Command */
-			proto_tree_add_item(elem_tree, hf_ctlv_at_cmd, tvb, pos, len, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(elem_tree, hf_ctlv_at_cmd, tvb, pos, len, ENC_ASCII);
 			break;
 		case 0x29:	/* AT Response */
-			proto_tree_add_item(elem_tree, hf_ctlv_at_rsp, tvb, pos, len, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(elem_tree, hf_ctlv_at_rsp, tvb, pos, len, ENC_ASCII);
 			break;
 		case 0x2c:	/* DTMF string */
 			dissect_cat_efadn_coding(tvb, elem_tree, pos, len, hf_ctlv_dtmf_string);
 			break;
 		case 0x2d:	/* language */
-			proto_tree_add_item(elem_tree, hf_ctlv_language, tvb, pos, len, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(elem_tree, hf_ctlv_language, tvb, pos, len, ENC_ASCII);
 			break;
 		case 0x2e:	/* Timing Advance */
 			proto_tree_add_item(elem_tree, hf_ctlv_me_status, tvb, pos, 1, ENC_BIG_ENDIAN);
@@ -1507,7 +1507,7 @@ dissect_cat(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 			break;
 		case 0x78:	/* NMEA sentence / IMS Status-Code */
 			if (ims_event) {
-				guint8 *status_code = tvb_get_string_enc(wmem_packet_scope(), tvb, pos, len, ENC_ASCII);
+				guint8 *status_code = tvb_get_string_enc(pinfo->pool, tvb, pos, len, ENC_ASCII);
 				proto_tree_add_string_format_value(elem_tree, hf_ctlv_ims_status_code, tvb, pos, len,
 					status_code, "%s (%s)", status_code, str_to_str(status_code, ims_status_code, "Unknown"));
 			}
@@ -1606,7 +1606,7 @@ proto_register_card_app_toolkit(void)
 		},
 		{ &hf_ctlv_alpha_id_string,
 			{ "Alpha Identifier String", "etsi_cat.comp_tlv.alpha_id.string",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_address_ton,
@@ -1621,12 +1621,12 @@ proto_register_card_app_toolkit(void)
 		},
 		{ &hf_ctlv_address_string,
 			{ "Address String", "etsi_cat.comp_tlv.address.string",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_subaddress_string,
 			{ "Subaddress String", "etsi_cat.comp_tlv.subaddress.string",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_result_gen,
@@ -1671,7 +1671,7 @@ proto_register_card_app_toolkit(void)
 		},
 		{ &hf_ctlv_text_string,
 			{ "Text String", "etsi_cat.comp_tlv.text",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_event,
@@ -1691,7 +1691,7 @@ proto_register_card_app_toolkit(void)
 		},
 		{ &hf_ctlv_item_string,
 			{ "Item String", "etsi_cat.comp_tlv.item.string",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_loc_status,
@@ -1751,22 +1751,22 @@ proto_register_card_app_toolkit(void)
 		},
 		{ &hf_ctlv_at_cmd,
 			{ "AT Command", "etsi_cat.comp_tlv.at_cmd",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_at_rsp,
 			{ "AT Response", "etsi_cat.comp_tlv.at_rsp",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_dtmf_string,
 			{ "DMTF String", "etsi_cat.comp_tlv.dtmf.string",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_language,
 			{ "Language", "etsi_cat.comp_tlv.language",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_me_status,
@@ -2021,17 +2021,17 @@ proto_register_card_app_toolkit(void)
 		},
 		{ &hf_ctlv_iari,
 			{ "IARI", "etsi_cat.comp_tlv.iari",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_impu,
 			{ "IMPU", "etsi_cat.comp_tlv.impu",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_ims_status_code,
 			{ "IMS Status-Code", "etsi_cat.comp_tlv.ims_status_code",
-			  FT_STRING, STR_UNICODE, NULL, 0,
+			  FT_STRING, BASE_NONE, NULL, 0,
 			  NULL, HFILL },
 		},
 		{ &hf_ctlv_broadcast_nw_tech,

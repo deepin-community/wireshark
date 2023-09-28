@@ -1,4 +1,4 @@
-/* progress_frame.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -18,7 +18,7 @@ namespace Ui {
 class ProgressFrame;
 }
 
-#if defined(Q_OS_WIN)
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0)) && defined(Q_OS_WIN)
 #include <QWinTaskbarButton>
 #include <QWinTaskbarProgress>
 #endif
@@ -89,16 +89,3 @@ private slots:
 };
 
 #endif // PROGRESS_FRAME_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

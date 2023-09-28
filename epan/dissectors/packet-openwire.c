@@ -670,7 +670,7 @@ dissect_openwire_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int o
         proto_item * cached_item = NULL;
         inlined = tvb_get_guint8(tvb, offset + 0) == TRUE ? TRUE : FALSE;
         cachedID = tvb_get_ntohs(tvb, offset + 1);
-        cache_str = wmem_strdup_printf(wmem_packet_scope(), " (CachedID: %d)", cachedID);
+        cache_str = wmem_strdup_printf(pinfo->pool, " (CachedID: %d)", cachedID);
         if (openwire_verbose_type)
         {
             proto_tree_add_item(tree, hf_openwire_cached_inlined, tvb, offset, 1, ENC_BIG_ENDIAN);
@@ -1085,7 +1085,7 @@ dissect_openwire_command(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, in
     {
         if (tvb_reported_length_remaining(tvb, offset) >= 17)
         {
-            proto_tree_add_item(tree, hf_openwire_wireformatinfo_magic, tvb, offset + 0, 8, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_openwire_wireformatinfo_magic, tvb, offset + 0, 8, ENC_ASCII);
             proto_tree_add_item(tree, hf_openwire_wireformatinfo_version, tvb, offset + 8, 4, ENC_BIG_ENDIAN);
             proto_tree_add_item(tree, hf_openwire_wireformatinfo_data, tvb, offset + 12, 1, ENC_BIG_ENDIAN);
             proto_tree_add_item(tree, hf_openwire_wireformatinfo_length, tvb, offset + 13, 4, ENC_BIG_ENDIAN);

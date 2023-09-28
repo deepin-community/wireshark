@@ -690,7 +690,7 @@ dissect_sabp_T_pLMNidentity(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx 
 	 if (!parameter_tvb)
 		return offset;
 	subtree = proto_item_add_subtree(actx->created_item, ett_sabp_e212);
-	dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, E212_NONE, FALSE);
+	dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, subtree, 0, E212_SAI, FALSE);
 
 
 
@@ -1782,7 +1782,7 @@ dissect_sabp_cb_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     if (unpacked_tvb != NULL){
       if (tree != NULL){
         proto_tree *cbs_page_subtree = proto_item_add_subtree(cbs_page_item, ett_sabp_cbs_page_content);
-        proto_tree_add_item(cbs_page_subtree, hf_sabp_cbs_page_content, unpacked_tvb, 0, len, ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(cbs_page_subtree, hf_sabp_cbs_page_content, unpacked_tvb, 0, len, ENC_UTF_8);
       }
     }
 
@@ -1865,7 +1865,7 @@ void proto_register_sabp(void) {
         NULL, HFILL }},
     { &hf_sabp_cbs_page_content,
       { "CBS Page Content", "sabp.cb_page_content",
-        FT_STRING, STR_UNICODE, NULL, 0,
+        FT_STRING, BASE_NONE, NULL, 0,
         NULL, HFILL }},
     { &hf_sabp_cb_inf_len,
       { "CBS-Message-Information-Length", "sabp.cb_inf_len",

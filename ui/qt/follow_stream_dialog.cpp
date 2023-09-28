@@ -10,12 +10,14 @@
 #include "follow_stream_dialog.h"
 #include <ui_follow_stream_dialog.h>
 
+#include "main_application.h"
 #include "main_window.h"
-#include "wireshark_application.h"
 
+#include "frame_tvbuff.h"
 #include "epan/follow.h"
 #include "epan/dissectors/packet-tcp.h"
 #include "epan/dissectors/packet-udp.h"
+#include "epan/dissectors/packet-dccp.h"
 #include "epan/dissectors/packet-http2.h"
 #include "epan/dissectors/packet-quic.h"
 #include "epan/prefs.h"
@@ -27,10 +29,11 @@
 #include "ui/alert_box.h"
 #include "ui/simple_dialog.h"
 #include <wsutil/utf8_entities.h>
+#include <wsutil/ws_assert.h>
 
 #include "wsutil/file_util.h"
 #include "wsutil/str_util.h"
-#include "version_info.h"
+#include "ui/version_info.h"
 
 #include "ws_symbol_export.h"
 
@@ -44,6 +47,7 @@
 #include <QElapsedTimer>
 #include <QKeyEvent>
 #include <QMessageBox>
+#include <QMutex>
 #include <QPrintDialog>
 #include <QPrinter>
 #include <QScrollBar>
@@ -59,6 +63,12 @@
 
 // Matches SplashOverlay.
 static int info_update_freq_ = 100;
+
+// Handle the loop breaking notification properly
+static QMutex loop_break_mutex;
+
+// Indicates that a Follow Stream is currently running
+static gboolean isReadRunning;
 
 FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_type_t type) :
     WiresharkDialog(parent, cf),
@@ -93,6 +103,9 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
     case FOLLOW_UDP:
         follower_ = get_follow_by_name("UDP");
         break;
+    case FOLLOW_DCCP:
+        follower_ = get_follow_by_name("DCCP");
+        break;
     case FOLLOW_HTTP:
         follower_ = get_follow_by_name("HTTP");
         break;
@@ -102,12 +115,16 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
     case FOLLOW_QUIC:
         follower_ = get_follow_by_name("QUIC");
         break;
+    case FOLLOW_SIP:
+        follower_ = get_follow_by_name("SIP");
+        break;
     default :
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     memset(&follow_info_, 0, sizeof(follow_info_));
     follow_info_.show_stream = BOTH_HOSTS;
+    follow_info_.substream_id = SUBSTREAM_UNUSED;
 
     ui->teStreamContent->installEventFilter(this);
 
@@ -144,8 +161,6 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
             this, SLOT(fillHintLabel(int)));
     connect(ui->teStreamContent, SIGNAL(mouseClickedOnTextCursorPosition(int)),
             this, SLOT(goToPacketForTextPos(int)));
-    connect(&cap_file_, SIGNAL(captureEvent(CaptureEvent)),
-            this, SLOT(captureEvent(CaptureEvent)));
 
     fillHintLabel(-1);
 }
@@ -161,11 +176,7 @@ void FollowStreamDialog::addCodecs(const QMap<QString, QTextCodec *> &codecMap)
     // Make the combobox respect max visible items?
     //ui->cbCharset->setStyleSheet("QComboBox { combobox-popup: 0;}");
     ui->cbCharset->insertSeparator(ui->cbCharset->count());
-#if QT_VERSION >= QT_VERSION_CHECK(5, 7, 0)
     for (const auto &codec : qAsConst(codecMap)) {
-#else
-    foreach (const QTextCodec *codec, codecMap) {
-#endif
         // This is already in the menu and handled separately
         if (codec->name() != "US-ASCII" && codec->name() != "UTF-8")
             ui->cbCharset->addItem(tr(codec->name()), SHOW_CODEC);
@@ -245,6 +256,9 @@ void FollowStreamDialog::updateWidgets(bool follow_in_progress)
     ui->cbDirections->setEnabled(enable);
     ui->cbCharset->setEnabled(enable);
     ui->streamNumberSpinBox->setEnabled(enable);
+    if (follow_type_ == FOLLOW_HTTP2 || follow_type_ == FOLLOW_QUIC) {
+        ui->subStreamNumberSpinBox->setEnabled(enable);
+    }
     ui->leFind->setEnabled(enable);
     ui->bFind->setEnabled(enable);
     b_filter_out_->setEnabled(enable);
@@ -269,7 +283,11 @@ void FollowStreamDialog::findText(bool go_back)
 
     bool found;
     if (use_regex_find_) {
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 13, 0))
+        QRegularExpression regex(ui->leFind->text(), QRegularExpression::UseUnicodePropertiesOption);
+#else
         QRegExp regex(ui->leFind->text());
+#endif
         found = ui->teStreamContent->find(regex);
     } else {
         found = ui->teStreamContent->find(ui->leFind->text());
@@ -285,7 +303,7 @@ void FollowStreamDialog::findText(bool go_back)
 
 void FollowStreamDialog::saveAs()
 {
-    QString file_name = WiresharkFileDialog::getSaveFileName(this, wsApp->windowTitleString(tr("Save Stream Content As…")));
+    QString file_name = WiresharkFileDialog::getSaveFileName(this, mainApp->windowTitleString(tr("Save Stream Content As…")));
     if (file_name.isEmpty()) {
         return;
     }
@@ -305,12 +323,12 @@ void FollowStreamDialog::saveAs()
     }
 
     QDataStream out(&file);
-    out.writeRawData(bytes.constData(), bytes.size());
+    out.writeRawData(bytes.constData(), static_cast<int>(bytes.size()));
 }
 
 void FollowStreamDialog::helpButton()
 {
-    wsApp->helpTopicAction(HELP_FOLLOW_STREAM_DIALOG);
+    mainApp->helpTopicAction(HELP_FOLLOW_STREAM_DIALOG);
 }
 
 void FollowStreamDialog::backButton()
@@ -392,12 +410,36 @@ void FollowStreamDialog::on_streamNumberSpinBox_valueChanged(int stream_num)
     sub_stream_num = ui->subStreamNumberSpinBox->value();
     ui->subStreamNumberSpinBox->blockSignals(false);
 
-    if (sub_stream_num < 0) {
-        sub_stream_num = 0;
+    gboolean ok;
+    if (ui->subStreamNumberSpinBox->isVisible()) {
+        /* We need to find a suitable sub stream for the new stream */
+        guint sub_stream_num_new = static_cast<guint>(sub_stream_num);
+        if (sub_stream_num < 0) {
+            // Stream ID 0 should always exist as it is used for control messages.
+            sub_stream_num_new = 0;
+            ok = TRUE;
+        } else if (follow_type_ == FOLLOW_HTTP2) {
+            ok = http2_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+            if (!ok) {
+                ok = http2_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+            }
+        } else if (follow_type_ == FOLLOW_QUIC) {
+            ok = quic_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+            if (!ok) {
+                ok = quic_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+            }
+        } else {
+            // Should not happen, this field is only visible for suitable protocols.
+            return;
+        }
+        sub_stream_num = static_cast<gint>(sub_stream_num_new);
+    } else {
+        ok = true;
     }
 
-    if (stream_num >= 0) {
+    if (stream_num >= 0 && ok) {
         follow(previous_filter_, true, stream_num, sub_stream_num);
+        previous_sub_stream_num_ = sub_stream_num;
     }
 }
 
@@ -425,8 +467,11 @@ void FollowStreamDialog::on_subStreamNumberSpinBox_valueChanged(int sub_stream_n
             ok = http2_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
         }
     } else if (follow_type_ == FOLLOW_QUIC) {
-        // TODO clamp the stream IDs correctly for QUIC
-        ok = TRUE;
+        if (previous_sub_stream_num_ < sub_stream_num) {
+            ok = quic_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+        } else {
+            ok = quic_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
+        }
     } else {
         // Should not happen, this field is only visible for suitable protocols.
         return;
@@ -496,6 +541,8 @@ void FollowStreamDialog::resetStream()
         follow_info_.fragments[1] = Q_NULLPTR;
     }
 
+    free_address(&follow_info_.client_ip);
+    free_address(&follow_info_.server_ip);
     follow_info_.payload = Q_NULLPTR;
     follow_info_.client_port = 0;
 }
@@ -504,8 +551,29 @@ frs_return_t
 FollowStreamDialog::readStream()
 {
 
+    // interrupt any reading already running
+    loop_break_mutex.lock();
+    isReadRunning = FALSE;
+    loop_break_mutex.unlock();
+
     ui->teStreamContent->clear();
     text_pos_to_packet_.clear();
+    switch (show_type_) {
+
+    case SHOW_CARRAY:
+    case SHOW_HEXDUMP:
+    case SHOW_YAML:
+        /* We control the width and insert line breaks in these formats. */
+        ui->teStreamContent->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+        break;
+
+    default:
+        /* Everything else might have extremely long lines without whitespace,
+         * (SHOW_RAW almost surely so), and QTextEdit is O(N^2) trying
+         * to search for word boundaries on long lines when adding text.
+         */
+        ui->teStreamContent->setWordWrapMode(QTextOption::WrapAnywhere);
+    }
 
     truncated_ = false;
     frs_return_t ret;
@@ -521,16 +589,18 @@ FollowStreamDialog::readStream()
 
     case FOLLOW_TCP :
     case FOLLOW_UDP :
+    case FOLLOW_DCCP :
     case FOLLOW_HTTP :
     case FOLLOW_HTTP2:
     case FOLLOW_QUIC:
     case FOLLOW_TLS :
+    case FOLLOW_SIP :
         ret = readFollowStream();
         break;
 
     default :
-        g_assert_not_reached();
         ret = (frs_return_t)0;
+        ws_assert_not_reached();
         break;
     }
 
@@ -546,7 +616,7 @@ FollowStreamDialog::followStream()
 }
 
 const int FollowStreamDialog::max_document_length_ = 500 * 1000 * 1000; // Just a guess
-void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 packet_num)
+void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 packet_num, gboolean colorize)
 {
     if (truncated_) {
         return;
@@ -561,8 +631,12 @@ void FollowStreamDialog::addText(QString text, gboolean is_from_server, guint32 
     setUpdatesEnabled(false);
     int cur_pos = ui->teStreamContent->verticalScrollBar()->value();
     ui->teStreamContent->moveCursor(QTextCursor::End);
+
     QTextCharFormat tcf = ui->teStreamContent->currentCharFormat();
-    if (is_from_server) {
+    if (!colorize) {
+        tcf.setBackground(palette().window().color());
+        tcf.setForeground(palette().windowText().color());
+    } else if (is_from_server) {
         tcf.setForeground(ColorUtils::fromColorT(prefs.st_server_fg));
         tcf.setBackground(ColorUtils::fromColorT(prefs.st_server_bg));
     } else {
@@ -646,7 +720,7 @@ static inline void sanitize_buffer(char *buffer, size_t nchars) {
 
 frs_return_t
 FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_server, guint32 packet_num,
-                                guint32 *global_pos)
+                                nstime_t abs_ts, guint32 *global_pos)
 {
     gchar initbuf[256];
     guint32 current_pos;
@@ -703,7 +777,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
                 memset(cur, ' ', 4);
                 cur += 4;
             }
-            cur += g_snprintf(cur, 20, "%08X  ", *global_pos);
+            cur += snprintf(cur, 20, "%08X  ", *global_pos);
             /* 49 is space consumed by hex chars */
             ascii_start = cur + 49 + 2;
             for (i = 0; i < 16 && current_pos + i < nchars; i++) {
@@ -739,7 +813,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
 
     case SHOW_CARRAY:
         current_pos = 0;
-        g_snprintf(initbuf, sizeof(initbuf), "char peer%d_%d[] = { /* Packet %u */\n",
+        snprintf(initbuf, sizeof(initbuf), "char peer%d_%d[] = { /* Packet %u */\n",
                    is_from_server ? 1 : 0,
                    is_from_server ? server_buffer_count_++ : client_buffer_count_++,
                    packet_num);
@@ -787,17 +861,63 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
         const int base64_raw_len = 57; // Encodes to 76 bytes, common in RFCs
         current_pos = 0;
 
+        if (last_packet_ == 0) {
+            // Header with general info about peers
+            const char *hostname0 = address_to_name(&follow_info_.client_ip);
+            const char *hostname1 = address_to_name(&follow_info_.server_ip);
+
+            char *port0 = get_follow_port_to_display(follower_)(NULL, follow_info_.client_port);
+            char *port1 = get_follow_port_to_display(follower_)(NULL, follow_info_.server_port);
+
+            addText("peers:\n", false, 0, false);
+
+            addText(QString(
+                "  - peer: 0\n"
+                "    host: %1\n"
+                "    port: %2\n")
+                .arg(hostname0)
+                .arg(port0), false, 0);
+
+            addText(QString(
+                "  - peer: 1\n"
+                "    host: %1\n"
+                "    port: %2\n")
+                .arg(hostname1)
+                .arg(port1), true, 0);
+
+            wmem_free(NULL, port0);
+            wmem_free(NULL, port1);
+
+            addText("packets:\n", false, 0, false);
+        }
+
         if (packet_num != last_packet_) {
-            yaml_text.append(QString("# Packet %1\npeer%2_%3: !!binary |\n")
-                    .arg(packet_num)
-                    .arg(is_from_server ? 1 : 0)
+            yaml_text.append(QString("  - packet: %1\n")
+                    .arg(packet_num));
+            yaml_text.append(QString("    peer: %1\n")
+                    .arg(is_from_server ? 1 : 0));
+            yaml_text.append(QString("    index: %1\n")
                     .arg(is_from_server ? server_buffer_count_++ : client_buffer_count_++));
+            yaml_text.append(QString("    timestamp: %1.%2\n")
+                    .arg(abs_ts.secs)
+                    .arg(abs_ts.nsecs, 9, 10, QChar('0')));
+            yaml_text.append(QString("    data: !!binary |\n"));
         }
         while (current_pos < nchars) {
             int len = current_pos + base64_raw_len < nchars ? base64_raw_len : (int) nchars - current_pos;
             QByteArray base64_data(&buffer[current_pos], len);
 
-            yaml_text += "  " + base64_data.toBase64() + "\n";
+            /* XXX: GCC 12.1 has a bogus stringop-overread warning using the Qt
+             * conversions from QByteArray to QString at -O2 and higher due to
+             * computing a branch that will never be taken.
+             */
+#if WS_IS_AT_LEAST_GNUC_VERSION(12,1)
+DIAG_OFF(stringop-overread)
+#endif
+            yaml_text += "      " + base64_data.toBase64() + "\n";
+#if WS_IS_AT_LEAST_GNUC_VERSION(12,1)
+DIAG_ON(stringop-overread)
+#endif
 
             current_pos += len;
             (*global_pos) += len;
@@ -853,13 +973,12 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
         return false;
     }
 
-    if (cap_file_.capFile()->edt == NULL)
-    {
-        QMessageBox::warning(this, tr("Error following stream."), tr("Capture file invalid."));
-        return false;
-    }
-
     if (!use_stream_index) {
+        if (cap_file_.capFile()->edt == NULL)
+        {
+            QMessageBox::warning(this, tr("Error following stream."), tr("Capture file invalid."));
+            return false;
+        }
         is_follower = proto_is_frame_protocol(cap_file_.capFile()->edt->pi.layers, proto_get_protocol_filter_name(get_follow_proto_id(follower_)));
         if (!is_follower) {
             QMessageBox::warning(this, tr("Error following stream."), tr("Please make sure you have a %1 packet selected.").arg
@@ -881,12 +1000,22 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     if (use_stream_index) {
         follow_filter = gchar_free_to_qstring(get_follow_index_func(follower_)(stream_num, sub_stream_num));
     } else {
-        follow_filter = gchar_free_to_qstring(get_follow_conv_func(follower_)(&cap_file_.capFile()->edt->pi, &stream_num, &sub_stream_num));
+        follow_filter = gchar_free_to_qstring(get_follow_conv_func(follower_)(cap_file_.capFile()->edt, &cap_file_.capFile()->edt->pi, &stream_num, &sub_stream_num));
     }
     if (follow_filter.isEmpty()) {
-        QMessageBox::warning(this,
-                             tr("Error creating filter for this stream."),
-                             tr("A transport or network layer header is needed."));
+        if (follow_type_ == FOLLOW_QUIC) {
+            QMessageBox::warning(this,
+                                 tr("Error creating filter for this stream."),
+                                 tr("QUIC streams not found on the selected packet."));
+        } else {
+            // XXX: This error probably has to do with tunneling, where
+            // the addresses or ports changed after the TCP or UDP layer.
+            // (The appropriate layer must be present, or else the GUI
+            // doesn't allow the option to be selected.)
+            QMessageBox::warning(this,
+                                 tr("Error creating filter for this stream."),
+                                 tr("A transport or network layer header is needed."));
+        }
         return false;
     }
 
@@ -900,6 +1029,8 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     {
         filter_out_filter_ = QString("!(%1)").arg(follow_filter);
     }
+
+    follow_info_.substream_id = sub_stream_num;
 
     /* data will be passed via tap callback*/
     if (!registerTapListener(get_follow_tap_string(follower_), &follow_info_,
@@ -943,6 +1074,18 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
 
         break;
     }
+    case FOLLOW_DCCP:
+    {
+        int stream_count = get_dccp_stream_count();
+        ui->streamNumberSpinBox->blockSignals(true);
+        ui->streamNumberSpinBox->setMaximum(stream_count-1);
+        ui->streamNumberSpinBox->setValue(stream_num);
+        ui->streamNumberSpinBox->blockSignals(false);
+        ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
+        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
+
+        break;
+    }
     case FOLLOW_HTTP2:
     {
         int stream_count = get_tcp_stream_count();
@@ -975,17 +1118,18 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
         ui->streamNumberSpinBox->setMaximum(stream_count-1);
         ui->streamNumberSpinBox->setValue(stream_num);
         ui->streamNumberSpinBox->blockSignals(false);
-        ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
+        ui->streamNumberSpinBox->setToolTip(tr("Total number of QUIC connections: %Ln", "", stream_count));
         ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
 
-        // TODO extract number of QUIC streams?
-        stream_count = G_MAXINT32;
+        guint substream_max_id = 0;
+        quic_get_stream_id_le(static_cast<guint>(stream_num), G_MAXINT32, &substream_max_id);
+        stream_count = static_cast<gint>(substream_max_id);
         ui->subStreamNumberSpinBox->blockSignals(true);
         ui->subStreamNumberSpinBox->setEnabled(true);
         ui->subStreamNumberSpinBox->setMaximum(stream_count);
         ui->subStreamNumberSpinBox->setValue(sub_stream_num);
         ui->subStreamNumberSpinBox->blockSignals(false);
-        ui->subStreamNumberSpinBox->setToolTip(tr("%Ln total sub stream(s).", "", stream_count));
+        ui->subStreamNumberSpinBox->setToolTip(tr("Max QUIC Stream ID for the selected connection: %Ln", "", stream_count));
         ui->subStreamNumberSpinBox->setToolTip(ui->subStreamNumberSpinBox->toolTip());
         ui->subStreamNumberSpinBox->setVisible(true);
         ui->subStreamNumberLabel->setVisible(true);
@@ -996,6 +1140,19 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     case FOLLOW_HTTP:
         /* No extra handling */
         break;
+    case FOLLOW_SIP:
+    {
+        /* There are no more streams */
+        ui->streamNumberSpinBox->setEnabled(false);
+        ui->streamNumberSpinBox->blockSignals(true);
+        ui->streamNumberSpinBox->setMaximum(0);
+        ui->streamNumberSpinBox->setValue(0);
+        ui->streamNumberSpinBox->blockSignals(false);
+        ui->streamNumberSpinBox->setToolTip(tr("No streams"));
+        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
+
+        break;
+    }
     }
 
     beginRetapPackets();
@@ -1020,7 +1177,7 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
             .arg(hostname1).arg(port1)
             .arg(gchar_free_to_qstring(format_size(
                                             follow_info_.bytes_written[0],
-                                        format_size_unit_bytes|format_size_prefix_si)));
+                                        FORMAT_SIZE_UNIT_BYTES, FORMAT_SIZE_PREFIX_SI)));
 
     client_to_server_string =
             QString("%1:%2 %3 %4:%5 (%6)")
@@ -1029,7 +1186,7 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
             .arg(hostname0).arg(port0)
             .arg(gchar_free_to_qstring(format_size(
                                             follow_info_.bytes_written[1],
-                                        format_size_unit_bytes|format_size_prefix_si)));
+                                        FORMAT_SIZE_UNIT_BYTES, FORMAT_SIZE_PREFIX_SI)));
 
     wmem_free(NULL, port0);
     wmem_free(NULL, port1);
@@ -1037,7 +1194,7 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     both_directions_string = tr("Entire conversation (%1)")
             .arg(gchar_free_to_qstring(format_size(
                                             follow_info_.bytes_written[0] + follow_info_.bytes_written[1],
-                    format_size_unit_bytes|format_size_prefix_si)));
+                    FORMAT_SIZE_UNIT_BYTES, FORMAT_SIZE_PREFIX_SI)));
     setWindowSubtitle(tr("Follow %1 Stream (%2)").arg(proto_get_protocol_short_name(find_protocol_by_id(get_follow_proto_id(follower_))))
                                                  .arg(follow_filter));
 
@@ -1061,15 +1218,12 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     return true;
 }
 
-void FollowStreamDialog::captureEvent(CaptureEvent e)
+void FollowStreamDialog::captureFileClosed()
 {
-    if ((e.captureContext() == CaptureEvent::File) &&
-            (e.eventType() == CaptureEvent::Closing)) {
-            QString tooltip = tr("File closed.");
-            ui->streamNumberSpinBox->setToolTip(tooltip);
-            ui->streamNumberLabel->setToolTip(tooltip);
-            WiresharkDialog::captureFileClosing();
-    }
+    QString tooltip = tr("File closed.");
+    ui->streamNumberSpinBox->setToolTip(tooltip);
+    ui->streamNumberLabel->setToolTip(tooltip);
+    WiresharkDialog::captureFileClosed();
 }
 
 /*
@@ -1102,8 +1256,12 @@ FollowStreamDialog::readFollowStream()
 
     elapsed_timer.start();
 
+    loop_break_mutex.lock();
+    isReadRunning = TRUE;
+    loop_break_mutex.unlock();
+
     for (cur = g_list_last(follow_info_.payload); cur; cur = g_list_previous(cur)) {
-        if (dialogClosed()) break;
+        if (dialogClosed() || !isReadRunning) break;
 
         follow_record = (follow_record_t *)cur->data;
         skip = FALSE;
@@ -1130,29 +1288,21 @@ FollowStreamDialog::readFollowStream()
                         follow_record->data->len,
                         follow_record->is_server,
                         follow_record->packet_num,
+                        follow_record->abs_ts,
                         global_pos);
             if (frs_return == FRS_PRINT_ERROR)
                 return frs_return;
             if (elapsed_timer.elapsed() > info_update_freq_) {
                 fillHintLabel(ui->teStreamContent->textCursor().position());
-                wsApp->processEvents();
+                mainApp->processEvents();
                 elapsed_timer.start();
             }
         }
     }
 
+    loop_break_mutex.lock();
+    isReadRunning = FALSE;
+    loop_break_mutex.unlock();
+
     return FRS_OK;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

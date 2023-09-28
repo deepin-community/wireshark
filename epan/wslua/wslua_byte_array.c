@@ -19,7 +19,6 @@
 
 #include "wslua.h"
 
-
 /* WSLUA_CONTINUE_MODULE Tvb */
 
 
@@ -90,11 +89,11 @@ static int ByteArray__gc(lua_State* L) {
 
 WSLUA_METAMETHOD ByteArray__concat(lua_State* L) {
     /* Concatenate two <<lua_class_ByteArray,`ByteArray`>>s. */
-#define WSLUA_ARG_ByteArray__cat_FIRST 1 /* First array. */
-#define WSLUA_ARG_ByteArray__cat_SECOND 2 /* Second array. */
+#define WSLUA_ARG_ByteArray__concat_FIRST 1 /* First array. */
+#define WSLUA_ARG_ByteArray__concat_SECOND 2 /* Second array. */
 
-    ByteArray ba1 = checkByteArray(L,WSLUA_ARG_ByteArray__cat_FIRST);
-    ByteArray ba2 = checkByteArray(L,WSLUA_ARG_ByteArray__cat_SECOND);
+    ByteArray ba1 = checkByteArray(L,WSLUA_ARG_ByteArray__concat_FIRST);
+    ByteArray ba2 = checkByteArray(L,WSLUA_ARG_ByteArray__concat_SECOND);
     ByteArray ba;
 
     ba = g_byte_array_new();
@@ -231,11 +230,11 @@ WSLUA_METHOD ByteArray_len(lua_State* L) {
 
 WSLUA_METHOD ByteArray_subset(lua_State* L) {
     /* Obtain a segment of a <<lua_class_ByteArray,`ByteArray`>>, as a new <<lua_class_ByteArray,`ByteArray`>>. */
-#define WSLUA_ARG_ByteArray_set_index_OFFSET 2 /* The position of the first byte (0=first). */
-#define WSLUA_ARG_ByteArray_set_index_LENGTH 3 /* The length of the segment. */
+#define WSLUA_ARG_ByteArray_subset_OFFSET 2 /* The position of the first byte (0=first). */
+#define WSLUA_ARG_ByteArray_subset_LENGTH 3 /* The length of the segment. */
     ByteArray ba = checkByteArray(L,1);
-    int offset = (int)luaL_checkinteger(L,WSLUA_ARG_ByteArray_set_index_OFFSET);
-    int len = (int)luaL_checkinteger(L,WSLUA_ARG_ByteArray_set_index_LENGTH);
+    int offset = (int)luaL_checkinteger(L,WSLUA_ARG_ByteArray_subset_OFFSET);
+    int len = (int)luaL_checkinteger(L,WSLUA_ARG_ByteArray_subset_LENGTH);
     ByteArray sub;
 
     if ((offset + len) > (int)ba->len || offset < 0 || len < 1) {
@@ -372,7 +371,7 @@ WSLUA_METHOD ByteArray_tvb (lua_State *L) {
         return 0;
     }
 
-    data = (guint8 *)g_memdup(ba->data, ba->len);
+    data = (guint8 *)g_memdup2(ba->data, ba->len);
 
     tvb = (Tvb)g_malloc(sizeof(struct _wslua_tvb));
     tvb->ws_tvb = tvb_new_child_real_data(lua_tvb, data, ba->len,ba->len);

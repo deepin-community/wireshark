@@ -314,7 +314,7 @@ dissect_acse_T_indirect_reference(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, 
 
   /* look up the indirect reference */
   if((oid = find_oid_by_pres_ctx_id(actx->pinfo, indir_ref)) != NULL) {
-    actx->external.direct_reference = wmem_strdup(wmem_packet_scope(), oid);
+    actx->external.direct_reference = wmem_strdup(actx->pinfo->pool, oid);
     actx->external.direct_ref_present = TRUE;
   }
 
@@ -2121,7 +2121,7 @@ void proto_register_acse(void) {
         FT_NONE, BASE_NONE, NULL, 0,
         NULL, HFILL }},
     { &hf_acse_pcontext_result,
-      { "result", "acse.result",
+      { "result", "acse.pcontext.result",
         FT_INT32, BASE_DEC, VALS(acse_Result_vals), 0,
         NULL, HFILL }},
     { &hf_acse_concrete_syntax_name,

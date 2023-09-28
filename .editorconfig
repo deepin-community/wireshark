@@ -16,8 +16,13 @@ trim_trailing_whitespace = true
 insert_final_newline = true
 
 # CMake
+# The CMake project itself uses two spaces:
+# https://gitlab.kitware.com/cmake/cmake/-/blob/master/.editorconfig
 [{CMake*,*.cmake,*.cmake.in}]
 indent_style = tab
+[CMake*.json]
+indent_style = space
+indent_size = 2
 
 # Makefiles. Although we dropped Autotools we still have a few lying around.
 [Makefile*]
@@ -26,6 +31,11 @@ indent_size = 8
 
 # Python
 [*.{py,py.in}]
+indent_style = space
+indent_size = 4
+
+# Lemon
+[*.lemon]
 indent_style = space
 indent_size = 4
 
@@ -44,67 +54,28 @@ indent_size = 2
 indent_style = space
 indent_size = 2
 
+# Asciidoc
+[*.adoc]
+indent_style = space
+indent_size = 4
+
 # GraphViz. The examples at https://gitlab.com/graphviz/graphviz/-/blob/master/graphs
 # seem to be all over the place, so just go with 4 spaces for now.
 [*.gv]
 indent_style = space
 indent_size = 4
 
-# C/C++
-[*.{c,cpp,h}]
+# manuf
+[manuf.tmpl]
+indent_style = tab
+indent_size = 8
+
+# C/C++/Objective C
+[*.{c,cpp,h,m}]
 indent_style = space
 indent_size = 4
 
-[{capinfos,captype,mergecap,tfshark,tshark}.c]
-indent_size = 2
-
-[{dftest,randpkt,trigcap}.c]
+# Flex (lexical analyzer generator)
+[*.l]
 indent_style = tab
-indent_size = tab
-
-[capture_stop_conditions.[ch]]
-indent_size = 2
-
-[cfile.[ch]]
-indent_size = 2
-
-[conditions.[ch]]
-indent_size = 2
-
-[file.[ch]]
-indent_size = 2
-
-[filter_files.[ch]]
-indent_size = 2
-
-[frame_tvbuff.[ch]]
-indent_style = tab
-indent_size = tab
-
-[pcapio.[ch]]
 indent_size = 8
-
-[ringbuffer.[ch]]
-indent_size = 2
-
-[summary.[ch]]
-indent_size = 2
-
-[randpkt_core.[ch]]
-indent_style = tab
-indent_size = tab
-
-[sharkd.c]
-indent_size = 2
-
-[sharkd_daemon.c]
-indent_style = tab
-indent_size = tab
-
-[sharkd_session.c]
-indent_style = tab
-indent_size = tab
-
-[version_info.[ch]]
-indent_style = tab
-indent_size = tab

@@ -42,6 +42,9 @@
         <Component Id="cmpAUTHORS_SHORT" Guid="*">
           <File Id="filAUTHORS_SHORT" KeyPath="yes" Source="$(var.Staging.Dir)\AUTHORS-SHORT" />
         </Component>
+        <Component Id="cmpGpl2_Standalone_html" Guid="*">
+          <File Id="filGpl2_Standalone_html" KeyPath="yes" Source="$(var.Staging.Dir)\gpl-2.0-standalone.html" />
+        </Component>
         <Component Id="cmpManuf" Guid="*">
           <File Id="filManuf" KeyPath="yes" Source="$(var.Staging.Dir)\manuf" />
         </Component>
@@ -87,6 +90,7 @@
         <ComponentRef Id="cmpREADME_txt" />
         <ComponentRef Id="cmpREADME_windows_txt" />
         <ComponentRef Id="cmpAUTHORS_SHORT" />
+        <ComponentRef Id="cmpGpl2_Standalone_html" />
         <ComponentRef Id="cmpManuf" />
         <ComponentRef Id="cmpWka" />
         <ComponentRef Id="cmpServices" />
@@ -221,6 +225,20 @@
       </ComponentGroup>
     </Fragment>
 
+  <!-- protobuf TLV definitions -->
+    <Fragment>
+      <DirectoryRef Id="dirProtobuf">
+        <Component Id="cmpProtobuf_sparkplug_b_proto" Guid="*">
+          <File Id="filProtobuf_sparkplug_b_proto" KeyPath="yes" Source="$(var.Protobuf.Dir)\sparkplug_b.proto" />
+        </Component>
+      </DirectoryRef>
+    </Fragment>
+    <Fragment>
+      <ComponentGroup Id="CG.Protobuf">
+        <ComponentRef Id="cmpProtobuf_sparkplug_b_proto" />
+      </ComponentGroup>
+    </Fragment>
+
   <!-- TShark -->
     <Fragment>
         <DirectoryRef Id="INSTALLFOLDER">
@@ -246,6 +264,9 @@
         <Component Id="cmpBluetooth_colorfilters" Guid="*">
           <File Id="filBluetooth_colorfilters" KeyPath="yes" Source="$(var.Profiles.Dir)\Bluetooth\colorfilters" />
         </Component>
+        <Component Id="cmpBluetooth_preferences" Guid="*">
+          <File Id="filBluetooth_preferences" KeyPath="yes" Source="$(var.Profiles.Dir)\Bluetooth\preferences" />
+        </Component>
       </Directory>
       <Directory Id="dirClassic" Name="Classic">
         <Component Id="cmpClassic_colorfilters" Guid="*">
@@ -262,6 +283,7 @@
   <Fragment>
     <ComponentGroup Id="CG.Plugins.ConfigurationProfiles">
       <ComponentRef Id="cmpBluetooth_colorfilters" />
+      <ComponentRef Id="cmpBluetooth_preferences" />
       <ComponentRef Id="cmpClassic_colorfilters" />
       <ComponentRef Id="cmpNoReassembly_preferences" />
     </ComponentGroup>
@@ -375,6 +397,24 @@
     </ComponentGroup>
   </Fragment>
 
+  <!-- Captype -->
+  <Fragment>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="cmpCaptype_exe" Guid="*">
+        <File Id="filCaptype_exe" KeyPath="yes" Source="$(var.Staging.Dir)\captype.exe" />
+      </Component>
+      <Component Id="cmpCaptype_html" Guid="*">
+        <File Id="filCaptype_html" KeyPath="yes" Source="$(var.Staging.Dir)\captype.html" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+  <Fragment>
+    <ComponentGroup Id="CG.Tools.Captype">
+      <ComponentRef Id="cmpCaptype_exe" />
+      <ComponentRef Id="cmpCaptype_html" />
+    </ComponentGroup>
+  </Fragment>
+
   <!-- Rawshark -->
   <Fragment>
     <DirectoryRef Id="INSTALLFOLDER">
@@ -471,6 +511,26 @@
     </ComponentGroup>
   </Fragment>
 
+  <!-- Etwdump -->
+  <Fragment>
+    <DirectoryRef Id="dirExtcap">
+      <Component Id="cmpEtwdump_exe" Guid="*">
+        <File Id="filEtwdump_exe" KeyPath="yes" Source="$(var.Extcap.Dir)\etwdump.exe" />
+      </Component>
+    </DirectoryRef>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="cmpEtwdump_html" Guid="*">
+        <File Id="filEtwdump_html" KeyPath="yes" Source="$(var.Staging.Dir)\etwdump.html" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+  <Fragment>
+    <ComponentGroup Id="CG.Tools.Etwdump">
+      <ComponentRef Id="cmpEtwdump_exe" />
+      <ComponentRef Id="cmpEtwdump_html" />
+    </ComponentGroup>
+  </Fragment>
+
   <!-- Sshdump -->
   <Fragment>
     <DirectoryRef Id="dirExtcap">
@@ -511,6 +571,26 @@
     </ComponentGroup>
   </Fragment>
 
+  <!-- Wifidump -->
+  <Fragment>
+    <DirectoryRef Id="dirExtcap">
+      <Component Id="cmpWifidump_exe" Guid="*">
+        <File Id="filWifidump_exe" KeyPath="yes" Source="$(var.Extcap.Dir)\wifidump.exe" />
+      </Component>
+    </DirectoryRef>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="cmpWifidump_html" Guid="*">
+        <File Id="filWifidump_html" KeyPath="yes" Source="$(var.Staging.Dir)\wifidump.html" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+  <Fragment>
+    <ComponentGroup Id="CG.Tools.Wifidump">
+      <ComponentRef Id="cmpWifidump_exe" />
+      <ComponentRef Id="cmpWifidump_html" />
+    </ComponentGroup>
+  </Fragment>
+
   <!-- Udpdump -->
   <Fragment>
     <DirectoryRef Id="dirExtcap">
@@ -532,14 +612,7 @@
   </Fragment>
 
   <?ifdef DOCBOOK_DIR?>
-    <!-- User Guide -->
-    <Fragment>
-      <DirectoryRef Id="INSTALLFOLDER">
-        <Component Id="cmpUserGuide_chm" Guid="*">
-          <File Id="filUserGuide_chm" KeyPath="yes" Source="$(var.DOCBOOK_DIR)\user-guide.chm" />
-        </Component>
-      </DirectoryRef>
-    </Fragment>
+    <!-- User Guide is created by heat -->
     <!-- FAQ -->
     <Fragment>
       <DirectoryRef Id="INSTALLFOLDER">
@@ -550,7 +623,6 @@
     </Fragment>
     <Fragment>
       <ComponentGroup Id="CG.Documentation">
-        <ComponentRef Id="cmpUserGuide_chm" />
         <ComponentRef Id="cmpFAQ_html" />
       </ComponentGroup>
     </Fragment>

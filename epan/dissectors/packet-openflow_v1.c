@@ -423,7 +423,7 @@ dissect_openflow_phy_port(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tre
     offset+=2;
     proto_tree_add_item(tree, hf_openflow_hw_addr, tvb, offset, 6, ENC_NA);
     offset+=6;
-    proto_tree_add_item(tree, hf_openflow_port_name, tvb, offset, OFP_MAX_PORT_NAME_LEN, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_openflow_port_name, tvb, offset, OFP_MAX_PORT_NAME_LEN, ENC_ASCII);
     offset+=OFP_MAX_PORT_NAME_LEN;
 
     /* Bitmap of OFPPC_* flags. */
@@ -529,10 +529,10 @@ dissect_openflow_features_reply_v1(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 
     ti = proto_tree_add_item(tree, hf_openflow_datapath_id, tvb, offset, 8, ENC_BIG_ENDIAN);
     path_id_tree = proto_item_add_subtree(ti, ett_openflow_path_id);
-    proto_tree_add_item(path_id_tree, hf_openflow_datapath_mac, tvb, offset, 6, ENC_NA);
-    offset+=6;
     proto_tree_add_item(path_id_tree, hf_openflow_datapath_impl, tvb, offset, 2, ENC_BIG_ENDIAN);
     offset+=2;
+    proto_tree_add_item(path_id_tree, hf_openflow_datapath_mac, tvb, offset, 6, ENC_NA);
+    offset+=6;
 
     proto_tree_add_item(tree, hf_openflow_n_buffers, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset+=4;

@@ -171,7 +171,7 @@ dissect_bcp_connect_data(proto_tree *bcp_tree, tvbuff_t *tvb, gint flags)
         bcp_subtree = proto_tree_add_subtree_format(bcp_tree, tvb, offset, len, ett_bcp_data, NULL,
                                                     "BCP Connect Request: Name=%s IpAddr=%s",
                                                     tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 16, BCP_NAME_LEN, ENC_ASCII),
-                                                    tvb_ip_to_str(tvb, offset + 12));
+                                                    tvb_ip_to_str(wmem_packet_scope(), tvb, offset + 12));
 
         proto_tree_add_item(bcp_subtree, hf_bcp_connectreq_lenin, tvb, offset, 2, ENC_BIG_ENDIAN);
         offset += 2;
@@ -183,7 +183,7 @@ dissect_bcp_connect_data(proto_tree *bcp_tree, tvbuff_t *tvb, gint flags)
         offset += 4;
         proto_tree_add_item(bcp_subtree, hf_bcp_connectreq_ipaddr, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
-        proto_tree_add_item(bcp_subtree, hf_bcp_connectreq_name, tvb, offset, BCP_NAME_LEN, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(bcp_subtree, hf_bcp_connectreq_name, tvb, offset, BCP_NAME_LEN, ENC_ASCII);
         offset += BCP_NAME_LEN;
         proto_tree_add_item(bcp_subtree, hf_bcp_connectreq_ethaddr, tvb, offset, BCP_ETHADDR_LEN, ENC_NA);
         offset += BCP_ETHADDR_LEN;
@@ -231,8 +231,8 @@ dissect_bcp_search_data(proto_tree *bcp_tree, tvbuff_t *tvb, gint flags)
             case BCP_SEARCH_IPADDR:
                 bcp_subtree = proto_tree_add_subtree_format(bcp_tree, tvb, offset, len, ett_bcp_data, NULL,
                                   "BCP Search Request: IpAddrFirst=%s, IpAddrLast=%s",
-                                  tvb_ip_to_str(tvb, offset + 8),
-                                  tvb_ip_to_str(tvb, offset + 12)
+                                  tvb_ip_to_str(wmem_packet_scope(), tvb, offset + 8),
+                                  tvb_ip_to_str(wmem_packet_scope(), tvb, offset + 12)
                                   );
                 break;
 
@@ -262,7 +262,7 @@ dissect_bcp_search_data(proto_tree *bcp_tree, tvbuff_t *tvb, gint flags)
                 break;
 
             case BCP_SEARCH_NAME:
-                proto_tree_add_item(bcp_subtree, hf_bcp_searchreq_name, tvb, offset, BCP_NAME_LEN, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(bcp_subtree, hf_bcp_searchreq_name, tvb, offset, BCP_NAME_LEN, ENC_ASCII);
                 break;
 
             default:
@@ -278,7 +278,7 @@ dissect_bcp_search_data(proto_tree *bcp_tree, tvbuff_t *tvb, gint flags)
         bcp_subtree = proto_tree_add_subtree_format(bcp_tree, tvb, offset, len, ett_bcp_data, NULL,
                           "BCP Search Response: Name=%s, IpAddr=%s Error=%d",
                           tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 16, BCP_NAME_LEN, ENC_ASCII),
-                          tvb_ip_to_str(tvb, offset + 12),
+                          tvb_ip_to_str(wmem_packet_scope(), tvb, offset + 12),
                           tvb_get_letohl(tvb, offset)
                           );
 
@@ -292,7 +292,7 @@ dissect_bcp_search_data(proto_tree *bcp_tree, tvbuff_t *tvb, gint flags)
         offset += 2;
         proto_tree_add_item(bcp_subtree, hf_bcp_searchrsp_ipaddr, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
-        proto_tree_add_item(bcp_subtree, hf_bcp_searchrsp_name, tvb, offset, BCP_NAME_LEN, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(bcp_subtree, hf_bcp_searchrsp_name, tvb, offset, BCP_NAME_LEN, ENC_ASCII);
         offset += BCP_NAME_LEN;
         proto_tree_add_item(bcp_subtree, hf_bcp_searchrsp_ethaddr, tvb, offset, BCP_ETHADDR_LEN, ENC_NA);
         offset += BCP_ETHADDR_LEN;
@@ -320,7 +320,7 @@ dissect_bcp_identify_data(proto_tree *bcp_tree, tvbuff_t *tvb)
     bcp_subtree = proto_tree_add_subtree_format(bcp_tree, tvb, offset, len, ett_bcp_data, NULL,
                     "BCP Identify Request: Name=%s, IpAddr=%s",
                     tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 12, BCP_NAME_LEN, ENC_ASCII),
-                    tvb_ip_to_str(tvb, offset + 8)
+                    tvb_ip_to_str(wmem_packet_scope(), tvb, offset + 8)
                     );
 
     proto_tree_add_item(bcp_subtree, hf_bcp_identify_error, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -329,7 +329,7 @@ dissect_bcp_identify_data(proto_tree *bcp_tree, tvbuff_t *tvb)
     offset += 4;
     proto_tree_add_item(bcp_subtree, hf_bcp_identify_ipaddr, tvb, offset, 4, ENC_BIG_ENDIAN);
     offset += 4;
-    proto_tree_add_item(bcp_subtree, hf_bcp_identify_name, tvb, offset, BCP_NAME_LEN, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(bcp_subtree, hf_bcp_identify_name, tvb, offset, BCP_NAME_LEN, ENC_ASCII);
     offset += BCP_NAME_LEN;
     proto_tree_add_item(bcp_subtree, hf_bcp_identify_ethaddr, tvb, offset, BCP_ETHADDR_LEN, ENC_NA);
     offset += BCP_ETHADDR_LEN;
@@ -606,7 +606,7 @@ proto_register_bluecom(void)
             "TransId", "bluecom.hdr.transid", FT_UINT16,
             BASE_DEC_HEX, NULL, 0, NULL, HFILL }},
         { &hf_bcp_hdr_cmd, {
-            "Cmd", "bluecom.hdr.cmd", FT_UINT32,
+            "Cmd", "bluecom.hdr.cmd", FT_UINT8,
             BASE_HEX, VALS(bcp_cmds), 0, NULL, HFILL }},
         { &hf_bcp_hdr_slavestate, {
             "SlaveState", "bluecom.hdr.slavestate", FT_UINT8,
@@ -615,7 +615,7 @@ proto_register_bluecom(void)
             "Flags", "bluecom.hdr.blockflags", FT_UINT8,
              BASE_DEC_HEX, NULL, 0, NULL, HFILL }},
         { &hf_bcp_hdr_len, {
-            "Len", "bluecom.hdr.len", FT_UINT8,
+            "Len", "bluecom.hdr.len", FT_UINT16,
             BASE_DEC_HEX, NULL, 0, NULL, HFILL }},
         { &hf_bcp_hdr_fragoffset, {
             "FragOffset", "bluecom.hdr.fragoffset", FT_UINT16,
@@ -659,7 +659,7 @@ proto_register_bluecom(void)
             BASE_NONE, NULL, 0, NULL, HFILL }},
         { &hf_bcp_identify_name, {
             "Name", "bluecom.identify.name", FT_STRING,
-            STR_ASCII, NULL, 0, NULL, HFILL }},
+            BASE_NONE, NULL, 0, NULL, HFILL }},
         { &hf_bcp_identify_ethaddr, {
             "EthAddr", "bluecom.identify.ethaddr", FT_ETHER,
             BASE_NONE, NULL, 0, NULL, HFILL }},
@@ -676,7 +676,7 @@ proto_register_bluecom(void)
              BASE_DEC_HEX, NULL, 0, NULL, HFILL }},
         { &hf_bcp_searchreq_name, {
             "Name", "bluecom.searchreq.name", FT_STRING,
-            STR_ASCII, NULL, 0, NULL, HFILL }},
+            BASE_NONE, NULL, 0, NULL, HFILL }},
         { &hf_bcp_searchreq_ipaddrfirst, {
             "IpAddrFirst", "bluecom.searchreq.ipaddrfirst", FT_IPv4,
             BASE_NONE, NULL, 0, NULL, HFILL }},
@@ -705,7 +705,7 @@ proto_register_bluecom(void)
             BASE_NONE, NULL, 0, NULL, HFILL }},
         { &hf_bcp_searchrsp_name, {
             "Name", "bluecom.searchrsp.name", FT_STRING,
-            STR_ASCII, NULL, 0, NULL, HFILL }},
+            BASE_NONE, NULL, 0, NULL, HFILL }},
         { &hf_bcp_searchrsp_ethaddr, {
             "EthAddr", "bluecom.searchrsp.ethaddr", FT_ETHER,
             BASE_NONE, NULL, 0, NULL, HFILL }},
@@ -731,7 +731,7 @@ proto_register_bluecom(void)
             BASE_NONE, NULL, 0, NULL, HFILL }},
         { &hf_bcp_connectreq_name, {
             "Name", "bluecom.connectreq.name", FT_STRING,
-            STR_ASCII, NULL, 0, NULL, HFILL }},
+            BASE_NONE, NULL, 0, NULL, HFILL }},
         { &hf_bcp_connectreq_ethaddr, {
             "EthAddr", "bluecom.connectreq.ethaddr", FT_ETHER,
             BASE_NONE, NULL, 0, NULL, HFILL }},

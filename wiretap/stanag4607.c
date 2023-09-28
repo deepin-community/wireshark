@@ -29,6 +29,10 @@ typedef struct {
 #define PKT_HDR_SIZE  32 /* size of a packet header */
 #define SEG_HDR_SIZE  5  /* size of a segment header */
 
+static int stanag4607_file_type_subtype = -1;
+
+void register_stanag4607(void);
+
 static gboolean is_valid_id(guint16 version_id)
 {
 #define VERSION_21 0x3231
@@ -63,6 +67,7 @@ static gboolean stanag4607_read_file(wtap *wth, FILE_T fh, wtap_rec *rec,
   }
 
   rec->rec_type = REC_TYPE_PACKET;
+  rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 
   /* The next 4 bytes are the packet length */
   packet_size = pntoh32(&stanag_pkt_hdr[2]);
@@ -72,7 +77,7 @@ static gboolean stanag4607_read_file(wtap *wth, FILE_T fh, wtap_rec *rec,
      * to allocate space for an immensely-large packet.
      */
     *err = WTAP_ERR_BAD_FILE;
-    *err_info = g_strdup_printf("stanag4607: File has %" G_GUINT32_FORMAT "d-byte packet, "
+    *err_info = ws_strdup_printf("stanag4607: File has %" PRIu32 "d-byte packet, "
       "bigger than maximum of %u", packet_size, WTAP_MAX_PACKET_SIZE_STANDARD);
     return FALSE;
   }
@@ -82,7 +87,7 @@ static gboolean stanag4607_read_file(wtap *wth, FILE_T fh, wtap_rec *rec,
      * infinitely if the size is zero.
      */
     *err = WTAP_ERR_BAD_FILE;
-    *err_info = g_strdup_printf("stanag4607: File has %" G_GUINT32_FORMAT "d-byte packet, "
+    *err_info = ws_strdup_printf("stanag4607: File has %" PRIu32 "d-byte packet, "
       "smaller than minimum of %u", packet_size, PKT_HDR_SIZE+SEG_HDR_SIZE);
     return FALSE;
   }
@@ -181,11 +186,11 @@ wtap_open_return_val stanag4607_open(wtap *wth, int *err, gchar **err_info)
   if (file_seek(wth->fh, 0, SEEK_SET, err) == -1)
     return WTAP_OPEN_ERROR;
 
-  wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_STANAG_4607;
+  wth->file_type_subtype = stanag4607_file_type_subtype;
   wth->file_encap = WTAP_ENCAP_STANAG_4607;
   wth->snapshot_length = 0; /* not known */
 
-  stanag4607 = (stanag4607_t *)g_malloc(sizeof(stanag4607_t));
+  stanag4607 = g_new(stanag4607_t, 1);
   wth->priv = (void *)stanag4607;
   stanag4607->base_secs = 0; /* unknown as of yet */
 
@@ -202,6 +207,31 @@ wtap_open_return_val stanag4607_open(wtap *wth, int *err, gchar **err_info)
   wtap_add_generated_idb(wth);
 
   return WTAP_OPEN_MINE;
+}
+
+static const struct supported_block_type stanag4607_blocks_supported[] = {
+  /*
+   * We support packet blocks, with no comments or other options.
+   */
+  { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info stanag4607_info = {
+  "STANAG 4607 Format", "stanag4607", NULL, NULL,
+  FALSE, BLOCKS_SUPPORTED(stanag4607_blocks_supported),
+  NULL, NULL, NULL
+};
+
+void register_stanag4607(void)
+{
+  stanag4607_file_type_subtype = wtap_register_file_type_subtype(&stanag4607_info);
+
+  /*
+   * Register name for backwards compatibility with the
+   * wtap_filetypes table in Lua.
+   */
+  wtap_register_backwards_compatibility_lua_name("STANAG_4607",
+                                                 stanag4607_file_type_subtype);
 }
 
 /*

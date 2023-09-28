@@ -1,4 +1,5 @@
-/* profile.h
+/** @file
+ *
  * Definitions for dialog box for profiles editing.
  * Stig Bjorlykke <stig@bjorlykke.org>, 2008
  *
@@ -121,16 +122,3 @@ gboolean delete_current_profile(void);
 #endif /* __cplusplus */
 
 #endif /* __PROFILE_H__ */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -51,6 +51,7 @@
 #include <glib.h>
 
 #include <windows.h>
+#include <winsock2.h>
 #include <errno.h>
 #include <wchar.h>
 #include <tchar.h>
@@ -456,7 +457,7 @@ init_dll_load_paths()
     if (program_path && system_path && npcap_path)
         return TRUE;
 
-    /* XXX - Duplicate code in filesystem.c:init_progfile_dir */
+    /* XXX - Duplicate code in filesystem.c:configuration_init */
     if (GetModuleFileName(NULL, path_w, MAX_PATH) == 0 || GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
         return FALSE;
     }
@@ -666,6 +667,21 @@ void close_app_running_mutex() {
         CloseHandle(global_running_mutex);
         global_running_mutex = NULL;
     }
+}
+
+int ws_close_if_possible(int fd) {
+    fd_set rfds;
+    struct timeval tv = { 0, 1 };
+    int retval;
+
+    FD_ZERO(&rfds);
+    FD_SET(fd, &rfds);
+
+    retval = select(1, &rfds, NULL, NULL, &tv);
+    if (retval > -1)
+        return _close(fd);
+
+    return -1;
 }
 
 /*

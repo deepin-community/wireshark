@@ -1,4 +1,4 @@
-/* data_printer.h
+/** @file
  *
  * Used by ByteView and others, to create data dumps in printable
  * form
@@ -58,16 +58,3 @@ private:
 };
 
 #endif // DATA_PRINTER_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

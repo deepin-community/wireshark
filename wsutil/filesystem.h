@@ -1,4 +1,4 @@
-/* filesystem.h
+/** @file
  * Filesystem utility definitions
  *
  * Wireshark - Network traffic analyzer
@@ -11,8 +11,7 @@
 #ifndef FILESYSTEM_H
 #define FILESYSTEM_H
 
-#include "ws_symbol_export.h"
-#include "ws_attributes.h"
+#include <wireshark.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,22 +22,48 @@ extern "C" {
  */
 #define DEFAULT_PROFILE      "Default"
 
-
-/*
+/**
+ * Initialize our configuration environment.
+ *
  * Get the pathname of the directory from which the executable came,
- * and save it for future use.  Returns NULL on success, and a
- * g_mallocated string containing an error on failure.
+ * and save it for future use.
+ *
+ * Set our configuration namespace, which determines the top-level
+ * configuration directory name and environment variable prefixes.
+ * Default is "Wireshark".
+ *
+ * @param arg0 Executable name hint. Should be argv[0].
+ * @param namespace_name The namespace to use. "Wireshark" or NULL uses
+ *        the Wireshark namespace. "Logray" uses the Logray namespace.
+ * @return NULL on success, and a g_mallocated string containing an error on failure.
  */
-WS_DLL_PUBLIC char *init_progfile_dir(const char *arg0);
+WS_DLL_PUBLIC char *configuration_init(const char *arg0, const char *namespace_name);
+
+/**
+ * Get the configuration namespace name.
+ * @return The namespace name. One of "Wireshark" or "Logray".
+ */
+WS_DLL_PUBLIC const char *get_configuration_namespace(void);
+
+/**
+ * Check to see if the configuration namespace is for packet analysis
+ * (Wireshark) or log analysis (Logray).
+ * @return true if the configuration namespace is for packets.
+ */
+WS_DLL_PUBLIC bool is_packet_configuration_namespace(void);
 
 /*
- * Get the directory in which the program resides.
+ * Get the directory in which the main (Wireshark, TShark, Logray, etc)
+ * program resides.
+ * Extcaps should use get_extcap_dir() to get their path.
+ *
+ * @return The main program file directory.
  */
 WS_DLL_PUBLIC const char *get_progfile_dir(void);
 
 /*
  * Get the directory in which plugins are stored; this must not be called
- * before init_progfile_dir() is called, as they might be stored in a
+ * before configuration_init() is called, as they might be stored in a
  * subdirectory of the program file directory.
  */
 WS_DLL_PUBLIC const char *get_plugins_dir(void);
@@ -60,7 +85,7 @@ WS_DLL_PUBLIC const char *get_plugins_pers_dir_with_version(void);
 
 /*
  * Get the directory in which extcap hooks are stored; this must not be called
- * before init_progfile_dir() is called, as they might be stored in a
+ * before configuration_init() is called, as they might be stored in a
  * subdirectory of the program file directory.
  */
 WS_DLL_PUBLIC const char *get_extcap_dir(void);
@@ -145,6 +170,12 @@ WS_DLL_PUBLIC char *get_global_profiles_dir(void);
  * files to copy when duplicate a configuration profile.
  */
 WS_DLL_PUBLIC void profile_store_persconffiles(gboolean store);
+
+/*
+ * Register a filename to the personal config files storage.
+ * This is for files which are not read using get_persconffile_path() during startup.
+ */
+WS_DLL_PUBLIC void profile_register_persconffile(const char *filename);
 
 /*
  * Check if given configuration profile exists.
@@ -306,6 +337,17 @@ WS_DLL_PUBLIC gboolean files_identical(const char *fname1, const char *fname2);
  * Check if file has been recreated since it was opened.
  */
 WS_DLL_PUBLIC gboolean file_needs_reopen(int fd, const char* filename);
+
+/*
+ * Write content to a file in binary mode, for those operating systems that
+ * care about such things. This should be OK for all files, even text files, as
+ * we'll write the raw bytes, and we don't look at the bytes as we copy them.
+ *
+ * Returns TRUE on success, FALSE on failure. If a failure, it also
+ * displays a simple dialog window with the error message.
+ */
+WS_DLL_PUBLIC gboolean write_file_binary_mode(const char *filename,
+    const void *content, size_t content_len);
 
 /*
  * Copy a file in binary mode, for those operating systems that care about

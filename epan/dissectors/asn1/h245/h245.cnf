@@ -149,7 +149,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
       h245_setup_channels(actx->pinfo, &upcoming_olc->rev_lc);
     } else {
       wmem_map_insert(h245_pending_olc_reqs,
-        wmem_strdup(wmem_file_scope(), gen_olc_key(upcoming_olc->fwd_lc_num, &%(ACTX)s->pinfo->dst, &%(ACTX)s->pinfo->src)),
+        wmem_strdup(wmem_file_scope(), gen_olc_key(upcoming_olc->fwd_lc_num, &%(ACTX)s->pinfo->dst, &%(ACTX)s->pinfo->src, actx->pinfo->pool)),
         upcoming_olc);
     }
   }
@@ -176,7 +176,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
 	h223_lc_params_temp->subdissector = data_handle;
 
   if (upcoming_channel && codec_type) {
-    g_strlcpy(upcoming_channel->data_type_str, codec_type, sizeof(upcoming_channel->data_type_str));
+    (void) g_strlcpy(upcoming_channel->data_type_str, codec_type, sizeof(upcoming_channel->data_type_str));
   }
   upcoming_channel = NULL;
 #.END
@@ -197,7 +197,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
 %(DEFAULT_BODY)s
 
   if (upcoming_channel && codec_type) {
-    g_strlcpy(upcoming_channel->data_type_str, codec_type, sizeof(upcoming_channel->data_type_str));
+    (void) g_strlcpy(upcoming_channel->data_type_str, codec_type, sizeof(upcoming_channel->data_type_str));
   }
   upcoming_channel = NULL;
 #.END
@@ -221,7 +221,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
   const gchar *olc_key;
   olc_info_t *olc_req;
 
-  upcoming_olc = (!actx->pinfo->fd->visited) ? wmem_new0(wmem_packet_scope(), olc_info_t) : NULL;
+  upcoming_olc = (!actx->pinfo->fd->visited) ? wmem_new0(actx->pinfo->pool, olc_info_t) : NULL;
 
   h223_fw_lc_num = 0;
   h223_rev_lc_num = 0;
@@ -250,7 +250,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
   %(ACTX)s->pinfo->p2p_dir = p2p_dir;
 
   if (upcoming_olc) {
-    olc_key = gen_olc_key(upcoming_olc->fwd_lc_num, &%(ACTX)s->pinfo->src, &%(ACTX)s->pinfo->dst);
+    olc_key = gen_olc_key(upcoming_olc->fwd_lc_num, &%(ACTX)s->pinfo->src, &%(ACTX)s->pinfo->dst, actx->pinfo->pool);
     olc_req = (olc_info_t *)wmem_map_lookup(h245_pending_olc_reqs, olc_key);
     if (olc_req) {
       update_unicast_addr(&olc_req->fwd_lc.media_addr, &upcoming_olc->fwd_lc.media_addr);
@@ -381,17 +381,17 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
 
     if (strlen(h245_pi->frame_label) == 0)
     {
-      g_snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(value, h245_RequestMessage_short_vals, "UKN"));
+      snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(value, h245_RequestMessage_short_vals, "UKN"));
 
       /* if it is OLC or RM*/
       if ((codec_type != NULL) && (( value == RequestMessage_openLogicalChannel) || ( value == RequestMessage_requestMode)))
       {
-        g_strlcat(h245_pi->frame_label, " (", 50);
-        g_strlcat(h245_pi->frame_label, codec_type, 50);
-        g_strlcat(h245_pi->frame_label, ")", 50);
+        (void) g_strlcat(h245_pi->frame_label, " (", 50);
+        (void) g_strlcat(h245_pi->frame_label, codec_type, 50);
+        (void) g_strlcat(h245_pi->frame_label, ")", 50);
       }
     }
-    g_strlcat(h245_pi->comment, val_to_str(value, h245_RequestMessage_vals, "<unknown>"), 50);
+    (void) g_strlcat(h245_pi->comment, val_to_str(value, h245_RequestMessage_vals, "<unknown>"), 50);
 #.END
 #----------------------------------------------------------------------------------------
 #.FN_BODY ResponseMessage  VAL_PTR = &value
@@ -404,9 +404,9 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
 	if (h245_pi != NULL){
 		/* Add to packet info */
 		if ( strlen(h245_pi->frame_label) == 0 ){
-		   g_snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(value, h245_ResponseMessage_short_vals, "UKN"));
+		   snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(value, h245_ResponseMessage_short_vals, "UKN"));
 		}
-		g_strlcat(h245_pi->comment, val_to_str(value, h245_ResponseMessage_vals, "<unknown>"), 50);
+		(void) g_strlcat(h245_pi->comment, val_to_str(value, h245_ResponseMessage_vals, "<unknown>"), 50);
 	}
 
 #.END
@@ -421,9 +421,9 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
     /* Add to packet info */
     if (h245_pi  !=NULL){
       if ( strlen(h245_pi->frame_label) == 0 ){
-	    g_snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(value, h245_IndicationMessage_short_vals, "UKN"));
+	    snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(value, h245_IndicationMessage_short_vals, "UKN"));
 	  }
-      g_strlcat(h245_pi->comment, val_to_str(value, h245_IndicationMessage_vals, "<unknown>"), 50);
+      (void) g_strlcat(h245_pi->comment, val_to_str(value, h245_IndicationMessage_vals, "<unknown>"), 50);
 
     }
 
@@ -439,9 +439,9 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
     /* Add to packet info */
     if (h245_pi != NULL){
       if ( strlen(h245_pi->frame_label) == 0 ){
-        g_snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(value, h245_CommandMessage_short_vals, "UKN"));
+        snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(value, h245_CommandMessage_short_vals, "UKN"));
       }
-	  g_strlcat(h245_pi->comment, val_to_str(value, h245_CommandMessage_vals, "<unknown>"), 50);
+	  (void) g_strlcat(h245_pi->comment, val_to_str(value, h245_CommandMessage_vals, "<unknown>"), 50);
     }
 
 #.END
@@ -571,7 +571,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
   /* check if not inherited from GenericInformation */
   gefx = gef_ctx_get(actx->private_data);
   if (!gefx) {
-    gefx = gef_ctx_alloc(NULL, "GenericMessage");
+    gefx = gef_ctx_alloc(actx->pinfo->pool, NULL, "GenericMessage");
     actx->private_data = gefx;
   }
 #.FN_FTR
@@ -594,13 +594,13 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
 
 %(DEFAULT_BODY)s
   if (gefx) {
-    gefx->subid = wmem_strdup_printf(wmem_packet_scope(), "%%u", subMessageIdentifier);
-    gef_ctx_update_key(gef_ctx_get(actx->private_data));
+    gefx->subid = wmem_strdup_printf(actx->pinfo->pool, "%%u", subMessageIdentifier);
+    gef_ctx_update_key(actx->pinfo->pool, gef_ctx_get(actx->private_data));
   }
   if (hf_index == hf_h245_subMessageIdentifier_standard)
   {
     col_append_str(actx->pinfo->cinfo, COL_INFO, val_to_str(subMessageIdentifier, h245_h239subMessageIdentifier_vals, "<unknown>") );
-    g_snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(subMessageIdentifier, h245_h239subMessageIdentifier_vals, "<unknown>"));
+    snprintf(h245_pi->frame_label, 50, "%%s", val_to_str(subMessageIdentifier, h245_h239subMessageIdentifier_vals, "<unknown>"));
   }
 #.END
 
@@ -608,7 +608,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
   gef_ctx_t *parent_gefx;
 
   parent_gefx = gef_ctx_get(actx->private_data);
-  actx->private_data = gef_ctx_alloc(parent_gefx, NULL);
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, parent_gefx, NULL);
 #.FN_FTR
   actx->private_data = parent_gefx;
 #.END
@@ -616,7 +616,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
 #----------------------------------------------------------------------------------------
 #.FN_HDR GenericInformation
   void *priv_data = actx->private_data;
-  actx->private_data = gef_ctx_alloc(NULL, "GenericInformation");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, NULL, "GenericInformation");
 #.FN_FTR
   actx->private_data = priv_data;
 #.END
@@ -624,7 +624,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
 #--- GenericCapability ------------------------------------------------------------------
 #.FN_HDR GenericCapability
   void *priv_data = actx->private_data;
-  actx->private_data = gef_ctx_alloc(NULL, "GenericCapability");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, NULL, "GenericCapability");
 #.FN_FTR
   actx->private_data = priv_data;
 #.END
@@ -633,7 +633,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
   gef_ctx_t *parent_gefx;
 
   parent_gefx = gef_ctx_get(actx->private_data);
-  actx->private_data = gef_ctx_alloc(parent_gefx, "collapsing");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, parent_gefx, "collapsing");
 #.FN_FTR
   actx->private_data = parent_gefx;
 #.END
@@ -642,7 +642,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
   gef_ctx_t *parent_gefx;
 
   parent_gefx = gef_ctx_get(actx->private_data);
-  actx->private_data = gef_ctx_alloc(parent_gefx, "nonCollapsing");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, parent_gefx, "nonCollapsing");
 #.FN_FTR
   actx->private_data = parent_gefx;
 #.END
@@ -654,7 +654,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
   proto_item* ti;
 
   parent_gefx = gef_ctx_get(actx->private_data);
-  actx->private_data = gef_ctx_alloc(parent_gefx, "nonCollapsingRaw");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, parent_gefx, "nonCollapsingRaw");
 %(DEFAULT_BODY)s
   gefx = gef_ctx_get(actx->private_data);
   if (gefx) {
@@ -668,7 +668,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
 #--- EncryptionSync ---------------------------------------------------------------------
 #.FN_HDR EncryptionSync
   void *priv_data = actx->private_data;
-  actx->private_data = gef_ctx_alloc(NULL, "EncryptionSync");
+  actx->private_data = gef_ctx_alloc(actx->pinfo->pool, NULL, "EncryptionSync");
 #.FN_FTR
   actx->private_data = priv_data;
 #.END
@@ -679,7 +679,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
   proto_item* ti;
 
 #.FN_FTR
-  gef_ctx_update_key(gef_ctx_get(actx->private_data));
+  gef_ctx_update_key(actx->pinfo->pool, gef_ctx_get(actx->private_data));
   gefx = gef_ctx_get(actx->private_data);
   if (gefx) {
     ti = proto_tree_add_string(tree, hf_h245_debug_dissector_try_string, tvb, offset>>3, 0, gefx->key);
@@ -710,7 +710,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
   gef_ctx_t *gefx;
   proto_item* ti;
 #.FN_FTR
-  gef_ctx_update_key(gef_ctx_get(actx->private_data));
+  gef_ctx_update_key(actx->pinfo->pool, gef_ctx_get(actx->private_data));
   gefx = gef_ctx_get(actx->private_data);
   if (gefx) {
     ti = proto_tree_add_string(tree, hf_h245_debug_dissector_try_string, tvb, offset>>3, 0, gefx->key);
@@ -726,7 +726,7 @@ Rfc2733Format  FECCapability/rfc2733Format  FECMode/rfc2733Format
 
 %(DEFAULT_BODY)s
   gefx = gef_ctx_get(actx->private_data);
-  if (gefx) gefx->id = wmem_strdup_printf(wmem_packet_scope(), "%%d", value_int);
+  if (gefx) gefx->id = wmem_strdup_printf(actx->pinfo->pool, "%%d", value_int);
 #.END
 #----------------------------------------------------------------------------------------
 #.FN_BODY ParameterValue/booleanArray  VAL_PTR = &value
@@ -1302,7 +1302,7 @@ DataMode/bitRate bitRate_0_4294967295
 H223Capability/bitRate bitRate_1_19200
 H261VideoMode/bitRate bitRate_1_19200
 H263VideoMode/bitRate bitRate_1_19200
-DialingInformationNumber/networkAddress networkAddressNum
+DialingInformationNumber/networkAddress din_networkAddress
 NewATMVCCommand/aal/aal1/clockRecovery/adaptiveClockRecovery adaptiveClockRecoveryFlag
 NewATMVCIndication/aal/aal1/clockRecovery/adaptiveClockRecovery adaptiveClockRecoveryFlag
 NewATMVCCommand/aal/aal1/clockRecovery/nullClockRecovery nullClockRecoveryflag
@@ -1403,6 +1403,23 @@ ParameterValue/octetString  TYPE = FT_UINT32 DISPLAY = BASE_DEC
 #----------------------------------------------------------------------------------------
 #.FIELD_ATTR
 AlternativeCapabilitySet/_item NAME = "alternativeCapability"
+CapabilityIdentifier/standard ABBREV=standardOid
+UnicastAddress/iPXAddress/tsapIdentifier ABBREV=ipx.tsapIdentifier
+UnicastAddress/iP6Address/tsapIdentifier ABBREV=ipv6.tsapIdentifier
+UnicastAddress/iPSourceRouteAddress/tsapIdentifier ABBREV=iPSrcRoute.tsapIdentifier
+MulticastAddress/iPAddress/tsapIdentifier ABBREV=multicast.tsapIdentifier
+MulticastAddress/iP6Address/tsapIdentifier ABBREV=multicast_IPv6.tsapIdentifier
+UnicastAddress/iPAddress/network ABBREV=ip4_network
+UnicastAddress/iP6Address/network ABBREV=ip6_network
+MulticastAddress/iP6Address/network ABBREV=mip6_network
+MulticastAddress/iPAddress ABBREV=mIPAddress
+MulticastAddress/iP6Address ABBREV=mIP6Address
+MulticastAddress/iPAddress/network ABBREV=mip4_network
+Criteria/value ABBREV=criteriaValue
+DialingInformationNumber/networkAddress ABBREV=din_networkAddress
+SendTerminalCapabilitySet/specificRequest/multiplexCapability ABBREV=multiplexCapabilityBool
+H263Version3Options/pictureNumber ABBREV=pictureNumberBoolean
+H223Capability/mobileOperationTransmitCapability/h223AnnexADoubleFlag ABBREV=h223AnnexADoubleFlagFlag
 
 #----------------------------------------------------------------------------------------
 # vim:set ts=4 sts=2 sw=2:

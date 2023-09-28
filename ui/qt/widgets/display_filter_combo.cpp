@@ -21,7 +21,7 @@
 #include <ui/qt/widgets/display_filter_edit.h>
 #include <ui/qt/widgets/display_filter_combo.h>
 #include <ui/qt/utils/color_utils.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 
 // If we ever add support for multiple windows this will need to be replaced.
 static DisplayFilterCombo *cur_display_filter_combo = NULL;
@@ -48,7 +48,7 @@ DisplayFilterCombo::DisplayFilterCombo(QWidget *parent) :
     updateStyleSheet();
     setToolTip(tr("Select from previously used filters."));
 
-    connect(wsApp, &WiresharkApplication::preferencesChanged, this, &DisplayFilterCombo::updateMaxCount);
+    connect(mainApp, &MainApplication::preferencesChanged, this, &DisplayFilterCombo::updateMaxCount);
 }
 
 extern "C" void dfilter_recent_combo_write_all(FILE *rf) {
@@ -170,17 +170,3 @@ extern "C" gboolean dfilter_combo_add_recent(const gchar *filter) {
     cur_display_filter_combo->lineEdit()->blockSignals(block_state);
     return TRUE;
 }
-
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

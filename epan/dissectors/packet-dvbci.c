@@ -36,6 +36,7 @@
 #include "packet-x509ce.h"
 #include "packet-ber.h"
 #include <wsutil/wsgcrypt.h>
+#include <wsutil/pint.h>
 
 void proto_register_dvbci(void);
 void proto_reg_handoff_dvbci(void);
@@ -167,6 +168,7 @@ void proto_reg_handoff_dvbci(void);
 #define RES_CLASS_HLC 0x8D
 #define RES_CLASS_CUP 0x8E
 #define RES_CLASS_OPP 0x8F
+#define RES_CLASS_AFS 0x91
 #define RES_CLASS_SAS 0x96
 
 #define RES_ID_LEN 4 /* bytes */
@@ -366,9 +368,14 @@ void proto_reg_handoff_dvbci(void);
 #define COMMS_REP_ID_SEND_ACK            6
 
 #define LSC_RET_OK 0
-#define LSC_RET_DISCONNECTED 0
-#define LSC_RET_CONNECTED    1
+#define LSC_DISCONNECTED 0
+#define LSC_CONNECTED    1
 #define LSC_RET_TOO_BIG 0xFE
+
+/* auxiliary file system resource */
+#define AFS_ACK_RSV     0
+#define AFS_ACK_OK      1
+#define AFS_ACK_UNKNOWN 2
 
 /* operator profile resource */
 #define TABLE_ID_CICAM_NIT 0x40  /* CICAM NIT must be a NIT actual */
@@ -438,59 +445,63 @@ typedef struct _apdu_info_t {
 
 static void
 dissect_dvbci_payload_rm(guint32 tag, gint len_field,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_ap(guint32 tag, gint len_field _U_,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_ca(guint32 tag, gint len_field,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_aut(guint32 tag, gint len_field _U_,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo _U_, proto_tree *tree);
 static void
 dissect_dvbci_payload_hc(guint32 tag, gint len_field _U_,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_dt(guint32 tag, gint len_field,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_mmi(guint32 tag, gint len_field,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_hlc(guint32 tag, gint len_field _U_,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_cup(guint32 tag, gint len_field _U_,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_cc(guint32 tag, gint len_field _U_,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_ami(guint32 tag, gint len_field _U_,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_lsc(guint32 tag, gint len_field,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit,
+        tvbuff_t *tvb, gint offset, conversation_t *conv,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_opp(guint32 tag, gint len_field _U_,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
+        packet_info *pinfo, proto_tree *tree);
+static void
+dissect_dvbci_payload_afs(guint32 tag, gint len_field _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
         packet_info *pinfo, proto_tree *tree);
 static void
 dissect_dvbci_payload_sas(guint32 tag, gint len_field _U_,
-        tvbuff_t *tvb, gint offset, conversation_t *circuit,
+        tvbuff_t *tvb, gint offset, conversation_t *conv,
         packet_info *pinfo, proto_tree *tree);
 
 
@@ -516,6 +527,11 @@ dissect_dvbci_payload_sas(guint32 tag, gint len_field _U_,
 #define T_TUNE_BROADCAST_REQ            0x9F8404
 #define T_TUNE_REPLY                    0x9F8405
 #define T_ASK_RELEASE_REPLY             0x9F8406
+#define T_TUNE_LCN_REQ                  0x9F8407
+#define T_TUNE_IP_REQ                   0x9F8408
+#define T_TUNE_TRIPLET_REQ              0x9F8409
+#define T_TUNE_STATUS_REQ               0x9F840A
+#define T_TUNE_STATUS_REPLY             0x9F840B
 #define T_DATE_TIME_ENQ                 0x9F8440
 #define T_DATE_TIME                     0x9F8441
 #define T_CLOSE_MMI                     0x9F8800
@@ -565,6 +581,12 @@ dissect_dvbci_payload_sas(guint32 tag, gint len_field _U_,
 #define T_COMMS_SEND_MORE               0x9F8C04
 #define T_COMMS_RCV_LAST                0x9F8C05
 #define T_COMMS_RCV_MORE                0x9F8C06
+#define T_COMMS_IP_CONFIG_REQ           0x9F8C09
+#define T_COMMS_IP_CONFIG_REPLY         0x9F8C0A
+#define T_AFS_FILE_SYSTEM_OFFER         0x9F9400
+#define T_AFS_FILE_SYSTEM_ACK           0x9F9401
+#define T_AFS_FILE_REQUEST              0x9F9402
+#define T_AFS_FILE_ACKNOWLEDGE          0x9F9403
 #define T_OPERATOR_STATUS_REQ           0x9F9C00
 #define T_OPERATOR_STATUS               0x9F9C01
 #define T_OPERATOR_NIT_REQ              0x9F9C02
@@ -666,12 +688,19 @@ static const apdu_info_t apdu_info[] = {
     {T_APP_ABORT_REQUEST,   0, LEN_FIELD_ANY, DIRECTION_ANY,    RES_CLASS_AMI, 1, dissect_dvbci_payload_ami},
     {T_APP_ABORT_ACK,       0, LEN_FIELD_ANY, DIRECTION_ANY,    RES_CLASS_AMI, 1, dissect_dvbci_payload_ami},
 
-    {T_COMMS_CMD,           1, LEN_FIELD_ANY, DATA_CAM_TO_HOST, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
-    {T_COMMS_REPLY,         0, 2,             DATA_HOST_TO_CAM, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
-    {T_COMMS_SEND_LAST,     2, LEN_FIELD_ANY, DATA_CAM_TO_HOST, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
-    {T_COMMS_SEND_MORE,     2, LEN_FIELD_ANY, DATA_CAM_TO_HOST, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
-    {T_COMMS_RCV_LAST,      2, LEN_FIELD_ANY, DATA_HOST_TO_CAM, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
-    {T_COMMS_RCV_MORE,      2, LEN_FIELD_ANY, DATA_HOST_TO_CAM, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
+    {T_COMMS_CMD,             1, LEN_FIELD_ANY, DATA_CAM_TO_HOST, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
+    {T_COMMS_REPLY,           0, 2,             DATA_HOST_TO_CAM, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
+    {T_COMMS_SEND_LAST,       2, LEN_FIELD_ANY, DATA_CAM_TO_HOST, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
+    {T_COMMS_SEND_MORE,       2, LEN_FIELD_ANY, DATA_CAM_TO_HOST, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
+    {T_COMMS_RCV_LAST,        2, LEN_FIELD_ANY, DATA_HOST_TO_CAM, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
+    {T_COMMS_RCV_MORE,        2, LEN_FIELD_ANY, DATA_HOST_TO_CAM, RES_CLASS_LSC, 1, dissect_dvbci_payload_lsc},
+    {T_COMMS_IP_CONFIG_REQ,   0, 0,             DATA_CAM_TO_HOST, RES_CLASS_LSC, 4, NULL},
+    {T_COMMS_IP_CONFIG_REPLY, 2, LEN_FIELD_ANY, DATA_HOST_TO_CAM, RES_CLASS_LSC, 4, dissect_dvbci_payload_lsc},
+
+    {T_AFS_FILE_SYSTEM_OFFER, 1, LEN_FIELD_ANY, DATA_CAM_TO_HOST, RES_CLASS_AFS, 1, dissect_dvbci_payload_afs},
+    {T_AFS_FILE_SYSTEM_ACK,   1, 1,             DATA_HOST_TO_CAM, RES_CLASS_AFS, 1, dissect_dvbci_payload_afs},
+    {T_AFS_FILE_REQUEST,      1, LEN_FIELD_ANY, DATA_HOST_TO_CAM, RES_CLASS_AFS, 1, dissect_dvbci_payload_afs},
+    {T_AFS_FILE_ACKNOWLEDGE,  2, LEN_FIELD_ANY, DATA_CAM_TO_HOST, RES_CLASS_AFS, 1, dissect_dvbci_payload_afs},
 
     {T_OPERATOR_STATUS_REQ,       0, 0,             DATA_HOST_TO_CAM, RES_CLASS_OPP, 1, NULL},
     {T_OPERATOR_STATUS,           0, 6,             DATA_CAM_TO_HOST, RES_CLASS_OPP, 1, dissect_dvbci_payload_opp},
@@ -714,6 +743,11 @@ static const value_string dvbci_apdu_tag[] = {
     { T_TUNE_BROADCAST_REQ,            "Tune broadcast request" },
     { T_TUNE_REPLY,                    "Tune reply" },
     { T_ASK_RELEASE_REPLY,             "Ask release reply" },
+    { T_TUNE_LCN_REQ,                  "Tune LCN request" },
+    { T_TUNE_IP_REQ,                   "Tune IP request" },
+    { T_TUNE_TRIPLET_REQ,              "Tune triplet request" },
+    { T_TUNE_STATUS_REQ,               "Tune status request" },
+    { T_TUNE_STATUS_REPLY,             "Tune status reply" },
     { T_DATE_TIME_ENQ,                 "Date-Time enquiry" },
     { T_DATE_TIME,                     "Date-Time" },
     { T_CLOSE_MMI,                     "Close MMI" },
@@ -766,6 +800,12 @@ static const value_string dvbci_apdu_tag[] = {
     { T_COMMS_SEND_MORE,               "Comms send more" },
     { T_COMMS_RCV_LAST,                "Comms receive last" },
     { T_COMMS_RCV_MORE,                "Comms receive more" },
+    { T_COMMS_IP_CONFIG_REQ,           "Comms IP config request" },
+    { T_COMMS_IP_CONFIG_REPLY,         "Comms IP config reply" },
+    { T_AFS_FILE_SYSTEM_OFFER,         "File system offer" },
+    { T_AFS_FILE_SYSTEM_ACK,           "File system ack" },
+    { T_AFS_FILE_REQUEST,              "File request" },
+    { T_AFS_FILE_ACKNOWLEDGE,          "File acknowledge" },
     { T_OPERATOR_STATUS_REQ,           "Operator status request" },
     { T_OPERATOR_STATUS,               "Operator status" },
     { T_OPERATOR_NIT_REQ,              "Operator NIT request" },
@@ -809,7 +849,7 @@ static unsigned char *dvbci_siv_bin = NULL;
 static dissector_handle_t data_handle;
 static dissector_handle_t mpeg_pmt_handle;
 static dissector_handle_t dvb_nit_handle;
-static dissector_handle_t png_handle;
+static dissector_handle_t mime_handle;
 static dissector_table_t tcp_dissector_table;
 static dissector_table_t udp_dissector_table;
 
@@ -1029,7 +1069,6 @@ static int hf_dvbci_file_data_len = -1;
 static int hf_dvbci_ami_priv_data = -1;
 static int hf_dvbci_req_ok = -1;
 static int hf_dvbci_file_ok = -1;
-static int hf_dvbci_file_data = -1;
 static int hf_dvbci_abort_req_code = -1;
 static int hf_dvbci_abort_ack_code = -1;
 static int hf_dvbci_phase_id = -1;
@@ -1049,6 +1088,15 @@ static int hf_dvbci_lsc_proto = -1;
 static int hf_dvbci_lsc_hostname = -1;
 static int hf_dvbci_lsc_retry_count = -1;
 static int hf_dvbci_lsc_timeout = -1;
+static int hf_dvbci_lsc_conn_state = -1;
+static int hf_dvbci_lsc_phys_addr = -1;
+static int hf_dvbci_lsc_netmask = -1;
+static int hf_dvbci_lsc_gateway = -1;
+static int hf_dvbci_lsc_dhcp_srv = -1;
+static int hf_dvbci_lsc_num_dns_srv = -1;
+static int hf_dvbci_lsc_dns_srv = -1;
+static int hf_dvbci_afs_dom_id = -1;
+static int hf_dvbci_afs_ack_code = -1;
 static int hf_dvbci_info_ver_op_status = -1;
 static int hf_dvbci_nit_ver = -1;
 static int hf_dvbci_pro_typ = -1;
@@ -1320,6 +1368,7 @@ static const value_string dvbci_res_class[] = {
     { RES_CLASS_HLC, "Host Language & Country" },
     { RES_CLASS_CUP, "CAM Upgrade" },
     { RES_CLASS_OPP, "Operator Profile" },
+    { RES_CLASS_AFS, "Auxiliary File System" },
     { RES_CLASS_SAS, "Specific Application Support" },
     { 0, NULL }
 };
@@ -1577,14 +1626,20 @@ static const value_string dvbci_lsc_ret_val[] = {
     { LSC_RET_OK, "ok" },
     { 0, NULL }
 };
-static const value_string dvbci_lsc_ret_val_connect[] = {
-    { LSC_RET_DISCONNECTED, "disconnected" },
-    { LSC_RET_CONNECTED, "connected" },
+static const value_string dvbci_lsc_connect[] = {
+    { LSC_DISCONNECTED, "disconnected" },
+    { LSC_CONNECTED, "connected" },
     { 0, NULL }
 };
 static const value_string dvbci_lsc_ret_val_params[] = {
     { LSC_RET_OK, "ok" },
     { LSC_RET_TOO_BIG, "buffer size too big" },
+    { 0, NULL }
+};
+static const value_string dvbci_afs_ack_code[] = {
+    { AFS_ACK_RSV, "Reserved for future use" },
+    { AFS_ACK_OK, "The application environment is supported by the Host" },
+    { AFS_ACK_UNKNOWN, "The DomainIdentifier is not supported by the Host" },
     { 0, NULL }
 };
 static const value_string dvbci_opp_ref_req_flag[] = {
@@ -1919,13 +1974,13 @@ dissect_conn_desc(tvbuff_t *tvb, gint offset, conversation_t *conv,
                     tvb, offset, 1, ENC_BIG_ENDIAN);
         offset ++;
         if (port_item) {
-            if (ip_proto==LSC_TCP && tcp_port_to_display(wmem_packet_scope(), port)) {
+            if (ip_proto==LSC_TCP && tcp_port_to_display(pinfo->pool, port)) {
                 proto_item_append_text(port_item, " (%s)",
-                        tcp_port_to_display(wmem_packet_scope(), port));
+                        tcp_port_to_display(pinfo->pool, port));
             }
-            else if (ip_proto==LSC_UDP && udp_port_to_display(wmem_packet_scope(), port)) {
+            else if (ip_proto==LSC_UDP && udp_port_to_display(pinfo->pool, port)) {
                 proto_item_append_text(port_item, " (%s)",
-                        udp_port_to_display(wmem_packet_scope(), port));
+                        udp_port_to_display(pinfo->pool, port));
             }
         }
         store_lsc_msg_dissector(conv, ip_proto, port);
@@ -1946,13 +2001,13 @@ dissect_conn_desc(tvbuff_t *tvb, gint offset, conversation_t *conv,
                 hf_dvbci_lsc_dst_port, tvb, offset, 2, ENC_BIG_ENDIAN);
         offset +=2;
         if (port_item) {
-            if (ip_proto==LSC_TCP && tcp_port_to_display(wmem_packet_scope(), port)) {
+            if (ip_proto==LSC_TCP && tcp_port_to_display(pinfo->pool, port)) {
                 proto_item_append_text(port_item, " (%s)",
-                        tcp_port_to_display(wmem_packet_scope(), port));
+                        tcp_port_to_display(pinfo->pool, port));
             }
-            else if (ip_proto==LSC_UDP && udp_port_to_display(wmem_packet_scope(), port)) {
+            else if (ip_proto==LSC_UDP && udp_port_to_display(pinfo->pool, port)) {
                 proto_item_append_text(port_item, " (%s)",
-                        udp_port_to_display(wmem_packet_scope(), port));
+                        udp_port_to_display(pinfo->pool, port));
             }
         }
         store_lsc_msg_dissector(conv, ip_proto, port);
@@ -1960,7 +2015,7 @@ dissect_conn_desc(tvbuff_t *tvb, gint offset, conversation_t *conv,
         /* everything from here to the descriptor's end is a hostname */
         hostname_len = (offset_body+len_field)-offset;
         proto_tree_add_item(conn_desc_tree, hf_dvbci_lsc_hostname,
-                tvb, offset, hostname_len, ENC_ASCII|ENC_NA);
+                tvb, offset, hostname_len, ENC_ASCII);
         offset += hostname_len;
     } else {
         proto_tree_add_item(conn_desc_tree, hf_dvbci_lsc_media_data,
@@ -2411,7 +2466,7 @@ decrypt_sac_msg_body(packet_info *pinfo,
     clear_data = (unsigned char *)wmem_alloc(pinfo->pool, clear_len);
 
     err = gcry_cipher_decrypt (cipher, clear_data, clear_len,
-            tvb_memdup(wmem_packet_scope(), encrypted_tvb, offset, len), len);
+            tvb_memdup(pinfo->pool, encrypted_tvb, offset, len), len);
     if (gcry_err_code (err))
         goto end;
 
@@ -2447,7 +2502,7 @@ dissect_si_string(tvbuff_t *tvb, gint offset, gint str_len,
     offset += enc_len;
     str_len -= enc_len;
 
-    si_str = tvb_get_string_enc(wmem_packet_scope(),
+    si_str = tvb_get_string_enc(pinfo->pool,
             tvb, offset, str_len, dvb_enc_to_item_enc(encoding));
     if (!si_str)
         return;
@@ -2715,7 +2770,7 @@ dissect_dvbci_payload_ap(guint32 tag, gint len_field _U_,
             menu_str_len -= enc_len;
             proto_tree_add_item_ret_string(tree, hf_dvbci_menu_str,
                     tvb, offset, menu_str_len, dvb_enc_to_item_enc(encoding),
-                    wmem_packet_scope(), &menu_string);
+                    pinfo->pool, &menu_string);
             col_append_sep_fstr(pinfo->cinfo, COL_INFO, NULL,
                     "Module name %s", menu_string);
         }
@@ -2995,7 +3050,7 @@ dissect_dvbci_payload_dt(guint32 tag, gint len_field,
         }
         else {
             col_append_sep_fstr(pinfo->cinfo, COL_INFO, NULL,
-                    "update every %s", rel_time_to_str(wmem_packet_scope(), &resp_intv));
+                    "update every %s", rel_time_to_str(pinfo->pool, &resp_intv));
         }
     }
     else if (tag==T_DATE_TIME) {
@@ -3015,7 +3070,7 @@ dissect_dvbci_payload_dt(guint32 tag, gint len_field,
         proto_tree_add_time(tree, hf_dvbci_utc_time,
                 tvb, offset, time_field_len, &utc_time);
         col_append_sep_fstr(pinfo->cinfo, COL_INFO, ": ", "%s UTC",
-                abs_time_to_str(wmem_packet_scope(), &utc_time, ABSOLUTE_TIME_UTC, FALSE));
+                abs_time_to_str(pinfo->pool, &utc_time, ABSOLUTE_TIME_UTC, FALSE));
         offset += time_field_len;
 
         if (len_field==7) {
@@ -3229,7 +3284,7 @@ dissect_dvbci_payload_hlc(guint32 tag, gint len_field _U_,
   }
 
   /* both apdus' body is only a country code, this can be shared */
-  str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset,
+  str = tvb_get_string_enc(pinfo->pool, tvb, offset,
               tvb_reported_length_remaining(tvb, offset),
               ENC_ISO_8859_1|ENC_NA);
   if (str)
@@ -3299,10 +3354,8 @@ static int exp_pdu_data_dvbci_size(packet_info *pinfo _U_, void* data _U_)
 
 static int exp_pdu_data_dvbci_populate_data(packet_info *pinfo, void* data, guint8 *tlv_buffer, guint32 buffer_size _U_)
 {
-  tlv_buffer[0] = 0;
-  tlv_buffer[1] = EXP_PDU_TAG_DVBCI_EVT;
-  tlv_buffer[2] = 0;
-  tlv_buffer[3] = EXP_PDU_TAG_DVBCI_EVT_LEN;
+  phton16(&tlv_buffer[0], EXP_PDU_TAG_DVBCI_EVT);
+  phton16(&tlv_buffer[2], EXP_PDU_TAG_DVBCI_EVT_LEN);
   tlv_buffer[4] = dvbci_get_evt_from_addrs(pinfo);
 
   return exp_pdu_data_dvbci_size(pinfo, data);
@@ -3417,7 +3470,7 @@ dissect_sac_msg(guint32 tag, tvbuff_t *tvb, gint offset,
         tvb_composite_append(clear_sac_msg_tvb, clear_sac_body_tvb);
         tvb_composite_finalize(clear_sac_msg_tvb);
 
-        exp_pdu_data = export_pdu_create_tags(pinfo, EXPORTED_SAC_MSG_PROTO, EXP_PDU_TAG_PROTO_NAME, dvbci_exp_pdu_items);
+        exp_pdu_data = export_pdu_create_tags(pinfo, EXPORTED_SAC_MSG_PROTO, EXP_PDU_TAG_DISSECTOR_NAME, dvbci_exp_pdu_items);
 
         exp_pdu_data->tvb_captured_length = tvb_captured_length(clear_sac_msg_tvb);
         exp_pdu_data->tvb_reported_length = tvb_reported_length(clear_sac_msg_tvb);
@@ -3561,10 +3614,43 @@ dissect_dvbci_payload_cc(guint32 tag, gint len_field _U_,
         case T_CC_PIN_MMI_REQ:
             proto_tree_add_item(tree, hf_dvbci_pincode, tvb, offset,
                     tvb_reported_length_remaining(tvb, offset),
-                    ENC_ASCII|ENC_NA);
+                    ENC_ASCII);
             break;
         default:
             break;
+    }
+}
+
+
+static void
+dissect_dvbci_ami_file_req(tvbuff_t *tvb, gint offset,
+        packet_info *pinfo, proto_tree *tree)
+{
+    guint8  req_type;
+    const guint8 *req_str;
+
+    req_type = tvb_get_guint8(tvb, offset);
+    proto_tree_add_item(tree, hf_dvbci_req_type, tvb, offset, 1, ENC_BIG_ENDIAN);
+    col_append_sep_str(pinfo->cinfo, COL_INFO, ": ",
+            val_to_str_const(req_type, dvbci_req_type, "unknown"));
+    offset++;
+    if (req_type==REQ_TYPE_FILE_HASH) {
+        proto_tree_add_item(tree, hf_dvbci_file_hash,
+                tvb, offset, 16, ENC_NA);
+        offset += 16;
+    }
+    if (tvb_reported_length_remaining(tvb, offset) <= 0) {
+        return;
+    }
+    if (req_type==REQ_TYPE_FILE || req_type==REQ_TYPE_FILE_HASH) {
+        proto_tree_add_item_ret_string(tree, hf_dvbci_file_name,
+                tvb, offset, tvb_reported_length_remaining(tvb, offset),
+                ENC_ASCII, pinfo->pool, &req_str);
+        col_append_sep_str(pinfo->cinfo, COL_INFO, " ", req_str);
+    }
+    else if (req_type==REQ_TYPE_DATA) {
+        proto_tree_add_item(tree, hf_dvbci_ami_priv_data, tvb, offset,
+                tvb_reported_length_remaining(tvb, offset), ENC_NA);
     }
 }
 
@@ -3578,7 +3664,6 @@ dissect_dvbci_ami_file_ack(tvbuff_t *tvb, gint offset,
     guint8      file_name_len;
     guint8     *file_name_str;
     guint32     file_data_len;
-    tvbuff_t   *png_file_tvb = NULL;
     proto_tree *req_tree;
 
     req_type = tvb_get_guint8(tvb, offset+1);
@@ -3599,7 +3684,7 @@ dissect_dvbci_ami_file_ack(tvbuff_t *tvb, gint offset,
         proto_tree_add_item(tree, hf_dvbci_file_name_len,
                 tvb, offset, 1, ENC_BIG_ENDIAN);
         offset++;
-        file_name_str = tvb_get_string_enc(wmem_packet_scope(),
+        file_name_str = tvb_get_string_enc(pinfo->pool,
                 tvb, offset, file_name_len, ENC_ASCII);
         if (!file_name_str)
             return;
@@ -3614,25 +3699,14 @@ dissect_dvbci_ami_file_ack(tvbuff_t *tvb, gint offset,
                 tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
         if (file_data_len > 0) {
-            if (file_name_len>4) {
-                gchar *suffix_lo;
-                suffix_lo = wmem_ascii_strdown(wmem_packet_scope(),
-                        &file_name_str[file_name_len-4], -1);
-                if (g_strcmp0(suffix_lo, ".png")==0) {
-                    png_file_tvb = tvb_new_subset_length(
-                            tvb, offset, file_data_len);
-                }
-            }
-
-            if (png_handle && png_file_tvb) {
-                col_set_fence(pinfo->cinfo, COL_PROTOCOL);
-                col_set_fence(pinfo->cinfo, COL_INFO);
-                call_dissector(png_handle, png_file_tvb, pinfo, tree);
-            }
-            else {
-                proto_tree_add_item(tree, hf_dvbci_file_data,
-                        tvb, offset, file_data_len, ENC_NA);
-            }
+            col_append_str(pinfo->cinfo, COL_PROTOCOL, ", ");
+            col_set_fence(pinfo->cinfo, COL_PROTOCOL);
+            /* The mime_encap dissector may overwrite this part. */
+            col_append_str(pinfo->cinfo, COL_PROTOCOL, "Data");
+            col_set_fence(pinfo->cinfo, COL_INFO);
+            call_dissector(mime_handle,
+                    tvb_new_subset_length(tvb, offset, file_data_len),
+                    pinfo, tree);
         }
     }
     else if (req_type==REQ_TYPE_DATA) {
@@ -3667,8 +3741,6 @@ dissect_dvbci_payload_ami(guint32 tag, gint len_field _U_,
     guint8  app_dom_id_len, init_obj_len;
     const guint8 *app_dom_id;
     guint8  ack_code;
-    guint8  req_type;
-    const guint8 *req_str;
 
     switch(tag) {
         case T_REQUEST_START:
@@ -3682,14 +3754,14 @@ dissect_dvbci_payload_ami(guint32 tag, gint len_field _U_,
                     tvb, offset, 1, ENC_BIG_ENDIAN);
             offset++;
             proto_tree_add_item_ret_string(tree, hf_dvbci_app_dom_id,
-                    tvb, offset, app_dom_id_len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &app_dom_id);
+                    tvb, offset, app_dom_id_len, ENC_ASCII|ENC_NA, pinfo->pool, &app_dom_id);
             if (app_dom_id) {
                 col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ",
                         "for %s", app_dom_id);
             }
             offset += app_dom_id_len;
             proto_tree_add_item(tree, hf_dvbci_init_obj,
-                    tvb, offset, init_obj_len, ENC_ASCII|ENC_NA);
+                    tvb, offset, init_obj_len, ENC_ASCII);
             break;
         case T_REQUEST_START_ACK:
             ack_code = tvb_get_guint8(tvb, offset);
@@ -3699,28 +3771,7 @@ dissect_dvbci_payload_ami(guint32 tag, gint len_field _U_,
                     val_to_str_const(ack_code, dvbci_ack_code, "unknown"));
             break;
         case T_FILE_REQUEST:
-            req_type = tvb_get_guint8(tvb, offset);
-            proto_tree_add_item(tree, hf_dvbci_req_type, tvb, offset, 1, ENC_BIG_ENDIAN);
-            col_append_sep_str(pinfo->cinfo, COL_INFO, ": ",
-                    val_to_str_const(req_type, dvbci_req_type, "unknown"));
-            offset++;
-            if (req_type==REQ_TYPE_FILE_HASH) {
-                proto_tree_add_item(tree, hf_dvbci_file_hash,
-                        tvb, offset, 16, ENC_NA);
-                offset += 16;
-            }
-            if (tvb_reported_length_remaining(tvb, offset) <= 0)
-              break;
-            if (req_type==REQ_TYPE_FILE || req_type==REQ_TYPE_FILE_HASH) {
-                proto_tree_add_item_ret_string(tree, hf_dvbci_file_name,
-                        tvb, offset, tvb_reported_length_remaining(tvb, offset),
-                        ENC_ASCII, wmem_packet_scope(), &req_str);
-                col_append_sep_str(pinfo->cinfo, COL_INFO, " ", req_str);
-            }
-            else if (req_type==REQ_TYPE_DATA) {
-                proto_tree_add_item(tree, hf_dvbci_ami_priv_data, tvb, offset,
-                        tvb_reported_length_remaining(tvb, offset), ENC_NA);
-            }
+            dissect_dvbci_ami_file_req(tvb, offset, pinfo, tree);
             break;
         case T_FILE_ACKNOWLEDGE:
             dissect_dvbci_ami_file_ack(tvb, offset, pinfo, tree);
@@ -3757,6 +3808,7 @@ dissect_dvbci_payload_lsc(guint32 tag, gint len_field,
     gint                msg_len;
     tvbuff_t           *msg_tvb;
     dissector_handle_t  msg_handle;
+    guint32             conn_state, i, num_dns_srv;
 
     offset_start = offset;
 
@@ -3852,7 +3904,7 @@ dissect_dvbci_payload_lsc(guint32 tag, gint len_field,
                     break;
                 case COMMS_REP_ID_STATUS_REPLY:
                     ret_val_str = val_to_str_const(ret_val,
-                            dvbci_lsc_ret_val_connect, "unknown/error");
+                            dvbci_lsc_connect, "unknown/error");
                     break;
                 default:
                     ret_val_str = val_to_str_const(ret_val,
@@ -3893,6 +3945,36 @@ dissect_dvbci_payload_lsc(guint32 tag, gint len_field,
             }
             if (msg_handle)
                 call_dissector(msg_handle, msg_tvb, pinfo, tree);
+            break;
+        case T_COMMS_IP_CONFIG_REPLY:
+            proto_tree_add_item_ret_uint(tree, hf_dvbci_lsc_conn_state,
+                    tvb, offset, 1, ENC_BIG_ENDIAN, &conn_state);
+            offset++;
+            proto_tree_add_item(tree, hf_dvbci_lsc_phys_addr,
+                    tvb, offset, FT_ETHER_LEN, ENC_NA);
+            offset += FT_ETHER_LEN;
+            if (conn_state == LSC_CONNECTED) {
+                proto_tree_add_item(tree, hf_dvbci_lsc_ipv6_addr,
+                        tvb, offset, FT_IPv6_LEN, ENC_NA);
+                offset += FT_IPv6_LEN;
+                proto_tree_add_item(tree, hf_dvbci_lsc_netmask,
+                        tvb, offset, FT_IPv6_LEN, ENC_NA);
+                offset += FT_IPv6_LEN;
+                proto_tree_add_item(tree, hf_dvbci_lsc_gateway,
+                        tvb, offset, FT_IPv6_LEN, ENC_NA);
+                offset += FT_IPv6_LEN;
+                proto_tree_add_item(tree, hf_dvbci_lsc_dhcp_srv,
+                        tvb, offset, FT_IPv6_LEN, ENC_NA);
+                offset += FT_IPv6_LEN;
+                proto_tree_add_item_ret_uint(tree, hf_dvbci_lsc_num_dns_srv,
+                        tvb, offset, 1, ENC_BIG_ENDIAN, &num_dns_srv);
+                offset++;
+                for(i = 0; i < num_dns_srv; i++) {
+                    proto_tree_add_item(tree, hf_dvbci_lsc_dns_srv,
+                            tvb, offset, FT_IPv6_LEN, ENC_NA);
+                    offset += FT_IPv6_LEN;
+                }
+            }
             break;
         default:
             break;
@@ -3998,7 +4080,7 @@ dissect_dvbci_payload_opp(guint32 tag, gint len_field _U_,
                   tvb, offset, 1, ENC_BIG_ENDIAN);
           offset++;
           proto_tree_add_item(tree, hf_dvbci_opp_lang_code,
-                  tvb, offset, 3, ENC_ASCII|ENC_NA);
+                  tvb, offset, 3, ENC_ASCII);
           offset += 3;
           /* hf_dvbci_prof_name is an FT_UINT_STRING, one leading len byte */
           proto_tree_add_item(tree, hf_dvbci_prof_name,
@@ -4071,6 +4153,39 @@ dissect_dvbci_payload_opp(guint32 tag, gint len_field _U_,
 
 
 static void
+dissect_dvbci_payload_afs(guint32 tag, gint len_field _U_,
+        tvbuff_t *tvb, gint offset, conversation_t *conv _U_,
+        packet_info *pinfo, proto_tree *tree)
+{
+    const guint8 *dom_id_str;
+
+    switch(tag) {
+        case T_AFS_FILE_SYSTEM_OFFER:
+            proto_tree_add_item_ret_string(tree, hf_dvbci_afs_dom_id,
+                    tvb, offset, 1, ENC_UTF_8|ENC_BIG_ENDIAN,
+                    pinfo->pool, &dom_id_str);
+            if (dom_id_str) {
+                col_append_sep_fstr(pinfo->cinfo,
+                        COL_INFO, ": ", "%s", dom_id_str);
+            }
+            break;
+        case T_AFS_FILE_SYSTEM_ACK:
+            proto_tree_add_item(tree, hf_dvbci_afs_ack_code,
+                    tvb, offset, 1, ENC_BIG_ENDIAN);
+            break;
+        case T_AFS_FILE_REQUEST:
+            dissect_dvbci_ami_file_req(tvb, offset, pinfo, tree);
+            break;
+        case T_AFS_FILE_ACKNOWLEDGE:
+            dissect_dvbci_ami_file_ack(tvb, offset, pinfo, tree);
+            break;
+        default:
+            break;
+    }
+}
+
+
+static void
 dissect_dvbci_payload_sas(guint32 tag, gint len_field _U_,
         tvbuff_t *tvb, gint offset, conversation_t *conv,
         packet_info *pinfo, proto_tree *tree)
@@ -4085,8 +4200,8 @@ dissect_dvbci_payload_sas(guint32 tag, gint len_field _U_,
     switch(tag) {
         case T_SAS_CONNECT_RQST:
         case T_SAS_CONNECT_CNF:
-            g_snprintf(app_id_str, sizeof(app_id_str),
-                    "0x%016" G_GINT64_MODIFIER "x", tvb_get_ntoh64(tvb, offset));
+            snprintf(app_id_str, sizeof(app_id_str),
+                    "0x%016" PRIx64, tvb_get_ntoh64(tvb, offset));
             col_append_sep_str(pinfo->cinfo, COL_INFO, ": ", app_id_str);
             proto_tree_add_item(tree, hf_dvbci_sas_app_id,
                     tvb, offset, 8, ENC_BIG_ENDIAN);
@@ -4311,7 +4426,7 @@ dissect_dvbci_spdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                 break;
             }
             col_append_sep_str(pinfo->cinfo, COL_INFO, NULL, "Session opened");
-            conv = conversation_new_by_id(pinfo->num, ENDPOINT_DVBCI, CT_ID(ssnb, tcid), 0);
+            conv = conversation_new_by_id(pinfo->num, CONVERSATION_DVBCI, CT_ID(ssnb, tcid));
             /* we always add the resource id immediately after the circuit
                 was created */
             conversation_add_proto_data(conv, proto_dvbci, GUINT_TO_POINTER(res_id));
@@ -4332,7 +4447,7 @@ dissect_dvbci_spdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
             ssnb = tvb_get_ntohs(tvb, offset+1);
             proto_tree_add_item(sess_tree, hf_dvbci_sess_nb,
                     tvb, offset+1, 2, ENC_BIG_ENDIAN);
-            conv = find_conversation_by_id(pinfo->num, ENDPOINT_DVBCI, CT_ID(ssnb, tcid), 0);
+            conv = find_conversation_by_id(pinfo->num, CONVERSATION_DVBCI, CT_ID(ssnb, tcid));
             if (conv)
                 conv->last_frame = pinfo->num;
             break;
@@ -4349,7 +4464,7 @@ dissect_dvbci_spdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
 
     if (ssnb && !conv)
-        conv = find_conversation_by_id(pinfo->num, ENDPOINT_DVBCI, CT_ID(ssnb, tcid), 0);
+        conv = find_conversation_by_id(pinfo->num, CONVERSATION_DVBCI, CT_ID(ssnb, tcid));
 
     /* if the packet contains no resource id, we add the cached id from
        the circuit so that each packet has a resource id that can be
@@ -4716,14 +4831,14 @@ dissect_dvbci_cis_payload_tpll_v1(tvbuff_t *data_tvb,
     if (offset_str_end<offset) /* offset_str_end==offset is ok */
         return offset;
     proto_tree_add_item(tree, hf_dvbci_cis_tpll_v1_info_manuf,
-            data_tvb, offset, offset_str_end-offset, ENC_ASCII|ENC_NA);
+            data_tvb, offset, offset_str_end-offset, ENC_ASCII);
     offset = offset_str_end+1; /* +1 for 0 termination */
 
     offset_str_end = tvb_find_guint8(data_tvb, offset, -1, 0x0);
     if (offset_str_end<offset)
         return offset;
     proto_tree_add_item(tree, hf_dvbci_cis_tpll_v1_info_name,
-            data_tvb, offset, offset_str_end-offset, ENC_ASCII|ENC_NA);
+            data_tvb, offset, offset_str_end-offset, ENC_ASCII);
     offset = offset_str_end+1;
 
     /* the pc-card spec mentions two additional info strings,
@@ -4734,7 +4849,7 @@ dissect_dvbci_cis_payload_tpll_v1(tvbuff_t *data_tvb,
         if (offset_str_end<offset)
             break;
         proto_tree_add_item(tree, hf_dvbci_cis_tpll_v1_info_additional,
-                data_tvb, offset, offset_str_end-offset, ENC_ASCII|ENC_NA);
+                data_tvb, offset, offset_str_end-offset, ENC_ASCII);
         offset = offset_str_end+1;
     }
 
@@ -4806,7 +4921,7 @@ dissect_dvbci_cis_payload_config(tvbuff_t *data_tvb,
             /* the stci_str field could consist of multiple strings,
                this case is not supported for now */
             proto_tree_add_item(st_tree, hf_dvbci_cis_stci_str,
-                    data_tvb, offset, st_len-stci_ifn_size, ENC_ASCII|ENC_NA);
+                    data_tvb, offset, st_len-stci_ifn_size, ENC_ASCII);
             offset += st_len-stci_ifn_size;
         }
         else {
@@ -5159,15 +5274,15 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_cis_tpll_v1_info_manuf,
           { "Manufacturer", "dvb-ci.cis.tpll_v1_info.manufacturer",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_cis_tpll_v1_info_name,
           { "Name", "dvb-ci.cis.tpll_v1_info.name",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_cis_tpll_v1_info_additional,
           { "Additional info", "dvb-ci.cis.tpll_v1_info.additional",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_cis_tpll_v1_end,
           { "End of chain", "dvb-ci.cis.tpll_v1_end",
@@ -5215,7 +5330,7 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_cis_stci_str,
           { "Interface description strings", "dvb-ci.cis.stci_str",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_cis_tpce_indx_intface,
           { "Intface", "dvb-ci.cis.tpce_indx.intface",
@@ -5445,7 +5560,7 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_menu_str,
           { "Menu string", "dvb-ci.ap.menu_string",
-            FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_data_rate,
           { "Transport stream data rate supported by the host",
@@ -5619,7 +5734,7 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_enq,
           { "Enquiry string", "dvb-ci.mmi.enq",
-            FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_ans_id,
           { "Answer ID", "dvb-ci.mmi.ans_id",
@@ -5627,7 +5742,7 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_ans,
           { "Answer", "dvb-ci.mmi.ans",
-            FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_choice_nb,
           { "Number of menu items", "dvb-ci.mmi.choice_nb",
@@ -5643,27 +5758,27 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_title,
           { "Title", "dvb-ci.mmi.title",
-            FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_subtitle,
           { "Sub-title", "dvb-ci.mmi.subtitle",
-            FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_bottom,
           { "Bottom line", "dvb-ci.mmi.bottom",
-            FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_item,
           { "Item", "dvb-ci.mmi.item",
-            FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_host_country,
           { "Host country", "dvb-ci.hlc.country",
-            FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_host_language,
           { "Host language", "dvb-ci.hlc.language",
-            FT_STRING, STR_UNICODE, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_cup_type,
           { "CAM upgrade type", "dvb-ci.cup.type",
@@ -5829,7 +5944,7 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_pincode,
           { "PIN code", "dvb-ci.cc.pincode",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_app_dom_id_len,
           { "Application Domain Identifier length", "dvb-ci.ami.app_dom_id_len",
@@ -5841,11 +5956,11 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_app_dom_id,
           { "Application Domain Identifier", "dvb-ci.ami.app_dom_id",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_init_obj,
           { "Initial Object", "dvb-ci.ami.init_obj",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_ack_code,
           { "Acknowledgement", "dvb-ci.ami.ack_code",
@@ -5865,7 +5980,7 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_file_name,
           { "File name", "dvb-ci.ami.file_name",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_file_data_len,
           { "File data length", "dvb-ci.ami.file_data_len",
@@ -5882,10 +5997,6 @@ proto_register_dvbci(void)
         { &hf_dvbci_file_ok,
           { "FileOK", "dvb-ci.ami.file_ok",
             FT_UINT8, BASE_HEX, NULL, 0x01, NULL, HFILL }
-        },
-        { &hf_dvbci_file_data,
-          { "File data", "dvb-ci.ami.file_data",
-            FT_BYTES, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_abort_req_code,
           { "Abort request code", "dvb-ci.ami.abort_req_code",
@@ -5953,7 +6064,7 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_lsc_hostname,
           { "Hostname", "dvb-ci.lsc.hostname",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_lsc_retry_count,
           { "Retry count", "dvb-ci.lsc.retry_count",
@@ -5963,7 +6074,42 @@ proto_register_dvbci(void)
           { "Timeout", "dvb-ci.lsc.timeout",
             FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
         },
-
+        { &hf_dvbci_lsc_conn_state,
+          { "Connection state", "dvb-ci.lsc.connection_state",
+            FT_UINT8, BASE_HEX, VALS(dvbci_lsc_connect), 0xC0, NULL, HFILL }
+        },
+        { &hf_dvbci_lsc_phys_addr,
+          { "Physical address", "dvb-ci.lsc.physical_address",
+            FT_ETHER, BASE_NONE, NULL, 0x0, NULL, HFILL }
+        },
+        { &hf_dvbci_lsc_netmask,
+          { "Network mask", "dvb-ci.lsc.netmask",
+            FT_IPv6, BASE_NONE, NULL, 0, NULL, HFILL }
+        },
+        { &hf_dvbci_lsc_gateway,
+          { "Default gateway", "dvb-ci.lsc.gateway",
+            FT_IPv6, BASE_NONE, NULL, 0, NULL, HFILL }
+        },
+        { &hf_dvbci_lsc_dhcp_srv,
+          { "DHCP server", "dvb-ci.lsc.dhcp_server",
+            FT_IPv6, BASE_NONE, NULL, 0, NULL, HFILL }
+        },
+        { &hf_dvbci_lsc_num_dns_srv,
+          { "Number of DNS servers", "dvb-ci.lsc.num_dns_srv",
+            FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL }
+        },
+        { &hf_dvbci_lsc_dns_srv,
+          { "DNS server", "dvb-ci.lsc.dns_server",
+            FT_IPv6, BASE_NONE, NULL, 0, NULL, HFILL }
+        },
+        { &hf_dvbci_afs_dom_id,
+          { "Domain identifier", "dvb-ci.afs.domain_identifier",
+            FT_UINT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
+        },
+        { &hf_dvbci_afs_ack_code,
+          { "Ack code", "dvb-ci.afs.ack_code",
+            FT_UINT8, BASE_HEX, VALS(dvbci_afs_ack_code), 0, NULL, HFILL }
+        },
         /* filter string for hf_dvbci_info_ver_op_status and
          * hf_dvbci_info_ver_op_info below is the same, it seems this is ok */
         { &hf_dvbci_info_ver_op_status,
@@ -6076,7 +6222,7 @@ proto_register_dvbci(void)
         },
         { &hf_dvbci_opp_lang_code,
           { "Language code", "dvb-ci.opp.lang_code",
-            FT_STRING, STR_ASCII, NULL, 0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0, NULL, HFILL }
         },
         { &hf_dvbci_prof_name,
           { "Profile name", "dvb-ci.opp.profile_name",
@@ -6284,8 +6430,7 @@ proto_register_dvbci(void)
     expert_dvbci = expert_register_protocol(proto_dvbci);
     expert_register_field_array(expert_dvbci, ei, array_length(ei));
 
-    dvbci_module = prefs_register_protocol(
-        proto_dvbci, proto_reg_handoff_dvbci);
+    dvbci_module = prefs_register_protocol(proto_dvbci, proto_reg_handoff_dvbci);
     prefs_register_string_preference(dvbci_module,
             "sek", "SAC Encryption Key", "SAC Encryption Key (16 hex bytes)",
             &dvbci_sek);
@@ -6302,7 +6447,7 @@ proto_register_dvbci(void)
             &dvbci_dissect_lsc_msg);
 
     sas_msg_dissector_table = register_dissector_table("dvb-ci.sas.app_id_str",
-                "SAS application id", proto_dvbci, FT_STRING, STR_ASCII);
+                "SAS application id", proto_dvbci, FT_STRING, BASE_NONE);
 
     register_init_routine(dvbci_init);
     reassembly_table_register(&tpdu_reassembly_table,
@@ -6326,14 +6471,19 @@ proto_register_dvbci(void)
 void
 proto_reg_handoff_dvbci(void)
 {
-    dissector_add_uint("wtap_encap", WTAP_ENCAP_DVBCI, dvbci_handle);
+    static gboolean initialized = FALSE;
 
-    data_handle = find_dissector("data");
-    mpeg_pmt_handle = find_dissector_add_dependency("mpeg_pmt", proto_dvbci);
-    dvb_nit_handle = find_dissector_add_dependency("dvb_nit", proto_dvbci);
-    png_handle = find_dissector_add_dependency("png", proto_dvbci);
-    tcp_dissector_table = find_dissector_table("tcp.port");
-    udp_dissector_table = find_dissector_table("udp.port");
+    if (!initialized) {
+        dissector_add_uint("wtap_encap", WTAP_ENCAP_DVBCI, dvbci_handle);
+
+        data_handle = find_dissector("data");
+        mpeg_pmt_handle = find_dissector_add_dependency("mpeg_pmt", proto_dvbci);
+        dvb_nit_handle = find_dissector_add_dependency("dvb_nit", proto_dvbci);
+        mime_handle = find_dissector_add_dependency("mime_dlt", proto_dvbci);
+        tcp_dissector_table = find_dissector_table("tcp.port");
+        udp_dissector_table = find_dissector_table("udp.port");
+        initialized = TRUE;
+    }
 
     g_free(dvbci_sek_bin);
     g_free(dvbci_siv_bin);

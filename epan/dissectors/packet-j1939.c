@@ -145,15 +145,15 @@ static const value_string j1939_address_vals[] = {
     { 0, NULL }
 };
 
-value_string_ext j1939_address_vals_ext = VALUE_STRING_EXT_INIT(j1939_address_vals);
+static value_string_ext j1939_address_vals_ext = VALUE_STRING_EXT_INIT(j1939_address_vals);
 
 static void
 j1939_fmt_address(gchar *result, guint32 addr )
 {
     if ((addr < 128) || (addr > 247))
-        g_snprintf(result, ITEM_LABEL_LENGTH, "%d (%s)", addr, val_to_str_ext_const(addr, &j1939_address_vals_ext, "Reserved"));
+        snprintf(result, ITEM_LABEL_LENGTH, "%d (%s)", addr, val_to_str_ext_const(addr, &j1939_address_vals_ext, "Reserved"));
     else
-        g_snprintf(result, ITEM_LABEL_LENGTH, "%d (Arbitrary)", addr);
+        snprintf(result, ITEM_LABEL_LENGTH, "%d (Arbitrary)", addr);
 }
 
 static int dissect_j1939(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
@@ -236,7 +236,7 @@ static int dissect_j1939(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, vo
     else
     {
         /* For now just include raw bytes */
-        col_append_fstr(pinfo->cinfo, COL_INFO, "   %s", tvb_bytes_to_str_punct(wmem_packet_scope(), tvb, 0, data_length, ' '));
+        col_append_fstr(pinfo->cinfo, COL_INFO, "   %s", tvb_bytes_to_str_punct(pinfo->pool, tvb, 0, data_length, ' '));
     }
 
     msg_tree = proto_tree_add_subtree(j1939_tree, tvb, 0, tvb_reported_length(tvb), ett_j1939_message, NULL, "Message");

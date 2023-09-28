@@ -20,6 +20,8 @@
 
 #include "ws_attributes.h"
 
+#include <wsutil/wslog.h>
+
 void register_tap_listener_funnel(void);
 
 struct _funnel_text_window_t {
@@ -29,7 +31,7 @@ struct _funnel_text_window_t {
 
 static GPtrArray *text_windows = NULL;
 
-static funnel_text_window_t *new_text_window(const gchar *title) {
+static funnel_text_window_t *new_text_window(funnel_ops_id_t *ops_id _U_, const gchar *title) {
     funnel_text_window_t *tw = g_new(funnel_text_window_t, 1);
     tw->title = g_strdup(title);
     tw->text = g_string_new("");
@@ -64,12 +66,11 @@ static const gchar *text_window_get_text(funnel_text_window_t *tw) {
     return tw->text->str;
 }
 
-/* XXX: finish this */
-static void funnel_logger(const gchar *log_domain _U_,
-                          GLogLevelFlags log_level _U_,
+static void funnel_logger(const gchar *log_domain,
+                          enum ws_log_level log_level,
                           const gchar *message,
                           gpointer user_data _U_) {
-    fputs(message, stderr);
+    ws_log(log_domain, log_level, "%s", message);
 }
 
 
@@ -90,6 +91,7 @@ static const funnel_ops_t funnel_ops = {
     NULL,
     NULL,
     funnel_logger,
+    NULL,
     NULL,
     NULL,
     NULL,
@@ -159,7 +161,7 @@ static void register_menu_cb(const char *name,
                              void (*callback)(gpointer),
                              gpointer callback_data,
                              gboolean retap _U_) {
-    menu_cb_t *mcb = g_malloc(sizeof(menu_cb_t));
+    menu_cb_t* mcb = g_new(menu_cb_t, 1);
     stat_tap_ui ui_info;
 
     mcb->callback = callback;
@@ -192,16 +194,3 @@ register_tap_listener_funnel(void)
     funnel_register_all_menus(register_menu_cb);
 #endif
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

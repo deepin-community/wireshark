@@ -166,7 +166,7 @@ dissect_cpfi_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
   tda = (word1 & CPFI_DEST_MASK) >> CPFI_DEST_SHIFT;
   if ( tda >= FIRST_TIO_CARD_ADDRESS )
   {
-    g_strlcpy(src_str, " CPFI", sizeof(src_str));
+    (void) g_strlcpy(src_str, " CPFI", sizeof(src_str));
     src = 0;                            /* Make it smallest */
   }
   else
@@ -181,14 +181,14 @@ dissect_cpfi_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     src_board = tda >> 4;
     src_port = tda & 0x0f;
     src = (1 << 24)  +  (src_instance << 16) + (src_board << 8) + src_port;
-    g_snprintf(src_str, sizeof(src_str), "%u.%u.%u", src_instance, src_board, src_port);
+    snprintf(src_str, sizeof(src_str), "%u.%u.%u", src_instance, src_board, src_port);
   }
 
   /* Figure out where the frame is going. srcTDA is destination of frame! */
   tda = (word1 & CPFI_SOURCE_MASK) >> CPFI_SOURCE_SHIFT;
   if ( tda >= FIRST_TIO_CARD_ADDRESS )
   {
-    g_strlcpy(dst_str, " CPFI", sizeof(dst_str));
+    (void) g_strlcpy(dst_str, " CPFI", sizeof(dst_str));
     dst = 0;                            /* Make it smallest */
   }
   else
@@ -203,7 +203,7 @@ dissect_cpfi_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     dst_board = tda >> 4;
     dst_port = tda & 0x0f;
     dst = (1 << 24)  +  (dst_instance << 16) + (dst_board << 8) + dst_port;
-    g_snprintf(dst_str, sizeof(dst_str), "%u.%u.%u", dst_instance, dst_board, dst_port);
+    snprintf(dst_str, sizeof(dst_str), "%u.%u.%u", dst_instance, dst_board, dst_port);
   }
 
   /* Set up the source and destination and arrow per user configuration. */

@@ -22,7 +22,7 @@
 #include <epan/expert.h>
 #include <epan/prefs.h>
 #include <epan/addr_resolv.h>
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 #include <epan/conversation.h>
 #include <epan/dissectors/packet-tcp.h>
 
@@ -262,7 +262,7 @@ static void rtitcp_util_add_error_attribute(proto_tree *attribute, tvbuff_t* tvb
                              gint offset, guint size) {
     proto_tree_add_item(attribute, hf_rtitcp_control_attribute_error_code_value, tvb, offset, 4, ENC_BIG_ENDIAN);
     proto_tree_add_item(attribute, hf_rtitcp_control_attribute_error_code_description, tvb, offset + 4,
-            size - 4, ENC_ASCII|ENC_NA);
+            size - 4, ENC_ASCII);
 }
 
 static void rtitcp_util_add_locator_t(proto_tree *tree, packet_info *pinfo _U_, tvbuff_t * tvb,
@@ -289,9 +289,9 @@ static void rtitcp_util_add_locator_t(proto_tree *tree, packet_info *pinfo _U_, 
             col_append_str(pinfo->cinfo, COL_INFO, " (");
         }
         proto_item_append_text(rtitcp_message, "%s%s:%u",
-            *first_attribute ? "" : ", ", tvb_ip_to_str(tvb, offset + 12), port);
+            *first_attribute ? "" : ", ", tvb_ip_to_str(pinfo->pool, tvb, offset + 12), port);
         col_append_fstr(pinfo->cinfo, COL_INFO, "%s%s:%u",
-                *first_attribute ? "" : ", ", tvb_ip_to_str(tvb, offset + 12), port);
+                *first_attribute ? "" : ", ", tvb_ip_to_str(pinfo->pool, tvb, offset + 12), port);
     } else {
         proto_tree_add_item(tree, hf_rtitcp_locator_ipv6, tvb, offset, 16, ENC_NA);
         if (*first_attribute) {
@@ -299,9 +299,9 @@ static void rtitcp_util_add_locator_t(proto_tree *tree, packet_info *pinfo _U_, 
             col_append_str(pinfo->cinfo, COL_INFO, " (");
         }
         proto_item_append_text(rtitcp_message, "%s%s",
-            *first_attribute ? "" : ", ", tvb_ip6_to_str(tvb, offset));
+            *first_attribute ? "" : ", ", tvb_ip6_to_str(pinfo->pool, tvb, offset));
         col_append_fstr(pinfo->cinfo, COL_INFO, "%s%s",
-                *first_attribute ? "" : ", ", tvb_ip6_to_str(tvb, offset));
+                *first_attribute ? "" : ", ", tvb_ip6_to_str(pinfo->pool, tvb, offset));
     }
 }
 
@@ -360,10 +360,10 @@ static guint dissect_attribute(tvbuff_t *tvb, packet_info *pinfo,
             }
             proto_item_append_text(rtitcp_message, "%s%s",
                 (*first_attribute) ? "" : ", ",
-                tvb_bytes_to_str(wmem_packet_scope(), tvb, attributes_list_offset+offset+4, 16));
+                tvb_bytes_to_str(pinfo->pool, tvb, attributes_list_offset+offset+4, 16));
             col_append_fstr(pinfo->cinfo, COL_INFO, "%s%s",
                 (*first_attribute) ? "" : ", ",
-                tvb_bytes_to_str(wmem_packet_scope(), tvb, attributes_list_offset+offset+4, 16));
+                tvb_bytes_to_str(pinfo->pool, tvb, attributes_list_offset+offset+4, 16));
             (*first_attribute) = FALSE;
             break;
         }
@@ -506,7 +506,7 @@ static guint16 dissect_control_message(proto_tree *rtitcp_tree, tvbuff_t *tvb, p
 
     /* Now we dissect the transaction id */
     proto_tree_add_item(rtitcp_message, hf_rtitcp_control_transaction_id, tvb, offset, 12, ENC_NA);
-    transaction_id_str = tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, 12);
+    transaction_id_str = tvb_bytes_to_str(pinfo->pool, tvb, offset, 12);
 
     /* Get the transaction identifier. Not the whole transaction but the middle part, which
      * shouldn't coincide */
@@ -552,7 +552,7 @@ static guint16 dissect_control_message(proto_tree *rtitcp_tree, tvbuff_t *tvb, p
     }
     if (!rtitcp_trans) {
             /* create a "fake" rtitcp_trans structure */
-            rtitcp_trans=wmem_new(wmem_packet_scope(), rtitcp_transaction_t);
+            rtitcp_trans=wmem_new(pinfo->pool, rtitcp_transaction_t);
             rtitcp_trans->req_frame = 0;
             rtitcp_trans->rep_frame = 0;
             rtitcp_trans->req_time = pinfo->abs_ts;

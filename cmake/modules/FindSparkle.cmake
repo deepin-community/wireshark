@@ -5,11 +5,12 @@
 #  SPARKLE_FOUND        - True if we found Sparkle
 #  SPARKLE_INCLUDE_DIRS - Path to Sparkle.h, empty if not found
 #  SPARKLE_LIBRARIES    - Path to Sparkle.framework, empty if not found
+#  SPARKLE_VERSION      - Sparkle framework bundle version
 
 include(FindPackageHandleStandardArgs)
 
-file(GLOB USR_LOCAL_HINT "/usr/local/Sparkle-[1-9]*/")
-file(GLOB HOMEBREW_HINT "/usr/local/Caskroom/sparkle/[1-9]*/")
+file(GLOB USR_LOCAL_HINT "/usr/local/Sparkle-[2-9]*/")
+file(GLOB HOMEBREW_HINT "/usr/local/Caskroom/sparkle/[2-9]*/")
 
 find_path(SPARKLE_INCLUDE_DIR Sparkle.h
   HINTS ${USR_LOCAL_HINT} ${HOMEBREW_HINT}
@@ -18,7 +19,26 @@ find_library(SPARKLE_LIBRARY NAMES Sparkle
   HINTS ${USR_LOCAL_HINT} ${HOMEBREW_HINT}
 )
 
-find_package_handle_standard_args(Sparkle DEFAULT_MSG SPARKLE_INCLUDE_DIR SPARKLE_LIBRARY)
+# Sparkle doesn't appear to provide a version macro, and its Info.plist versions
+# are all over the place. Check for SPUStandardUpdaterController.h, which was
+# added in version 2.
+set(SPARKLE_VERSION 1)
+
+find_file(_spustandardupdatercontroller_h SPUStandardUpdaterController.h
+  ${SPARKLE_LIBRARY}/Headers
+  NO_DEFAULT_PATH
+)
+
+if(_spustandardupdatercontroller_h)
+  set(SPARKLE_VERSION 2)
+endif()
+
+unset(_spustandardupdatercontroller_h CACHE)
+
+find_package_handle_standard_args(Sparkle
+  REQUIRED_VARS SPARKLE_INCLUDE_DIR SPARKLE_LIBRARY
+  VERSION_VAR SPARKLE_VERSION
+)
 
 if(SPARKLE_FOUND)
   set(SPARKLE_LIBRARIES ${SPARKLE_LIBRARY} )

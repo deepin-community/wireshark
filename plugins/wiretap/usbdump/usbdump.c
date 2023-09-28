@@ -113,7 +113,7 @@ usbdump_open(wtap *wth, int *err, char **err_info)
     if (GUINT16_FROM_BE(version) != 3) {
         /* We only support version 0.3 */
         *err = WTAP_ERR_UNSUPPORTED;
-        *err_info = g_strdup_printf("usbdump: version %u.%u unsupported",
+        *err_info = ws_strdup_printf("usbdump: version %u.%u unsupported",
             version >> 8, version & 0xff);
         return WTAP_OPEN_NOT_MINE;
     }
@@ -134,7 +134,7 @@ usbdump_open(wtap *wth, int *err, char **err_info)
     }
 
     /* Create a private structure to track the multiframe */
-    usbdump_info = (usbdump_info_t *)g_malloc(sizeof(usbdump_info_t));
+    usbdump_info = g_new(usbdump_info_t, 1);
     usbdump_info->version = GUINT16_FROM_BE(version);
     usbdump_info->multiframe_size = GUINT32_FROM_LE(multiframe_size);
     usbdump_info->multiframe_overrun = FALSE;
@@ -176,7 +176,7 @@ usbdump_read(wtap *wth, wtap_rec *rec, Buffer *buf, int *err, gchar **err_info,
     if (usbdump_info->multiframe_overrun)
     {
         *err = WTAP_ERR_BAD_FILE;
-        *err_info = g_strdup_printf("Multiframe overrun");
+        *err_info = ws_strdup_printf("Multiframe overrun");
         return FALSE;
     }
 
@@ -261,6 +261,7 @@ usbdump_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
 
     /* Setup the per packet structure and fill it with info from this frame */
     rec->rec_type = REC_TYPE_PACKET;
+    rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
     rec->presence_flags = WTAP_HAS_TS | WTAP_HAS_CAP_LEN;
     rec->ts.secs = (guint32)bpf_hdr[3] << 24 | (guint32)bpf_hdr[2] << 16 |
                     (guint32)bpf_hdr[1] << 8 | (guint32)bpf_hdr[0];
@@ -307,6 +308,22 @@ usbdump_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
  * Register how we can handle an unknown file to see if this is a valid
  * usbdump file and register information about this file format.
  */
+static const struct supported_block_type usbdump_blocks_supported[] = {
+    /* We support packet blocks, with no comments or other options. */
+    { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+static const struct file_type_subtype_info fi = {
+    "FreeBSD USBDUMP",
+    "usbdump",
+    NULL,
+    NULL,
+    FALSE,
+    BLOCKS_SUPPORTED(usbdump_blocks_supported),
+    NULL,
+    NULL,
+    NULL
+};
+
 void
 wtap_register_usbdump(void)
 {
@@ -321,21 +338,7 @@ wtap_register_usbdump(void)
 
     wtap_register_open_info(&oi, FALSE);
 
-    struct file_type_subtype_info fi = {
-        "FreeBSD USBDUMP",
-        "usbdump",
-        NULL,
-        NULL,
-        FALSE,
-        FALSE,
-        0,
-        NULL,
-        NULL,
-        NULL
-    };
-
-    usbdump_file_type_subtype =
-        wtap_register_file_type_subtypes(&fi, WTAP_FILE_TYPE_SUBTYPE_UNKNOWN);
+    usbdump_file_type_subtype = wtap_register_file_type_subtype(&fi);
 }
 
 /*

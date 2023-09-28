@@ -63,7 +63,9 @@ def program_path(request):
     '''
     curdir_run = os.path.join(os.curdir, 'run')
     if sys.platform == 'win32':
-        curdir_run = os.path.join(curdir_run, 'RelWithDebInfo')
+        curdir_run_config = os.path.join(curdir_run, 'RelWithDebInfo')
+        if os.path.exists(curdir_run_config):
+            curdir_run = curdir_run_config
     paths = (
         request.config.getoption('--program-path', default=None),
         os.environ.get('WS_BIN_PATH'),
@@ -170,18 +172,17 @@ def features(cmd_tshark, make_env):
     except subprocess.CalledProcessError as ex:
         print('Failed to detect tshark features: %s' % (ex,))
         tshark_v = ''
-    gcry_m = re.search(r'with +Gcrypt +([0-9]+\.[0-9]+)', tshark_v)
+    gcry_m = re.search(r'with +Gcrypt +([0-9]+)\.([0-9]+)', tshark_v)
+    gcry_ver = (int(gcry_m.group(1)),int(gcry_m.group(2)))
     return types.SimpleNamespace(
         have_x64='Compiled (64-bit)' in tshark_v,
         have_lua='with Lua' in tshark_v,
         have_nghttp2='with nghttp2' in tshark_v,
-        have_kerberos='with MIT Kerberos' in tshark_v or 'with Heimdal Kerberos' in tshark_v,
-        have_libgcrypt16=gcry_m and float(gcry_m.group(1)) >= 1.6,
-        have_libgcrypt17=gcry_m and float(gcry_m.group(1)) >= 1.7,
-        have_libgcrypt18=gcry_m and float(gcry_m.group(1)) >= 1.8,
+        have_kerberos='with Kerberos' in tshark_v,
         have_gnutls='with GnuTLS' in tshark_v,
         have_pkcs11='and PKCS #11 support' in tshark_v,
         have_brotli='with brotli' in tshark_v,
+        have_plugins='binary plugins supported' in tshark_v,
     )
 
 
@@ -195,6 +196,7 @@ def dirs():
         config_dir=os.path.join(this_dir, 'config'),
         key_dir=os.path.join(this_dir, 'keys'),
         lua_dir=os.path.join(this_dir, 'lua'),
+        protobuf_lang_files_dir=os.path.join(this_dir, 'protobuf_lang_files'),
         tools_dir=os.path.join(this_dir, '..', 'tools'),
     )
 
@@ -238,6 +240,11 @@ def make_env():
             # This directory is supposed not to be written and is used by
             # "readonly" tests that do not read any other preferences.
             env[home_env] = "/wireshark-tests-unused"
+        # XDG_CONFIG_HOME takes precedence over HOME, which we don't want.
+        try:
+            del env['XDG_CONFIG_HOME']
+        except KeyError:
+            pass
         return env
     return make_env_real
 

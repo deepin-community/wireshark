@@ -121,7 +121,6 @@ static int hf_gsm_map_cbs_coding_grp4_7_char_set = -1;
 static int hf_gsm_map_cbs_coding_grp4_7_class = -1;
 static int hf_gsm_map_cbs_coding_grp15_mess_code = -1;
 static int hf_gsm_map_cbs_coding_grp15_class = -1;
-static int hf_gsm_map_tmsi = -1;
 static int hf_gsm_map_ie_tag = -1;
 static int hf_gsm_map_len = -1;
 static int hf_gsm_map_disc_par = -1;
@@ -570,9 +569,9 @@ dissect_gsm_map_ext2_qos_subscribed(tvbuff_t *tvb, packet_info *pinfo _U_, proto
     {
         temp32 = qos_calc_ext_bitrate(oct);
         if (temp32 % 1000 == 0)
-            str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32 / 1000);
+            str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32 / 1000);
         else
-            str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", temp32);
+            str = wmem_strdup_printf(pinfo->pool, "%u kbps", temp32);
     }
     proto_tree_add_uint_format_value(subtree, hf_gsm_map_qos_max_bitrate_downl_ext, tvb,
         offset, 1, oct, "%s (%u)", str, oct);
@@ -591,9 +590,9 @@ dissect_gsm_map_ext2_qos_subscribed(tvbuff_t *tvb, packet_info *pinfo _U_, proto
     {
         temp32 = qos_calc_ext_bitrate(oct);
         if (temp32 % 1000 == 0)
-            str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32 / 1000);
+            str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32 / 1000);
         else
-            str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", temp32);
+            str = wmem_strdup_printf(pinfo->pool, "%u kbps", temp32);
     }
     proto_tree_add_uint_format_value(subtree, hf_gsm_map_qos_guar_bitrate_downl_ext, tvb,
         offset, 1, oct, "%s (%u)", str, oct);
@@ -626,9 +625,9 @@ dissect_gsm_map_ext3_qos_subscribed(tvbuff_t *tvb, packet_info *pinfo _U_, proto
     {
         temp32 = qos_calc_ext_bitrate(oct);
         if (temp32 % 1000 == 0)
-            str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32 / 1000);
+            str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32 / 1000);
         else
-            str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", temp32);
+            str = wmem_strdup_printf(pinfo->pool, "%u kbps", temp32);
     }
     proto_tree_add_uint_format_value(subtree, hf_gsm_map_qos_max_bitrate_upl_ext, tvb,
         offset, 1, oct, "%s (%u)", str, oct);
@@ -647,9 +646,9 @@ dissect_gsm_map_ext3_qos_subscribed(tvbuff_t *tvb, packet_info *pinfo _U_, proto
     {
         temp32 = qos_calc_ext_bitrate(oct);
         if (temp32 % 1000 == 0)
-            str = wmem_strdup_printf(wmem_packet_scope(), "%u Mbps", temp32 / 1000);
+            str = wmem_strdup_printf(pinfo->pool, "%u Mbps", temp32 / 1000);
         else
-            str = wmem_strdup_printf(wmem_packet_scope(), "%u kbps", temp32);
+            str = wmem_strdup_printf(pinfo->pool, "%u kbps", temp32);
     }
     proto_tree_add_uint_format_value(subtree, hf_gsm_map_qos_guar_bitrate_upl_ext, tvb,
         offset, 1, oct, "%s (%u)", str, oct);
@@ -1320,7 +1319,11 @@ static int dissect_invokeData(proto_tree *tree, tvbuff_t *tvb, int offset, asn1_
     offset=dissect_gsm_map_ms_CancelVcsgLocationArg(FALSE, tvb, offset, actx, tree, -1);
     break;
   case 37: /*reset*/
-    offset=dissect_gsm_map_ms_ResetArg(FALSE, tvb, offset, actx, tree, -1);
+      if (application_context_version == 1) {
+          offset = dissect_gsm_old_ResetArgV1(FALSE, tvb, offset, actx, tree, -1);
+      } else {
+          offset = dissect_gsm_map_ms_ResetArg(FALSE, tvb, offset, actx, tree, -1);
+      }
     break;
   case 38: /*forwardCheckSS-Indication*/
     return offset;
@@ -1374,8 +1377,10 @@ static int dissect_invokeData(proto_tree *tree, tvbuff_t *tvb, int offset, asn1_
   case 47: /*reportSM-DeliveryStatus*/
     offset=dissect_gsm_map_sm_ReportSM_DeliveryStatusArg(FALSE, tvb, offset, actx, tree, -1);
     break;
-    /* reserved noteSubscriberPresent (48) */
-    /* reserved alertServiceCentreWithoutResult (49)
+  case 48: /*noteSubscriberPresent*/
+      offset = dissect_gsm_map_IMSI(FALSE, tvb, offset, actx, tree, hf_gsm_map_imsi);
+      break;
+      /* reserved alertServiceCentreWithoutResult (49)
      * ETS 300 599: December 2000 (GSM 09.02 version 4.19.1)
      * -- alertServiceCentreWithoutResult must not be used in
      * -- version greater 1
@@ -1966,7 +1971,11 @@ static int dissect_returnErrorData(proto_tree *tree, tvbuff_t *tvb, int offset, 
     offset=dissect_gsm_map_er_SubBusyForMT_SMS_Param(FALSE, tvb, offset, actx, tree, -1);
     break;
   case 32: /* SM-DeliveryFailureCause */
-    offset=dissect_gsm_map_er_SM_DeliveryFailureCause(FALSE, tvb, offset, actx, tree, -1);
+    offset = dissect_mc_message(tvb, offset, actx, tree,
+                              FALSE, dissect_gsm_map_er_SM_EnumeratedDeliveryFailureCause, hf_gsm_map_er_sm_EnumeratedDeliveryFailureCause,
+                              FALSE, dissect_gsm_map_er_SM_DeliveryFailureCause, -1,
+                              FALSE, NULL, -1);
+
     break;
   case 33: /* MessageWaitListFullParam */
     offset=dissect_gsm_map_er_MessageWaitListFullParam(FALSE, tvb, offset, actx, tree, -1);
@@ -2359,7 +2368,7 @@ dissect_gsm_map(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void
 
   asn1_ctx.subtree.top_tree = parent_tree;
 
-  gsm_map_priv = wmem_new0(wmem_packet_scope(), gsm_map_private_info_t);
+  gsm_map_priv = wmem_new0(pinfo->pool, gsm_map_private_info_t);
   gsm_map_priv->tcap_private = (struct tcap_private_t *)data;
   asn1_ctx.value_ptr = gsm_map_priv;
 
@@ -2398,7 +2407,7 @@ dissect_gsm_map_sccp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree,
 
   asn1_ctx.subtree.top_tree = parent_tree;
 
-  gsm_map_priv = wmem_new0(wmem_packet_scope(), gsm_map_private_info_t);
+  gsm_map_priv = wmem_new0(pinfo->pool, gsm_map_private_info_t);
   gsm_map_priv->sccp_msg_info = (sccp_msg_info_t *)data;
   asn1_ctx.value_ptr = gsm_map_priv;
 
@@ -2706,16 +2715,17 @@ static stat_tap_table_item gsm_map_stat_fields[] = {
   {TABLE_ITEM_STRING, TAP_ALIGN_LEFT, "Operation Code", "%-25s"},
   {TABLE_ITEM_UINT, TAP_ALIGN_RIGHT, "Invokes", "%d"},
   {TABLE_ITEM_UINT, TAP_ALIGN_RIGHT, "Num Bytes", "%d"},
-  {TABLE_ITEM_FLOAT, TAP_ALIGN_RIGHT, "Avg Bytes", "%d"},
+  {TABLE_ITEM_FLOAT, TAP_ALIGN_RIGHT, "Avg Bytes", "%1.2f"},
   {TABLE_ITEM_UINT, TAP_ALIGN_RIGHT, "Return Result", "%d"},
   {TABLE_ITEM_UINT, TAP_ALIGN_RIGHT, "Num Bytes", "%d"},
-  {TABLE_ITEM_FLOAT, TAP_ALIGN_RIGHT, "Avg Bytes", "%d"},
+  {TABLE_ITEM_FLOAT, TAP_ALIGN_RIGHT, "Avg Bytes", "%1.2f"},
   {TABLE_ITEM_UINT, TAP_ALIGN_RIGHT, "Total Bytes", "%d"},
-  {TABLE_ITEM_FLOAT, TAP_ALIGN_RIGHT, "Avg Bytes", "%d"},
+  {TABLE_ITEM_FLOAT, TAP_ALIGN_RIGHT, "Avg Bytes", "%1.2f"},
 };
 
 static void gsm_map_stat_init(stat_tap_table_ui* new_stat)
 {
+  const char *table_name = "GSM MAP Operation Statistics";
   int num_fields = sizeof(gsm_map_stat_fields)/sizeof(stat_tap_table_item);
   stat_tap_table* table;
   guint i;
@@ -2734,7 +2744,15 @@ static void gsm_map_stat_init(stat_tap_table_ui* new_stat)
   items[TOT_BYTES_COLUMN].type = TABLE_ITEM_UINT;
   items[AVG_BYTES_COLUMN].type = TABLE_ITEM_FLOAT;
 
-  table = stat_tap_init_table("GSM MAP Operation Statistics", num_fields, 0, NULL);
+  table = stat_tap_find_table(new_stat, table_name);
+  if (table) {
+    if (new_stat->stat_tap_reset_table_cb) {
+      new_stat->stat_tap_reset_table_cb(table);
+    }
+    return;
+  }
+
+  table = stat_tap_init_table(table_name, num_fields, 0, NULL);
   stat_tap_add_table(new_stat, table);
 
   /* Add a row for each value type */
@@ -2745,7 +2763,7 @@ static void gsm_map_stat_init(stat_tap_table_ui* new_stat)
     if (ocs) {
       col_str = g_strdup(ocs);
     } else {
-      col_str = g_strdup_printf("Unknown op code %d", i);
+      col_str = ws_strdup_printf("Unknown op code %d", i);
     }
 
     items[ID_COLUMN].value.uint_value = i;
@@ -2755,16 +2773,15 @@ static void gsm_map_stat_init(stat_tap_table_ui* new_stat)
 }
 
 static tap_packet_status
-gsm_map_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *gmtr_ptr)
+gsm_map_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *gmtr_ptr, tap_flags_t flags _U_)
 {
   stat_data_t* stat_data = (stat_data_t*)tapdata;
   const gsm_map_tap_rec_t *gmtr = (const gsm_map_tap_rec_t *)gmtr_ptr;
   stat_tap_table* table;
   stat_tap_table_item_type *invoke_data, *fwd_bytes_data, *result_data, *rev_bytes_data, *avg_data;
   guint invokes, fwd_bytes, results, rev_bytes;
-  guint i = 0;
 
-  table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, i);
+  table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, 0);
 
   invoke_data = stat_tap_get_field_data(table, gmtr->opcode, INVOKES_COLUMN);
   fwd_bytes_data = stat_tap_get_field_data(table, gmtr->opcode, NUM_BYTES_FWD_COLUMN);
@@ -3199,11 +3216,6 @@ void proto_register_gsm_map(void) {
           FT_UINT8,BASE_DEC, VALS(gsm_map_cbs_coding_grp15_class_vals), 0x03,
           NULL, HFILL }
       },
-      { &hf_gsm_map_tmsi,
-        { "tmsi", "gsm_map.tmsi",
-          FT_BYTES, BASE_NONE, NULL, 0,
-          "gsm_map.TMSI", HFILL }},
-
       { &hf_gsm_map_ie_tag,
         { "Tag", "gsm_map.ie_tag",
           FT_UINT8, BASE_DEC, VALS(gsm_map_tag_vals), 0,
@@ -3242,7 +3254,7 @@ void proto_register_gsm_map(void) {
           "Service Area Code", HFILL }},
       { &hf_gsm_map_ussd_string,
         { "USSD String", "gsm_map.ussd_string",
-          FT_STRING, STR_UNICODE, NULL, 0,
+          FT_STRING, BASE_NONE, NULL, 0,
           NULL, HFILL }},
     { &hf_gsm_map_spare_bits,
         { "Spare bit(s)", "gsm_map.spare_bits",

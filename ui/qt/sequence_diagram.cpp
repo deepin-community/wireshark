@@ -14,6 +14,7 @@
 
 #include <ui/qt/utils/color_utils.h>
 #include <ui/qt/utils/qt_ui_utils.h>
+#include "ui/recent.h"
 
 #include <QFont>
 #include <QFontMetrics>
@@ -54,6 +55,9 @@ SequenceDiagram::SequenceDiagram(QCPAxis *keyAxis, QCPAxis *valueAxis, QCPAxis *
     // yaxis2 (comment): Extra info ("Comment" in GTK+)
 
 //    valueAxis->setAutoTickStep(false);
+
+    /* The comments are not numbers, don't try to pretty print exponentials. */
+    commentAxis->setNumberFormat("f");
     QList<QCPAxis *> axes;
     axes << value_axis_ << key_axis_ << comment_axis_;
     QPen no_pen(Qt::NoPen);
@@ -250,7 +254,7 @@ void SequenceDiagram::draw(QCPPainter *painter)
             fg_pen.setColor(sel_pal.color(QPalette::HighlightedText));
             bg_color = sel_pal.color(QPalette::Highlight);
             selected_key_ = cur_key;
-        } else if (sai->has_color_filter) {
+        } else if ((sai->has_color_filter) && (recent.packet_list_colorize)) {
             fg_pen.setColor(QColor().fromRgb(sai->fg_color));
             bg_color = QColor().fromRgb(sai->bg_color);
         } else {
@@ -395,16 +399,3 @@ QCPRange SequenceDiagram::getValueRange(bool &validRange, QCP::SignDomain, const
     validRange = valid;
     return range;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -26,10 +26,14 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+#include <ws_log_defs.h>
+
 #include <wiretap/wtap.h>
 
 #include <wsutil/report_message.h>
 #include <wsutil/nstime.h>
+#include <wsutil/ws_assert.h>
+#include <wsutil/wslog.h>
 
 #include <epan/packet.h>
 #include <epan/strutil.h>
@@ -54,7 +58,7 @@
 #define WSLUA_INIT_ROUTINES "init_routines"
 #define WSLUA_PREFS_CHANGED "prefs_changed"
 
-typedef void (*wslua_logger_t)(const gchar *, GLogLevelFlags, const gchar *, gpointer);
+typedef void (*wslua_logger_t)(const gchar *, enum ws_log_level, const gchar *, gpointer);
 extern wslua_logger_t wslua_logger;
 
 /* type conversion macros - lua_Number is a double, so casting isn't kosher; and
@@ -277,7 +281,7 @@ struct _wslua_filehandler {
     struct file_type_subtype_info finfo;
     gboolean is_reader;
     gboolean is_writer;
-    gchar* description;
+    gchar* internal_description; /* XXX - this is redundant; finfo.description should suffice */
     gchar* type;
     gchar* extensions;
     lua_State* L;
@@ -463,6 +467,8 @@ extern int wslua_reg_attributes(lua_State *L, const wslua_attribute_table *t, gb
 #endif
 
 #define WSLUA_FUNCTION extern int
+/* This is for functions intended only to be used in init.lua */
+#define WSLUA_INTERNAL_FUNCTION extern int
 
 #define WSLUA_REGISTER_FUNCTION(name)     { lua_pushcfunction(L, wslua_## name); lua_setglobal(L, #name); }
 
@@ -686,7 +692,7 @@ extern C shift##C(lua_State* L,int i)
 #define THROW_LUA_ERROR(...) \
     THROW_FORMATTED(DissectorError, __VA_ARGS__)
 
-/* Catches any Wireshark exceptions in code and convert it into a LUA error.
+/* Catches any Wireshark exceptions in code and convert it into a Lua error.
  * Normal restrictions for TRY/CATCH apply, in particular, do not return! */
 #define WRAP_NON_LUA_EXCEPTIONS(code) \
 { \
@@ -800,7 +806,7 @@ extern char* wslua_get_actual_filename(const char* fname);
 
 extern int wslua_bin2hex(lua_State* L, const guint8* data, const guint len, const gboolean lowercase, const gchar* sep);
 extern int wslua_hex2bin(lua_State* L, const char* data, const guint len, const gchar* sep);
-extern int luaopen_rex_glib(lua_State *L);
+extern int luaopen_rex_pcre2(lua_State *L);
 
 extern const gchar* get_current_plugin_version(void);
 extern void clear_current_plugin_version(void);

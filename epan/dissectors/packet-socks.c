@@ -53,6 +53,8 @@
 
 #include "packet-tcp.h"
 #include "packet-udp.h"
+#include "packet-tls.h"
+
 #include <epan/strutil.h>
 
 #define TCP_PORT_SOCKS 1080
@@ -119,6 +121,7 @@ static int hf_socks_traceroute_results = -1;
 /************* Dissector handles ***********/
 
 static dissector_handle_t socks_handle;
+static dissector_handle_t socks_handle_tls;
 static dissector_handle_t socks_udp_handle;
 
 /************* State Machine names ***********/
@@ -235,7 +238,7 @@ static const char *get_auth_method_name( guint Number){
     return "Bad method number (not 0-0xff)";
 }
 
-static int display_address(tvbuff_t *tvb, int offset, proto_tree *tree) {
+static int display_address(packet_info *pinfo, tvbuff_t *tvb, int offset, proto_tree *tree) {
 
 /* decode and display the v5 address, return offset of next byte */
 
@@ -256,7 +259,7 @@ static int display_address(tvbuff_t *tvb, int offset, proto_tree *tree) {
         gchar* str;
 
         len = tvb_get_guint8(tvb, offset);
-        str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+1, len, ENC_ASCII);
+        str = tvb_get_string_enc(pinfo->pool, tvb, offset+1, len, ENC_ASCII);
         proto_tree_add_string(tree, hf_socks_remote_name, tvb, offset, len+1, str);
         offset += (len+1);
         }
@@ -344,7 +347,7 @@ socks_udp_dissector(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
         proto_tree_add_item(socks_tree, hf_socks_fragment_number, tvb, offset, 1, ENC_BIG_ENDIAN);
         offset += 1;
 
-        offset = display_address( tvb, offset, socks_tree);
+        offset = display_address(pinfo, tvb, offset, socks_tree);
         hash_info->udp_remote_port = tvb_get_ntohs(tvb, offset);
 
         proto_tree_add_uint( socks_tree, hf_socks_dstport, tvb,
@@ -376,7 +379,7 @@ socks_udp_dissector(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
 static void
 new_udp_conversation( socks_hash_entry_t *hash_info, packet_info *pinfo){
 
-    conversation_t *conversation = conversation_new( pinfo->num, &pinfo->src, &pinfo->dst, ENDPOINT_UDP,
+    conversation_t *conversation = conversation_new( pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_UDP,
             hash_info->udp_port, hash_info->port, 0);
 
     DISSECTOR_ASSERT( conversation);
@@ -444,14 +447,14 @@ display_socks_v4(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
             /* display user name */
             str_len = tvb_strsize(tvb, offset);
-            proto_tree_add_item( tree, hf_socks_username, tvb, offset, str_len, ENC_ASCII|ENC_NA);
+            proto_tree_add_item( tree, hf_socks_username, tvb, offset, str_len, ENC_ASCII);
             offset += str_len;
 
             if ( ipaddr[0] == 0 && ipaddr[1] == 0 &&
                  ipaddr[2] == 0 && ipaddr[3] != 0) {
                 /* 0.0.0.x , where x!=0 means v4a support */
                 str_len = tvb_strsize(tvb, offset);
-                proto_tree_add_item( tree, hf_v4a_dns_name, tvb, offset, str_len, ENC_ASCII|ENC_NA);
+                proto_tree_add_item( tree, hf_v4a_dns_name, tvb, offset, str_len, ENC_ASCII);
             }
             break;
         default:
@@ -548,7 +551,7 @@ client_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo,
         proto_tree_add_item( tree, hf_socks_reserved, tvb, offset, 1, ENC_BIG_ENDIAN);
         offset += 1;
 
-        offset = display_address(tvb, offset, tree);
+        offset = display_address(pinfo, tvb, offset, tree);
         proto_tree_add_item( tree, hf_client_port, tvb, offset, 2, ENC_BIG_ENDIAN);
     }
     else if ((state_info->client == clientWaitForAuthReply) &&
@@ -571,12 +574,12 @@ client_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo,
 
             /* process user name */
             len = tvb_get_guint8(tvb, offset);
-            str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+1, len, ENC_ASCII);
+            str = tvb_get_string_enc(pinfo->pool, tvb, offset+1, len, ENC_ASCII);
             proto_tree_add_string(tree, hf_socks_username, tvb, offset, len+1, str);
             offset += (len+1);
 
             len = tvb_get_guint8(tvb, offset);
-            str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset+1, len, ENC_ASCII);
+            str = tvb_get_string_enc(pinfo->pool, tvb, offset+1, len, ENC_ASCII);
             proto_tree_add_string(tree, hf_socks_password, tvb, offset, len+1, str);
             /* offset += (len+1); */
             break;
@@ -601,7 +604,7 @@ client_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo,
 }
 
 static void
-server_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
+server_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo,
     proto_tree *tree, socks_hash_entry_t *hash_info _U_, sock_state_t* state_info) {
 
 /* Display the protocol tree for the version. This routine uses the */
@@ -685,7 +688,7 @@ server_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
         proto_tree_add_item( tree, hf_socks_reserved, tvb, offset, 1, ENC_BIG_ENDIAN);
         offset += 1;
 
-        offset = display_address(tvb, offset, tree);
+        offset = display_address(pinfo, tvb, offset, tree);
         proto_tree_add_item( tree, hf_client_port, tvb, offset, 2, ENC_BIG_ENDIAN);
         break;
 
@@ -701,7 +704,7 @@ server_display_socks_v5(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
         proto_tree_add_item( tree, hf_socks_reserved, tvb, offset, 1, ENC_BIG_ENDIAN);
         offset += 1;
 
-        offset = display_address(tvb, offset, tree);
+        offset = display_address(pinfo, tvb, offset, tree);
         proto_tree_add_item( tree, hf_server_remote_host_port, tvb, offset, 2, ENC_BIG_ENDIAN);
         break;
 
@@ -885,7 +888,7 @@ server_state_machine_v5( socks_hash_entry_t *hash_info, tvbuff_t *tvb,
             hash_info->serverState = serverBindReply;
             if ((tvb_get_guint8(tvb, offset + 2) == 0) &&
                 (tvb_reported_length_remaining(tvb, offset) > 5)) {
-                    offset = display_address(tvb, offset, NULL);
+                    offset = display_address(pinfo, tvb, offset, NULL);
                     client_state_machine_v5(hash_info, tvb, offset, pinfo, FALSE);
             }
             break;
@@ -1044,7 +1047,7 @@ dissect_socks(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
             return 0;
 
         conversation = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst,
-                                        conversation_pt_to_endpoint_type(pinfo->ptype), pinfo->srcport, pinfo->destport, 0);
+                                        conversation_pt_to_conversation_type(pinfo->ptype), pinfo->srcport, pinfo->destport, 0);
     }
 
     hash_info = (socks_hash_entry_t *)conversation_get_proto_data(conversation,proto_socks);
@@ -1061,7 +1064,9 @@ dissect_socks(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
         conversation_add_proto_data(conversation, proto_socks, hash_info);
 
                         /* set dissector for now */
-        conversation_set_dissector(conversation, socks_handle);
+        if (conversation_get_dissector(conversation, pinfo->num) != NULL) {
+            conversation_set_dissector(conversation, socks_handle);
+        }
     }
 
     /* display summary window information  */
@@ -1172,6 +1177,22 @@ dissect_socks(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
 }
 
 
+static int
+dissect_socks_tls(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data) {
+    if (data != NULL) {
+        return dissect_socks(tvb, pinfo, tree, data);
+    } else {
+        /* lets fake a tcpinfo, which TLS does not give us */
+        struct tcpinfo tmp;
+        tmp.flags = 0;
+        tmp.is_reassembled = FALSE;
+        tmp.lastackseq = 0;
+        tmp.nxtseq = 0;
+        tmp.seq = 0;
+        tmp.urgent_pointer = 0;
+        return dissect_socks(tvb, pinfo, tree, &tmp);
+    }
+}
 
 void
 proto_register_socks( void){
@@ -1345,8 +1366,11 @@ proto_reg_handoff_socks(void) {
     /* dissector install routine */
     socks_udp_handle = create_dissector_handle(socks_udp_dissector, proto_socks);
     socks_handle = create_dissector_handle(dissect_socks, proto_socks);
+    socks_handle_tls = register_dissector("SOCKS over TLS", dissect_socks_tls, proto_socks);
 
     dissector_add_uint_with_preference("tcp.port", TCP_PORT_SOCKS, socks_handle);
+
+    ssl_dissector_add(0, socks_handle_tls);
 }
 
 /*

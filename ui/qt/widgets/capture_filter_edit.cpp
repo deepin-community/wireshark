@@ -23,7 +23,7 @@
 #include "capture_filter_syntax_worker.h"
 #include "filter_dialog.h"
 #include <ui/qt/widgets/stock_icon_tool_button.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 
 #include <QComboBox>
 #include <QCompleter>
@@ -218,19 +218,26 @@ CaptureFilterEdit::CaptureFilterEdit(QWidget *parent, bool plain) :
 #endif
     }
 
-    QThread *syntax_thread = new QThread;
+    syntax_thread_ = new QThread;
     syntax_worker_ = new CaptureFilterSyntaxWorker;
-    syntax_worker_->moveToThread(syntax_thread);
-    connect(wsApp, &WiresharkApplication::appInitialized, this, &CaptureFilterEdit::updateBookmarkMenu);
-    connect(wsApp, &WiresharkApplication::captureFilterListChanged, this, &CaptureFilterEdit::updateBookmarkMenu);
-    connect(syntax_thread, &QThread::started, syntax_worker_, &CaptureFilterSyntaxWorker::start);
-    connect(syntax_thread, &QThread::started, this,
+    syntax_worker_->moveToThread(syntax_thread_);
+    connect(mainApp, &MainApplication::appInitialized, this, &CaptureFilterEdit::updateBookmarkMenu);
+    connect(mainApp, &MainApplication::captureFilterListChanged, this, &CaptureFilterEdit::updateBookmarkMenu);
+    connect(syntax_thread_, &QThread::started, this,
             static_cast<void (CaptureFilterEdit::*)()>(&CaptureFilterEdit::checkFilter));
     connect(syntax_worker_, &CaptureFilterSyntaxWorker::syntaxResult,
             this, &CaptureFilterEdit::setFilterSyntaxState);
-    connect(syntax_thread, &QThread::finished, syntax_worker_, &CaptureFilterSyntaxWorker::deleteLater);
-    syntax_thread->start();
+    connect(this, &CaptureFilterEdit::captureFilterChanged, syntax_worker_, &CaptureFilterSyntaxWorker::checkFilter);
+    syntax_thread_->start();
     updateBookmarkMenu();
+}
+
+CaptureFilterEdit::~CaptureFilterEdit()
+{
+    syntax_thread_->quit();
+    syntax_thread_->wait();
+    delete syntax_thread_;
+    delete syntax_worker_;
 }
 
 void CaptureFilterEdit::paintEvent(QPaintEvent *evt) {
@@ -248,7 +255,7 @@ void CaptureFilterEdit::paintEvent(QPaintEvent *evt) {
         painter.setPen(divider_color);
         QRect cr = contentsRect();
         QSize bksz = bookmark_button_->size();
-        painter.drawLine(bksz.width(), cr.top(), bksz.width(), cr.bottom());
+        painter.drawLine(bksz.width(), cr.top(), bksz.width(), cr.bottom() + 1);
     }
 }
 
@@ -324,7 +331,7 @@ void CaptureFilterEdit::checkFilter(const QString& filter)
         actions_->checkedAction()->setChecked(false);
 
     setSyntaxState(Busy);
-    wsApp->popStatus(WiresharkApplication::FilterSyntax);
+    mainApp->popStatus(MainApplication::FilterSyntax);
     setToolTip(QString());
     bool empty = filter.isEmpty();
 
@@ -366,7 +373,7 @@ void CaptureFilterEdit::checkFilter(const QString& filter)
     if (empty) {
         setFilterSyntaxState(filter, Empty, QString());
     } else {
-        syntax_worker_->checkFilter(filter);
+        emit captureFilterChanged(filter);
     }
 }
 
@@ -425,7 +432,7 @@ void CaptureFilterEdit::setFilterSyntaxState(QString filter, int state, QString 
     if (filter.compare(text()) == 0) { // The user hasn't changed the filter
         setSyntaxState((SyntaxState)state);
         if (!err_msg.isEmpty()) {
-            wsApp->pushStatus(WiresharkApplication::FilterSyntax, err_msg);
+            mainApp->pushStatus(MainApplication::FilterSyntax, err_msg);
             setToolTip(err_msg);
         }
     }
@@ -553,16 +560,3 @@ void CaptureFilterEdit::prepareFilter()
 
     emit textEdited(filter);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

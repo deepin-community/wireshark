@@ -164,7 +164,7 @@ typedef struct _value_string_keyval {
 } value_string_keyval;
 
 
-const value_zrtp_versions valid_zrtp_versions[] =
+static const value_zrtp_versions valid_zrtp_versions[] =
   {
     {"1.1x"},
     {"1.0x"},
@@ -174,7 +174,7 @@ const value_zrtp_versions valid_zrtp_versions[] =
     {NULL}
   };
 
-const value_string_keyval zrtp_hash_type_vals[] =
+static const value_string_keyval zrtp_hash_type_vals[] =
   {
     { "S256",   "SHA-256 Hash"},
     { "S384",   "SHA-384 Hash"},
@@ -183,7 +183,7 @@ const value_string_keyval zrtp_hash_type_vals[] =
     { NULL,             NULL }
   };
 
-const value_string_keyval zrtp_cipher_type_vals[] =
+static const value_string_keyval zrtp_cipher_type_vals[] =
   {
     { "AES1",   "AES-CM with 128 bit keys"},
     { "AES2",   "AES-CM with 192 bit keys"},
@@ -197,7 +197,7 @@ const value_string_keyval zrtp_cipher_type_vals[] =
     { NULL,             NULL }
   };
 
-const value_string_keyval zrtp_auth_tag_vals[] =
+static const value_string_keyval zrtp_auth_tag_vals[] =
   {
     { "HS32",   "HMAC-SHA1 32 bit authentication tag"},
     { "HS80",   "HMAC-SHA1 80 bit authentication tag"},
@@ -206,14 +206,14 @@ const value_string_keyval zrtp_auth_tag_vals[] =
     { NULL,             NULL }
   };
 
-const value_string_keyval zrtp_sas_type_vals[] =
+static const value_string_keyval zrtp_sas_type_vals[] =
   {
     { "B32 ",   "Short authentication string using base 32"},
     { "B256",   "Short authentication string using base 256"},
     { NULL,             NULL }
   };
 
-const value_string_keyval zrtp_key_agreement_vals[] =
+static const value_string_keyval zrtp_key_agreement_vals[] =
   {
     { "DH2k",   "DH mode with p=2048 bit prime"},
     { "DH3k",   "DH mode with p=3072 bit prime"},
@@ -226,7 +226,7 @@ const value_string_keyval zrtp_key_agreement_vals[] =
     { NULL,             NULL }
   };
 
-const value_string zrtp_error_vals[] =
+static const value_string zrtp_error_vals[] =
   {
     { ZRTP_ERR_10, "Malformed Packet (CRC OK but wrong structure)"},
     { ZRTP_ERR_20, "Critical Software Error"},
@@ -334,7 +334,7 @@ dissect_zrtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 
   proto_tree_add_item(zrtp_tree, hf_zrtp_sequence, tvb, prime_offset+2, 2, ENC_BIG_ENDIAN);
 
-  proto_tree_add_item(zrtp_tree, hf_zrtp_cookie, tvb, prime_offset+4, 4, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(zrtp_tree, hf_zrtp_cookie, tvb, prime_offset+4, 4, ENC_ASCII);
 
   proto_tree_add_item(zrtp_tree, hf_zrtp_source_id, tvb, prime_offset+8, 4, ENC_BIG_ENDIAN);
 
@@ -350,7 +350,7 @@ dissect_zrtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 
   tvb_memcpy(tvb, (void *)message_type, msg_offset+4, 8);
   message_type[8] = '\0';
-  proto_tree_add_item(zrtp_msg_tree, hf_zrtp_msg_type, tvb, msg_offset+4, 8, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(zrtp_msg_tree, hf_zrtp_msg_type, tvb, msg_offset+4, 8, ENC_ASCII);
 
   linelen = tvb_reported_length_remaining(tvb, msg_offset+12);
 
@@ -469,7 +469,7 @@ dissect_Ping(tvbuff_t *tvb, packet_info *pinfo, proto_tree *zrtp_tree) {
 
   col_set_str(pinfo->cinfo, COL_INFO, "Ping Packet");
 
-  proto_tree_add_item(zrtp_tree, hf_zrtp_msg_ping_version,      tvb, data_offset,   4, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(zrtp_tree, hf_zrtp_msg_ping_version,      tvb, data_offset,   4, ENC_ASCII);
   proto_tree_add_item(zrtp_tree, hf_zrtp_msg_ping_endpointhash, tvb, data_offset+4, 8, ENC_BIG_ENDIAN);
 }
 
@@ -479,7 +479,7 @@ dissect_PingACK(tvbuff_t *tvb, packet_info *pinfo, proto_tree *zrtp_tree) {
 
   col_set_str(pinfo->cinfo, COL_INFO, "PingACK Packet");
 
-  proto_tree_add_item(zrtp_tree, hf_zrtp_msg_ping_version,         tvb, data_offset,    4, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(zrtp_tree, hf_zrtp_msg_ping_version,         tvb, data_offset,    4, ENC_ASCII);
   proto_tree_add_item(zrtp_tree, hf_zrtp_msg_pingack_endpointhash, tvb, data_offset+4,  8, ENC_BIG_ENDIAN);
   proto_tree_add_item(zrtp_tree, hf_zrtp_msg_ping_endpointhash,    tvb, data_offset+12, 8, ENC_BIG_ENDIAN);
   proto_tree_add_item(zrtp_tree, hf_zrtp_msg_ping_ssrc,            tvb, data_offset+20, 4, ENC_BIG_ENDIAN);
@@ -635,8 +635,8 @@ dissect_Hello(tvbuff_t *tvb, packet_info *pinfo, proto_tree *zrtp_tree) {
   if (check_valid_version(version_str) == NULL) {
     col_set_str(pinfo->cinfo, COL_INFO, "Unsupported version of ZRTP protocol");
   }
-  proto_tree_add_item(zrtp_tree, hf_zrtp_msg_version,    tvb, msg_offset+12,  4, ENC_ASCII|ENC_NA);
-  proto_tree_add_item(zrtp_tree, hf_zrtp_msg_client_id,  tvb, msg_offset+16, 16, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(zrtp_tree, hf_zrtp_msg_version,    tvb, msg_offset+12,  4, ENC_ASCII);
+  proto_tree_add_item(zrtp_tree, hf_zrtp_msg_client_id,  tvb, msg_offset+16, 16, ENC_ASCII);
   proto_tree_add_item(zrtp_tree, hf_zrtp_msg_hash_image, tvb, msg_offset+32, 32, ENC_NA);
   proto_tree_add_item(zrtp_tree, hf_zrtp_msg_zid,        tvb, msg_offset+64, 12, ENC_NA);
   proto_tree_add_item(zrtp_tree, hf_zrtp_msg_sigcap,     tvb, data_offset+0,  1, ENC_BIG_ENDIAN);

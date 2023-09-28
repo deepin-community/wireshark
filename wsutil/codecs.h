@@ -1,4 +1,4 @@
-/* codecs.h
+/** @file
  * codecs interface   2007 Tomas Kukosa
  *
  * Wireshark - Network traffic analyzer
@@ -11,24 +11,20 @@
 #ifndef _CODECS_H_
 #define _CODECS_H_
 
-#include <epan/epan.h>
 #include "ws_symbol_export.h"
 #include "ws_attributes.h"
-#ifdef HAVE_PLUGINS
-#include "wsutil/plugins.h"
-#endif
+
+#include <glib.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-#ifdef HAVE_PLUGINS
 typedef struct {
     void (*register_codec_module)(void);  /* routine to call to register a codec */
 } codecs_plugin;
 
 WS_DLL_PUBLIC void codecs_register_plugin(const codecs_plugin *plug);
-#endif
 
 /**
  * For all built-in codecs and codec plugins, call their register routines.

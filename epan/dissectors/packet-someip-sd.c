@@ -1,7 +1,7 @@
 /* packet-someip-sd.c
  * SOME/IP-SD dissector.
  * By Dr. Lars Voelker <lars.voelker@technica-engineering.de> / <lars.voelker@bmw.de>
- * Copyright 2012-2020 Dr. Lars Voelker
+ * Copyright 2012-2022 Dr. Lars Voelker
  * Copyright 2020      Ayoub Kaanich
  * Copyright 2019      Ana Pantar
  * Copyright 2019      Guenter Ebermann
@@ -14,12 +14,15 @@
  */
 
 #include <config.h>
+
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/to_str.h>
 #include <epan/uat.h>
-#include "packet-udp.h"
-#include "packet-someip.h"
+#include <epan/stats_tree.h>
+
+#include <packet-udp.h>
+#include <packet-someip.h>
 
  /*
   * Dissector for SOME/IP Service Discovery (SOME/IP-SD).
@@ -104,12 +107,15 @@ static int hf_someip_sd_entry_index1 = -1;
 static int hf_someip_sd_entry_index2 = -1;
 static int hf_someip_sd_entry_numopt1 = -1;
 static int hf_someip_sd_entry_numopt2 = -1;
+static int hf_someip_sd_entry_opts_referenced = -1;
 static int hf_someip_sd_entry_serviceid = -1;
+static int hf_someip_sd_entry_servicename = -1;
 static int hf_someip_sd_entry_instanceid = -1;
 static int hf_someip_sd_entry_majorver = -1;
 static int hf_someip_sd_entry_ttl = -1;
 static int hf_someip_sd_entry_minorver = -1;
 static int hf_someip_sd_entry_eventgroupid = -1;
+static int hf_someip_sd_entry_eventgroupname = -1;
 static int hf_someip_sd_entry_reserved = -1;
 static int hf_someip_sd_entry_counter = -1;
 static int hf_someip_sd_entry_intial_event_flag = -1;
@@ -128,6 +134,7 @@ static int hf_someip_sd_option_proto = -1;
 static int hf_someip_sd_option_reserved2 = -1;
 static int hf_someip_sd_option_data = -1;
 static int hf_someip_sd_option_config_string = -1;
+static int hf_someip_sd_option_config_string_element = -1;
 static int hf_someip_sd_option_lb_priority = -1;
 static int hf_someip_sd_option_lb_weight = -1;
 
@@ -138,6 +145,29 @@ static gint ett_someip_sd_entries = -1;
 static gint ett_someip_sd_entry = -1;
 static gint ett_someip_sd_options = -1;
 static gint ett_someip_sd_option = -1;
+static gint ett_someip_sd_config_string = -1;
+
+
+/*** Taps ***/
+static int tap_someip_sd_entries = -1;
+
+typedef struct _someip_sd_entries_tap {
+    guint8  entry_type;
+    guint16 service_id;
+    guint8  major_version;
+    guint32 minor_version;
+    guint16 instance_id;
+    guint16 eventgroup_id;
+    guint32 ttl;
+} someip_sd_entries_tap_t;
+
+
+/*** Stats ***/
+static const gchar *st_str_ip_src = "Source Addresses";
+static const gchar *st_str_ip_dst = "Destination Addresses";
+
+static int st_node_ip_src = -1;
+static int st_node_ip_dst = -1;
 
 /*** Preferences ***/
 static range_t *someip_ignore_ports_udp = NULL;
@@ -206,6 +236,7 @@ static expert_field ef_someipsd_option_array_bytes_left = EI_INIT;
 static expert_field ef_someipsd_option_unknown = EI_INIT;
 static expert_field ef_someipsd_option_wrong_length = EI_INIT;
 static expert_field ef_someipsd_L4_protocol_unsupported = EI_INIT;
+static expert_field ef_someipsd_config_string_malformed = EI_INIT;
 
 /*** prototypes ***/
 void proto_register_someip_sd(void);
@@ -216,8 +247,11 @@ void proto_reg_handoff_someip_sd(void);
  *************************************/
 
 static void
-dissect_someip_sd_pdu_option_configuration(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, guint32 offset, guint32 length, int optionnum) {
+dissect_someip_sd_pdu_option_configuration(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset, guint32 length, int optionnum) {
     guint32         offset_orig = offset;
+    const guint8   *config_string;
+    proto_item     *ti;
+    proto_tree     *subtree;
 
     tree = proto_tree_add_subtree_format(tree, tvb, offset, length, ett_someip_sd_option, NULL, "%d: Configuration Option", optionnum);
 
@@ -231,9 +265,28 @@ dissect_someip_sd_pdu_option_configuration(tvbuff_t *tvb, packet_info *pinfo _U_
     proto_tree_add_item(tree, hf_someip_sd_option_reserved, tvb, offset, 1, ENC_NA);
     offset += 1;
 
-    proto_tree_add_item(tree, hf_someip_sd_option_config_string, tvb, offset, length - offset + offset_orig, ENC_ASCII|ENC_NA);
+    gint config_string_length = length - offset + offset_orig;
+    ti = proto_tree_add_item_ret_string(tree, hf_someip_sd_option_config_string, tvb, offset, config_string_length, ENC_ASCII | ENC_NA, pinfo->pool, &config_string);
+    subtree = proto_item_add_subtree(ti, ett_someip_sd_config_string);
 
-    /* TODO: splitting the config string would be nice... does DNS have code for this? */
+    guint8 pos = 0;
+    guint8 element_length;
+    while (config_string != NULL && config_string_length - pos > 0) {
+        element_length = config_string[pos];
+        pos++;
+
+        if (element_length == 0) {
+            break;
+        }
+
+        if (element_length > config_string_length - pos) {
+            expert_add_info(pinfo, ti, &ef_someipsd_config_string_malformed);
+            break;
+        }
+
+        proto_tree_add_item(subtree, hf_someip_sd_option_config_string_element, tvb, offset + pos, element_length, ENC_ASCII | ENC_NA);
+        pos += element_length;
+    }
 }
 
 static void
@@ -288,7 +341,7 @@ dissect_someip_sd_pdu_option_ipv4(tvbuff_t *tvb, packet_info *pinfo, proto_tree 
     offset += 1;
 
     proto_tree_add_item(tree, hf_someip_sd_option_ipv4, tvb, offset, 4, ENC_NA);
-    ipstring = tvb_ip_to_str(tvb, offset);
+    ipstring = tvb_ip_to_str(pinfo->pool, tvb, offset);
     offset += 4;
 
     proto_tree_add_item(tree, hf_someip_sd_option_reserved2, tvb, offset, 1, ENC_NA);
@@ -398,11 +451,13 @@ dissect_someip_sd_pdu_option_unknown(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 }
 
 static int
-dissect_someip_sd_pdu_options(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_item *ti, guint32 offset, guint32 length) {
+dissect_someip_sd_pdu_options(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_item *ti, guint32 offset_orig, guint32 length) {
     guint16             real_length = 0;
     guint8              option_type = 0;
     int                 optionnum = 0;
     tvbuff_t           *subtvb = NULL;
+
+    guint32             offset = offset_orig;
 
     if (!tvb_bytes_exist(tvb, offset, SD_OPTION_MINLENGTH) || !tvb_bytes_exist(tvb, offset, length)) {
         expert_add_info(pinfo, ti, &ef_someipsd_option_array_truncated);
@@ -413,7 +468,7 @@ dissect_someip_sd_pdu_options(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
         real_length = tvb_get_ntohs(tvb, offset) + 3;
         option_type = tvb_get_guint8(tvb, offset + 2);
 
-        if (!tvb_bytes_exist(tvb, offset, (gint)real_length)) {
+        if (!tvb_bytes_exist(tvb, offset, (gint)real_length) || offset - offset_orig + real_length > length) {
             expert_add_info(pinfo, ti, &ef_someipsd_option_array_truncated);
             return offset;
         }
@@ -451,7 +506,7 @@ dissect_someip_sd_pdu_options(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
 }
 
 static void
-dissect_someip_sd_pdu_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset_orig, guint32 length _U_, guint32 *entry_flags, guint32 *stop_entry_flags) {
+dissect_someip_sd_pdu_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint32 offset_orig, guint32 length, guint32 *entry_flags, guint32 *stop_entry_flags) {
     guint8              type = 255;
     guint32             serviceid = 0;
     guint32             instanceid = 0;
@@ -459,11 +514,16 @@ dissect_someip_sd_pdu_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     guint32             majorver = 0;
     guint32             minorver = 0;
     guint32             ttl = 0;
+    guint32             opt_index1;
+    guint32             opt_index2;
+    guint32             opt_num1;
+    guint32             opt_num2;
 
     guint64             uniqueid = 0;
     guint8              category = SD_ENTRY_UNKNOWN;
 
     const gchar        *description = NULL;
+    static gchar        buf_opt_ref[32];
 
     proto_item         *ti;
     proto_item         *ti_top;
@@ -500,19 +560,35 @@ dissect_someip_sd_pdu_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     proto_tree_add_uint_format_value(tree, hf_someip_sd_entry_type, tvb, offset, 1, type, "0x%02x (%s)", type, description);
     offset += 1;
 
-    proto_tree_add_item(tree, hf_someip_sd_entry_index1, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf_someip_sd_entry_index1, tvb, offset, 1, ENC_BIG_ENDIAN, &opt_index1);
     offset += 1;
-    proto_tree_add_item(tree, hf_someip_sd_entry_index2, tvb, offset, 1, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf_someip_sd_entry_index2, tvb, offset, 1, ENC_BIG_ENDIAN, &opt_index2);
     offset += 1;
 
-    proto_tree_add_item(tree, hf_someip_sd_entry_numopt1, tvb, offset, 1, ENC_NA);
-    proto_tree_add_item(tree, hf_someip_sd_entry_numopt2, tvb, offset, 1, ENC_NA);
+    proto_tree_add_item_ret_uint(tree, hf_someip_sd_entry_numopt1, tvb, offset, 1, ENC_NA, &opt_num1);
+    proto_tree_add_item_ret_uint(tree, hf_someip_sd_entry_numopt2, tvb, offset, 1, ENC_NA, &opt_num2);
     offset += 1;
+
+    if (opt_num1 != 0 && opt_num2 == 0) {
+        snprintf(buf_opt_ref, 32, "%d-%d", opt_index1, opt_index1 + opt_num1 - 1);
+    } else if (opt_num1 == 0 && opt_num2 != 0) {
+        snprintf(buf_opt_ref, 32, "%d-%d", opt_index2, opt_index2 + opt_num2 - 1);
+    } else if (opt_num1 != 0 && opt_num2 != 0) {
+        snprintf(buf_opt_ref, 32, "%d-%d,%d-%d", opt_index1, opt_index1 + opt_num1 - 1, opt_index2, opt_index2 + opt_num2 - 1);
+    } else {
+        snprintf(buf_opt_ref, 32, "None");
+    }
+
+    ti = proto_tree_add_string(tree, hf_someip_sd_entry_opts_referenced, tvb, offset - 3, 3, buf_opt_ref);
+    proto_item_set_generated(ti);
 
     ti = proto_tree_add_item_ret_uint(tree, hf_someip_sd_entry_serviceid, tvb, offset, 2, ENC_BIG_ENDIAN, &serviceid);
     description = someip_lookup_service_name((guint16)serviceid);
     if (description != NULL) {
         proto_item_append_text(ti, " (%s)", description);
+        ti = proto_tree_add_string(tree, hf_someip_sd_entry_servicename, tvb, offset, 2, description);
+        proto_item_set_generated(ti);
+        proto_item_set_hidden(ti);
     }
     offset += 2;
 
@@ -528,7 +604,7 @@ dissect_someip_sd_pdu_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     /* Add specific fields - i.e. the last line */
     if (category == SD_ENTRY_SERVICE) {
         proto_tree_add_item_ret_uint(tree, hf_someip_sd_entry_minorver, tvb, offset, 4, ENC_BIG_ENDIAN, &minorver);
-        offset += 4;
+        /* offset += 4; */
 
         proto_item_append_text(ti_top, " (Service ID 0x%04x, Instance ID 0x%04x, Version %u.%u)", serviceid, instanceid, majorver, minorver);
     } else if (category == SD_ENTRY_EVENTGROUP) {
@@ -544,6 +620,9 @@ dissect_someip_sd_pdu_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         description = someip_lookup_eventgroup_name((guint16)serviceid, (guint16)eventgroupid);
         if (description != NULL) {
             proto_item_append_text(ti, " (%s)", description);
+            ti = proto_tree_add_string(tree, hf_someip_sd_entry_eventgroupname, tvb, offset, 2, description);
+            proto_item_set_generated(ti);
+            proto_item_set_hidden(ti);
         }
 
         proto_item_append_text(ti_top, " (Service ID 0x%04x, Instance ID 0x%04x, Eventgroup ID 0x%04x, Version %u)", serviceid, instanceid, eventgroupid, majorver);
@@ -559,40 +638,52 @@ dissect_someip_sd_pdu_entry(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     }
 
     /* lets add some combined filtering term */
-    uniqueid = (((guint64)serviceid) << 32) | instanceid << 16 | eventgroupid;
+    uniqueid = (((guint64)serviceid) << 32) | (guint64)instanceid << 16 | (guint64)eventgroupid;
 
     ti = NULL;
     if (ttl > 0) {
         switch (type) {
         case SD_ENTRY_FIND_SERVICE:
-            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_findservice, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" G_GINT64_MODIFIER "x", uniqueid);
+            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_findservice, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" PRIx64, uniqueid);
             break;
         case SD_ENTRY_OFFER_SERVICE:
-            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_offerservice, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" G_GINT64_MODIFIER "x", uniqueid);
+            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_offerservice, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" PRIx64, uniqueid);
             break;
         case SD_ENTRY_SUBSCRIBE_EVENTGROUP:
-            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_subscribeeventgroup, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" G_GINT64_MODIFIER "x", uniqueid);
+            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_subscribeeventgroup, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" PRIx64, uniqueid);
             break;
         case SD_ENTRY_SUBSCRIBE_EVENTGROUP_ACK:
-            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_subscribeeventgroupack, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" G_GINT64_MODIFIER "x", uniqueid);
+            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_subscribeeventgroupack, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" PRIx64, uniqueid);
             break;
         }
     } else {
         switch (type) {
         case SD_ENTRY_STOP_OFFER_SERVICE:
-            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_stopofferservice, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" G_GINT64_MODIFIER "x", uniqueid);
+            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_stopofferservice, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" PRIx64, uniqueid);
             break;
         case SD_ENTRY_STOP_SUBSCRIBE_EVENTGROUP:
-            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_stopsubscribeeventgroup, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" G_GINT64_MODIFIER "x", uniqueid);
+            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_stopsubscribeeventgroup, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" PRIx64, uniqueid);
             break;
         case SD_ENTRY_SUBSCRIBE_EVENTGROUP_NACK:
-            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_subscribeeventgroupnack, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" G_GINT64_MODIFIER "x", uniqueid);
+            ti = proto_tree_add_uint64_format_value(tree, hf_someip_sd_entry_type_subscribeeventgroupnack, tvb, offset_orig, SD_ENTRY_LENGTH, uniqueid, "on 0x%012" PRIx64, uniqueid);
             break;
         }
     }
 
-    if (ti != NULL) {
-        PROTO_ITEM_SET_HIDDEN(ti);
+    proto_item_set_hidden(ti);
+
+    /* TAP */
+    if (have_tap_listener(tap_someip_sd_entries)) {
+        someip_sd_entries_tap_t *data = wmem_alloc(pinfo->pool, sizeof(someip_sd_entries_tap_t));
+        data->entry_type = type;
+        data->service_id = (guint16)serviceid;
+        data->major_version = (guint8)majorver;
+        data->minor_version = minorver;
+        data->instance_id = (guint16)instanceid;
+        data->eventgroup_id = (guint16)eventgroupid;
+        data->ttl = ttl;
+
+        tap_queue_packet(tap_someip_sd_entries, pinfo, data);
     }
 }
 
@@ -753,6 +844,145 @@ dissect_someip_sd_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
     return offset;
 }
 
+/*******************************************
+ **************** Statistics ***************
+ *******************************************/
+
+static void
+someipsd_entries_stats_tree_init(stats_tree *st) {
+    st_node_ip_src = stats_tree_create_node(st, st_str_ip_src, 0, STAT_DT_INT, TRUE);
+    stat_node_set_flags(st, st_str_ip_src, 0, FALSE, ST_FLG_SORT_TOP);
+    st_node_ip_dst = stats_tree_create_node(st, st_str_ip_dst, 0, STAT_DT_INT, TRUE);
+}
+
+static void
+stat_number_to_string_with_any(guint32 value, guint max, gchar *format_string, gchar *ret, size_t size_limit) {
+    if (value == max) {
+        snprintf(ret, size_limit, "%s", "MAX");
+    } else {
+        snprintf(ret, size_limit, format_string, value);
+    }
+}
+
+static void
+stat_create_entry_summary_string(const someip_sd_entries_tap_t *data, gchar *ret, size_t size_limit) {
+    gchar service_str[128];
+    gchar instance_str[128];
+    gchar majorver_str[128];
+    gchar minorver_str[128];
+    gchar eventgrp_str[128];
+    gchar tmp[128];
+
+    char *service_name  = someip_lookup_service_name(data->service_id);
+    char *eventgrp_name = someip_lookup_eventgroup_name(data->service_id, data->eventgroup_id);
+
+    stat_number_to_string_with_any(data->service_id, UINT32_MAX, "0x%04x", service_str, sizeof(service_str) - 1);
+    stat_number_to_string_with_any(data->instance_id, UINT32_MAX, "0x%04x", instance_str, sizeof(instance_str) - 1);
+    stat_number_to_string_with_any(data->major_version, UINT8_MAX, "%d", majorver_str, sizeof(majorver_str) - 1);
+
+    switch (data->entry_type) {
+    case SD_ENTRY_FIND_SERVICE:
+    case SD_ENTRY_OFFER_SERVICE:
+        stat_number_to_string_with_any(data->minor_version, UINT32_MAX, "%d", minorver_str, sizeof(minorver_str) - 1);
+        if (service_name != NULL) {
+            snprintf(ret, size_limit, "Service %s (%s) Version %s.%s Instance %s", service_str, service_name, majorver_str, minorver_str, instance_str);
+        } else {
+            snprintf(ret, size_limit, "Service %s Version %s.%s Instance %s", service_str, majorver_str, minorver_str, instance_str);
+        }
+        break;
+
+    case SD_ENTRY_SUBSCRIBE_EVENTGROUP:
+    case SD_ENTRY_SUBSCRIBE_EVENTGROUP_ACK:
+        stat_number_to_string_with_any(data->eventgroup_id, UINT32_MAX, "0x%04x", eventgrp_str, sizeof(eventgrp_str) - 1);
+        if (service_name != NULL) {
+            snprintf(tmp, sizeof(tmp) - 1, "Service %s (%s) Version %s Instance %s Eventgroup %s", service_str, service_name, majorver_str, instance_str, eventgrp_str);
+        } else {
+            snprintf(tmp, sizeof(tmp) - 1, "Service %s Version %s Instance %s Eventgroup %s", service_str, majorver_str, instance_str, eventgrp_str);
+        }
+        if (eventgrp_name != NULL) {
+            snprintf(ret, size_limit, "%s (%s)", tmp, eventgrp_name);
+        }
+        break;
+    }
+}
+
+static tap_packet_status
+someipsd_entries_stats_tree_packet(stats_tree *st, packet_info *pinfo, epan_dissect_t *edt _U_, const void *p, tap_flags_t flags _U_) {
+    DISSECTOR_ASSERT(p);
+    const someip_sd_entries_tap_t *data = (const someip_sd_entries_tap_t *)p;
+    static gchar tmp_addr_str[256];
+
+    snprintf(tmp_addr_str, sizeof(tmp_addr_str) - 1, "%s (%s)", address_to_str(pinfo->pool, &pinfo->net_src), address_to_name(&pinfo->net_src));
+    tick_stat_node(st, st_str_ip_src, 0, FALSE);
+    int src_id = tick_stat_node(st, tmp_addr_str, st_node_ip_src, TRUE);
+
+    snprintf(tmp_addr_str, sizeof(tmp_addr_str) - 1, "%s (%s)", address_to_str(pinfo->pool, &pinfo->net_dst), address_to_name(&pinfo->net_dst));
+    tick_stat_node(st, st_str_ip_dst, 0, FALSE);
+    int dst_id = tick_stat_node(st, tmp_addr_str, st_node_ip_dst, TRUE);
+
+    int tmp_id;
+    static gchar tmp_str[128];
+
+    if (data->ttl == 0) {
+        switch (data->entry_type) {
+        case SD_ENTRY_STOP_OFFER_SERVICE:
+            stat_create_entry_summary_string(data, tmp_str, sizeof(tmp_str) - 1);
+            tmp_id = tick_stat_node(st, "Stop Offer Service", src_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            tmp_id = tick_stat_node(st, "Stop Offer Service", dst_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            break;
+        case SD_ENTRY_STOP_SUBSCRIBE_EVENTGROUP:
+            stat_create_entry_summary_string(data, tmp_str, sizeof(tmp_str) - 1);
+            tmp_id = tick_stat_node(st, "Stop Subscribe Eventgroup", src_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            tmp_id = tick_stat_node(st, "Stop Subscribe Eventgroup", dst_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            break;
+        case SD_ENTRY_SUBSCRIBE_EVENTGROUP_NACK:
+            stat_create_entry_summary_string(data, tmp_str, sizeof(tmp_str) - 1);
+            tmp_id = tick_stat_node(st, "Subscribe Eventgroup Nack", src_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            tmp_id = tick_stat_node(st, "Subscribe Eventgroup Nack", dst_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            break;
+        }
+    } else {
+        switch (data->entry_type) {
+        case SD_ENTRY_FIND_SERVICE:
+            stat_create_entry_summary_string(data, tmp_str, sizeof(tmp_str) - 1);
+            tmp_id = tick_stat_node(st, "Find Service", src_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            tmp_id = tick_stat_node(st, "Find Service", dst_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            break;
+        case SD_ENTRY_OFFER_SERVICE:
+            stat_create_entry_summary_string(data, tmp_str, sizeof(tmp_str) - 1);
+            tmp_id = tick_stat_node(st, "Offer Service", src_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            tmp_id = tick_stat_node(st, "Offer Service", dst_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            break;
+        case SD_ENTRY_SUBSCRIBE_EVENTGROUP:
+            stat_create_entry_summary_string(data, tmp_str, sizeof(tmp_str) - 1);
+            tmp_id = tick_stat_node(st, "Subscribe Eventgroup", src_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            tmp_id = tick_stat_node(st, "Subscribe Eventgroup", dst_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            break;
+        case SD_ENTRY_SUBSCRIBE_EVENTGROUP_ACK:
+            stat_create_entry_summary_string(data, tmp_str, sizeof(tmp_str) - 1);
+            tmp_id = tick_stat_node(st, "Subscribe Eventgroup Ack", src_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            tmp_id = tick_stat_node(st, "Subscribe Eventgroup Ack", dst_id, TRUE);
+            tick_stat_node(st, tmp_str, tmp_id, FALSE);
+            break;
+        }
+    }
+
+    return TAP_PACKET_REDRAW;
+}
+
 void
 proto_register_someip_sd(void) {
     module_t *someipsd_module;
@@ -801,10 +1031,16 @@ proto_register_someip_sd(void) {
         { &hf_someip_sd_entry_numopt2,
             { "Number of Opts 2", "someipsd.entry.numopt2",
             FT_UINT8, BASE_HEX, NULL, 0x0f, NULL, HFILL }},
+        { &hf_someip_sd_entry_opts_referenced,
+            { "Options referenced", "someipsd.entry.optionsreferenced",
+            FT_STRING, BASE_NONE, NULL, 0x00, NULL, HFILL }},
 
         { &hf_someip_sd_entry_serviceid,
             { "Service ID", "someipsd.entry.serviceid",
             FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+        { &hf_someip_sd_entry_servicename,
+            { "Service Name", "someipsd.entry.servicename",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
         { &hf_someip_sd_entry_instanceid,
             { "Instance ID", "someipsd.entry.instanceid",
             FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
@@ -820,6 +1056,9 @@ proto_register_someip_sd(void) {
         { &hf_someip_sd_entry_eventgroupid,
             { "Eventgroup ID", "someipsd.entry.eventgroupid",
             FT_UINT16, BASE_HEX, NULL, 0x0, NULL, HFILL }},
+        { &hf_someip_sd_entry_eventgroupname,
+            { "Eventgroup Name", "someipsd.entry.eventgroupname",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }},
         { &hf_someip_sd_entry_reserved,
             { "Reserved", "someipsd.entry.reserved",
             FT_UINT8, BASE_HEX, NULL, 0x0, NULL, HFILL } },
@@ -870,6 +1109,9 @@ proto_register_someip_sd(void) {
         { &hf_someip_sd_option_config_string,
             { "Configuration String", "someipsd.option.config_string",
             FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL } },
+        { &hf_someip_sd_option_config_string_element,
+            { "Configuration String Element", "someipsd.option.config_string_element",
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL } },
         { &hf_someip_sd_option_lb_priority,
             { "Priority", "someipsd.option.priority",
             FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL } },
@@ -908,6 +1150,7 @@ proto_register_someip_sd(void) {
         &ett_someip_sd_entry,
         &ett_someip_sd_options,
         &ett_someip_sd_option,
+        &ett_someip_sd_config_string,
     };
 
     static ei_register_info ei_sd[] = {
@@ -920,14 +1163,16 @@ proto_register_someip_sd(void) {
         { &ef_someipsd_option_unknown,{ "someipsd.option_unknown", PI_MALFORMED, PI_WARN, "SOME/IP-SD Unknown Option!", EXPFILL } },
         { &ef_someipsd_option_wrong_length,{ "someipsd.option_wrong_length", PI_MALFORMED, PI_ERROR, "SOME/IP-SD Option length is incorrect!", EXPFILL } },
         { &ef_someipsd_L4_protocol_unsupported,{ "someipsd.L4_protocol_unsupported", PI_MALFORMED, PI_ERROR, "SOME/IP-SD Unsupported Layer 4 Protocol!", EXPFILL } },
+        { &ef_someipsd_config_string_malformed,{ "someipsd.config_string_malformed", PI_MALFORMED, PI_ERROR, "SOME/IP-SD Configuration String malformed!", EXPFILL } },
     };
 
-    /* Register ETTs */
+    /* Register Protocol, Fields, ETTs, Expert Info, Taps */
     proto_someip_sd = proto_register_protocol(SOMEIP_SD_NAME_LONG, SOMEIP_SD_NAME, SOMEIP_SD_NAME_FILTER);
     proto_register_field_array(proto_someip_sd, hf_sd, array_length(hf_sd));
     proto_register_subtree_array(ett_sd, array_length(ett_sd));
     expert_module_someip_sd = expert_register_protocol(proto_someip_sd);
     expert_register_field_array(expert_module_someip_sd, ei_sd, array_length(ei_sd));
+    tap_someip_sd_entries = register_tap("someipsd_entries");
 
     /* Register preferences */
     someipsd_module = prefs_register_protocol(proto_someip_sd, &proto_reg_handoff_someip_sd);
@@ -951,6 +1196,9 @@ proto_reg_handoff_someip_sd(void) {
     if (!initialized) {
         someip_sd_handle = create_dissector_handle(dissect_someip_sd_pdu, proto_someip_sd);
         dissector_add_uint("someip.messageid", SOMEIP_SD_MESSAGEID, someip_sd_handle);
+
+        stats_tree_register("someipsd_entries", "someipsd_entries", "SOME/IP-SD Entries", 0, someipsd_entries_stats_tree_packet, someipsd_entries_stats_tree_init, NULL);
+
         initialized = TRUE;
     }
 

@@ -1,4 +1,4 @@
-/* iface_toolbar.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -10,7 +10,6 @@
 #ifndef __IFACE_TOOLBAR_H__
 #define __IFACE_TOOLBAR_H__
 
-#include "config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,16 +77,3 @@ void iface_toolbar_register_cb(iface_toolbar_add_cb_t, iface_toolbar_remove_cb_t
 #endif /* __cplusplus */
 
 #endif /* __IFACE_TOOLBAR_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
