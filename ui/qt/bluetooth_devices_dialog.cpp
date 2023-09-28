@@ -44,12 +44,12 @@ static const int column_number_is_local_adapter = 8;
 
 
 static tap_packet_status
-bluetooth_device_tap_packet(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *edt, const void* data)
+bluetooth_device_tap_packet(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *edt, const void* data, tap_flags_t flags)
 {
     bluetooth_devices_tapinfo_t *tapinfo = (bluetooth_devices_tapinfo_t *) tapinfo_ptr;
 
     if (tapinfo->tap_packet)
-        tapinfo->tap_packet(tapinfo, pinfo, edt, data);
+        tapinfo->tap_packet(tapinfo, pinfo, edt, data, flags);
 
     return TAP_PACKET_REDRAW;
 }
@@ -110,12 +110,12 @@ BluetoothDevicesDialog::~BluetoothDevicesDialog()
 }
 
 
-void BluetoothDevicesDialog::captureFileClosing()
+void BluetoothDevicesDialog::captureFileClosed()
 {
     ui->interfaceComboBox->setEnabled(FALSE);
     ui->showInformationStepsCheckBox->setEnabled(FALSE);
 
-    WiresharkDialog::captureFileClosing();
+    WiresharkDialog::captureFileClosed();
 }
 
 
@@ -149,7 +149,7 @@ void BluetoothDevicesDialog::keyPressEvent(QKeyEvent *event)
 
 void BluetoothDevicesDialog::tableContextMenu(const QPoint &pos)
 {
-    context_menu_.exec(ui->tableTreeWidget->viewport()->mapToGlobal(pos));
+    context_menu_.popup(ui->tableTreeWidget->viewport()->mapToGlobal(pos));
 }
 
 void BluetoothDevicesDialog::tableItemDoubleClicked(QTreeWidgetItem *item, int)
@@ -253,7 +253,7 @@ void BluetoothDevicesDialog::tapReset(void *tapinfo_ptr)
     bluetooth_devices_dialog->ui->tableTreeWidget->clear();
 }
 
-tap_packet_status BluetoothDevicesDialog::tapPacket(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *, const void *data)
+tap_packet_status BluetoothDevicesDialog::tapPacket(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *, const void *data, tap_flags_t)
 {
     bluetooth_devices_tapinfo_t  *tapinfo    = static_cast<bluetooth_devices_tapinfo_t *>(tapinfo_ptr);
     BluetoothDevicesDialog       *dialog     = static_cast<BluetoothDevicesDialog *>(tapinfo->ui);
@@ -274,7 +274,7 @@ tap_packet_status BluetoothDevicesDialog::tapPacket(void *tapinfo_ptr, packet_in
         const char  *interface_name;
 
         interface_name = epan_get_interface_name(pinfo->epan, pinfo->rec->rec_header.packet_header.interface_id);
-        interface = wmem_strdup_printf(wmem_packet_scope(), "%u: %s", pinfo->rec->rec_header.packet_header.interface_id, interface_name);
+        interface = wmem_strdup_printf(pinfo->pool, "%u: %s", pinfo->rec->rec_header.packet_header.interface_id, interface_name);
 
         if (dialog->ui->interfaceComboBox->findText(interface) == -1)
             dialog->ui->interfaceComboBox->addItem(interface);
@@ -295,7 +295,7 @@ tap_packet_status BluetoothDevicesDialog::tapPacket(void *tapinfo_ptr, packet_in
             int pos;
 
             bd_addr_oui = QString(manuf);
-            pos = bd_addr_oui.indexOf('_');
+            pos = static_cast<int>(bd_addr_oui.indexOf('_'));
             if (pos < 0) {
                 manuf = NULL;
             } else {
@@ -453,16 +453,3 @@ void BluetoothDevicesDialog::on_buttonBox_clicked(QAbstractButton *)
 {
 /*    if (button == foo_button_) */
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

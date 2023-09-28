@@ -109,6 +109,10 @@ static gboolean aethra_seek_read(wtap *wth, gint64 seek_off,
 static gboolean aethra_read_rec_header(wtap *wth, FILE_T fh, struct aethrarec_hdr *hdr,
     wtap_rec *rec, int *err, gchar **err_info);
 
+static int aethra_file_type_subtype = -1;
+
+void register_aethra(void);
+
 wtap_open_return_val aethra_open(wtap *wth, int *err, gchar **err_info)
 {
 	struct aethra_hdr hdr;
@@ -130,8 +134,8 @@ wtap_open_return_val aethra_open(wtap *wth, int *err, gchar **err_info)
 	if (!wtap_read_bytes(wth->fh, (char *)&hdr + sizeof hdr.magic,
 	    sizeof hdr - sizeof hdr.magic, err, err_info))
 		return WTAP_OPEN_ERROR;
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_AETHRA;
-	aethra = (aethra_t *)g_malloc(sizeof(aethra_t));
+	wth->file_type_subtype = aethra_file_type_subtype;
+	aethra = g_new(aethra_t, 1);
 	wth->priv = (void *)aethra;
 	wth->subtype_read = aethra_read;
 	wth->subtype_seek_read = aethra_seek_read;
@@ -305,7 +309,7 @@ aethra_read_rec_header(wtap *wth, FILE_T fh, struct aethrarec_hdr *hdr,
 	if (rec_size < (sizeof *hdr - sizeof hdr->rec_size)) {
 		/* The record is shorter than a record header. */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("aethra: File has %u-byte record, less than minimum of %u",
+		*err_info = ws_strdup_printf("aethra: File has %u-byte record, less than minimum of %u",
 		    rec_size,
 		    (unsigned int)(sizeof *hdr - sizeof hdr->rec_size));
 		return FALSE;
@@ -317,7 +321,7 @@ aethra_read_rec_header(wtap *wth, FILE_T fh, struct aethrarec_hdr *hdr,
 		 * space for an immensely-large packet.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("aethra: File has %u-byte packet, bigger than maximum of %u",
+		*err_info = ws_strdup_printf("aethra: File has %u-byte packet, bigger than maximum of %u",
 		    rec_size, WTAP_MAX_PACKET_SIZE_STANDARD);
 		return FALSE;
 	}
@@ -326,6 +330,7 @@ aethra_read_rec_header(wtap *wth, FILE_T fh, struct aethrarec_hdr *hdr,
 
 	msecs = pletoh32(hdr->timestamp);
 	rec->rec_type = REC_TYPE_PACKET;
+	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 	rec->presence_flags = WTAP_HAS_TS;
 	rec->ts.secs = aethra->start + (msecs / 1000);
 	rec->ts.nsecs = (msecs % 1000) * 1000000;
@@ -335,6 +340,31 @@ aethra_read_rec_header(wtap *wth, FILE_T fh, struct aethrarec_hdr *hdr,
 	rec->rec_header.packet_header.pseudo_header.isdn.channel = 0;	/* XXX - D channel */
 
 	return TRUE;
+}
+
+static const struct supported_block_type aethra_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info aethra_info = {
+	"Aethra .aps file", "aethra", "aps", NULL,
+	FALSE, BLOCKS_SUPPORTED(aethra_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_aethra(void)
+{
+	aethra_file_type_subtype = wtap_register_file_type_subtype(&aethra_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("AETHRA",
+	    aethra_file_type_subtype);
 }
 
 /*

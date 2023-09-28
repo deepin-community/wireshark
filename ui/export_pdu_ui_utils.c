@@ -13,17 +13,16 @@
 #include "config.h"
 
 #include "globals.h"
-#include "wiretap/pcap-encap.h"
 #include "wsutil/os_version_info.h"
 #include "wsutil/tempfile.h"
-#include "version_info.h"
+#include "ui/version_info.h"
 
 #include <epan/tap.h>
+#include <epan/prefs.h>
 #include <epan/exported_pdu.h>
 #include <epan/epan_dissect.h>
 #include <wiretap/wtap.h>
 #include <wiretap/wtap_opttypes.h>
-#include <wiretap/pcapng.h>
 
 #include "ui/alert_box.h"
 #include "ui/simple_dialog.h"
@@ -31,12 +30,13 @@
 #include "export_pdu_ui_utils.h"
 
 void
-do_export_pdu(const char *filter, const gchar *tap_name)
+do_export_pdu(const char *filter, const gchar *temp_dir, const gchar *tap_name)
 {
     exp_pdu_t exp_pdu_tap_data;
     char *error;
     int   import_file_fd;
-    char *capfile_name, *comment;
+    int   file_type_subtype;
+    char *capfile_name = NULL, *comment;
     gboolean status;
     int   err;
     gchar *err_info;
@@ -51,7 +51,7 @@ do_export_pdu(const char *filter, const gchar *tap_name)
 
     /* Choose a random name for the temporary import buffer */
     GError *err_tempfile = NULL;
-    import_file_fd = create_tempfile(&capfile_name, "Wireshark_PDU_", NULL, &err_tempfile);
+    import_file_fd = create_tempfile(temp_dir, &capfile_name, "Wireshark_PDU_", NULL, &err_tempfile);
     if (import_file_fd < 0) {
         failure_alert_box("Temporary file could not be created: %s", err_tempfile->message);
         g_error_free(err_tempfile);
@@ -59,14 +59,16 @@ do_export_pdu(const char *filter, const gchar *tap_name)
         return;
     }
 
-    comment = g_strdup_printf("Dump of PDUs from %s", cfile.filename);
-    status = exp_pdu_open(&exp_pdu_tap_data, import_file_fd, comment, &err,
-                          &err_info);
+    /* Write a pcapng file... */
+    file_type_subtype = wtap_pcapng_file_type_subtype();
+    /* ...with this comment */
+    comment = ws_strdup_printf("Dump of PDUs from %s", cfile.filename);
+    status = exp_pdu_open(&exp_pdu_tap_data, capfile_name, file_type_subtype,
+                          import_file_fd, comment, &err, &err_info);
     g_free(comment);
     if (!status) {
         cfile_dump_open_failure_alert_box(capfile_name ? capfile_name : "temporary file",
-                                          err, err_info,
-                                          WTAP_FILE_TYPE_SUBTYPE_PCAPNG);
+                                          err, err_info, file_type_subtype);
         g_free(capfile_name);
         return;
     }
@@ -107,16 +109,3 @@ do_export_pdu(const char *filter, const gchar *tap_name)
 
     g_free(capfile_name);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

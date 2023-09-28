@@ -21,7 +21,7 @@
 #ifdef HAVE_PCAP_REMOTE
 #include "ui/qt/remote_capture_dialog.h"
 #include "ui/qt/remote_settings_dialog.h"
-#include "caputils/capture-pcap-util.h"
+#include "capture/capture-pcap-util.h"
 #include "ui/recent.h"
 #endif
 #include "ui/iface_lists.h"
@@ -31,13 +31,13 @@
 
 #include <ui/qt/utils/qt_ui_utils.h>
 
-#include "wireshark_application.h"
+#include "main_application.h"
 
 #include <QDebug>
 
 #include "ui/capture_ui_utils.h"
 
-#include <ui/qt/models/path_chooser_delegate.h>
+#include <ui/qt/models/path_selection_delegate.h>
 
 #include <QCheckBox>
 #include <QHBoxLayout>
@@ -49,7 +49,7 @@
 // To do:
 // - Check the validity of pipes and remote interfaces and provide feedback
 //   via hintLabel.
-// - We might want to move PathChooserDelegate to its own module and use it in
+// - We might want to move PathSelectionDelegate to its own module and use it in
 //   other parts of the application such as the general preferences and UATs.
 //   Qt Creator has a much more elaborate version from which we might want
 //   to draw inspiration.
@@ -153,6 +153,9 @@ ManageInterfacesDialog::ManageInterfacesDialog(QWidget *parent) :
     proxyModel->setColumns(columns);
     proxyModel->setSourceModel(sourceModel);
     proxyModel->setFilterHidden(false);
+#ifdef HAVE_PCAP_REMOTE
+    proxyModel->setRemoteDisplay(false);
+#endif
     proxyModel->setFilterByType(false);
 
     ui->localView->setModel(proxyModel);
@@ -165,17 +168,18 @@ ManageInterfacesDialog::ManageInterfacesDialog(QWidget *parent) :
     pipeProxyModel->setColumns(columns);
     pipeProxyModel->setSourceModel(sourceModel);
     pipeProxyModel->setFilterHidden(true);
+#ifdef HAVE_PCAP_REMOTE
+    pipeProxyModel->setRemoteDisplay(false);
+#endif
     pipeProxyModel->setFilterByType(true, true);
     pipeProxyModel->setInterfaceTypeVisible(IF_PIPE, false);
     ui->pipeView->setModel(pipeProxyModel);
     ui->delPipe->setEnabled(pipeProxyModel->rowCount() > 0);
 
-    ui->pipeView->setItemDelegateForColumn(
-            pipeProxyModel->mapSourceToColumn(IFTREE_COL_PIPE_PATH), new PathChooserDelegate()
-            );
-    connect(ui->pipeView->selectionModel(),
-            SIGNAL(selectionChanged(const QItemSelection &, const QItemSelection &)), this,
-            SLOT(onSelectionChanged(const QItemSelection &, const QItemSelection &)));
+    ui->pipeView->setItemDelegateForColumn(pipeProxyModel->mapSourceToColumn(IFTREE_COL_PIPE_PATH), new PathSelectionDelegate());
+     connect(ui->pipeView->selectionModel(), &QItemSelectionModel::selectionChanged, this, [=](const QItemSelection &sel, const QItemSelection &) {
+        ui->delPipe->setEnabled(sel.count() > 0);
+    });
 
 #if defined(HAVE_PCAP_REMOTE)
     // The default indentation (20) means our checkboxes are shifted too far on Windows.
@@ -206,11 +210,6 @@ ManageInterfacesDialog::ManageInterfacesDialog(QWidget *parent) :
 ManageInterfacesDialog::~ManageInterfacesDialog()
 {
     delete ui;
-}
-
-void ManageInterfacesDialog::onSelectionChanged(const QItemSelection &sel, const QItemSelection &)
-{
-    ui->delPipe->setEnabled(sel.count() > 0);
 }
 
 void ManageInterfacesDialog::updateWidgets()
@@ -262,7 +261,7 @@ void ManageInterfacesDialog::on_buttonBox_accepted()
     remoteAccepted();
 #endif
     prefs_main_write();
-    wsApp->refreshLocalInterfaces();
+    mainApp->refreshLocalInterfaces();
     emit ifsChanged();
 }
 
@@ -307,7 +306,7 @@ void ManageInterfacesDialog::on_delPipe_clicked()
 
 void ManageInterfacesDialog::on_buttonBox_helpRequested()
 {
-    wsApp->helpTopicAction(HELP_CAPTURE_MANAGE_INTERFACES_DIALOG);
+    mainApp->helpTopicAction(HELP_CAPTURE_MANAGE_INTERFACES_DIALOG);
 }
 
 #ifdef HAVE_PCAP_REMOTE
@@ -365,21 +364,21 @@ void ManageInterfacesDialog::updateRemoteInterfaceList(GList* rlist, remote_opti
         descr = capture_dev_user_descr_find(if_info->name);
         if (descr != NULL) {
             /* Yes, we have a user-supplied description; use it. */
-            if_string = g_strdup_printf("%s: %s", descr, if_info->name);
+            if_string = ws_strdup_printf("%s: %s", descr, if_info->name);
             g_free(descr);
         } else {
             /* No, we don't have a user-supplied description; did we get
                one from the OS or libpcap? */
             if (if_info->vendor_description != NULL) {
                 /* Yes - use it. */
-                if_string = g_strdup_printf("%s: %s", if_info->vendor_description, if_info->name);
+                if_string = ws_strdup_printf("%s: %s", if_info->vendor_description, if_info->name);
             } else {
                 /* No. */
                 if_string = g_strdup(if_info->name);
             }
         } /* else descr != NULL */
         if (if_info->loopback) {
-            device.display_name = g_strdup_printf("%s (loopback)", if_string);
+            device.display_name = ws_strdup_printf("%s (loopback)", if_string);
         } else {
             device.display_name = g_strdup(if_string);
         }
@@ -400,10 +399,10 @@ void ManageInterfacesDialog::updateRemoteInterfaceList(GList* rlist, remote_opti
         device.timestamp_type = g_strdup(global_capture_opts.default_options.timestamp_type);
         monitor_mode = prefs_capture_device_monitor_mode(if_string);
         if (roptions->remote_host_opts.auth_type == CAPTURE_AUTH_PWD) {
-            auth_str = g_strdup_printf("%s:%s", roptions->remote_host_opts.auth_username,
+            auth_str = ws_strdup_printf("%s:%s", roptions->remote_host_opts.auth_username,
                                        roptions->remote_host_opts.auth_password);
         }
-        caps = capture_get_if_capabilities(if_string, monitor_mode, auth_str, NULL, main_window_update);
+        caps = capture_get_if_capabilities(if_string, monitor_mode, auth_str, NULL, NULL, main_window_update);
         g_free(auth_str);
         for (; (curr_addr = g_slist_nth(if_info->addrs, ips)) != NULL; ips++) {
             address addr_str;
@@ -450,7 +449,7 @@ void ManageInterfacesDialog::updateRemoteInterfaceList(GList* rlist, remote_opti
                     linkr->name = g_strdup(data_link_info->description);
                     linkr->dlt = data_link_info->dlt;
                 } else {
-                    linkr->name = g_strdup_printf("%s (not supported)", data_link_info->name);
+                    linkr->name = ws_strdup_printf("%s (not supported)", data_link_info->name);
                     linkr->dlt = -1;
                 }
                 if (linktype_count == 0) {
@@ -563,21 +562,38 @@ void ManageInterfacesDialog::showRemoteInterfaces()
 {
     guint i;
     interface_t *device;
-    QTreeWidgetItem *item = NULL;
+    QTreeWidgetItem * item = nullptr;
 
     // We assume that remote interfaces are grouped by host.
     for (i = 0; i < global_capture_opts.all_ifaces->len; i++) {
-        QTreeWidgetItem *child;
+        QTreeWidgetItem * child = nullptr;
         device = &g_array_index(global_capture_opts.all_ifaces, interface_t, i);
         if (!device->local) {
-            if (!item || item->text(col_r_host_dev_).compare(device->remote_opts.remote_host_opts.remote_host) != 0) {
+
+            // check if the QTreeWidgetItem for that interface already exists
+            QList<QTreeWidgetItem*> items = ui->remoteList->findItems(QString(device->name), Qt::MatchCaseSensitive | Qt::MatchFixedString, col_r_host_dev_);
+            if (items.count() > 0)
+               continue;
+
+            // create or find the QTreeWidgetItem for the remote host configuration
+            QString parentName = QString(device->remote_opts.remote_host_opts.remote_host);
+            items = ui->remoteList->findItems(parentName, Qt::MatchCaseSensitive | Qt::MatchFixedString, col_r_host_dev_);
+            if (items.count() == 0) {
                 item = new QTreeWidgetItem(ui->remoteList);
-                item->setText(col_r_host_dev_, device->remote_opts.remote_host_opts.remote_host);
+                item->setText(col_r_host_dev_, parentName);
                 item->setExpanded(true);
             }
-            child = new QTreeWidgetItem(item);
-            child->setCheckState(col_r_show_, device->hidden ? Qt::Unchecked : Qt::Checked);
-            child->setText(col_r_host_dev_, QString(device->name));
+            else {
+                item = items.at(0);
+            }
+
+            items = ui->remoteList->findItems(QString(device->name), Qt::MatchCaseSensitive | Qt::MatchFixedString | Qt::MatchRecursive, col_r_host_dev_);
+            if (items.count() == 0)
+            {
+                child = new QTreeWidgetItem(item);
+                child->setCheckState(col_r_show_, device->hidden ? Qt::Unchecked : Qt::Checked);
+                child->setText(col_r_host_dev_, QString(device->name));
+            }
         }
     }
 }
@@ -623,16 +639,3 @@ void ManageInterfacesDialog::setRemoteSettings(interface_t *iface)
     }
 }
 #endif // HAVE_PCAP_REMOTE
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

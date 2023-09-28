@@ -375,7 +375,7 @@ static int zbee_nwk_address_to_str(const address* addr, gchar *buf, int buf_len)
         return (int)g_strlcpy(buf, "Broadcast", buf_len) + 1;
     }
     else {
-        return g_snprintf(buf, buf_len, "0x%04x", zbee_nwk_addr) + 1;
+        return snprintf(buf, buf_len, "0x%04x", zbee_nwk_addr) + 1;
     }
 }
 
@@ -557,7 +557,7 @@ dissect_zbee_nwk_full(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
 
         set_address_tvb(&pinfo->net_dst, zbee_nwk_address_type, 2, tvb, offset);
         copy_address_shallow(&pinfo->dst, &pinfo->net_dst);
-        dst_addr = address_to_str(wmem_packet_scope(), &pinfo->dst);
+        dst_addr = address_to_str(pinfo->pool, &pinfo->dst);
 
         proto_tree_add_uint(nwk_tree, hf_zbee_nwk_dst, tvb, offset, 2, packet.dst);
         ti = proto_tree_add_uint(nwk_tree, hf_zbee_nwk_addr, tvb, offset, 2, packet.dst);
@@ -573,7 +573,7 @@ dissect_zbee_nwk_full(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
 
         set_address_tvb(&pinfo->net_src, zbee_nwk_address_type, 2, tvb, offset);
         copy_address_shallow(&pinfo->src, &pinfo->net_src);
-        src_addr = address_to_str(wmem_packet_scope(), &pinfo->src);
+        src_addr = address_to_str(pinfo->pool, &pinfo->src);
 
         if (nwk_hints)
             nwk_hints->src = packet.src;
@@ -1057,7 +1057,7 @@ dissect_zbee_nwk_route_rep(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, 
     }
 
     /* Update the info column. */
-    col_append_fstr(pinfo->cinfo, COL_INFO, ", Dst: 0x%04x, Src: 0x%04x", resp_addr, orig_addr);
+    col_append_fstr(pinfo->cinfo, COL_INFO, ", Responder: 0x%04x, Originator: 0x%04x", resp_addr, orig_addr);
 
     /* Done */
     return offset;
@@ -1557,9 +1557,9 @@ static int dissect_zbee_beacon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
     if (version >= ZBEE_VERSION_2007) {
         /* In ZigBee 2006 and later, the beacon contains an extended PAN ID. */
         proto_tree_add_item(beacon_tree, hf_zbee_beacon_epid, tvb, offset, 8, ENC_LITTLE_ENDIAN);
-        col_append_fstr(pinfo->cinfo, COL_INFO, ", EPID: %s", eui64_to_display(wmem_packet_scope(),
+        col_append_fstr(pinfo->cinfo, COL_INFO, ", EPID: %s", eui64_to_display(pinfo->pool,
                 tvb_get_guint64(tvb, offset, ENC_LITTLE_ENDIAN)));
-        proto_item_append_text(beacon_root, ", EPID: %s", eui64_to_display(wmem_packet_scope(),
+        proto_item_append_text(beacon_root, ", EPID: %s", eui64_to_display(pinfo->pool,
                 tvb_get_guint64(tvb, offset, ENC_LITTLE_ENDIAN)));
         offset += 8;
 
@@ -1657,9 +1657,9 @@ static int dissect_zbip_beacon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tr
     offset += 1;
 
     /* Get and display the network ID. */
-    proto_tree_add_item(beacon_tree, hf_zbip_beacon_network_id, tvb, offset, 16, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(beacon_tree, hf_zbip_beacon_network_id, tvb, offset, 16, ENC_ASCII);
 
-    ssid = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 16, ENC_ASCII|ENC_NA);
+    ssid = tvb_get_string_enc(pinfo->pool, tvb, offset, 16, ENC_ASCII|ENC_NA);
     col_append_fstr(pinfo->cinfo, COL_INFO, ", SSID: %s", ssid);
     offset += 16;
 
@@ -1786,7 +1786,7 @@ dissect_ieee802154_zigbee_rejoin(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tr
     subtree = proto_tree_add_subtree(tree, tvb, *offset, 10, ett_zbee_nwk_ie_rejoin, NULL, "ZigBee Rejoin");
 
     proto_tree_add_item(subtree, hf_ieee802154_zigbee_rejoin_epid, tvb, *offset, 8, ENC_LITTLE_ENDIAN);
-    proto_item_append_text(tree, ", EPID %s", eui64_to_display(wmem_packet_scope(),
+    proto_item_append_text(tree, ", EPID %s", eui64_to_display(pinfo->pool,
             tvb_get_guint64(tvb, *offset, ENC_LITTLE_ENDIAN)));
     *offset += 8;
 
@@ -1813,38 +1813,40 @@ static const char* zbee_nwk_conv_get_filter_type(conv_item_t* conv, conv_filter_
 
 static ct_dissector_info_t zbee_nwk_ct_dissector_info = {&zbee_nwk_conv_get_filter_type };
 
-static tap_packet_status zbee_nwk_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_)
+static tap_packet_status zbee_nwk_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
 {
     conv_hash_t *hash = (conv_hash_t*)pct;
+    hash->flags = flags;
 
     add_conversation_table_data(hash, &pinfo->net_src, &pinfo->net_dst, 0, 0, 1,
             pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts,
-            &zbee_nwk_ct_dissector_info, ENDPOINT_NONE);
+            &zbee_nwk_ct_dissector_info, CONVERSATION_NONE);
 
     return TAP_PACKET_REDRAW;
 }
 
-static const char* zbee_nwk_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
+static const char* zbee_nwk_endpoint_get_filter_type(endpoint_item_t* endpoint, conv_filter_type_e filter)
 {
-    if ((filter == CONV_FT_ANY_ADDRESS) && (host->myaddress.type == zbee_nwk_address_type))
+    if ((filter == CONV_FT_ANY_ADDRESS) && (endpoint->myaddress.type == zbee_nwk_address_type))
         return "zbee_nwk.addr";
 
     return CONV_FILTER_INVALID;
 }
 
-static hostlist_dissector_info_t zbee_nwk_host_dissector_info = {&zbee_nwk_host_get_filter_type };
+static et_dissector_info_t zbee_nwk_endpoint_dissector_info = {&zbee_nwk_endpoint_get_filter_type };
 
-static tap_packet_status zbee_nwk_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_)
+static tap_packet_status zbee_nwk_endpoint_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip _U_, tap_flags_t flags)
 {
     conv_hash_t *hash = (conv_hash_t*)pit;
+    hash->flags = flags;
 
     /* Take two "add" passes per packet, adding for each direction, ensures that all
      packets are counted properly (even if address is sending to itself)
-     XXX - this could probably be done more efficiently inside hostlist_table */
-    add_hostlist_table_data(hash, &pinfo->net_src, 0, TRUE, 1,
-            pinfo->fd->pkt_len, &zbee_nwk_host_dissector_info, ENDPOINT_NONE);
-    add_hostlist_table_data(hash, &pinfo->net_dst, 0, FALSE, 1,
-            pinfo->fd->pkt_len, &zbee_nwk_host_dissector_info, ENDPOINT_NONE);
+     XXX - this could probably be done more efficiently inside endpoint_table */
+    add_endpoint_table_data(hash, &pinfo->net_src, 0, TRUE, 1,
+            pinfo->fd->pkt_len, &zbee_nwk_endpoint_dissector_info, ENDPOINT_NONE);
+    add_endpoint_table_data(hash, &pinfo->net_dst, 0, FALSE, 1,
+            pinfo->fd->pkt_len, &zbee_nwk_endpoint_dissector_info, ENDPOINT_NONE);
 
     return TAP_PACKET_REDRAW;
 }
@@ -1856,7 +1858,7 @@ static gboolean zbee_nwk_filter_valid(packet_info *pinfo)
 
 static gchar* zbee_nwk_build_filter(packet_info *pinfo)
 {
-    return g_strdup_printf("zbee_nwk.addr eq %s and zbee_nwk.addr eq %s",
+    return ws_strdup_printf("zbee_nwk.addr eq %s and zbee_nwk.addr eq %s",
             address_to_str(pinfo->pool, &pinfo->net_src),
             address_to_str(pinfo->pool, &pinfo->net_dst));
 }
@@ -2356,7 +2358,7 @@ void proto_register_zbee_nwk(void)
 
     zbee_nwk_tap = register_tap(ZBEE_PROTOABBREV_NWK);
 
-    register_conversation_table(proto_zbee_nwk, TRUE, zbee_nwk_conversation_packet, zbee_nwk_hostlist_packet);
+    register_conversation_table(proto_zbee_nwk, TRUE, zbee_nwk_conversation_packet, zbee_nwk_endpoint_packet);
     register_conversation_filter(ZBEE_PROTOABBREV_NWK, "ZigBee Network Layer", zbee_nwk_filter_valid, zbee_nwk_build_filter);
 } /* proto_register_zbee_nwk */
 

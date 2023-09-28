@@ -733,17 +733,17 @@ rs01(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 /* Get Shelf Address Info
  */
 static void
-rs02(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
+rs02(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	ipmi_add_typelen(tree, hf_ipmi_picmg_02_shelf_address, hf_ipmi_picmg_02_shelf_type, hf_ipmi_picmg_02_shelf_length, tvb, 0, TRUE);
+	ipmi_add_typelen(pinfo, tree, hf_ipmi_picmg_02_shelf_address, hf_ipmi_picmg_02_shelf_type, hf_ipmi_picmg_02_shelf_length, tvb, 0, TRUE);
 }
 
 /* Set Shelf Address Info
  */
 static void
-rq03(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
+rq03(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
-	ipmi_add_typelen(tree, hf_ipmi_picmg_03_shelf_address, hf_ipmi_picmg_03_shelf_type, hf_ipmi_picmg_03_shelf_length, tvb, 0, TRUE);
+	ipmi_add_typelen(pinfo, tree, hf_ipmi_picmg_03_shelf_address, hf_ipmi_picmg_03_shelf_type, hf_ipmi_picmg_03_shelf_length, tvb, 0, TRUE);
 }
 
 /* FRU Control.
@@ -888,7 +888,7 @@ parse_ipmb_state(proto_tree *tree, tvbuff_t *tvb, guint offs, int hf, int hf_lin
 		if (!num) {
 			desc = "All Links";
 		} else if (num < 0x60) {
-			g_snprintf(buf, sizeof(buf), "Link #%d", num);
+			snprintf(buf, sizeof(buf), "Link #%d", num);
 			desc = buf;
 		} else {
 			desc = "Reserved";
@@ -977,7 +977,7 @@ parse_link_info_state(proto_tree *tree, tvbuff_t *tvb, guint offs, const char *n
 	guint8 v = tvb_get_guint8(tvb, offs + 4);
 	char buf[32];
 
-	g_snprintf(buf, sizeof(buf), "Link info%s: ", num);
+	snprintf(buf, sizeof(buf), "Link info%s: ", num);
 	proto_tree_add_bitmask_text(tree, tvb, offs, 4, buf, NULL,
 			ett_ipmi_picmg_link_info, link_info, ENC_LITTLE_ENDIAN, 0);
 	proto_tree_add_uint_format(tree, hf_ipmi_picmg_linkinfo_state, tvb, offs + 4, 1,
@@ -1416,10 +1416,10 @@ rq1f(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 }
 
 static void
-rs1f(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
+rs1f(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	proto_tree_add_item(tree, hf_ipmi_picmg_1f_rs_lockid, tvb, 0, 2, ENC_LITTLE_ENDIAN);
-	ipmi_add_timestamp(tree, hf_ipmi_picmg_1f_rs_tstamp, tvb, 2);
+	ipmi_add_timestamp(pinfo, tree, hf_ipmi_picmg_1f_rs_tstamp, tvb, 2);
 }
 
 static const value_string cc1f[] = {
@@ -1459,12 +1459,12 @@ rq21(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
 }
 
 static void
-rs21(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree)
+rs21(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 	static int * const byte9[] = { &hf_ipmi_picmg_21_is_shm, &hf_ipmi_picmg_21_addr_type, NULL };
 	guint8 addrtype;
 
-	ipmi_add_timestamp(tree, hf_ipmi_picmg_21_tstamp, tvb, 0);
+	ipmi_add_timestamp(pinfo, tree, hf_ipmi_picmg_21_tstamp, tvb, 0);
 	proto_tree_add_item(tree, hf_ipmi_picmg_21_addr_count, tvb, 4, 1, ENC_LITTLE_ENDIAN);
 	proto_tree_add_item(tree, hf_ipmi_picmg_21_site_type, tvb, 5, 1, ENC_LITTLE_ENDIAN);
 	proto_tree_add_item(tree, hf_ipmi_picmg_21_site_num, tvb, 6, 1, ENC_LITTLE_ENDIAN);
@@ -1590,7 +1590,7 @@ static const value_string picmg_24_controls[] = {
 static void
 fmt_power_amps(gchar *s, guint32 v)
 {
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%d.%dA", v / 10, v % 10);
+	snprintf(s, ITEM_LABEL_LENGTH, "%d.%dA", v / 10, v % 10);
 }
 
 /* Power Channel Control
@@ -1698,7 +1698,7 @@ static const value_string cc28[] = {
 static void
 fmt_100ms(gchar *s, guint32 v)
 {
-	g_snprintf(s, ITEM_LABEL_LENGTH, "%d.%dS", v / 10, v % 10);
+	snprintf(s, ITEM_LABEL_LENGTH, "%d.%dS", v / 10, v % 10);
 }
 
 /* PM Heart-Beat
@@ -1964,7 +1964,7 @@ prop_02(tvbuff_t *tvb, proto_tree *tree)
 	if (len > 12) {
 		len = 12;
 	}
-	proto_tree_add_item(tree, hf_ipmi_picmg_prop02_desc, tvb, 0, len, ENC_ASCII|ENC_NA);
+	proto_tree_add_item(tree, hf_ipmi_picmg_prop02_desc, tvb, 0, len, ENC_ASCII);
 }
 
 static const struct {
@@ -3492,7 +3492,7 @@ proto_register_ipmi_picmg(void)
 				"ipmi.picmg.hpm.base.chn", FT_UINT16, BASE_HEX, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_hpm_fabric_channels,
 			{ "Fabric Interface Channels",
-				"ipmi.picmg.hpm.base.chn", FT_UINT16, BASE_HEX, NULL, 0, NULL, HFILL }},
+				"ipmi.picmg.hpm.fabric.chn", FT_UINT16, BASE_HEX, NULL, 0, NULL, HFILL }},
 		{ &hf_ipmi_picmg_hpm_update_channels,
 			{ "Update Channels",
 				"ipmi.picmg.hpm.upd.chn", FT_UINT8, BASE_HEX, NULL, 0, NULL, HFILL }},

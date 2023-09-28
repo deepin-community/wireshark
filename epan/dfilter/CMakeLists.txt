@@ -7,13 +7,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
 
-include_directories(
-	${CMAKE_CURRENT_BINARY_DIR}
-	${CMAKE_CURRENT_SOURCE_DIR}
-	${CMAKE_SOURCE_DIR}/epan
-	${CMAKE_SOURCE_DIR}/tools/lemon
-)
-
 set(DFILTER_PUBLIC_HEADERS
 	dfilter.h
 	drange.h
@@ -29,10 +22,12 @@ set(DFILTER_HEADER_FILES
 	drange.h
 	gencode.h
 	semcheck.h
+	sttype-field.h
 	sttype-function.h
-	sttype-range.h
+	sttype-pointer.h
 	sttype-set.h
-	sttype-test.h
+	sttype-slice.h
+	sttype-op.h
 	syntax-tree.h
 )
 
@@ -44,13 +39,13 @@ set(DFILTER_NONGENERATED_FILES
 	drange.c
 	gencode.c
 	semcheck.c
+	sttype-field.c
 	sttype-function.c
-	sttype-integer.c
 	sttype-pointer.c
-	sttype-range.c
 	sttype-set.c
+	sttype-slice.c
 	sttype-string.c
-	sttype-test.c
+	sttype-op.c
 	syntax-tree.c
 )
 source_group(dfilter FILES ${DFILTER_NONGENERATED_FILES})
@@ -83,6 +78,14 @@ add_library(dfilter OBJECT
 	${DFILTER_FILES}
 )
 
+target_include_directories(dfilter
+	PRIVATE
+		${CMAKE_CURRENT_BINARY_DIR}
+		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_SOURCE_DIR}/epan
+		${CMAKE_SOURCE_DIR}/tools/lemon
+)
+
 set_target_properties(dfilter PROPERTIES
 	FOLDER "Libs/epan/dfilter"
 	COMPILE_DEFINITIONS "WS_BUILD_DLL"
@@ -96,7 +99,6 @@ CHECKAPI(
 	NAME
 	  dfilter
 	SWITCHES
-	  -g termoutput
 	SOURCES
 	  ${DFILTER_NONGENERATED_FILES}
 # LEX files commented out due to use of malloc, free etc.

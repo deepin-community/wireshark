@@ -67,7 +67,7 @@ static int tap_packet_cb_error_handler(lua_State* L) {
 }
 
 
-static tap_packet_status lua_tap_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const void *data) {
+static tap_packet_status lua_tap_packet(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const void *data, tap_flags_t flags _U_) {
     Listener tap = (Listener)tapdata;
     tap_packet_status retval = TAP_PACKET_DONT_REDRAW;
     TreeItem lua_tree_tap;
@@ -101,14 +101,14 @@ static tap_packet_status lua_tap_packet(void *tapdata, packet_info *pinfo, epan_
             /* XXX - TAP_PACKET_FAILED? */
             break;
         case LUA_ERRMEM:
-            g_warning("Memory alloc error while calling listener tap callback packet");
+            ws_warning("Memory alloc error while calling listener tap callback packet");
             /* XXX - TAP_PACKET_FAILED? */
             break;
         case LUA_ERRERR:
-            g_warning("Error while running the error handler function for listener tap callback");
+            ws_warning("Error while running the error handler function for listener tap callback");
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             break;
     }
 
@@ -141,16 +141,16 @@ static void lua_tap_reset(void *tapdata) {
         case 0:
             break;
         case LUA_ERRRUN:
-            g_warning("Runtime error while calling a listener's init()");
+            ws_warning("Runtime error while calling a listener's init()");
             break;
         case LUA_ERRMEM:
-            g_warning("Memory alloc error while calling a listener's init()");
+            ws_warning("Memory alloc error while calling a listener's init()");
             break;
         case LUA_ERRERR:
-            g_warning("Error while running the error handler function for a listener's init()");
+            ws_warning("Error while running the error handler function for a listener's init()");
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             break;
     }
 }
@@ -176,16 +176,16 @@ static void lua_tap_draw(void *tapdata) {
             break;
         case LUA_ERRRUN:
             error = lua_tostring(tap->L,-1);
-            g_warning("Runtime error while calling a listener's draw(): %s",error);
+            ws_warning("Runtime error while calling a listener's draw(): %s",error);
             break;
         case LUA_ERRMEM:
-            g_warning("Memory alloc error while calling a listener's draw()");
+            ws_warning("Memory alloc error while calling a listener's draw()");
             break;
         case LUA_ERRERR:
-            g_warning("Error while running the error handler function for a listener's draw()");
+            ws_warning("Error while running the error handler function for a listener's draw()");
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             break;
     }
 }
@@ -324,7 +324,7 @@ WSLUA_METAMETHOD Listener__tostring(lua_State* L) {
     /* Generates a string of debug info for the tap `Listener`. */
     Listener tap = checkListener(L,1);
 
-    lua_pushfstring(L,"Listener(%s) filter: %s",tap->name, tap->filter ? tap->filter : "NONE");
+    lua_pushfstring(L,"Listener(%s) filter: %s  tapinfo: %s",tap->name, tap->filter ? tap->filter : "NONE", tap->extractor ? "YES": "NO");
 
     return 1;
 }
@@ -345,14 +345,16 @@ WSLUA_METAMETHOD Listener__tostring(lua_State* L) {
 
     [NOTE]
     ====
-    `tapinfo` is a table of info based on the `Listener`'s type, or nil.
+    `tapinfo` is a table of info based on the `Listener` type, or nil.
+
+    See _epan/wslua/taps_ for `tapinfo` structure definitions.
     ====
 */
 WSLUA_ATTRIBUTE_FUNC_SETTER(Listener,packet);
 
 
 /* WSLUA_ATTRIBUTE Listener_draw WO A function that will be called once every few seconds to redraw the GUI objects;
-            in Tshark this funtion is called only at the very end of the capture file.
+            in TShark this funtion is called only at the very end of the capture file.
 
     When later called by Wireshark, the `draw` function will not be given any arguments.
 

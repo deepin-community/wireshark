@@ -81,7 +81,7 @@ static gint ett_flip_payload = -1;
 
 static void flip_prompt(packet_info *pinfo _U_, gchar* result)
 {
-    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Decode FLIP payload protocol as");
+    snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Decode FLIP payload protocol as");
 }
 
 /* Dissect the checksum extension header. */
@@ -440,7 +440,7 @@ proto_register_flip(void)
     proto_register_field_array(proto_flip, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
 
-    flip_module = prefs_register_protocol(proto_flip, NULL);
+    flip_module = prefs_register_protocol_obsolete(proto_flip);
 
     /* Register preferences - now obsolete because of Decode As*/
     prefs_register_obsolete_preference(flip_module, "decoding_mode");

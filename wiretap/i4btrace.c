@@ -27,6 +27,10 @@ static gboolean i4btrace_seek_read(wtap *wth, gint64 seek_off,
 static int i4b_read_rec(wtap *wth, FILE_T fh, wtap_rec *rec,
     Buffer *buf, int *err, gchar **err_info);
 
+static int i4btrace_file_type_subtype = -1;
+
+void register_i4btrace(void);
+
 /*
  * Byte-swap the header.
  */
@@ -154,8 +158,8 @@ wtap_open_return_val i4btrace_open(wtap *wth, int *err, gchar **err_info)
 
 	/* Get capture start time */
 
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_I4BTRACE;
-	i4btrace = (i4btrace_t *)g_malloc(sizeof(i4btrace_t));
+	wth->file_type_subtype = i4btrace_file_type_subtype;
+	i4btrace = g_new(i4btrace_t, 1);
 	wth->priv = (void *)i4btrace;
 	wth->subtype_read = i4btrace_read;
 	wth->subtype_seek_read = i4btrace_seek_read;
@@ -224,7 +228,7 @@ i4b_read_rec(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
 
 	if (hdr.length < sizeof(hdr)) {
 		*err = WTAP_ERR_BAD_FILE;	/* record length < header! */
-		*err_info = g_strdup_printf("i4btrace: record length %u < header length %lu",
+		*err_info = ws_strdup_printf("i4btrace: record length %u < header length %lu",
 		    hdr.length, (unsigned long)sizeof(hdr));
 		return FALSE;
 	}
@@ -235,12 +239,13 @@ i4b_read_rec(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
 		 * to allocate space for an immensely-large packet.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("i4btrace: File has %u-byte packet, bigger than maximum of %u",
+		*err_info = ws_strdup_printf("i4btrace: File has %u-byte packet, bigger than maximum of %u",
 		    length, WTAP_MAX_PACKET_SIZE_STANDARD);
 		return FALSE;
 	}
 
 	rec->rec_type = REC_TYPE_PACKET;
+	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 	rec->presence_flags = WTAP_HAS_TS;
 
 	rec->rec_header.packet_header.len = length;
@@ -291,6 +296,31 @@ i4b_read_rec(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
 	 * Read the packet data.
 	 */
 	return wtap_read_packet_bytes(fh, buf, length, err, err_info);
+}
+
+static const struct supported_block_type i4btrace_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info i4btrace_info = {
+	"I4B ISDN trace", "i4btrace", NULL, NULL,
+	FALSE, BLOCKS_SUPPORTED(i4btrace_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_i4btrace(void)
+{
+	i4btrace_file_type_subtype = wtap_register_file_type_subtype(&i4btrace_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("I4BTRACE",
+	    i4btrace_file_type_subtype);
 }
 
 /*

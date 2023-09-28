@@ -37,6 +37,7 @@ static int hf_exported_pdu_unknown_tag_val = -1;
 static int hf_exported_pdu_prot_name = -1;
 static int hf_exported_pdu_heur_prot_name = -1;
 static int hf_exported_pdu_dis_table_name = -1;
+static int hf_exported_pdu_p2p_dir = -1;
 static int hf_exported_pdu_dissector_data = -1;
 static int hf_exported_pdu_ipv4_src = -1;
 static int hf_exported_pdu_ipv4_dst = -1;
@@ -62,17 +63,17 @@ static int ss7pc_address_type = -1;
 
 static dissector_handle_t exported_pdu_handle;
 
-#define EXPORTED_PDU_NEXT_PROTO_STR      0
-#define EXPORTED_PDU_NEXT_HEUR_PROTO_STR 1
-#define EXPORTED_PDU_NEXT_DIS_TABLE_STR  2
+#define EXPORTED_PDU_NEXT_DISSECTOR_STR      0
+#define EXPORTED_PDU_NEXT_HEUR_DISSECTOR_STR 1
+#define EXPORTED_PDU_NEXT_DIS_TABLE_STR      2
 
 static const value_string exported_pdu_tag_vals[] = {
    { EXP_PDU_TAG_END_OF_OPT,       "End-of-options" },
 /* 1 - 9 reserved */
    { EXP_PDU_TAG_OPTIONS_LENGTH,        "Total length of the options excluding this TLV" },
    { EXP_PDU_TAG_LINKTYPE,              "Linktype value" },
-   { EXP_PDU_TAG_PROTO_NAME,            "PDU content protocol name" },
-   { EXP_PDU_TAG_HEUR_PROTO_NAME,       "PDU content heuristic protocol name" },
+   { EXP_PDU_TAG_DISSECTOR_NAME,        "PDU content dissector name" },
+   { EXP_PDU_TAG_HEUR_DISSECTOR_NAME,   "PDU content heuristic dissector name" },
    { EXP_PDU_TAG_DISSECTOR_TABLE_NAME,  "PDU content dissector table name" },
     /* Add protocol type related tags here */
 /* 14 - 19 reserved */
@@ -94,65 +95,74 @@ static const value_string exported_pdu_tag_vals[] = {
    { EXP_PDU_TAG_DISSECTOR_TABLE_NAME_NUM_VAL,  "Dissector table value" },
    { EXP_PDU_TAG_COL_PROT_TEXT,         "Column Protocol String" },
    { EXP_PDU_TAG_TCP_INFO_DATA,         "TCP Dissector Data" },
+   { EXP_PDU_TAG_P2P_DIRECTION,         "P2P direction" },
 
    { 0,        NULL   }
 };
 
 static const value_string exported_pdu_port_type_vals[] = {
-   { OLD_PT_NONE,     "NONE" },
-   { OLD_PT_SCTP,     "SCTP" },
-   { OLD_PT_TCP,      "TCP" },
-   { OLD_PT_UDP,      "UDP" },
-   { OLD_PT_DCCP,     "DCCP" },
-   { OLD_PT_IPX,      "IPX" },
-   { OLD_PT_NCP,      "NCP" },
-   { OLD_PT_EXCHG,    "FC EXCHG" },
-   { OLD_PT_DDP,      "DDP" },
-   { OLD_PT_SBCCS,    "FICON SBCCS" },
-   { OLD_PT_IDP,      "IDP" },
-   { OLD_PT_TIPC,     "TIPC" },
-   { OLD_PT_USB,      "USB" },
-   { OLD_PT_I2C,      "I2C" },
-   { OLD_PT_IBQP,     "IBQP" },
-   { OLD_PT_BLUETOOTH,"BLUETOOTH" },
-   { OLD_PT_TDMOP,    "TDMOP" },
+   { EXP_PDU_PT_NONE,     "NONE" },
+   { EXP_PDU_PT_SCTP,     "SCTP" },
+   { EXP_PDU_PT_TCP,      "TCP" },
+   { EXP_PDU_PT_UDP,      "UDP" },
+   { EXP_PDU_PT_DCCP,     "DCCP" },
+   { EXP_PDU_PT_IPX,      "IPX" },
+   { EXP_PDU_PT_NCP,      "NCP" },
+   { EXP_PDU_PT_EXCHG,    "FC EXCHG" },
+   { EXP_PDU_PT_DDP,      "DDP" },
+   { EXP_PDU_PT_SBCCS,    "FICON SBCCS" },
+   { EXP_PDU_PT_IDP,      "IDP" },
+   { EXP_PDU_PT_TIPC,     "TIPC" },
+   { EXP_PDU_PT_USB,      "USB" },
+   { EXP_PDU_PT_I2C,      "I2C" },
+   { EXP_PDU_PT_IBQP,     "IBQP" },
+   { EXP_PDU_PT_BLUETOOTH,"BLUETOOTH" },
+   { EXP_PDU_PT_TDMOP,    "TDMOP" },
+   { EXP_PDU_PT_IWARP_MPA,"IWARP_MPA" },
 
    { 0,        NULL   }
 };
 
-static port_type exp_pdu_old_to_new_port_type(guint type)
+static const value_string exported_pdu_p2p_dir_vals[] = {
+    { P2P_DIR_SENT, "Sent" },
+    { P2P_DIR_RECV, "Received" },
+    { P2P_DIR_UNKNOWN, "Unknown" },
+    { 0, NULL }
+};
+
+static port_type exp_pdu_port_type_to_ws_port_type(guint type)
 {
     switch (type)
     {
-    case OLD_PT_NONE:
+    case EXP_PDU_PT_NONE:
         return PT_NONE;
-    case OLD_PT_SCTP:
+    case EXP_PDU_PT_SCTP:
         return PT_SCTP;
-    case OLD_PT_TCP:
+    case EXP_PDU_PT_TCP:
         return PT_TCP;
-    case OLD_PT_UDP:
+    case EXP_PDU_PT_UDP:
         return PT_UDP;
-    case OLD_PT_DCCP:
+    case EXP_PDU_PT_DCCP:
         return PT_DCCP;
-    case OLD_PT_IPX:
+    case EXP_PDU_PT_IPX:
         return PT_IPX;
-    case OLD_PT_DDP:
+    case EXP_PDU_PT_DDP:
         return PT_DDP;
-    case OLD_PT_IDP:
+    case EXP_PDU_PT_IDP:
         return PT_IDP;
-    case OLD_PT_USB:
+    case EXP_PDU_PT_USB:
         return PT_USB;
-    case OLD_PT_I2C:
+    case EXP_PDU_PT_I2C:
         return PT_I2C;
-    case OLD_PT_IBQP:
+    case EXP_PDU_PT_IBQP:
         return PT_IBQP;
-    case OLD_PT_BLUETOOTH:
+    case EXP_PDU_PT_BLUETOOTH:
         return PT_BLUETOOTH;
-    case OLD_PT_EXCHG:
-    case OLD_PT_TIPC:
-    case OLD_PT_TDMOP:
-    case OLD_PT_NCP:
-    case OLD_PT_SBCCS:
+    case EXP_PDU_PT_EXCHG:
+    case EXP_PDU_PT_TIPC:
+    case EXP_PDU_PT_TDMOP:
+    case EXP_PDU_PT_NCP:
+    case EXP_PDU_PT_SBCCS:
         //no longer supported
         break;
     }
@@ -199,17 +209,17 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
         offset+=2;
 
         switch(tag) {
-            case EXP_PDU_TAG_PROTO_NAME:
-                next_proto_type = EXPORTED_PDU_NEXT_PROTO_STR;
-                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_prot_name, tvb, offset, tag_len, ENC_UTF_8|ENC_NA, wmem_packet_scope(), &proto_name);
+            case EXP_PDU_TAG_DISSECTOR_NAME:
+                next_proto_type = EXPORTED_PDU_NEXT_DISSECTOR_STR;
+                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_prot_name, tvb, offset, tag_len, ENC_UTF_8|ENC_NA, pinfo->pool, &proto_name);
                 break;
-            case EXP_PDU_TAG_HEUR_PROTO_NAME:
-                next_proto_type = EXPORTED_PDU_NEXT_HEUR_PROTO_STR;
-                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_heur_prot_name, tvb, offset, tag_len, ENC_UTF_8|ENC_NA, wmem_packet_scope(), &proto_name);
+            case EXP_PDU_TAG_HEUR_DISSECTOR_NAME:
+                next_proto_type = EXPORTED_PDU_NEXT_HEUR_DISSECTOR_STR;
+                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_heur_prot_name, tvb, offset, tag_len, ENC_UTF_8|ENC_NA, pinfo->pool, &proto_name);
                 break;
             case EXP_PDU_TAG_DISSECTOR_TABLE_NAME:
                 next_proto_type = EXPORTED_PDU_NEXT_DIS_TABLE_STR;
-                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_dis_table_name, tvb, offset, tag_len, ENC_UTF_8 | ENC_NA, wmem_packet_scope(), &dissector_table);
+                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_dis_table_name, tvb, offset, tag_len, ENC_UTF_8 | ENC_NA, pinfo->pool, &dissector_table);
                 break;
             case EXP_PDU_TAG_IPV4_SRC:
                 proto_tree_add_item(tag_tree, hf_exported_pdu_ipv4_src, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -253,7 +263,7 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
                 copy_address_shallow(&pinfo->dst, &pinfo->net_dst);
                 break;
             case EXP_PDU_TAG_PORT_TYPE:
-                pinfo->ptype = exp_pdu_old_to_new_port_type(tvb_get_ntohl(tvb, offset));
+                pinfo->ptype = exp_pdu_port_type_to_ws_port_type(tvb_get_ntohl(tvb, offset));
                 proto_tree_add_item(tag_tree, hf_exported_pdu_port_type, tvb, offset, 4, ENC_BIG_ENDIAN);
                 break;
             case EXP_PDU_TAG_SRC_PORT:
@@ -266,7 +276,7 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
                 break;
             case EXP_PDU_TAG_SS7_OPC:
                 proto_tree_add_item(tag_tree, hf_exported_pdu_ss7_opc, tvb, offset, 4, ENC_BIG_ENDIAN);
-                mtp3_addr = (mtp3_addr_pc_t *)wmem_alloc0(pinfo->pool, sizeof(mtp3_addr_pc_t));
+                mtp3_addr = wmem_new0(pinfo->pool, mtp3_addr_pc_t);
                 mtp3_addr->pc = tvb_get_ntohl(tvb, offset);
                 mtp3_addr->type = (Standard_Type)tvb_get_ntohs(tvb, offset+4);
                 mtp3_addr->ni = tvb_get_guint8(tvb, offset+6);
@@ -274,7 +284,7 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
                 break;
             case EXP_PDU_TAG_SS7_DPC:
                 proto_tree_add_item(tag_tree, hf_exported_pdu_ss7_dpc, tvb, offset, 4, ENC_BIG_ENDIAN);
-                mtp3_addr = (mtp3_addr_pc_t *)wmem_alloc0(pinfo->pool, sizeof(mtp3_addr_pc_t));
+                mtp3_addr = wmem_new0(pinfo->pool, mtp3_addr_pc_t);
                 mtp3_addr->pc = tvb_get_ntohl(tvb, offset);
                 mtp3_addr->type = (Standard_Type)tvb_get_ntohs(tvb, offset+4);
                 mtp3_addr->ni = tvb_get_guint8(tvb, offset+6);
@@ -294,11 +304,11 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
                 proto_tree_add_item(tag_tree, hf_exported_pdu_dis_table_val, tvb, offset, 4, ENC_BIG_ENDIAN);
                 break;
             case EXP_PDU_TAG_COL_PROT_TEXT:
-                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_col_proto_str, tvb, offset, tag_len, ENC_UTF_8 | ENC_NA, wmem_packet_scope(), &col_proto_str);
+                proto_tree_add_item_ret_string(tag_tree, hf_exported_pdu_col_proto_str, tvb, offset, tag_len, ENC_UTF_8 | ENC_NA, pinfo->pool, &col_proto_str);
                 break;
             case EXP_PDU_TAG_TCP_INFO_DATA:
                 {
-                struct tcpinfo* tcpdata = wmem_new0(wmem_packet_scope(), struct tcpinfo);
+                struct tcpinfo* tcpdata = wmem_new0(pinfo->pool, struct tcpinfo);
                 guint16 version;
                 proto_tree_add_item(tag_tree, hf_exported_pdu_dissector_data, tvb, offset, tag_len, ENC_NA);
 
@@ -314,6 +324,10 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
 
                 dissector_data = tcpdata;
                 }
+                break;
+            case EXP_PDU_TAG_P2P_DIRECTION:
+                pinfo->p2p_dir = tvb_get_ntohl(tvb, offset);
+                proto_tree_add_item(tag_tree, hf_exported_pdu_p2p_dir, tvb, offset, 4, ENC_NA);
                 break;
             case EXP_PDU_TAG_END_OF_OPT:
                 break;
@@ -334,7 +348,7 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
     proto_tree_add_item(exported_pdu_tree, hf_exported_pdu_exported_pdu, payload_tvb, 0, -1, ENC_NA);
 
     switch(next_proto_type) {
-        case EXPORTED_PDU_NEXT_PROTO_STR:
+        case EXPORTED_PDU_NEXT_DISSECTOR_STR:
             proto_handle = find_dissector(proto_name);
             if (proto_handle) {
                 if (col_proto_str) {
@@ -345,7 +359,7 @@ dissect_exported_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* 
                 call_dissector_with_data(proto_handle, payload_tvb, pinfo, tree, dissector_data);
             }
             break;
-        case EXPORTED_PDU_NEXT_HEUR_PROTO_STR:
+        case EXPORTED_PDU_NEXT_HEUR_DISSECTOR_STR:
         {
             heur_dtbl_entry_t *heur_diss = find_heur_dissector_by_unique_short_name(proto_name);
             if (heur_diss) {
@@ -403,17 +417,22 @@ proto_register_exported_pdu(void)
         },
         { &hf_exported_pdu_prot_name,
             { "Protocol Name", "exported_pdu.prot_name",
-               FT_STRING, BASE_NONE, NULL, 0,
+               FT_STRINGZPAD, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_exported_pdu_heur_prot_name,
             { "Heuristic Protocol Name", "exported_pdu.heur_prot_name",
-               FT_STRING, BASE_NONE, NULL, 0,
+               FT_STRINGZPAD, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
         { &hf_exported_pdu_dis_table_name,
             { "Dissector Table Name", "exported_pdu.dis_table_name",
-               FT_STRING, BASE_NONE, NULL, 0,
+               FT_STRINGZPAD, BASE_NONE, NULL, 0,
+              NULL, HFILL }
+        },
+        { &hf_exported_pdu_p2p_dir,
+            { "P2P direction", "exported_pdu.p2p_dir",
+               FT_INT32, BASE_DEC, VALS(exported_pdu_p2p_dir_vals), 0,
               NULL, HFILL }
         },
         { &hf_exported_pdu_dissector_data,
@@ -488,7 +507,7 @@ proto_register_exported_pdu(void)
         },
         { &hf_exported_pdu_col_proto_str,
             { "Column protocol string", "exported_pdu.col_proto_str",
-               FT_STRING, BASE_NONE, NULL, 0,
+               FT_STRINGZPAD, BASE_NONE, NULL, 0,
               NULL, HFILL }
         },
     };
@@ -534,7 +553,7 @@ proto_reg_handoff_exported_pdu(void)
     hf_ip_addr    = proto_registrar_get_id_byname("ip.addr");
     hf_ip_dst     = proto_registrar_get_id_byname("ip.dst");
     hf_ip_src     = proto_registrar_get_id_byname("ip.src");
-    hf_ipv6_addr  = proto_registrar_get_id_byname("ipv6.src");
+    hf_ipv6_addr  = proto_registrar_get_id_byname("ipv6.addr");
     hf_ipv6_dst   = proto_registrar_get_id_byname("ipv6.dst");
     hf_ipv6_src   = proto_registrar_get_id_byname("ipv6.src");
 }

@@ -9,15 +9,17 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-// Activate g_debug output with environment variable: G_MESSAGES_DEBUG=packet-knxip
-#define G_LOG_DOMAIN "packet-knxip"
+#include "config.h"
+
+#define WS_LOG_DOMAIN "packet-knxip"
 
 #include <wsutil/file_util.h>
 #include "proto.h"
 #include "packet-knxip_decrypt.h"
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 #include <wsutil/wsgcrypt.h>
 #include <wsutil/strtoi.h>
+#include <wsutil/wslog.h>
 
 #define TEXT_BUFFER_SIZE  128
 
@@ -57,7 +59,7 @@ static void build_ctr0( guint8 p_result[ KNX_KEY_LENGTH ], const guint8* nonce, 
 }
 
 // Calculate MAC for KNX IP Security or KNX Data Security
-void knx_ccm_calc_cbc_mac( guint8* p_mac, const guint8 key[ KNX_KEY_LENGTH ],
+void knx_ccm_calc_cbc_mac(guint8 p_mac[ KNX_KEY_LENGTH ], const guint8 key[ KNX_KEY_LENGTH ],
   const guint8* a_bytes, gint a_length, const guint8* p_bytes, gint p_length,
   const guint8 b_0[ KNX_KEY_LENGTH ] )
 {
@@ -103,7 +105,7 @@ void knx_ccm_calc_cbc_mac( guint8* p_mac, const guint8 key[ KNX_KEY_LENGTH ],
 }
 
 // Calculate MAC for KNX IP Security, using 6-byte Sequence ID
-void knxip_ccm_calc_cbc_mac( guint8* p_mac, const guint8 key[ KNX_KEY_LENGTH ],
+void knxip_ccm_calc_cbc_mac( guint8 p_mac[ KNX_KEY_LENGTH ], const guint8 key[ KNX_KEY_LENGTH ],
   const guint8* a_bytes, gint a_length, const guint8* p_bytes, gint p_length,
   const guint8* nonce, guint8 nonce_length )
 {
@@ -183,7 +185,7 @@ guint8* knx_ccm_encrypt( guint8* p_result, const guint8 key[ KNX_KEY_LENGTH ], c
 
 // Encrypt for KNX IP Security (with 16-byte MAC and Nonce based on 6-byte Sequence ID)
 guint8* knxip_ccm_encrypt( guint8* p_result, const guint8 key[ KNX_KEY_LENGTH ], const guint8* p_bytes, gint p_length,
-  const guint8* mac, const guint8* nonce, guint8 nonce_length )
+  const guint8 mac[KNX_KEY_LENGTH], const guint8* nonce, guint8 nonce_length )
 {
   guint8 ctr_0[ KNX_KEY_LENGTH ];
   build_ctr0( ctr_0, nonce, nonce_length );
@@ -295,7 +297,7 @@ static void decrypt_key( guint8 key[] _U_, guint8 password_hash[] _U_, guint8 cr
 static void decode_and_decrypt_key( guint8 key[ BASE64_KNX_KEY_LENGTH + 1 ], const gchar* text, guint8 password_hash[], guint8 created_hash[] )
 {
   gsize out_len;
-  g_snprintf( (gchar*) key, BASE64_KNX_KEY_LENGTH + 1, "%s", text );
+  snprintf( (gchar*) key, BASE64_KNX_KEY_LENGTH + 1, "%s", text );
   g_base64_decode_inplace( (gchar*) key, &out_len );
   decrypt_key( key, password_hash, created_hash );
 }
@@ -334,7 +336,7 @@ static void add_mca_key( const guint8 mca[ IPA_SIZE ], const gchar* text, guint8
       fprintf_hex( f2, key, KNX_KEY_LENGTH );
     }
 
-    mca_key = (struct knx_keyring_mca_keys*) wmem_alloc( wmem_epan_scope(), sizeof( struct knx_keyring_mca_keys ) );
+    mca_key = wmem_new(wmem_epan_scope(), struct knx_keyring_mca_keys);
 
     if( mca_key )
     {
@@ -381,7 +383,7 @@ static void add_ga_key( guint16 ga, const gchar* text, guint8 password_hash[], g
       fprintf_hex( f2, key, KNX_KEY_LENGTH );
     }
 
-    ga_key = (struct knx_keyring_ga_keys*) wmem_alloc( wmem_epan_scope(), sizeof( struct knx_keyring_ga_keys ) );
+    ga_key = wmem_new(wmem_epan_scope(), struct knx_keyring_ga_keys);
 
     if( ga_key )
     {
@@ -419,7 +421,7 @@ static void add_ga_sender( guint16 ga, const gchar* text, FILE* f2 )
     fprintf( f2, "GA %u/%u/%u sender %u.%u.%u\n", (ga >> 11) & 0x1F, (ga >> 8) & 0x7, ga & 0xFF, (ia >> 12) & 0xF, (ia >> 8) & 0xF, ia & 0xFF );
   }
 
-  ga_sender = (struct knx_keyring_ga_senders*) wmem_alloc( wmem_epan_scope(), sizeof( struct knx_keyring_ga_senders ) );
+  ga_sender = wmem_new(wmem_epan_scope(), struct knx_keyring_ga_senders);
 
   if( ga_sender )
   {
@@ -465,7 +467,7 @@ static void add_ia_key( guint16 ia, const gchar* text, guint8 password_hash[], g
       fprintf_hex( f2, key, KNX_KEY_LENGTH );
     }
 
-    ia_key = (struct knx_keyring_ia_keys*) wmem_alloc( wmem_epan_scope(), sizeof( struct knx_keyring_ia_keys ) );
+    ia_key = wmem_new(wmem_epan_scope(), struct knx_keyring_ia_keys);
 
     if( ia_key )
     {
@@ -501,10 +503,10 @@ static void add_ia_seq( guint16 ia, const gchar* text, FILE* f2 )
 
   if( f2 )
   {
-    fprintf( f2, "IA %u.%u.%u SeqNr %" G_GINT64_MODIFIER "u\n", (ia >> 12) & 0xF, (ia >> 8) & 0xF, ia & 0xFF, seq );
+    fprintf( f2, "IA %u.%u.%u SeqNr %" PRIu64 "\n", (ia >> 12) & 0xF, (ia >> 8) & 0xF, ia & 0xFF, seq );
   }
 
-  ia_seq = (struct knx_keyring_ia_seqs*) wmem_alloc( wmem_epan_scope(), sizeof( struct knx_keyring_ia_seqs ) );
+  ia_seq = wmem_new(wmem_epan_scope(), struct knx_keyring_ia_seqs);
 
   if( ia_seq )
   {
@@ -582,7 +584,7 @@ void read_knx_keyring_xml_file( const gchar* key_file, const gchar* password, co
 
     make_password_hash( password_hash, password );
 
-    g_debug( "%s:", key_file );
+    ws_debug( "%s:", key_file );
 
     gint c = fgetc( f );
 
@@ -635,7 +637,7 @@ void read_knx_keyring_xml_file( const gchar* key_file, const gchar* password, co
 
         if( !tag_name_done )  // tag name
         {
-          g_snprintf( tag_name, sizeof tag_name, "%s", name );
+          snprintf( tag_name, sizeof tag_name, "%s", name );
           *name = '\0';
           tag_name_done = 1;
         }
@@ -672,7 +674,7 @@ void read_knx_keyring_xml_file( const gchar* key_file, const gchar* password, co
               if( !tag_end )
               {
                 // Found name="value" construct between < and >
-                g_debug( "%s %s=%s", tag_name, name, value );
+                ws_debug( "%s %s=%s", tag_name, name, value );
 
                 // Process name/value pair
                 if( strcmp( tag_name, "Keyring" ) == 0 )

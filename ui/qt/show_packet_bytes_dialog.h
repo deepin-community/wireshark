@@ -1,4 +1,4 @@
-/* show_packet_bytes_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -24,6 +24,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QTextEdit>
+#include <QTextCodec>
 
 namespace Ui {
 class ShowPacketBytesDialog;
@@ -40,12 +41,11 @@ public:
 
     void addCodecs(const QMap<QString, QTextCodec *> &codecMap);
 
-public slots:
-    void captureFileClosing();
-
 protected:
     bool eventFilter(QObject *obj, QEvent *event);
     void keyPressEvent(QKeyEvent *event);
+    void captureFileClosing();
+    void captureFileClosed();
 
 private slots:
     void on_sbStart_valueChanged(int value);
@@ -65,10 +65,14 @@ private slots:
     void saveAs();
 
 private:
+    /* Keep these enums in the same order (generally alphabetically)
+     * that they are added to the combo boxes.
+     */
     enum DecodeAsType {
         DecodeAsNone,
         DecodeAsBASE64,
         DecodeAsCompressed,
+        DecodeAsHexDigits,
         DecodeAsQuotedPrintable,
         DecodeAsROT13
     };
@@ -80,7 +84,9 @@ private:
         ShowAsHexDump,
         ShowAsHTML,
         ShowAsImage,
+        ShowAsJson,
         ShowAsRAW,
+        ShowAsRustArray,
         ShowAsCodec, // Ordered to match the UTF-8 combobox index
         ShowAsYAML,
     };
@@ -138,16 +144,3 @@ private:
 };
 
 #endif // SHOW_PACKET_BYTES_DIALOG_H
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

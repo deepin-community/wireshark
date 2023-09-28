@@ -1,5 +1,5 @@
 --
--- 3GPP TS 32.298 v16.6.1 (2020-09-30)
+-- 3GPP TS 32.298 v17.2.0 (2022-03-22)
 --
 GPRSChargingDataTypes {itu-t (0) identified-organization (4) etsi (0) mobileDomain (0) charging (5) gprsChargingDataTypes (2) asn1Module (0) version2 (1)}
 DEFINITIONS IMPLICIT TAGS	::=
@@ -40,6 +40,7 @@ NodeID,
 PDPAddress,
 PLMN-Id,
 PositioningData,
+PSCellInformation,
 RATType,
 RecordingEntity,
 RecordType,
@@ -181,7 +182,9 @@ SGWRecord 	::= SET
 	servingPLMNRateControl		[61] ServingPLMNRateControl OPTIONAL,
 	pDPPDNTypeExtension			[62] PDPPDNTypeExtension OPTIONAL,
 	mOExceptionDataCounter		[63] MOExceptionDataCounter OPTIONAL,
-	listOfRANSecondaryRATUsageReports [64] SEQUENCE OF RANSecondaryRATUsageReport OPTIONAL
+	listOfRANSecondaryRATUsageReports [64] SEQUENCE OF RANSecondaryRATUsageReport OPTIONAL,
+	pSCellInformation			[65] PSCellInformation OPTIONAL
+
 }
 
 PGWRecord 	::= SET

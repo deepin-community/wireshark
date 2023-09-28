@@ -79,17 +79,17 @@ dissect_dx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* dat
 
 	col_set_str( pinfo->cinfo, COL_PROTOCOL, "DX" );
 
-	col_add_fstr( pinfo->cinfo, COL_INFO, "%s", tvb_format_text( tvb, offset, 15 ) );
+	col_add_fstr( pinfo->cinfo, COL_INFO, "%s", tvb_format_text( pinfo->pool, tvb, offset, 15 ) );
 
 	if ( parent_tree )
 		{
 		/* create display subtree for the protocol */
 		ti = proto_tree_add_protocol_format( parent_tree, proto_dx, tvb, 0, -1,
-		    "DX (%s)", tvb_format_text( tvb, offset, 15 ) );
+		    "DX (%s)", tvb_format_text( pinfo->pool, tvb, offset, 15 ) );
 		dx_tree = proto_item_add_subtree( ti, ett_dx );
 		offset = 0;
 
-		proto_tree_add_item( dx_tree, hf_dx_report, tvb, offset, data_len, ENC_ASCII|ENC_NA );
+		proto_tree_add_item( dx_tree, hf_dx_report, tvb, offset, data_len, ENC_ASCII );
 	}
 
 	return tvb_captured_length(tvb);
@@ -145,7 +145,7 @@ dissect_ax25_nol3(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, vo
 	guint8      dti      = 0;
 	gboolean    dissected;
 
-	info_buffer = (char *)wmem_alloc( wmem_packet_scope(), STRLEN );
+	info_buffer = (char *)wmem_alloc( pinfo->pool, STRLEN );
 	info_buffer[0] = '\0';
 
 	col_set_str( pinfo->cinfo, COL_PROTOCOL, "AX.25-NoL3");
@@ -153,18 +153,18 @@ dissect_ax25_nol3(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, vo
 	col_clear( pinfo->cinfo, COL_INFO);
 
 	offset = 0;
-	g_snprintf( info_buffer, STRLEN, "Text" );
+	snprintf( info_buffer, STRLEN, "Text" );
 
 	if ( gPREF_APRS )
 		{
 		dti = tvb_get_guint8( tvb, offset );
 		if ( isaprs( dti ) )
-			g_snprintf( info_buffer, STRLEN, "APRS" );
+			snprintf( info_buffer, STRLEN, "APRS" );
 		}
 	if ( gPREF_DX )
 		{
 		if ( tvb_get_guint8( tvb, offset ) == 'D' && tvb_get_guint8( tvb, offset + 1 ) == 'X' )
-		g_snprintf( info_buffer, STRLEN, "DX cluster" );
+		snprintf( info_buffer, STRLEN, "DX cluster" );
 		}
 
 	col_add_str( pinfo->cinfo, COL_INFO, info_buffer );

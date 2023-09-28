@@ -138,18 +138,16 @@ const QString FieldInformation::moduleName()
 
 QString FieldInformation::toString()
 {
-    QString repr;
-    gchar *repr_str;
-    repr_str = fvalue_to_string_repr(NULL, &fi_->value, FTREPR_DISPLAY, fi_->hfinfo->display);
-    if (repr_str) {
-        repr = repr_str;
-    }
-    wmem_free(NULL, repr_str);
+    QByteArray display_label;
 
-    if (repr.isEmpty()) {
+    display_label.resize(80); // Arbitrary.
+    int label_len = proto_item_fill_display_label(fi_, display_label.data(), static_cast<int>(display_label.size())-1);
+    display_label.resize(label_len);
+
+    if (display_label.isEmpty()) {
         return "[no value for field]";
     }
-    return repr;
+    return QString(display_label);
 }
 
 QString FieldInformation::url()
@@ -214,15 +212,3 @@ const QByteArray FieldInformation::printableData()
 
     return data;
 }
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

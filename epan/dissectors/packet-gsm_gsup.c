@@ -645,7 +645,7 @@ static void dissect_name_ie(tvbuff_t *tvb, packet_info *pinfo _U_, guint offset,
 
 	if (show_name_as_text) {
 		guint8 *str;
-		str = tvb_get_stringzpad(wmem_packet_scope(), tvb, offset, ie_len,  ENC_ASCII|ENC_NA);
+		str = tvb_get_stringzpad(pinfo->pool, tvb, offset, ie_len,  ENC_ASCII|ENC_NA);
 		proto_item_append_text(parent_ti, ": %s", (char *)str);
 	}
 
@@ -654,14 +654,14 @@ static void dissect_name_ie(tvbuff_t *tvb, packet_info *pinfo _U_, guint offset,
 		ti = proto_tree_add_item(tree, hf_gsup_source_name, tvb, offset, ie_len, ENC_NA);
 		if (show_name_as_text) {
 			proto_item_set_hidden(ti);
-			proto_tree_add_item(tree, hf_gsup_source_name_text, tvb, offset, ie_len, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_gsup_source_name_text, tvb, offset, ie_len, ENC_ASCII);
 		}
 		break;
 	case OSMO_GSUP_DESTINATION_NAME_IE:
 		ti = proto_tree_add_item(tree, hf_gsup_destination_name, tvb, offset, ie_len, ENC_NA);
 		if (show_name_as_text) {
 			proto_item_set_hidden(ti);
-			proto_tree_add_item(tree, hf_gsup_destination_name_text, tvb, offset, ie_len, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(tree, hf_gsup_destination_name_text, tvb, offset, ie_len, ENC_ASCII);
 		}
 		break;
 	}
@@ -764,7 +764,7 @@ dissect_gsup_tlvs(tvbuff_t *tvb, int base_offs, int length, packet_info *pinfo, 
 			proto_tree_add_item(att_tree, hf_gsup_pdp_context_id, tvb, offset, len, ENC_NA);
 			break;
 		case OSMO_GSUP_CHARG_CHAR_IE:
-			proto_tree_add_item(att_tree, hf_gsup_charg_char, tvb, offset, len, ENC_ASCII|ENC_NA);
+			proto_tree_add_item(att_tree, hf_gsup_charg_char, tvb, offset, len, ENC_ASCII);
 			break;
 		case OSMO_GSUP_CAUSE_IE:
 			proto_tree_add_item(att_tree, hf_gsup_cause, tvb, offset, len, ENC_NA);
@@ -973,7 +973,7 @@ proto_register_gsup(void)
 		  { "gsup.sm_rp_oa.invalid", PI_PROTOCOL, PI_ERROR,
 		    "Malformed SM-RP-OA IE", EXPFILL } },
 		{ &ei_gsup_ie_len_invalid,
-		  { "gsup.ie.len.invalid", PI_PROTOCOL, PI_MALFORMED,
+		  { "gsup.ie.len.invalid", PI_PROTOCOL, PI_ERROR,
 		    "Invalid Information Element Length", EXPFILL } },
 	};
 

@@ -30,7 +30,9 @@ ImmediateMDT_PDU
 LastVisitedEUTRANCellInformation_PDU
 LastVisitedGERANCellInformation_PDU
 MDTMode_PDU
+PSCellInformation_PDU
 SourceeNB-ToTargeteNB-TransparentContainer_PDU
+SONConfigurationTransfer_PDU
 SONtransferApplicationIdentity_PDU
 SONtransferRequestContainer_PDU
 SONtransferRequestContainer
@@ -49,8 +51,10 @@ ImmediateMDT
 LastVisitedEUTRANCellInformation
 LastVisitedGERANCellInformation
 MDTMode
+PSCellInformation
 S1AP-PDU
 SourceeNB-ToTargeteNB-TransparentContainer
+SONConfigurationTransfer
 SONtransferApplicationIdentity
 SONtransferRequestContainer
 SONtransferResponseContainer
@@ -107,6 +111,13 @@ ProtocolExtensionField/id ext_id
 
 #PrivateIE-Field/value private_value
 ProtocolIE-Field/value ie_field_value
+
+#.FIELD_ATTR
+UE-associatedLogicalS1-ConnectionItem/eNB-UE-S1AP-ID ABBREV=ENB_UE_S1AP_ID
+UE-associatedLogicalS1-ConnectionItem/mME-UE-S1AP-ID ABBREV=MME_UE_S1AP_ID
+UE-S1AP-ID-pair/eNB-UE-S1AP-ID ABBREV=ENB_UE_S1AP_ID
+UE-S1AP-ID-pair/mME-UE-S1AP-ID ABBREV=MME_UE_S1AP_ID
+UE-S1AP-IDs/mME-UE-S1AP-ID ABBREV=MME_UE_S1AP_ID
 
 #.FN_BODY ProtocolIE-ID VAL_PTR=&s1ap_data->protocol_ie_id
   struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
@@ -238,6 +249,8 @@ MAX_VAL = asn1_param_get_integer(%(ACTX)s,"upperBound")
 #.FN_BODY PLMNidentity  VAL_PTR = parameter_tvb
   tvbuff_t *parameter_tvb=NULL;
   struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+  e212_number_type_t number_type = s1ap_data->number_type;
+  s1ap_data->number_type = E212_NONE;
 
   offset = dissect_per_octet_string(tvb, offset, actx, tree, hf_index,
                                        3, 3, FALSE, &parameter_tvb);
@@ -246,7 +259,7 @@ MAX_VAL = asn1_param_get_integer(%(ACTX)s,"upperBound")
 
   if (!parameter_tvb)
     return offset;
-  dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, tree, 0, E212_NONE, FALSE);
+  dissect_e212_mcc_mnc(parameter_tvb, actx->pinfo, tree, 0, number_type, FALSE);
   if (s1ap_data->supported_ta) {
     guint32 plmn = tvb_get_ntoh24(parameter_tvb, 0);
     wmem_array_append_one(s1ap_data->supported_ta->plmn, plmn);
@@ -269,7 +282,7 @@ MAX_VAL = asn1_param_get_integer(%(ACTX)s,"upperBound")
 
   is_ascii = tvb_ascii_isprint(parameter_tvb, 0, length);
   if (is_ascii)
-     proto_item_append_text(actx->created_item," (%%s)",tvb_format_text(parameter_tvb, 0, length));
+     proto_item_append_text(actx->created_item," (%%s)",tvb_format_text(actx->pinfo->pool, parameter_tvb, 0, length));
 
 #.FN_BODY MMEname VAL_PTR = parameter_tvb
   tvbuff_t *parameter_tvb=NULL;
@@ -285,7 +298,7 @@ MAX_VAL = asn1_param_get_integer(%(ACTX)s,"upperBound")
 
   is_ascii = tvb_ascii_isprint(parameter_tvb, 0, length);
   if (is_ascii)
-     proto_item_append_text(actx->created_item," (%%s)",tvb_format_text(parameter_tvb, 0, length));
+     proto_item_append_text(actx->created_item," (%%s)",tvb_format_text(actx->pinfo->pool, parameter_tvb, 0, length));
 
 #.END
 
@@ -384,10 +397,23 @@ Port-Number TYPE = FT_UINT16 DISPLAY = BASE_DEC
   struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
   s1ap_data->handover_type_value = 0xff;
 
-#.FN_HDR SourceeNB-ToTargeteNB-TransparentContainer
+#.FN_BODY SourceeNB-ToTargeteNB-TransparentContainer
   struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+  volatile guint32 _offset;
 
   s1ap_data->transparent_container_type = SOURCE_TO_TARGET_TRANSPARENT_CONTAINER;
+  _offset = offset;
+   TRY {
+
+  offset = dissect_per_sequence(tvb, _offset, actx, tree, hf_index,
+                                   ett_s1ap_SourceeNB_ToTargeteNB_TransparentContainer, SourceeNB_ToTargeteNB_TransparentContainer_sequence);
+  } CATCH_ALL {
+    show_exception(tvb, actx->pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
+  }
+  ENDTRY;
+    offset = _offset;
+
+
 
 #.FN_BODY Source-ToTarget-TransparentContainer VAL_PTR = &parameter_tvb
 # I think the message is "directly encoded" into the octet string(no "double encoding")
@@ -400,7 +426,7 @@ Port-Number TYPE = FT_UINT16 DISPLAY = BASE_DEC
   tvbuff_t *parameter_tvb;
   proto_tree *subtree;
 
-%(DEFAULT_BODY)s
+  %(DEFAULT_BODY)s
 
   if ((g_s1ap_dissect_container)&&(parameter_tvb) && (tvb_reported_length(parameter_tvb) > 0)) {
     struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
@@ -464,10 +490,21 @@ Port-Number TYPE = FT_UINT16 DISPLAY = BASE_DEC
     col_set_writable(actx->pinfo->cinfo, COL_INFO, TRUE);
   }
 
-#.FN_HDR TargeteNB-ToSourceeNB-TransparentContainer
-  struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+#.FN_BODY TargeteNB-ToSourceeNB-TransparentContainer
+    struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+    volatile guint32 _offset;
 
   s1ap_data->transparent_container_type = TARGET_TO_SOURCE_TRANSPARENT_CONTAINER;
+  _offset = offset;
+     TRY {
+
+  _offset = dissect_per_sequence(tvb, _offset, actx, tree, hf_index,
+                                   ett_s1ap_TargeteNB_ToSourceeNB_TransparentContainer, TargeteNB_ToSourceeNB_TransparentContainer_sequence);
+  } CATCH_ALL {
+    show_exception(tvb, actx->pinfo, tree, EXCEPT_CODE, GET_MESSAGE);
+  }
+  ENDTRY;
+    offset = _offset;
 
 #.FN_BODY Target-ToSource-TransparentContainer VAL_PTR = &parameter_tvb
 # I think the message is "directly encoded" into the octet string(no "double encoding")
@@ -649,7 +686,7 @@ Port-Number TYPE = FT_UINT16 DISPLAY = BASE_DEC
     if (s1ap_data->protocol_ie_id == id_UERadioCapability_NR_Format) {
       handle = nr_rrc_ue_radio_access_cap_info_handle;
     } else if ((s1ap_is_nbiot_ue(actx->pinfo) && (g_s1ap_dissect_lte_container_as == S1AP_LTE_CONTAINER_AUTOMATIC)) ||
-        (g_s1ap_dissect_lte_container_as == S1AP_LTE_CONTAINER_NBIOT)) {
+               (g_s1ap_dissect_lte_container_as == S1AP_LTE_CONTAINER_NBIOT)) {
       handle = lte_rrc_ue_radio_access_cap_info_nb_handle;
     } else {
       handle = lte_rrc_ue_radio_access_cap_info_handle;
@@ -670,6 +707,22 @@ Threshold-RSRP DISPLAY = BASE_CUSTOM STRINGS = CF_FUNC(s1ap_Threshold_RSRP_fmt)
 
 #.TYPE_ATTR
 Threshold-RSRQ DISPLAY = BASE_CUSTOM STRINGS = CF_FUNC(s1ap_Threshold_RSRQ_fmt)
+
+#.FN_BODY RAT-RestrictionsItem/rAT-RestrictionInformation VAL_PTR = &parameter_tvb
+  tvbuff_t *parameter_tvb = NULL;
+%(DEFAULT_BODY)s
+  if(parameter_tvb){
+    static int * const fields[] = {
+      &hf_s1ap_rAT_RestrictionInformation_LEO,
+      &hf_s1ap_rAT_RestrictionInformation_MEO,
+      &hf_s1ap_rAT_RestrictionInformation_GEO,
+      &hf_s1ap_rAT_RestrictionInformation_OTHERSAT,
+      &hf_s1ap_rAT_RestrictionInformation_Reserved,
+      NULL
+    };
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_s1ap_rAT_RestrictionInformation);
+    proto_tree_add_bitmask_list(subtree, parameter_tvb, 0, 1, fields, ENC_BIG_ENDIAN);
+  }
 
 # 9.2.3.24 RIM Information
 # Contains the BSSGP RIM PDU
@@ -734,10 +787,13 @@ if (gcsna_handle) {
     return offset;
 
   if (g_s1ap_dissect_container) {
+    struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
     volatile dissector_handle_t handle;
     subtree = proto_item_add_subtree(actx->created_item, ett_s1ap_UERadioPagingInformation);
-    if ((s1ap_is_nbiot_ue(actx->pinfo) && (g_s1ap_dissect_lte_container_as == S1AP_LTE_CONTAINER_AUTOMATIC)) ||
-        (g_s1ap_dissect_lte_container_as == S1AP_LTE_CONTAINER_NBIOT)) {
+    if (s1ap_data->protocol_ie_id == id_UERadioCapabilityForPaging_NR_Format) {
+      handle = nr_rrc_ue_radio_paging_info_handle;
+    } else if ((s1ap_is_nbiot_ue(actx->pinfo) && (g_s1ap_dissect_lte_container_as == S1AP_LTE_CONTAINER_AUTOMATIC)) ||
+               (g_s1ap_dissect_lte_container_as == S1AP_LTE_CONTAINER_NBIOT)) {
       handle = lte_rrc_ue_radio_paging_info_nb_handle;
     } else {
       handle = lte_rrc_ue_radio_paging_info_handle;
@@ -959,13 +1015,18 @@ BitRate DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&units_bit_sec
     dissect_lte_rrc_QuantityConfigNR_r15_PDU(quantity_config_nr_tvb, actx->pinfo, subtree, NULL);
   }
 
-#.FN_BODY InterSystemMeasurementItem/blackCellsToAddModList VAL_PTR = &black_cells_list_tvb
-  tvbuff_t *black_cells_list_tvb = NULL;
+#.FN_BODY InterSystemMeasurementItem/excludedCellsToAddModList VAL_PTR = &excluded_cells_list_tvb
+  tvbuff_t *excluded_cells_list_tvb = NULL;
 %(DEFAULT_BODY)s
-  if (black_cells_list_tvb) {
-    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_s1ap_blackCellsToAddModList);
-    dissect_lte_rrc_CellsToAddModListNR_r15_PDU(black_cells_list_tvb, actx->pinfo, subtree, NULL);
+  if (excluded_cells_list_tvb) {
+    proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_s1ap_excludedCellsToAddModList);
+    dissect_lte_rrc_CellsToAddModListNR_r15_PDU(excluded_cells_list_tvb, actx->pinfo, subtree, NULL);
   }
+
+#.FN_BODY GUMMEI
+  struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+  s1ap_data->number_type = E212_GUMMEI;
+%(DEFAULT_BODY)s
 
 #.TYPE_ATTR
 MME-Code TYPE = FT_UINT8 DISPLAY = BASE_DEC_HEX
@@ -1030,6 +1091,12 @@ Time-UE-StayedInCell-EnhancedGranularity DISPLAY = BASE_CUSTOM STRINGS = CF_FUNC
 
 #.TYPE_ATTR
 TimeSinceSecondaryNodeRelease TYPE=FT_UINT32 DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&units_seconds
+
+#.TYPE_ATTR
+LastVisitedPSCellInformation/timeStay DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&units_seconds
+
+#.TYPE_ATTR
+RecommendedCellItem/timeStayedInCell DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&units_seconds
 
 #.FN_BODY LastVisitedNGRANCellInformation VAL_PTR = &parameter_tvb
   tvbuff_t *parameter_tvb = NULL;
@@ -1179,7 +1246,7 @@ ExtendedRepetitionPeriod DISPLAY=BASE_DEC|BASE_UNIT_STRING STRINGS=&units_second
   }
 
 #.TYPE_ATTR
-LHN-ID TYPE=FT_STRING DISPLAY = STR_UNICODE
+LHN-ID TYPE=FT_STRING DISPLAY = BASE_NONE
 #.FN_BODY LHN-ID VAL_PTR = &parameter_tvb HF_INDEX = -1
   tvbuff_t *parameter_tvb = NULL;
 %(DEFAULT_BODY)s
@@ -1278,6 +1345,11 @@ TAC TYPE = FT_UINT16 DISPLAY = BASE_DEC_HEX
     }
   }
 
+#.FN_BODY LAI
+  struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+  s1ap_data->number_type = E212_LAI;
+%(DEFAULT_BODY)s
+
 #.TYPE_ATTR
 LAC TYPE = FT_UINT16 DISPLAY = BASE_DEC_HEX
 #.FN_BODY LAC VAL_PTR = &parameter_tvb HF_INDEX = -1
@@ -1295,6 +1367,11 @@ RAC TYPE = FT_UINT8 DISPLAY = BASE_DEC_HEX
   if (parameter_tvb) {
     actx->created_item = proto_tree_add_item(tree, hf_index, parameter_tvb, 0, 1, ENC_BIG_ENDIAN);
   }
+
+#.FN_BODY FiveGSTAI
+  struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+  s1ap_data->number_type = E212_5GSTAI;
+%(DEFAULT_BODY)s
 
 #.TYPE_ATTR
 FiveGSTAC TYPE = FT_UINT24 DISPLAY = BASE_DEC_HEX
@@ -1349,8 +1426,8 @@ M-TMSI TYPE = FT_UINT32 DISPLAY = BASE_DEC_HEX
       (s1ap_data->message_type == INITIATING_MESSAGE) &&
       ((s1ap_data->procedure_code == id_S1Setup) ||
        (s1ap_data->procedure_code == id_ENBConfigurationUpdate))) {
-    s1ap_data->supported_ta = wmem_new0(wmem_packet_scope(), struct s1ap_supported_ta);
-    s1ap_data->supported_ta->plmn = wmem_array_new(wmem_packet_scope(), sizeof(guint32));
+    s1ap_data->supported_ta = wmem_new0(actx->pinfo->pool, struct s1ap_supported_ta);
+    s1ap_data->supported_ta->plmn = wmem_array_new(actx->pinfo->pool, sizeof(guint32));
   }
 
 #.FN_FTR SupportedTAs-Item
@@ -1360,7 +1437,7 @@ M-TMSI TYPE = FT_UINT32 DISPLAY = BASE_DEC_HEX
   guint32 rat_type = 0xffffffff;
   struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
 %(DEFAULT_BODY)s
-  if (s1ap_data->s1ap_conv && s1ap_data->supported_ta && (rat_type == nbiot)) {
+  if (s1ap_data->s1ap_conv && s1ap_data->supported_ta && rat_type <= nbiot_othersat) {
     guint64 *key;
     guint i;
 
@@ -1394,8 +1471,8 @@ M-TMSI TYPE = FT_UINT32 DISPLAY = BASE_DEC_HEX
 
 #.FN_BODY TAI
   struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
-
-  s1ap_data->tai = wmem_new0(wmem_packet_scope(), struct s1ap_tai);
+  s1ap_data->number_type = E212_TAI;
+  s1ap_data->tai = wmem_new0(actx->pinfo->pool, struct s1ap_tai);
 %(DEFAULT_BODY)s
   if (!PINFO_FD_VISITED(actx->pinfo) && s1ap_data->s1ap_conv &&
       (s1ap_data->message_type == INITIATING_MESSAGE) &&
@@ -1421,7 +1498,7 @@ M-TMSI TYPE = FT_UINT32 DISPLAY = BASE_DEC_HEX
 Packet-LossRate DISPLAY = BASE_CUSTOM STRINGS = CF_FUNC(s1ap_Packet_LossRate_fmt)
 
 #.TYPE_ATTR
-BluetoothName TYPE=FT_STRING DISPLAY = STR_UNICODE
+BluetoothName TYPE=FT_STRING DISPLAY = BASE_NONE
 #.FN_BODY BluetoothName VAL_PTR = &parameter_tvb HF_INDEX = -1
   tvbuff_t *parameter_tvb = NULL;
 %(DEFAULT_BODY)s
@@ -1429,7 +1506,7 @@ BluetoothName TYPE=FT_STRING DISPLAY = STR_UNICODE
 #.END
 
 #.TYPE_ATTR
-WLANName TYPE=FT_STRING DISPLAY = STR_UNICODE
+WLANName TYPE=FT_STRING DISPLAY = BASE_NONE
 #.FN_BODY WLANName VAL_PTR = &parameter_tvb HF_INDEX = -1
   tvbuff_t *parameter_tvb = NULL;
 %(DEFAULT_BODY)s
@@ -1841,6 +1918,24 @@ id-eNB-EarlyStatusTransfer-TransparentContainer     ProtocolIE-ID
 id-Bearers-SubjectToEarlyStatusTransfer-Item        ProtocolIE-ID
 id-WUS-Assistance-Information                       ProtocolIE-ID
 id-NB-IoT-PagingDRX                                 ProtocolIE-ID
+id-TraceCollectionEntityURI                         ProtocolIE-ID
+id-EmergencyIndicator                               ProtocolIE-ID
+id-UERadioCapabilityForPaging-NR-Format             ProtocolIE-ID
+id-SourceTransportLayerAddress                      ProtocolIE-ID
+id-lastVisitedPSCellList                            ProtocolIE-ID
+id-RACSIndication                                   ProtocolIE-ID
+id-PagingCause                                      ProtocolIE-ID
+id-SecurityIndication                               ProtocolIE-ID
+id-SecurityResult                                   ProtocolIE-ID
+id-E-RABSecurityResultItem                          ProtocolIE-ID
+id-E-RABSecurityResultList                          ProtocolIE-ID
+id-RAT-Restrictions                                 ProtocolIE-ID
+id-UEContextReferenceatSourceeNB                    ProtocolIE-ID
+id-LTE-NTN-TAI-Information                          ProtocolIE-ID
+id-SourceNodeTransportLayerAddress                  ProtocolIE-ID
+id-E-RABToBeUpdatedList                             ProtocolIE-ID
+id-E-RABToBeUpdatedItem                             ProtocolIE-ID
+id-SourceSNID                                       ProtocolIE-ID
 
 #.END
 
@@ -2089,6 +2184,12 @@ ENB-EarlyStatusTransfer-TransparentContainer    N s1ap.ies id-eNB-EarlyStatusTra
 Bearers-SubjectToEarlyStatusTransfer-Item       N s1ap.ies id-Bearers-SubjectToEarlyStatusTransfer-Item
 WUS-Assistance-Information                      N s1ap.ies id-WUS-Assistance-Information
 NB-IoT-PagingDRX                                N s1ap.ies id-NB-IoT-PagingDRX
+UERadioCapabilityForPaging                      N s1ap.ies id-UERadioCapabilityForPaging-NR-Format
+PagingCause                                     N s1ap.ies id-PagingCause
+E-RABSecurityResultItem                         N s1ap.ies id-E-RABSecurityResultItem
+LTE-NTN-TAI-Information                         N s1ap.ies id-LTE-NTN-TAI-Information
+E-RABToBeUpdatedList                            N s1ap.ies id-E-RABToBeUpdatedList
+E-RABToBeUpdatedItem                            N s1ap.ies id-E-RABToBeUpdatedItem
 
 #S1AP-PROTOCOL-IES-PAIR
 #RAB-SetupOrModifyItemFirst             N s1ap.ies.pair.first id-RAB-SetupOrModifyItem
@@ -2149,7 +2250,7 @@ NRrestrictionin5GS                      N s1ap.extension id-NRrestrictionin5GS
 PLMNidentity                            N s1ap.extension id-LastNG-RANPLMNIdentity
 PSCellInformation                       N s1ap.extension id-PSCellInformation
 IMSvoiceEPSfallbackfrom5G               N s1ap.extension id-IMSvoiceEPSfallbackfrom5G
-RequestTypeAdditionalInfo               N s1ap.extension id-TimeSinceSecondaryNodeRelease
+RequestTypeAdditionalInfo               N s1ap.extension id-RequestTypeAdditionalInfo
 ContextatSource                         N s1ap.extension id-ContextatSource
 Ethernet-Type                           N s1ap.extension id-Ethernet-Type
 IntersystemMeasurementConfiguration     N s1ap.extension id-IntersystemMeasurementConfiguration
@@ -2158,6 +2259,18 @@ NB-IoT-RLF-Report-Container             N s1ap.extension id-NB-IoT-RLF-Report-Co
 MDT-ConfigurationNR                     N s1ap.extension id-MDTConfigurationNR
 DAPSRequestInfo                         N s1ap.extension id-DAPSRequestInfo
 DAPSResponseInfoList                    N s1ap.extension id-DAPSResponseInfoList
+URI-Address                             N s1ap.extension id-TraceCollectionEntityURI
+EmergencyIndicator                      N s1ap.extension id-EmergencyIndicator
+TransportLayerAddress                   N s1ap.extension id-SourceTransportLayerAddress
+LastVisitedPSCellList                   N s1ap.extension id-lastVisitedPSCellList
+RACSIndication                          N s1ap.extension id-RACSIndication
+SecurityIndication                      N s1ap.extension id-SecurityIndication
+E-RABSecurityResultList                 N s1ap.extension id-E-RABSecurityResultList
+RAT-Restrictions                        N s1ap.extension id-RAT-Restrictions
+ENB-UE-S1AP-ID                          N s1ap.extension id-UEContextReferenceatSourceeNB
+LTE-NTN-TAI-Information                 N s1ap.extension id-LTE-NTN-TAI-Information
+TransportLayerAddress                   N s1ap.extension id-SourceNodeTransportLayerAddress
+Global-RAN-NODE-ID                      N s1ap.extension id-SourceSNID
 
 #S1AP-ELEMENTARY-PROCEDURE
 HandoverRequired                        N s1ap.proc.imsg id-HandoverPreparation
@@ -2553,6 +2666,16 @@ MMEEarlyStatusTransfer                  N s1ap.proc.imsg id-MMEEarlyStatusTransf
 
 #.END
 
+#.FN_BODY CGI
+  struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+  s1ap_data->number_type = E212_CGI;
+%(DEFAULT_BODY)s
+
+#.FN_BODY EUTRAN-CGI
+  struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+  s1ap_data->number_type = E212_ECGI;
+%(DEFAULT_BODY)s
+
 #.FIELD_ATTR
 EUTRAN-CGI/cell-ID ABBREV=CellIdentity TYPE=FT_UINT32 DISPLAY=BASE_HEX
 #.FN_BODY CellIdentity VAL_PTR = &cell_id_tvb HF_INDEX=-1
@@ -2563,6 +2686,11 @@ EUTRAN-CGI/cell-ID ABBREV=CellIdentity TYPE=FT_UINT32 DISPLAY=BASE_HEX
     actx->created_item = proto_tree_add_uint(tree, hf_index, cell_id_tvb, 0, 4, cell_id);
   }
 #.END
+
+#.FN_BODY NR-CGI
+  struct s1ap_private_data *s1ap_data = s1ap_get_private_data(actx->pinfo);
+  s1ap_data->number_type = E212_NRCGI;
+%(DEFAULT_BODY)s
 
 #
 # Editor modelines  -  https://www.wireshark.org/tools/modelines.html

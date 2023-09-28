@@ -179,7 +179,11 @@ void DragDropToolBar::dragMoveEvent(QDragMoveEvent *event)
 
     if (qobject_cast<const ToolbarEntryMimeData *>(event->mimeData()))
     {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0 ,0)
+        QAction * actionAtPos = actionAt(event->position().toPoint());
+#else
         QAction * actionAtPos = actionAt(event->pos());
+#endif
         if (actionAtPos)
         {
             QWidget * widget = widgetForAction(actionAtPos);
@@ -226,7 +230,11 @@ void DragDropToolBar::dropEvent(QDropEvent *event)
 
         int oldPos = data->position();
         int newPos = -1;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0 ,0)
+        QAction * action = actionAt(event->position().toPoint());
+#else
         QAction * action = actionAt(event->pos());
+#endif
         if (action && actions().at(oldPos))
         {
             widgetForAction(action)->setStyleSheet("QWidget { border: none; };");
@@ -285,16 +293,3 @@ void DragDropToolBar::moveToolbarItems(int fromPos, int newPos)
 
     setUpdatesEnabled(true);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -21,6 +21,7 @@
 #include "config.h"
 
 #include <epan/packet.h>
+#include <epan/exceptions.h>
 #include <epan/reassemble.h>
 
 #define PROTONAME "Peer Name Resolution Protocol"
@@ -388,11 +389,11 @@ static const fragment_items pnrp_frag_items = {
 static int dissect_pnrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
     /* Variable declaration */
-    gint offset;
+    int offset, start_offset;
     gint padding_bytes;
     guint8 message_type;
     guint16 field_type;
-    guint16 data_length;
+    unsigned data_length;
     proto_item *ti;
     proto_tree *pnrp_tree;
     proto_item *pnrp_header_item;
@@ -484,6 +485,7 @@ static int dissect_pnrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
      *------------------------------*/
 
     /* The following part has dynamic length depending on message type */
+    start_offset = offset;
     while (tvb_reported_length_remaining(tvb, offset) > 0) {
         /* Determine the Field Type */
         field_type = tvb_get_ntohs(tvb,offset );
@@ -567,7 +569,6 @@ static int dissect_pnrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
                             offset += data_length+2;
                         }
                         break;
-
 
                     default:
                         proto_tree_add_item(pnrp_message_tree, hf_pnrp_message_flags, tvb, offset + 4, data_length -4, ENC_BIG_ENDIAN);
@@ -869,6 +870,10 @@ static int dissect_pnrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
                 offset += data_length;
                 break;
         }
+        // SPLIT_CONTROLS might reset our offset.
+        if (start_offset <= offset) {
+            THROW(ReportedBoundsError);
+        }
     }
     return offset;
 
@@ -996,7 +1001,7 @@ static void dissect_encodedCPA_structure(tvbuff_t *tvb, gint offset, gint length
             /* Friendly Name Length */
             proto_tree_add_item(pnrp_encodedCPA_tree, hf_pnrp_encodedCPA_friendlyName_length, tvb, offset, 2, ENC_LITTLE_ENDIAN);
             /* Friendly Name */
-            proto_tree_add_item(pnrp_encodedCPA_tree, hf_pnrp_encodedCPA_friendlyName, tvb, offset+2, tvb_get_letohs(tvb,offset), ENC_ASCII|ENC_NA);
+            proto_tree_add_item(pnrp_encodedCPA_tree, hf_pnrp_encodedCPA_friendlyName, tvb, offset+2, tvb_get_letohs(tvb,offset), ENC_ASCII);
             offset +=tvb_get_letohs(tvb,offset)+2;
         }
         /* Service Address List */
@@ -1081,10 +1086,10 @@ static void dissect_publicKey_structure(tvbuff_t *tvb, gint offset, gint length,
         proto_tree_add_item(pnrp_publicKey_tree, hf_pnrp_publicKey_unused_bits, tvb, offset, 1, ENC_NA);
         offset +=1;
         /* Algorithm ObjID */
-        proto_tree_add_item(pnrp_publicKey_tree, hf_pnrp_publicKey_objID, tvb, offset, objIDLength, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(pnrp_publicKey_tree, hf_pnrp_publicKey_objID, tvb, offset, objIDLength, ENC_ASCII);
         offset += objIDLength;
         /*  Public Key Data */
-        proto_tree_add_item(pnrp_publicKey_tree, hf_pnrp_publicKey_publicKeyData, tvb, offset, cbDataLength, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(pnrp_publicKey_tree, hf_pnrp_publicKey_publicKeyData, tvb, offset, cbDataLength, ENC_ASCII);
     }
 }
 static void dissect_signature_structure(tvbuff_t *tvb, gint offset, gint length, proto_tree *tree)
@@ -1191,7 +1196,7 @@ void proto_register_pnrp(void)
             { "Entry Length", "pnrp.segment.classifier.entryLength", FT_UINT16, BASE_DEC, NULL, 0x0,
                 NULL, HFILL }},
         { &hf_pnrp_message_classifier_string,
-            { "Classifier", "pnrp.segment.classifier.string", FT_STRING, STR_UNICODE, NULL, 0x0,
+            { "Classifier", "pnrp.segment.classifier.string", FT_STRING, BASE_NONE, NULL, 0x0,
                 NULL, HFILL }},
         /* Ack Flags */
         { &hf_pnrp_message_ack_flags_reserved,

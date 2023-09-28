@@ -14,29 +14,30 @@
 #include <QLineEdit>
 
 #include <ui/qt/utils/qt_ui_utils.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 
 // Helper object used for sending close signal to open dialogs from a C function
-static FunnelStringDialogHelper dialogHelper;
+static FunnelStringDialogHelper dialog_helper_;
 
 const int min_edit_width_ = 20; // em widths
-FunnelStringDialog::FunnelStringDialog(const QString title, const QStringList field_name_list, funnel_dlg_cb_t dialog_cb, void *dialog_cb_data,
-    funnel_dlg_cb_data_free_t dialog_data_free_cb) :
-    QDialog(NULL),
+FunnelStringDialog::FunnelStringDialog(QWidget *parent, const QString title, const QList<QPair<QString, QString>> field_list, funnel_dlg_cb_t dialog_cb, void* dialog_cb_data, funnel_dlg_cb_data_free_t dialog_data_free_cb) :
+    QDialog(parent),
     ui(new Ui::FunnelStringDialog),
     dialog_cb_(dialog_cb),
     dialog_cb_data_(dialog_cb_data),
     dialog_cb_data_free_(dialog_data_free_cb)
 {
     ui->setupUi(this);
-    setWindowTitle(wsApp->windowTitleString(title));
+    setWindowTitle(mainApp->windowTitleString(title));
     int one_em = fontMetrics().height();
 
     int row = 0;
-    foreach (QString field_name, field_name_list) {
-        QLabel *field_label = new QLabel(field_name, this);
+    QPair<QString, QString> field;
+    foreach(field, field_list) {
+        QLabel* field_label = new QLabel(field.first, this);
         ui->stringGridLayout->addWidget(field_label, row, 0);
-        QLineEdit *field_edit = new QLineEdit(this);
+        QLineEdit* field_edit = new QLineEdit(this);
+        field_edit->setText(field.second);
         field_edit->setMinimumWidth(one_em * min_edit_width_);
         field_edits_ << field_edit;
         ui->stringGridLayout->addWidget(field_edit, row, 1);
@@ -84,10 +85,10 @@ void FunnelStringDialog::on_buttonBox_accepted()
     dialog_cb_(user_input, dialog_cb_data_);
 }
 
-void FunnelStringDialog::stringDialogNew(const QString title, const QStringList field_name_list, funnel_dlg_cb_t dialog_cb, void *dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free)
+void FunnelStringDialog::stringDialogNew(QWidget *parent, const QString title, QList<QPair<QString, QString>> field_list, funnel_dlg_cb_t dialog_cb, void* dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free)
 {
-    FunnelStringDialog *fsd = new FunnelStringDialog(title, field_name_list, dialog_cb, dialog_cb_data, dialog_cb_data_free);
-    connect(&dialogHelper, SIGNAL(closeDialogs()), fsd, SLOT(close()));
+    FunnelStringDialog* fsd = new FunnelStringDialog(parent, title, field_list, dialog_cb, dialog_cb_data, dialog_cb_data_free);
+    connect(&dialog_helper_, &FunnelStringDialogHelper::closeDialogs, fsd, &FunnelStringDialog::close);
     fsd->show();
 }
 
@@ -96,29 +97,7 @@ void FunnelStringDialogHelper::emitCloseDialogs()
     emit closeDialogs();
 }
 
-void string_dialog_new(const gchar *title, const gchar **fieldnames, funnel_dlg_cb_t dialog_cb, void *dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free)
-{
-    QStringList field_name_list;
-    for (int i = 0; fieldnames[i]; i++) {
-        field_name_list << fieldnames[i];
-    }
-    FunnelStringDialog::stringDialogNew(title, field_name_list, dialog_cb, dialog_cb_data, dialog_cb_data_free);
-}
-
 void string_dialogs_close(void)
 {
-    dialogHelper.emitCloseDialogs();
+    dialog_helper_.emitCloseDialogs();
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

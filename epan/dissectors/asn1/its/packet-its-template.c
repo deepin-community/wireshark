@@ -33,6 +33,7 @@
  */
 #include "config.h"
 
+#include <math.h>
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/decode_as.h>
@@ -129,6 +130,7 @@ static int proto_its_mapemv1 = -1;
 static int proto_its_mapem = -1;
 static int proto_its_spatemv1 = -1;
 static int proto_its_spatem = -1;
+static int proto_its_cpm = -1;
 static int proto_addgrpc = -1;
 
 /*
@@ -356,6 +358,468 @@ find_subcause_from_cause(CauseCodeType_enum cause)
 
 #include "packet-its-fn.c"
 
+static void
+its_latitude_fmt(gchar *s, guint32 v)
+{
+  gint32 lat = (gint32)v;
+  if (lat == 900000001) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", lat);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%u°%u'%.3f\"%c (%d)",
+               abs(lat) / 10000000,
+               abs(lat) % 10000000 * 6 / 1000000,
+               abs(lat) % 10000000 * 6 % 1000000 * 6.0 / 100000.0,
+               (lat >= 0) ? 'N' : 'S',
+               lat);
+  }
+}
+
+static void
+its_longitude_fmt(gchar *s, guint32 v)
+{
+  gint32 lng = (gint32)v;
+  if (lng == 1800000001) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", lng);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%u°%u'%.3f\"%c (%d)",
+               abs(lng) / 10000000,
+               abs(lng) % 10000000 * 6 / 1000000,
+               abs(lng) % 10000000 * 6 % 1000000 * 6.0 / 100000.0,
+               (lng >= 0) ? 'E' : 'W',
+               lng);
+  }
+}
+
+static void
+its_altitude_fmt(gchar *s, guint32 v)
+{
+  gint32 alt = (gint32)v;
+  if (alt == 800001) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", alt);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", alt * 0.01, alt);
+  }
+}
+
+static void
+its_delta_latitude_fmt(gchar *s, guint32 v)
+{
+  gint32 lat = (gint32)v;
+  if (lat == 131072) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", lat);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%u°%u'%.3f\"%c (%d)",
+               abs(lat) / 10000000,
+               abs(lat) % 10000000 * 6 / 1000000,
+               abs(lat) % 10000000 * 6 % 1000000 * 6.0 / 100000.0,
+               (lat >= 0) ? 'N' : 'S',
+               lat);
+  }
+}
+
+static void
+its_delta_longitude_fmt(gchar *s, guint32 v)
+{
+  gint32 lng = (gint32)v;
+  if (lng == 131072) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", lng);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%u°%u'%.3f\"%c (%d)",
+               abs(lng) / 10000000,
+               abs(lng) % 10000000 * 6 / 1000000,
+               abs(lng) % 10000000 * 6 % 1000000 * 6.0 / 100000.0,
+               (lng >= 0) ? 'E' : 'W',
+               lng);
+  }
+}
+
+static void
+its_delta_altitude_fmt(gchar *s, guint32 v)
+{
+  gint32 alt = (gint32)v;
+  if (alt == 12800) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", alt);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", alt * 0.01, alt);
+  }
+}
+
+static void
+its_path_delta_time_fmt(gchar *s, guint32 v)
+{
+  gint32 dt = (gint32)v;
+  snprintf(s, ITEM_LABEL_LENGTH, "%.2fs (%d)", dt * 0.01, dt);
+}
+
+
+static void
+its_sax_length_fmt(gchar *s, guint32 v)
+{
+  if (v == 4095) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 4094) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", v * 0.01, v);
+  }
+}
+
+static void
+its_heading_value_fmt(gchar *s, guint32 v)
+{
+  const gchar *p = try_val_to_str(v, VALS(its_HeadingValue_vals));
+  if (p) {
+    snprintf(s, ITEM_LABEL_LENGTH, "%s (%d)", p, v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1f° (%d)", v * 0.1, v);
+  }
+}
+
+static void
+its_heading_confidence_fmt(gchar *s, guint32 v)
+{
+  if (v == 127) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 126) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1f° (%d)", v * 0.1, v);
+  }
+}
+
+static void
+its_speed_value_fmt(gchar *s, guint32 v)
+{
+  if (v == 0) {
+    snprintf(s, ITEM_LABEL_LENGTH, "standstill (%d)", v);
+  } else if (v == 16383) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else {
+    double vms = v * 0.01;
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm/s = %.1fkm/h (%d)",
+            vms, vms * 3.6, v);
+  }
+}
+
+static void
+its_speed_confidence_fmt(gchar *s, guint32 v)
+{
+  if (v == 127) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 126) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm/s (%d)", v * 0.01, v);
+  }
+}
+
+static void
+its_speed_limit_fmt(gchar *s, guint32 v)
+{
+  snprintf(s, ITEM_LABEL_LENGTH, "%dkm/h (%d)", v, v);
+}
+
+static void
+its_vehicle_length_value_fmt(gchar *s, guint32 v)
+{
+  if (v == 1023) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 1022) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fm (%d)", v * 0.1, v);
+  }
+}
+
+static void
+its_vehicle_width_fmt(gchar *s, guint32 v)
+{
+  if (v == 62) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 61) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fm (%d)", v * 0.1, v);
+  }
+}
+
+static void
+its_acceleration_value_fmt(gchar *s, guint32 v)
+{
+  gint32 acc = (gint32)v;
+  if (acc == 161) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fm/s² (%d)", acc * 0.1, acc);
+  }
+}
+
+static void
+its_acceleration_confidence_fmt(gchar *s, guint32 v)
+{
+  if (v == 102) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 101) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1fm/s² (%d)", v * 0.1, v);
+  }
+}
+
+static void
+its_curvature_value_fmt(gchar *s, guint32 v)
+{
+  gint32 curv = (gint32)v;
+  if (curv == 0) {
+    snprintf(s, ITEM_LABEL_LENGTH, "straight (%d)", v);
+  } else if (curv == 30001) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.3fm %s (%d)",
+               30000.0 / curv,
+               (curv > 0) ? "left" : "right",
+               curv);
+  }
+}
+
+static void
+its_yaw_rate_value_fmt(gchar *s, guint32 v)
+{
+  gint32 yaw = (gint32)v;
+  if (yaw == 0) {
+    snprintf(s, ITEM_LABEL_LENGTH, "straight (%d)", v);
+  } else if (yaw == 32767) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2f°/s %s (%d)",
+               yaw * 0.01,
+               (yaw > 0) ? "left" : "right",
+               yaw);
+  }
+}
+
+static void
+its_swa_value_fmt(gchar *s, guint32 v)
+{
+  gint32 swa = (gint32)v;
+  if (swa == 0) {
+    snprintf(s, ITEM_LABEL_LENGTH, "straight (%d)", v);
+  } else if (swa == 512) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1f° %s (%d)",
+               swa * 1.5,
+               (swa > 0) ? "left" : "right",
+               swa);
+  }
+}
+
+static void
+its_swa_confidence_fmt(gchar *s, guint32 v)
+{
+  if (v == 127) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 126) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1f° (%d)", v * 1.5, v);
+  }
+}
+
+static void
+dsrc_moi_fmt(gchar *s, guint32 v)
+{
+  if (v == 527040) {
+    snprintf(s, ITEM_LABEL_LENGTH, "invalid (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%ud %02u:%02u (%d)",
+            v / 1440, v % 1440 / 60, v % 60, v);
+  }
+}
+
+static void
+dsrc_dsecond_fmt(gchar *s, guint32 v)
+{
+  if (v == 65535) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if ((61000 <= v) && (v <= 65534)) {
+    snprintf(s, ITEM_LABEL_LENGTH, "reserved (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%02u.%03u (%d)",
+            v / 1000, v % 1000, v);
+  }
+}
+
+static void
+dsrc_time_mark_fmt(gchar *s, guint32 v)
+{
+  if (v == 36001) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unknown (%d)", v);
+  } else if (v == 36000) {
+    snprintf(s, ITEM_LABEL_LENGTH, "moreThanHour (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%02u:%02u.%u (%d)",
+            v / 600, v % 600 / 10, v % 10, v);
+  }
+}
+
+static void
+its_timestamp_fmt(gchar *s, guint64 v)
+{
+  time_t secs = v / 1000 + 1072915200 - 5;
+  struct tm *tm = gmtime(&secs);
+  snprintf(s, ITEM_LABEL_LENGTH, "%u-%02u-%02u %02u:%02u:%02u.%03u (%" PRIu64 ")",
+    tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, (guint32)(v % 1000), v
+  );
+}
+
+static void
+its_validity_duration_fmt(gchar *s, guint32 v)
+{
+  snprintf(s, ITEM_LABEL_LENGTH, "%02u:%02u:%02u (%d)",
+          v / 3600, v % 3600 / 60, v % 60, v);
+}
+
+static const value_string dsrc_TimeIntervalConfidence_vals[] = {
+  {   0, "21% probability" },
+  {   1, "36% probability" },
+  {   2, "47% probability" },
+  {   3, "56% probability" },
+  {   4, "62% probability" },
+  {   5, "68% probability" },
+  {   6, "73% probability" },
+  {   7, "77% probability" },
+  {   8, "81% probability" },
+  {   9, "85% probability" },
+  {  10, "88% probability" },
+  {  11, "91% probability" },
+  {  12, "94% probability" },
+  {  13, "96% probability" },
+  {  14, "98% probability" },
+  {  15, "10% probability" },
+  { 0, NULL }
+};
+
+static void
+dsrc_velocity_fmt(gchar *s, guint32 v)
+{
+  if (v == 8191) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else {
+    double vms = v * 0.02;
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm/s = %ukm/h (%d)",
+            vms, (int)lround(vms * 3.6), v);
+  }
+}
+
+static void
+dsrc_angle_fmt(gchar *s, guint32 v)
+{
+  snprintf(s, ITEM_LABEL_LENGTH, "%.2f° (%d)", v * 0.0125, v);
+}
+
+static void
+dsrc_delta_time_fmt(gchar *s, guint32 v)
+{
+  gint32 dt = (gint32)v;
+  if (dt == -122) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unknown (%d)", dt);
+  } else if (dt == -121) {
+    snprintf(s, ITEM_LABEL_LENGTH, "moreThanMinus20Minutes (%d)", dt);
+  } else if (dt == 121) {
+    snprintf(s, ITEM_LABEL_LENGTH, "moreThanPlus20Minutes (%d)", dt);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%s%d:%02u (%d)",
+            (dt < 0) ? "-" : "", abs(dt) / 6, abs(dt) % 6 * 10, dt);
+  }
+}
+
+static void
+cpm_general_confidence_fmt(gchar *s, guint32 v)
+{
+  if (v == 0) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unknown (%u)", v);
+  } else if (v == 101) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%u)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%u%% (%u)", v, v);
+  }
+}
+
+static void
+cpm_distance_value_fmt(gchar *s, guint32 v)
+{
+  gint32 sv = (gint32)v;
+  snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", sv * 0.01, sv);
+}
+
+static void
+cpm_distance_confidence_fmt(gchar *s, guint32 v)
+{
+  if (v == 102) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 101) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", v * 0.01, v);
+  }
+}
+
+static void
+cpm_speed_value_ext_fmt(gchar *s, guint32 v)
+{
+  gint32 sv = (gint32)v;
+  if (sv == 0) {
+    snprintf(s, ITEM_LABEL_LENGTH, "standstill (%d)", sv);
+  } else if (sv == 16383) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", sv);
+  } else {
+    double vms = sv * 0.01;
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm/s = %.1fkm/h (%d)",
+            vms, vms * 3.6, sv);
+  }
+}
+
+static void
+cpm_cartesian_angle_value_fmt(gchar *s, guint32 v)
+{
+  if (v == 3601) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1f° (%d)", v * 0.1, v);
+  }
+}
+
+static void
+cpm_angle_confidence_fmt(gchar *s, guint32 v)
+{
+  if (v == 127) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 126) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.1f° (%d)", v * 0.1, v);
+  }
+}
+
+static void
+cpm_object_dimension_value_fmt(gchar *s, guint32 v)
+{
+  snprintf(s, ITEM_LABEL_LENGTH, "%.1fm (%d)", v * 0.1, v);
+}
+
+static void
+cpm_object_dimension_confidence_fmt(gchar *s, guint32 v)
+{
+  if (v == 102) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 101) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", v * 0.01, v);
+  }
+}
+
 static int
 dissect_its_PDU(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
@@ -377,7 +841,7 @@ its_msgid_prompt(packet_info *pinfo, gchar *result)
 {
     guint32 msgid = GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, hf_its_messageID, pinfo->curr_layer_num));
 
-    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "MsgId (%s%u)", UTF8_RIGHTWARDS_ARROW, msgid);
+    snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "MsgId (%s%u)", UTF8_RIGHTWARDS_ARROW, msgid);
 }
 
 static gpointer
@@ -636,6 +1100,7 @@ void proto_register_its(void)
     proto_its_rtcmem = proto_register_protocol_in_name_only("ITS message - RTCMEM", "RTCMEM", "its.message.rtcmem", proto_its, FT_BYTES);
     proto_its_evcsn = proto_register_protocol_in_name_only("ITS message - EVCSN", "EVCSN", "its.message.evcsn", proto_its, FT_BYTES);
     proto_its_tistpg = proto_register_protocol_in_name_only("ITS message - TISTPG", "TISTPG", "its.message.tistpg", proto_its, FT_BYTES);
+    proto_its_cpm = proto_register_protocol_in_name_only("ITS message - CPM", "CPM", "its.message.cpm", proto_its, FT_BYTES);
 
     proto_addgrpc = proto_register_protocol_in_name_only("DSRC Addition Grp C (EU)", "ADDGRPC", "dsrc.addgrpc", proto_its, FT_BYTES);
 
@@ -649,7 +1114,7 @@ void proto_register_its(void)
 }
 
 #define BTP_SUBDISS_SZ 2
-#define BTP_PORTS_SZ   11
+#define BTP_PORTS_SZ   12
 
 #define ITS_CAM_PROT_VER 2
 #define ITS_CAM_PROT_VERv1 1
@@ -663,12 +1128,14 @@ void proto_register_its(void)
 #define ITS_IVIM_PROT_VER 2
 #define ITS_SREM_PROT_VER 2
 #define ITS_SSEM_PROT_VER 2
-#define ITS_RTCMEM_PROT_VER 2
+#define ITS_RTCMEM_PROT_VER 1
+#define ITS_TIS_TPG_PROT_VER 1
+#define ITS_CPM_PROT_VER 1
 
 void proto_reg_handoff_its(void)
 {
     const char *subdissector[BTP_SUBDISS_SZ] = { "btpa.port", "btpb.port" };
-    const guint16 ports[BTP_PORTS_SZ] = { ITS_WKP_DEN, ITS_WKP_CA, ITS_WKP_EVCSN, ITS_WKP_CHARGING, ITS_WKP_IVI, ITS_WKP_TPG, ITS_WKP_TLC_SSEM, ITS_WKP_GPC, ITS_WKP_TLC_SREM, ITS_WKP_RLT, ITS_WKP_TLM };
+    const guint16 ports[BTP_PORTS_SZ] = { ITS_WKP_DEN, ITS_WKP_CA, ITS_WKP_EVCSN, ITS_WKP_CHARGING, ITS_WKP_IVI, ITS_WKP_TPG, ITS_WKP_TLC_SSEM, ITS_WKP_GPC, ITS_WKP_TLC_SREM, ITS_WKP_RLT, ITS_WKP_TLM, ITS_WKP_CPS };
     int sdIdx, pIdx;
     dissector_handle_t its_handle_;
 
@@ -693,12 +1160,13 @@ void proto_reg_handoff_its(void)
     dissector_add_uint("its.msg_id", (ITS_MAPEM_PROT_VER << 16) + ITS_MAPEM,        create_dissector_handle( dissect_dsrc_MapData_PDU, proto_its_mapem ));
     dissector_add_uint("its.msg_id", (ITS_IVIM_PROT_VERv1 << 16) + ITS_IVIM,        create_dissector_handle( dissect_ivi_IviStructure_PDU, proto_its_ivimv1 ));
     dissector_add_uint("its.msg_id", (ITS_IVIM_PROT_VER << 16) + ITS_IVIM,          create_dissector_handle( dissect_ivi_IviStructure_PDU, proto_its_ivim ));
-    dissector_add_uint("its.msg_id", ITS_EV_RSR,            create_dissector_handle( dissect_evrsr_EV_RSR_MessageBody_PDU, proto_its_evrsr ));
+    dissector_add_uint("its.msg_id", ITS_EV_RSR,                                    create_dissector_handle( dissect_evrsr_EV_RSR_MessageBody_PDU, proto_its_evrsr ));
     dissector_add_uint("its.msg_id", (ITS_SREM_PROT_VER << 16) + ITS_SREM,          create_dissector_handle( dissect_dsrc_SignalRequestMessage_PDU, proto_its_srem ));
     dissector_add_uint("its.msg_id", (ITS_SSEM_PROT_VER << 16) + ITS_SSEM,          create_dissector_handle( dissect_dsrc_SignalStatusMessage_PDU, proto_its_ssem ));
     dissector_add_uint("its.msg_id", (ITS_RTCMEM_PROT_VER << 16) + ITS_RTCMEM,      create_dissector_handle( dissect_dsrc_RTCMcorrections_PDU, proto_its_rtcmem ));
-    dissector_add_uint("its.msg_id", ITS_EVCSN,             create_dissector_handle( dissect_evcsn_EVChargingSpotNotificationPOIMessage_PDU, proto_its_evcsn ));
-    dissector_add_uint("its.msg_id", ITS_TISTPGTRANSACTION, create_dissector_handle( dissect_tistpg_TisTpgTransaction_PDU, proto_its_tistpg ));
+    dissector_add_uint("its.msg_id", ITS_EVCSN,                                     create_dissector_handle( dissect_evcsn_EVChargingSpotNotificationPOIMessage_PDU, proto_its_evcsn ));
+    dissector_add_uint("its.msg_id", (ITS_TIS_TPG_PROT_VER << 16) + ITS_TISTPGTRANSACTION, create_dissector_handle( dissect_tistpg_TisTpgTransaction_PDU, proto_its_tistpg ));
+    dissector_add_uint("its.msg_id", (ITS_CPM_PROT_VER << 16) + ITS_CPM,            create_dissector_handle(dissect_cpm_CollectivePerceptionMessage_PDU, proto_its_cpm));
 
     /* Missing definitions: ITS_POI, ITS_SAEM */
 

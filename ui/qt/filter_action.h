@@ -1,4 +1,4 @@
-/* filter_action.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -56,6 +56,7 @@ public:
         ActionDirectionAnyFromB
     };
 
+    explicit FilterAction(QObject *parent, Action action, ActionType type, QString actionName);
     explicit FilterAction(QObject *parent, Action action, ActionType type, ActionDirection direction);
     explicit FilterAction(QObject *parent, Action action, ActionType type);
     explicit FilterAction(QObject *parent, Action action);
@@ -85,6 +86,8 @@ private:
     ActionType type_;
     ActionDirection direction_;
 
+    QString actionName_;
+
 private slots:
     void groupTriggered(QAction *);
     void copyActionTriggered();
@@ -92,16 +95,3 @@ private slots:
 };
 
 #endif // FILTER_ACTION_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -15,6 +15,8 @@
 #include <epan/prefs.h>
 #include <epan/crc32-tvb.h>
 #include <epan/expert.h>
+#include <epan/decode_as.h>
+#include <epan/proto_data.h>
 #include "packet-mpeg-sect.h"
 
 void proto_register_mpeg_sect(void);
@@ -65,12 +67,45 @@ enum {
     TID_SDT,
     TID_SDT_OTHER = 0x46,
     TID_BAT       = 0x4A,
-    TID_EIT       = 0x4E,
-    TID_EIT_OTHER,
+    TID_EIT_PF    = 0x4E,
+    TID_EIT_PF_OTHER,
+    TID_EIT_SC0   = 0x50,
+    TID_EIT_SC1,
+    TID_EIT_SC2,
+    TID_EIT_SC3,
+    TID_EIT_SC4,
+    TID_EIT_SC5,
+    TID_EIT_SC6,
+    TID_EIT_SC7,
+    TID_EIT_SC8,
+    TID_EIT_SC9,
+    TID_EIT_SCA,
+    TID_EIT_SCB,
+    TID_EIT_SCC,
+    TID_EIT_SCD,
+    TID_EIT_SCE,
+    TID_EIT_SCF,
+    TID_EIT_SC0_OTH = 0x60,
+    TID_EIT_SC1_OTH,
+    TID_EIT_SC2_OTH,
+    TID_EIT_SC3_OTH,
+    TID_EIT_SC4_OTH,
+    TID_EIT_SC5_OTH,
+    TID_EIT_SC6_OTH,
+    TID_EIT_SC7_OTH,
+    TID_EIT_SC8_OTH,
+    TID_EIT_SC9_OTH,
+    TID_EIT_SCA_OTH,
+    TID_EIT_SCB_OTH,
+    TID_EIT_SCC_OTH,
+    TID_EIT_SCD_OTH,
+    TID_EIT_SCE_OTH,
+    TID_EIT_SCF_OTH,
     TID_TDT       = 0x70,
     TID_RST,
     TID_ST,
-    TID_TOT
+    TID_TOT,
+    TID_SIT       = 0x7F
 };
 
 /* From ETSI EN 301 790 */
@@ -117,13 +152,46 @@ static const value_string mpeg_sect_table_id_vals[] = {
     { TID_SDT,         "Service Description Table (SDT), current network" },
     { TID_SDT_OTHER,   "Service Description (SDT), other network" },
     { TID_BAT,         "Bouquet Association Table (BAT)" },
-    { TID_EIT,         "Event Information Table (EIT), actual TS" },
-    { TID_EIT_OTHER,   "Event Information Table (EIT), other TS" },
+    { TID_EIT_PF,      "Event Information Table (EIT), present/following, actual TS" },
+    { TID_EIT_PF_OTHER,"Event Information Table (EIT), present/following, other TS" },
+    { TID_EIT_SC0,     "Event Information Table (EIT), schedule 0, actual TS" },
+    { TID_EIT_SC1,     "Event Information Table (EIT), schedule 1, actual TS" },
+    { TID_EIT_SC2,     "Event Information Table (EIT), schedule 2, actual TS" },
+    { TID_EIT_SC3,     "Event Information Table (EIT), schedule 3, actual TS" },
+    { TID_EIT_SC4,     "Event Information Table (EIT), schedule 4, actual TS" },
+    { TID_EIT_SC5,     "Event Information Table (EIT), schedule 5, actual TS" },
+    { TID_EIT_SC6,     "Event Information Table (EIT), schedule 6, actual TS" },
+    { TID_EIT_SC7,     "Event Information Table (EIT), schedule 7, actual TS" },
+    { TID_EIT_SC8,     "Event Information Table (EIT), schedule 8, actual TS" },
+    { TID_EIT_SC9,     "Event Information Table (EIT), schedule 9, actual TS" },
+    { TID_EIT_SCA,     "Event Information Table (EIT), schedule A, actual TS" },
+    { TID_EIT_SCB,     "Event Information Table (EIT), schedule B, actual TS" },
+    { TID_EIT_SCC,     "Event Information Table (EIT), schedule C, actual TS" },
+    { TID_EIT_SCD,     "Event Information Table (EIT), schedule D, actual TS" },
+    { TID_EIT_SCE,     "Event Information Table (EIT), schedule E, actual TS" },
+    { TID_EIT_SCF,     "Event Information Table (EIT), schedule F, actual TS" },
+    { TID_EIT_SC0_OTH, "Event Information Table (EIT), schedule 0, other TS" },
+    { TID_EIT_SC1_OTH, "Event Information Table (EIT), schedule 1, other TS" },
+    { TID_EIT_SC2_OTH, "Event Information Table (EIT), schedule 2, other TS" },
+    { TID_EIT_SC3_OTH, "Event Information Table (EIT), schedule 3, other TS" },
+    { TID_EIT_SC4_OTH, "Event Information Table (EIT), schedule 4, other TS" },
+    { TID_EIT_SC5_OTH, "Event Information Table (EIT), schedule 5, other TS" },
+    { TID_EIT_SC6_OTH, "Event Information Table (EIT), schedule 6, other TS" },
+    { TID_EIT_SC7_OTH, "Event Information Table (EIT), schedule 7, other TS" },
+    { TID_EIT_SC8_OTH, "Event Information Table (EIT), schedule 8, other TS" },
+    { TID_EIT_SC9_OTH, "Event Information Table (EIT), schedule 9, other TS" },
+    { TID_EIT_SCA_OTH, "Event Information Table (EIT), schedule A, other TS" },
+    { TID_EIT_SCB_OTH, "Event Information Table (EIT), schedule B, other TS" },
+    { TID_EIT_SCC_OTH, "Event Information Table (EIT), schedule C, other TS" },
+    { TID_EIT_SCD_OTH, "Event Information Table (EIT), schedule D, other TS" },
+    { TID_EIT_SCE_OTH, "Event Information Table (EIT), schedule E, other TS" },
+    { TID_EIT_SCF_OTH, "Event Information Table (EIT), schedule F, other TS" },
     { TID_TDT,         "Time and Date Table (TDT)" },
     { TID_RST,         "Running Status Table (RST)" },
     { TID_ST,          "Stuffing Table (ST)" },
     { TID_TOT,         "Time Offset Table (TOT)" },
     { TID_AIT,         "Application Information Table (AIT)" },
+    { TID_SIT,         "Selection Information Table (SIT)" },
     { TID_SCT,         "Superframe Composition Table (SCT)" },
     { TID_FCT,         "Frame Composition Table (FCT)" },
     { TID_TCT,         "Time-Slot Composition Table (TCT)" },
@@ -138,6 +206,17 @@ static const value_string mpeg_sect_table_id_vals[] = {
     { TID_FORBIDEN,    "Forbidden" },
     { 0, NULL }
 };
+
+static void mpeg_sect_prompt(packet_info *pinfo, gchar* result)
+{
+    snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Table ID %u as",
+        GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, proto_mpeg_sect, MPEG_SECT_TID_KEY)));
+}
+
+static gpointer mpeg_sect_value(packet_info *pinfo)
+{
+    return p_get_proto_data(pinfo->pool, pinfo, proto_mpeg_sect, MPEG_SECT_TID_KEY);
+}
 
 /* read a utc_time field in a tvb and write it to the utc_time struct
    the encoding of the field is according to DVB-SI specification, section 5.2.5
@@ -268,6 +347,7 @@ dissect_mpeg_sect(tvbuff_t *tvb, packet_info *pinfo,
         return 0;
 
     table_id = tvb_get_guint8(tvb, offset);
+    p_add_proto_data(pinfo->pool, pinfo, proto_mpeg_sect, MPEG_SECT_TID_KEY, GUINT_TO_POINTER(table_id));
 
     /* Check if a dissector can parse the current table */
     if (dissector_try_uint(mpeg_sect_tid_dissector_table, table_id, tvb, pinfo, tree))
@@ -336,6 +416,11 @@ proto_register_mpeg_sect(void)
         { &ei_mpeg_sect_crc, { "mpeg_sect.crc.invalid", PI_CHECKSUM, PI_WARN, "Invalid CRC", EXPFILL }},
     };
 
+    /* Decode As handling */
+    static build_valid_func mpeg_sect_da_build_value[1] = {mpeg_sect_value};
+    static decode_as_value_t mpeg_sect_da_values = {mpeg_sect_prompt, 1, mpeg_sect_da_build_value};
+    static decode_as_t mpeg_sect_da = {"mpeg_sect", "mpeg_sect.tid", 1, 0, &mpeg_sect_da_values, NULL, NULL, decode_as_default_populate_list, decode_as_default_reset, decode_as_default_change, NULL};
+
     module_t *mpeg_sect_module;
     expert_module_t* expert_mpeg_sect;
 
@@ -359,6 +444,7 @@ proto_register_mpeg_sect(void)
                                  "MPEG SECT Table ID",
                                  proto_mpeg_sect, FT_UINT8, BASE_HEX);
 
+    register_decode_as(&mpeg_sect_da);
 }
 
 /*

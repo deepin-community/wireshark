@@ -34,10 +34,13 @@ macro(set_extcap_executable_properties _executable)
 		FOLDER "Executables/Extcaps"
 		INSTALL_RPATH "${EXTCAP_INSTALL_RPATH}"
 	)
+	if(MSVC)
+		set_target_properties(${_executable} PROPERTIES LINK_FLAGS_DEBUG "${WS_MSVC_DEBUG_LINK_FLAGS}")
+	endif()
 
 	set(PROGLIST ${PROGLIST} ${_executable})
 
-	if(WIN32)
+	if(MSVC)
 		set_target_properties(${_executable} PROPERTIES
 			RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/run/extcap
 			RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/run/Debug/extcap
@@ -70,6 +73,12 @@ macro(set_extcap_executable_properties _executable)
 			endif()
 		endif()
 	endif()
+
+	if (MINGW)
+		set_target_properties(${_executable} PROPERTIES
+			LINK_OPTIONS -municode
+		)
+	endif()
 endmacro()
 
 add_custom_target(extcaps)
@@ -90,7 +99,6 @@ if(BUILD_androiddump)
 				ui
 				wiretap
 				wsutil
-				${GLIB2_LIBRARIES}
 				${WIN_WS2_32_LIBRARY}
 				$<$<BOOL:${PCAP_FOUND}>:pcap::pcap>
 			)
@@ -102,7 +110,6 @@ if(BUILD_androiddump)
 			ui
 			wiretap
 			wsutil
-			${GLIB2_LIBRARIES}
 			${ZLIB_LIBRARIES}
 			${CMAKE_DL_LIBS}
 			${WIN_WS2_32_LIBRARY}
@@ -125,7 +132,6 @@ endif()
 if(BUILD_sshdump AND LIBSSH_FOUND)
 	set(sshdump_LIBS
 		wsutil
-		${GLIB2_LIBRARIES}
 		${CMAKE_DL_LIBS}
 		${WIN_WS2_32_LIBRARY}
 		${LIBSSH_LIBRARIES}
@@ -152,7 +158,6 @@ if(BUILD_ciscodump AND LIBSSH_FOUND)
 	set(ciscodump_LIBS
 		writecap
 		wsutil
-		${GLIB2_LIBRARIES}
 		${CMAKE_DL_LIBS}
 		${WIN_WS2_32_LIBRARY}
 		${LIBSSH_LIBRARIES}
@@ -175,12 +180,37 @@ elseif (BUILD_ciscodump)
 	#message( WARNING "Cannot find libssh, cannot build ciscodump" )
 endif()
 
+if(BUILD_wifidump AND LIBSSH_FOUND)
+	set(wifidump_LIBS
+		writecap
+		wsutil
+		${CMAKE_DL_LIBS}
+		${WIN_WS2_32_LIBRARY}
+		${LIBSSH_LIBRARIES}
+	)
+	set(wifidump_FILES
+		$<TARGET_OBJECTS:cli_main>
+		$<TARGET_OBJECTS:extcap-base>
+		$<TARGET_OBJECTS:ssh-base>
+		wifidump.c
+	)
+
+	set_executable_resources(wifidump "Wifidump")
+	add_executable(wifidump ${wifidump_FILES})
+	set_extcap_executable_properties(wifidump)
+	target_link_libraries(wifidump ${wifidump_LIBS})
+	target_include_directories(wifidump SYSTEM PRIVATE ${LIBSSH_INCLUDE_DIRS})
+	install(TARGETS wifidump RUNTIME DESTINATION ${EXTCAP_INSTALL_LIBDIR})
+	add_dependencies(extcaps wifidump)
+elseif (BUILD_wifidump)
+	#message( WARNING "Cannot find libssh, cannot build wifidump" )
+endif()
+
 if(BUILD_dpauxmon AND HAVE_LIBNL3)
 	set(dpauxmon_LIBS
-		${GLIB2_LIBRARIES}
-		${CMAKE_DL_LIBS}
 		wsutil
 		writecap
+		${CMAKE_DL_LIBS}
 		${NL_LIBRARIES}
 	)
 	set(dpauxmon_FILES
@@ -202,7 +232,6 @@ endif()
 if(BUILD_udpdump)
 	set(udpdump_LIBS
 		wsutil
-		${GLIB2_LIBRARIES}
 		${CMAKE_DL_LIBS}
 		${WIN_WS2_32_LIBRARY}
 		wsutil
@@ -227,7 +256,6 @@ if(BUILD_randpktdump)
 		randpkt_core
 		wiretap
 		wsutil
-		${GLIB2_LIBRARIES}
 		${ZLIB_LIBRARIES}
 		${CMAKE_DL_LIBS}
 		${WIN_WS2_32_LIBRARY}
@@ -246,15 +274,44 @@ if(BUILD_randpktdump)
 	add_dependencies(extcaps randpktdump)
 endif()
 
+
+if(BUILD_etwdump AND WIN32)
+	set(etwdump_LIBS
+		wiretap
+		wsutil
+		tdh
+		wevtapi
+		rpcrt4
+		${ZLIB_LIBRARIES}
+		${CMAKE_DL_LIBS}
+		${WIN_WS2_32_LIBRARY}
+	)
+	set(etwdump_FILES
+		$<TARGET_OBJECTS:cli_main>
+		$<TARGET_OBJECTS:extcap-base>
+		etwdump.c
+		etl.c
+		etw_message.c
+		etw_ndiscap.c
+	)
+
+	set_executable_resources(etwdump "etwdump")
+	add_executable(etwdump ${etwdump_FILES})
+	set_extcap_executable_properties(etwdump)
+	target_link_libraries(etwdump ${etwdump_LIBS})
+	install(TARGETS etwdump RUNTIME DESTINATION ${EXTCAP_INSTALL_LIBDIR})
+	add_dependencies(extcaps etwdump)
+endif()
+
 if(BUILD_sdjournal AND SYSTEMD_FOUND)
 	set(sdjournal_LIBS
 		wiretap
 		writecap
 		wsutil
-		${GLIB2_LIBRARIES}
 		${ZLIB_LIBRARIES}
 		${CMAKE_DL_LIBS}
 		${SYSTEMD_LIBRARIES}
+		${GCRYPT_LIBRARIES}
 	)
 	set(sdjournal_FILES
 		$<TARGET_OBJECTS:extcap-base>

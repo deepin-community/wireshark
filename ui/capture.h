@@ -1,4 +1,5 @@
-/* capture.h
+/** @file
+ *
  * Definitions for packet capture windows
  *
  * Wireshark - Network traffic analyzer
@@ -20,7 +21,7 @@
 #include "capture_opts.h"
 #include "capture_info.h"
 #include "cfile.h"
-#include "capchild/capture_session.h"
+#include "capture/capture_session.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,13 +61,17 @@ capture_input_init(capture_session *cap_session, capture_file *cf);
  * Start a capture session.
  *
  * @param capture_opts the numerous capture options
+ * @param capture_comments if not NULL, a GPtrArray * to a set of comments
+ *  to put in the capture file's Section Header Block if it's a pcapng file
  * @param cap_session the handle for the capture session
  * @param cap_data a struct with capture info data
  * @param update_cb update screen
  * @return TRUE if the capture starts successfully, FALSE otherwise.
  */
 extern gboolean
-capture_start(capture_options *capture_opts, capture_session *cap_session, info_data_t* cap_data, void(*update_cb)(void));
+capture_start(capture_options *capture_opts, GPtrArray *capture_comments,
+              capture_session *cap_session, info_data_t* cap_data,
+              void(*update_cb)(void));
 
 /** Stop a capture session (usually from a menu item). */
 extern void
@@ -102,16 +107,3 @@ void capture_stat_stop(if_stat_cache_t *sc);
 #endif /* __cplusplus */
 
 #endif /* capture.h */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

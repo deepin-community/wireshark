@@ -17,6 +17,8 @@
 #include "epan/funnel.h"
 #include "epan/prefs.h"
 
+#include <wsutil/wslog.h>
+
 #include "ui/progress_dlg.h"
 #include "ui/simple_dialog.h"
 
@@ -30,14 +32,17 @@
 #include <QDesktopServices>
 #include <QUrl>
 
-#include "wireshark_application.h"
+#include "main_application.h"
 
 // To do:
 // - Handle menu paths. Do we create a new path (GTK+) or use the base element?
 // - Add a FunnelGraphDialog class?
 
 extern "C" {
-static void funnel_statistics_logger(const gchar *, GLogLevelFlags, const gchar *message, gpointer);
+static struct _funnel_text_window_t* text_window_new(funnel_ops_id_t *ops_id, const char* title);
+static void string_dialog_new(funnel_ops_id_t *ops_id, const gchar* title, const gchar** field_names, const gchar** field_values, funnel_dlg_cb_t dialog_cb, void* dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free);
+
+static void funnel_statistics_logger(const gchar *, enum ws_log_level, const gchar *message, gpointer);
 static void funnel_statistics_retap_packets(funnel_ops_id_t *ops_id);
 static void funnel_statistics_copy_to_clipboard(GString *text);
 static const gchar *funnel_statistics_get_filter(funnel_ops_id_t *ops_id);
@@ -46,6 +51,7 @@ static gchar* funnel_statistics_get_color_filter_slot(guint8 filter_num);
 static void funnel_statistics_set_color_filter_slot(guint8 filter_num, const gchar* filter_string);
 static gboolean funnel_statistics_open_file(funnel_ops_id_t *ops_id, const char* fname, const char* filter, char**);
 static void funnel_statistics_reload_packets(funnel_ops_id_t *ops_id);
+static void funnel_statistics_redissect_packets(funnel_ops_id_t *ops_id);
 static void funnel_statistics_reload_lua_plugins(funnel_ops_id_t *ops_id);
 static void funnel_statistics_apply_filter(funnel_ops_id_t *ops_id);
 static gboolean browser_open_url(const gchar *url);
@@ -138,6 +144,7 @@ FunnelStatistics::FunnelStatistics(QObject *parent, CaptureFile &cf) :
     funnel_ops_->set_color_filter_slot = funnel_statistics_set_color_filter_slot;
     funnel_ops_->open_file = funnel_statistics_open_file;
     funnel_ops_->reload_packets = funnel_statistics_reload_packets;
+    funnel_ops_->redissect_packets = funnel_statistics_redissect_packets;
     funnel_ops_->reload_lua_plugins = funnel_statistics_reload_lua_plugins;
     funnel_ops_->apply_filter = funnel_statistics_apply_filter;
     funnel_ops_->browser_open_url = browser_open_url;
@@ -186,9 +193,15 @@ void FunnelStatistics::reloadPackets()
     capture_file_.reload();
 }
 
+void FunnelStatistics::redissectPackets()
+{
+    // This will trigger a packet redissection.
+    mainApp->emitAppSignal(MainApplication::PacketDissectionChanged);
+}
+
 void FunnelStatistics::reloadLuaPlugins()
 {
-    wsApp->reloadLuaPluginsDelayed();
+    mainApp->reloadLuaPluginsDelayed();
 }
 
 void FunnelStatistics::emitApplyDisplayFilter()
@@ -214,14 +227,31 @@ void FunnelStatistics::displayFilterTextChanged(const QString &filter)
     display_filter_ = filter.toUtf8();
 }
 
+struct _funnel_text_window_t* text_window_new(funnel_ops_id_t *ops_id, const char* title)
+{
+    return FunnelTextDialog::textWindowNew(qobject_cast<QWidget *>(ops_id->funnel_statistics->parent()), title);
+}
 
-/* The GTK+ code says "finish this." We shall follow its lead */
-// XXX Finish this.
-void funnel_statistics_logger(const gchar *,
-                          GLogLevelFlags,
+void string_dialog_new(funnel_ops_id_t *ops_id, const gchar* title, const gchar** field_names, const gchar** field_values, funnel_dlg_cb_t dialog_cb, void* dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free)
+{
+    QList<QPair<QString, QString>> field_list;
+    for (int i = 0; field_names[i]; i++) {
+        QPair<QString, QString> field = QPair<QString, QString>(QString(field_names[i]), QString(""));
+        if (field_values != NULL && field_values[i])
+        {
+            field.second = QString(field_values[i]);
+        }
+
+        field_list << field;
+    }
+    FunnelStringDialog::stringDialogNew(qobject_cast<QWidget *>(ops_id->funnel_statistics->parent()), title, field_list, dialog_cb, dialog_cb_data, dialog_cb_data_free);
+}
+
+void funnel_statistics_logger(const gchar *log_domain,
+                          enum ws_log_level log_level,
                           const gchar *message,
                           gpointer) {
-    fputs(message, stderr);
+    ws_log(log_domain, log_level, "%s", message);
 }
 
 void funnel_statistics_retap_packets(funnel_ops_id_t *ops_id) {
@@ -231,7 +261,7 @@ void funnel_statistics_retap_packets(funnel_ops_id_t *ops_id) {
 }
 
 void funnel_statistics_copy_to_clipboard(GString *text) {
-    wsApp->clipboard()->setText(text->str);
+    mainApp->clipboard()->setText(text->str);
 }
 
 const gchar *funnel_statistics_get_filter(funnel_ops_id_t *ops_id) {
@@ -276,6 +306,12 @@ void funnel_statistics_reload_packets(funnel_ops_id_t *ops_id) {
     ops_id->funnel_statistics->reloadPackets();
 }
 
+void funnel_statistics_redissect_packets(funnel_ops_id_t *ops_id) {
+    if (!ops_id || !ops_id->funnel_statistics) return;
+
+    ops_id->funnel_statistics->redissectPackets();
+}
+
 void funnel_statistics_reload_lua_plugins(funnel_ops_id_t *ops_id) {
     if (!ops_id || !ops_id->funnel_statistics) return;
 
@@ -312,17 +348,19 @@ void progress_window_destroy(progdlg *progress_dialog) {
 
 extern "C" {
 
+void register_tap_listener_qt_funnel(void);
+
 static void register_menu_cb(const char *name,
                              register_stat_group_t group,
                              funnel_menu_callback callback,
                              gpointer callback_data,
                              gboolean retap)
 {
-    FunnelAction *funnel_action = new FunnelAction(name, callback, callback_data, retap, wsApp);
+    FunnelAction *funnel_action = new FunnelAction(name, callback, callback_data, retap, mainApp);
     if (menus_registered) {
-        wsApp->appendDynamicMenuGroupItem(group, funnel_action);
+        mainApp->appendDynamicMenuGroupItem(group, funnel_action);
     } else {
-        wsApp->addDynamicMenuGroupItem(group, funnel_action);
+        mainApp->addDynamicMenuGroupItem(group, funnel_action);
     }
     if (!funnel_actions_.contains(group)) {
         funnel_actions_[group] = QList<FunnelAction *>();
@@ -339,7 +377,7 @@ static void deregister_menu_cb(funnel_menu_callback callback)
             if (funnel_action->callback() == callback) {
                 // Must set back to title to find the correct sub-menu in Tools
                 funnel_action->setText(funnel_action->title());
-                wsApp->removeDynamicMenuGroupItem(group, funnel_action);
+                mainApp->removeDynamicMenuGroupItem(group, funnel_action);
                 it = funnel_actions_[group].erase(it);
             } else {
                 ++it;
@@ -362,16 +400,3 @@ funnel_statistics_reload_menus(void)
 }
 
 } // extern "C"
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

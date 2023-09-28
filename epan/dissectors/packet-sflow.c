@@ -273,6 +273,7 @@ static value_string_ext sflow_5_flow_record_type_ext = VALUE_STRING_EXT_INIT(sfl
 #define SFLOW_5_100BASE_VG_INTERFACE 4
 #define SFLOW_5_VLAN 5
 #define SFLOW_5_80211_COUNTERS 6
+#define SFLOW_5_LAG 7
 #define SFLOW_5_PROCESSOR 1001
 #define SFLOW_5_RADIO_UTILIZATION 1002
 
@@ -282,6 +283,7 @@ static const value_string sflow_5_counters_record_type[] = {
     { SFLOW_5_TOKEN_RING,           "Token ring counters"},
     { SFLOW_5_100BASE_VG_INTERFACE, "100 Base VG interface counters"},
     { SFLOW_5_VLAN,                 "VLAN counters"},
+    { SFLOW_5_LAG,                  "LAG counters"},
     { SFLOW_5_80211_COUNTERS,       "IEEE 802.11 counters"},
     { SFLOW_5_PROCESSOR,            "Processor information"},
     { SFLOW_5_RADIO_UTILIZATION,    "Radio utilization"},
@@ -598,8 +600,8 @@ static int hf_sflow_5_extended_80211_tx_retransmissions = -1;
 static int hf_sflow_5_extended_80211_rx_version = -1;
 static int hf_sflow_flow_sample_dropped_packets = -1;
 static int hf_sflow_counters_sample_expanded_source_id_index = -1;
-static int hf_sflow_245_header_payload_removed = -1;
-static int hf_sflow_245_original_packet_header_length = -1;
+static int hf_sflow_245_header_payload_stripped = -1;
+static int hf_sflow_245_sampled_header_length = -1;
 static int hf_sflow_245_ethernet_destination_mac_address = -1;
 static int hf_sflow_counters_sample_source_id_class = -1;
 static int hf_sflow_5_extended_url_url_length = -1;
@@ -627,6 +629,7 @@ static int hf_sflow_5_extended_url_direction = -1;
 static int hf_sflow_5_extended_mpls_ftn_description = -1;
 static int hf_sflow_245_ip_protocol = -1;
 
+static int hf_sflow_lag_port_padding = -1;
 static int hf_sflow_lag_port_actorsystemid = -1;
 static int hf_sflow_lag_port_partneropersystemid = -1;
 static int hf_sflow_lag_port_attachedaggid = -1;
@@ -636,6 +639,10 @@ static int hf_sflow_lag_port_actoroperstate = -1;
 static int hf_sflow_lag_port_partneradminstate = -1;
 static int hf_sflow_lag_port_partneroperstate = -1;
 static int hf_sflow_lag_port_reserved = -1;
+static int hf_sflow_5_lag_port_actoradminstate = -1;
+static int hf_sflow_5_lag_port_actoroperstate = -1;
+static int hf_sflow_5_lag_port_partneradminstate = -1;
+static int hf_sflow_5_lag_port_partneroperstate = -1;
 static int hf_sflow_lag_port_stats_lacpdusrx = -1;
 static int hf_sflow_lag_port_stats_markerpdusrx = -1;
 static int hf_sflow_lag_port_stats_markerresponsepdusrx = -1;
@@ -692,11 +699,11 @@ dissect_sflow_245_sampled_header(tvbuff_t *tvb, packet_info *pinfo,
     offset += 4;
 
     if (version == 5) {
-        proto_tree_add_item(tree, hf_sflow_245_header_payload_removed, tvb, offset, 4, ENC_BIG_ENDIAN);
+        proto_tree_add_item(tree, hf_sflow_245_header_payload_stripped, tvb, offset, 4, ENC_BIG_ENDIAN);
         offset += 4;
     }
 
-    proto_tree_add_item_ret_uint(tree, hf_sflow_245_original_packet_header_length, tvb, offset, 4, ENC_BIG_ENDIAN, &header_length);
+    proto_tree_add_item_ret_uint(tree, hf_sflow_245_sampled_header_length, tvb, offset, 4, ENC_BIG_ENDIAN, &header_length);
     offset += 4;
 
     if (header_length % 4) /* XDR requires 4-byte alignment */
@@ -1849,6 +1856,50 @@ dissect_sflow_5_vlan(proto_tree *counter_data_tree, tvbuff_t *tvb, gint offset) 
     return offset;
 }
 
+static int * const sflow_5_lag_port_state_flags[] = {
+    &hf_sflow_5_lag_port_actoradminstate,
+    &hf_sflow_5_lag_port_actoroperstate,
+    &hf_sflow_5_lag_port_partneradminstate,
+    &hf_sflow_5_lag_port_partneroperstate,
+    NULL
+};
+
+static gint
+dissect_sflow_5_lag(proto_tree *counter_data_tree, tvbuff_t *tvb, gint offset) {
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_actorsystemid, tvb, offset, 6, ENC_NA);
+    offset += 6;
+    /* XDR requires 4-byte alignment */
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_padding, tvb, offset, 2, ENC_NA);
+    offset += 2;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_partneropersystemid, tvb, offset, 6, ENC_NA);
+    offset += 6;
+    /* XDR requires 4-byte alignment */
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_padding, tvb, offset, 2, ENC_NA);
+    offset += 2;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_attachedaggid, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+    proto_tree_add_bitmask(counter_data_tree, tvb, offset, hf_sflow_lag_port_state, ett_sflow_lag_port_state_flags, sflow_5_lag_port_state_flags, ENC_BIG_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_stats_lacpdusrx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_stats_markerpdusrx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_stats_markerresponsepdusrx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_stats_unknownrx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_stats_illegalrx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_stats_lacpdustx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_stats_markerpdustx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+    proto_tree_add_item(counter_data_tree, hf_sflow_lag_port_stats_markerresponsepdustx, tvb, offset, 4, ENC_BIG_ENDIAN);
+    offset += 4;
+
+    return offset;
+}
+
 /* dissect 802.11 counters */
 static gint
 dissect_sflow_5_80211_counters(proto_tree *counter_data_tree, tvbuff_t *tvb, gint offset) {
@@ -1969,6 +2020,9 @@ dissect_sflow_5_counters_record(tvbuff_t *tvb, proto_tree *tree, gint offset) {
                 break;
             case SFLOW_5_VLAN:
                 offset = dissect_sflow_5_vlan(counter_data_tree, tvb, offset);
+                break;
+            case SFLOW_5_LAG:
+                offset = dissect_sflow_5_lag(counter_data_tree, tvb, offset);
                 break;
             case SFLOW_5_80211_COUNTERS:
                 offset = dissect_sflow_5_80211_counters(counter_data_tree, tvb, offset);
@@ -2255,7 +2309,6 @@ static int * const sflow_lag_port_state_flags[] = {
     NULL
 };
 
-
 /* dissect an LAG Port Stats ( http://www.sflow.org/sflow_lag.txt ) */
 static void
 dissect_sflow_5_lag_port_stats(tvbuff_t *tvb, proto_tree *tree, gint offset, proto_item *parent _U_) {
@@ -2444,7 +2497,7 @@ dissect_sflow_245(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
             break;
         case ADDR_TYPE_IPV4:
         case ADDR_TYPE_IPV6:
-            col_append_fstr(pinfo->cinfo, COL_INFO, ", agent %s", address_to_str(wmem_packet_scope(), &addr_details));
+            col_append_fstr(pinfo->cinfo, COL_INFO, ", agent %s", address_to_str(pinfo->pool, &addr_details));
             break;
     }
 
@@ -2460,7 +2513,7 @@ dissect_sflow_245(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
     offset += 4;
     uptime = tvb_get_ntohl(tvb, offset);
     proto_tree_add_uint_format_value(sflow_245_tree, hf_sflow_245_sysuptime, tvb, offset, 4, uptime, "%s (%ums)",
-        unsigned_time_secs_to_str(wmem_packet_scope(), uptime / 1000), uptime);
+        unsigned_time_secs_to_str(pinfo->pool, uptime / 1000), uptime);
     offset += 4;
     numsamples = tvb_get_ntohl(tvb, offset);
     col_append_fstr(pinfo->cinfo, COL_INFO, ", %u samples", numsamples);
@@ -3066,13 +3119,13 @@ proto_register_sflow(void) {
           FT_UINT32, BASE_DEC, NULL, 0x0,
           NULL, HFILL }
       },
-      { &hf_sflow_245_header_payload_removed,
-        { "Payload removed", "sflow_245.header.payload_removed",
+      { &hf_sflow_245_header_payload_stripped,
+        { "Payload stripped", "sflow_245.header.payload_stripped",
           FT_UINT32, BASE_DEC, NULL, 0x0,
           NULL, HFILL }
       },
-      { &hf_sflow_245_original_packet_header_length,
-        { "Original packet length", "sflow_245.header.original_packet_header_length",
+      { &hf_sflow_245_sampled_header_length,
+        { "Sampled header length", "sflow_245.header.sampled_header_length",
           FT_UINT32, BASE_DEC, NULL, 0x0,
           NULL, HFILL }
       },
@@ -3526,7 +3579,11 @@ proto_register_sflow(void) {
           FT_UINT32, BASE_DEC, NULL, 0x0,
           NULL, HFILL }
       },
-
+      { &hf_sflow_lag_port_padding,
+        { "Padding", "sflow.lag_port.padding",
+          FT_BYTES, BASE_NONE, NULL, 0x0,
+          NULL, HFILL }
+      },
       { &hf_sflow_lag_port_actorsystemid,
         { "Actor System ID", "sflow.lag_port.actor_system_id",
           FT_ETHER, BASE_NONE, NULL, 0x0,
@@ -3570,6 +3627,26 @@ proto_register_sflow(void) {
       { &hf_sflow_lag_port_reserved,
         { "Reserved", "sflow.lag_port.reserved",
           FT_UINT32, BASE_HEX, NULL, 0xFFFFFFF0,
+          NULL, HFILL }
+      },
+      { &hf_sflow_5_lag_port_actoradminstate,
+        { "Actor Admin State", "sflow.lag_port.actor_admin_state",
+          FT_BOOLEAN, 32, NULL, 0x000000FF,
+          NULL, HFILL }
+      },
+      { &hf_sflow_5_lag_port_actoroperstate,
+        { "Actor Oper State", "sflow.lag_port.actor_oper_state",
+          FT_BOOLEAN, 32, NULL, 0x0000FF00,
+          NULL, HFILL }
+      },
+      { &hf_sflow_5_lag_port_partneradminstate,
+        { "Partner Admin State", "sflow.lag_port.partner_admin_state",
+          FT_BOOLEAN, 32, NULL, 0x00FF0000,
+          NULL, HFILL }
+      },
+      { &hf_sflow_5_lag_port_partneroperstate,
+        { "Partner Oper State", "sflow.lag_port.partner_oper_state",
+          FT_BOOLEAN, 32, NULL, 0xFF000000,
           NULL, HFILL }
       },
       { &hf_sflow_lag_port_stats_lacpdusrx,

@@ -1,4 +1,4 @@
-/* tap.h
+/** @file
  * packet tap interface   2002 Ronnie Sahlberg
  *
  * Wireshark - Network traffic analyzer
@@ -14,9 +14,6 @@
 #include <epan/epan.h>
 #include <epan/packet_info.h>
 #include "ws_symbol_export.h"
-#ifdef HAVE_PLUGINS
-#include "wsutil/plugins.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,40 +28,53 @@ typedef enum {
 	TAP_PACKET_FAILED	/**< Packet processing failed, stop calling this tap */
 } tap_packet_status;
 
+typedef guint tap_flags_t;
+
 typedef void (*tap_reset_cb)(void *tapdata);
-typedef tap_packet_status (*tap_packet_cb)(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const void *data);
+typedef tap_packet_status (*tap_packet_cb)(void *tapdata, packet_info *pinfo, epan_dissect_t *edt, const void *data, tap_flags_t flags);
 typedef void (*tap_draw_cb)(void *tapdata);
 typedef void (*tap_finish_cb)(void *tapdata);
 
 /**
  * Flags to indicate what a tap listener's packet routine requires.
  */
-#define TL_REQUIRES_NOTHING	0x00000000	        /**< nothing */
-#define TL_REQUIRES_PROTO_TREE	0x00000001	    /**< full protocol tree */
-#define TL_REQUIRES_COLUMNS	0x00000002	        /**< columns */
-#define TL_REQUIRES_ERROR_PACKETS	0x00000004	/**< include packet even if pinfo->flags.in_error_pkt is set */
-/** Flags to indicate what the tap listener does */
-#define TL_IS_DISSECTOR_HELPER	0x00000008	    /**< tap helps a dissector do work
-						                         ** but does not, itself, require dissection */
+#define TL_REQUIRES_NOTHING         0x00000000	    /**< nothing */
+#define TL_REQUIRES_PROTO_TREE      0x00000001	    /**< full protocol tree */
+#define TL_REQUIRES_COLUMNS         0x00000002	    /**< columns */
+#define TL_REQUIRES_ERROR_PACKETS   0x00000004	    /**< include packet even if pinfo->flags.in_error_pkt is set */
 
-#ifdef HAVE_PLUGINS
+/** Flags to indicate what the tap listener does */
+#define TL_IS_DISSECTOR_HELPER      0x00000008	    /**< tap helps a dissector do work
+						                             ** but does not, itself, require dissection */
+
+/** Flags to indicate what the packet cb should do */
+#define TL_IGNORE_DISPLAY_FILTER    0x00000010      /**< use packet, even if it woul dbe filtered out */
+#define TL_DISPLAY_FILTER_IGNORED   0x00100000      /**< flag for the conversation handler */
+
 typedef struct {
 	void (*register_tap_listener)(void);   /* routine to call to register tap listener */
 } tap_plugin;
 
 /** Register tap plugin with the plugin system. */
 WS_DLL_PUBLIC void tap_register_plugin(const tap_plugin *plug);
-#endif
 
 /*
- * For all tap plugins, call their register routines.
- * Must be called after plugins_init(), and must be called only once in
- * a program.
+ * Entry in the table of built-in taps to register.
+ */
+typedef struct _tap_reg {
+    const char *cb_name;
+    void (*cb_func)(void);
+} tap_reg_t;
+
+/*
+ * For all taps, call their register routines.
+ * Must be called after plugins_init(), if plugins are supported,
+ * and must be called only once in a program.
  *
  * XXX - should probably be handled by epan_init(), as the tap mechanism
  * is part of libwireshark.
  */
-WS_DLL_PUBLIC void register_all_plugin_tap_listeners(void);
+WS_DLL_PUBLIC void register_all_tap_listeners(tap_reg_t *tap_reg_listeners);
 
 extern void tap_init(void);
 

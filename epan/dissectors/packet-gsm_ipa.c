@@ -136,6 +136,7 @@ static const value_string ipaccess_msgtype_vals[] = {
 	{ 0x08,		"PROXY REQUEST" },
 	{ 0x09,		"PROXY ACK" },
 	{ 0x0a,		"PROXY NACK" },
+	{ 0x0b,		"SSL INFO" },
 	{ 0,		NULL }
 };
 
@@ -149,6 +150,10 @@ static const value_string ipaccess_idtag_vals[] = {
 	{ 0x06,		"IP Address" },
 	{ 0x07,		"MAC Address" },
 	{ 0x08,		"Unit ID" },
+	{ 0x09,		"User Name" },
+	{ 0x0a,		"Password" },
+	{ 0x0b,		"Access Class" },
+	{ 0x0c,		"Application Protocol Version" },
 	{ 0,		NULL }
 };
 
@@ -180,7 +185,7 @@ dissect_ipa_attr(tvbuff_t *tvb, int base_offs, proto_tree *tree)
 			proto_tree_add_item(tree, hf_ipaccess_attr_tag,
 					    tvb, offset+2, 1, ENC_BIG_ENDIAN);
 			proto_tree_add_item(tree, hf_ipaccess_attr_string,
-					    tvb, offset+3, len-1, ENC_ASCII|ENC_NA);
+					    tvb, offset+3, len-1, ENC_ASCII);
 			break;
 		case 0x01:	/* a single-byte request for a certain attr */
 			len = 0;
@@ -254,7 +259,7 @@ dissect_osmo(tvbuff_t *tvb, packet_info *pinfo, proto_tree *ipatree, proto_tree 
 		return 1;
 	/* Simply display the CTRL data as text */
 	} else if (osmo_proto == IPAC_PROTO_EXT_CTRL) {
-		proto_tree_add_item(tree, hf_ipa_osmo_ctrl_data, next_tvb, 0, -1, ENC_ASCII|ENC_NA);
+		proto_tree_add_item(tree, hf_ipa_osmo_ctrl_data, next_tvb, 0, -1, ENC_ASCII);
 		return 1;
 	}
 
@@ -344,13 +349,13 @@ dissect_ipa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gboolean is_udp
 			break;
 		case HSL_DEBUG:
 			proto_tree_add_item(ipa_tree, hf_ipa_hsl_debug,
-					next_tvb, 0, len, ENC_ASCII|ENC_NA);
+					next_tvb, 0, len, ENC_ASCII);
 			if (global_ipa_in_root == TRUE)
 				proto_tree_add_item(tree, hf_ipa_hsl_debug,
-						next_tvb, 0, len, ENC_ASCII|ENC_NA);
+						next_tvb, 0, len, ENC_ASCII);
 			if (global_ipa_in_info == TRUE)
 				col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
-						tvb_get_stringz_enc(wmem_packet_scope(), next_tvb, 0, NULL, ENC_ASCII));
+						tvb_get_stringz_enc(pinfo->pool, next_tvb, 0, NULL, ENC_ASCII));
 			break;
 		default:
 			if (msg_type < ABISIP_RSL_MAX) {

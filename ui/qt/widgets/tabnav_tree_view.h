@@ -1,4 +1,5 @@
-/* tabnav_tree_view.h
+/** @file
+ *
  * Tree view with saner tab navigation functionality.
  *
  * Copyright 2016 Peter Wu <peter@lekensteyn.nl>
@@ -35,15 +36,3 @@ signals:
     void currentItemChanged(const QModelIndex &current, const QModelIndex &previous);
 };
 #endif // TABNAV_TREE_VIEW_H
-
-/* * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

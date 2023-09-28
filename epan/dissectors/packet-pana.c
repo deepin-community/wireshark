@@ -370,7 +370,7 @@ dissect_avps(tvbuff_t *tvb, packet_info *pinfo, proto_tree *avp_tree)
                                 }
                                 case PANA_UTF8STRING: {
                                         proto_tree_add_item(single_avp_tree, hf_pana_avp_data_string, tvb,
-                                                                     offset, avp_data_length, ENC_UTF_8|ENC_NA);
+                                                                     offset, avp_data_length, ENC_UTF_8);
                                         break;
                                 }
                                 case PANA_OCTET_STRING: {
@@ -519,7 +519,7 @@ dissect_pana_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
         if(!pana_trans){
                 /* create a "fake" pana_trans structure */
-                pana_trans=wmem_new(wmem_packet_scope(), pana_transaction_t);
+                pana_trans=wmem_new(pinfo->pool, pana_transaction_t);
                 pana_trans->req_frame=0;
                 pana_trans->rep_frame=0;
                 pana_trans->req_time=pinfo->abs_ts;

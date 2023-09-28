@@ -438,7 +438,7 @@ static dissector_handle_t eth_withoutfcs_handle;
 static dissector_handle_t http_handle;
 
 
-void add35records(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_tree *ns_tree);
+static void add35records(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_tree *ns_tree);
 
 #define CL_FP 	0x01
 #define CL_FR 	0x02
@@ -511,11 +511,11 @@ dissect_nstrace(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data 
 	case NSPR_HEADER_VERSION205:
 
 		if(src_vmname_len){
-			proto_tree_add_item(ns_tree,hf_ns_src_vm,tvb,pnstr->data_offset,src_vmname_len,ENC_ASCII|ENC_NA);
+			proto_tree_add_item(ns_tree,hf_ns_src_vm,tvb,pnstr->data_offset,src_vmname_len,ENC_ASCII);
 			}
 
 		if(dst_vmname_len){
-			proto_tree_add_item(ns_tree,hf_ns_dst_vm,tvb,pnstr->data_offset+src_vmname_len,dst_vmname_len,ENC_ASCII|ENC_NA);
+			proto_tree_add_item(ns_tree,hf_ns_dst_vm,tvb,pnstr->data_offset+src_vmname_len,dst_vmname_len,ENC_ASCII);
 			}
 		/* fall through */
 
@@ -622,7 +622,7 @@ static gboolean no_record_header(int rec_type)
 	return FALSE;
 }
 
-void add35records(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_tree *ns_tree)
+static void add35records(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_tree *ns_tree)
 {
 	tvbuff_t  *next_tvb;
 	guint     nsheaderlen=0;
@@ -878,7 +878,7 @@ void add35records(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_tre
 			case NSREC_INFO:
 				subitem = proto_tree_add_item(ns_tree, hf_ns_inforec, tvb, offset, reclen, ENC_NA);
 				subtree = proto_item_add_subtree(subitem, ett_ns_inforec);
-				proto_tree_add_item(subtree, hf_ns_inforec_info, tvb, offset+3, reclen-3, ENC_ASCII|ENC_NA);
+				proto_tree_add_item(subtree, hf_ns_inforec_info, tvb, offset+3, reclen-3, ENC_ASCII);
 
 				offset += reclen;
 				cur_record = nextrec;
@@ -908,9 +908,9 @@ void add35records(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, proto_tre
 				subitem = proto_tree_add_item(ns_tree, hf_ns_vmnamerec, tvb, offset, reclen, ENC_NA);
 				subtree = proto_item_add_subtree(subitem, ett_ns_vmnamerec);
 				proto_tree_add_item(subtree, hf_ns_vmnamerec_srcvmname, tvb, offset+5,
-														srcvmnamelen, ENC_ASCII|ENC_NA);
+														srcvmnamelen, ENC_ASCII);
 				proto_tree_add_item(subtree, hf_ns_vmnamerec_dstvmname, tvb, offset+5+srcvmnamelen,
-														dstvmnamelen, ENC_ASCII|ENC_NA);
+														dstvmnamelen, ENC_ASCII);
 
 				offset += reclen;
 				cur_record = nextrec;
@@ -980,7 +980,7 @@ proto_register_ns(void)
 
 		{ &hf_ns_dir,
 		  { "Operation", "nstrace.dir",
-		    FT_UINT8, BASE_HEX|BASE_EXT_STRING, &ns_dir_vals_ext, 0x0,
+		    FT_UINT16, BASE_HEX|BASE_EXT_STRING, &ns_dir_vals_ext, 0x0,
 		    NULL, HFILL }
 		},
 
@@ -1717,7 +1717,7 @@ proto_register_ns(void)
 
 		{ &hf_ns_inforec_info,
 		  { "info", "nstrace.inforec.info",
-		    FT_STRING, STR_ASCII, NULL, 0x0,
+		    FT_STRING, BASE_NONE, NULL, 0x0,
 		    NULL, HFILL}
 		},
 
@@ -1753,13 +1753,13 @@ proto_register_ns(void)
 
 		{ &hf_ns_vmnamerec_srcvmname,
 		  { "SrcVmName", "nstrace.vmnames.srcvmname",
-		    FT_STRING, STR_ASCII, NULL, 0x0,
+		    FT_STRING, BASE_NONE, NULL, 0x0,
 		    NULL, HFILL}
 		},
 
 		{ &hf_ns_vmnamerec_dstvmname,
 		  { "DstVmName", "nstrace.vmnames.dstvmnames",
-		    FT_STRING, STR_ASCII, NULL, 0x0,
+		    FT_STRING, BASE_NONE, NULL, 0x0,
 		    NULL, HFILL}
 		},
 

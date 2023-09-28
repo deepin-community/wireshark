@@ -153,7 +153,7 @@ static rlc_lte_ep_t *alloc_rlc_lte_ep(const struct rlc_lte_tap_info *si, packet_
 /* Process stat struct for a RLC LTE frame */
 static tap_packet_status
 rlc_lte_stat_packet(void *phs, packet_info *pinfo, epan_dissect_t *edt _U_,
-                    const void *phi)
+                    const void *phi, tap_flags_t flags _U_)
 {
     /* Get reference to stats struct */
     rlc_lte_stat_t *hs = (rlc_lte_stat_t *)phs;
@@ -404,16 +404,3 @@ register_tap_listener_rlc_lte_stat(void)
 {
     register_stat_tap_ui(&rlc_lte_stat_ui, NULL);
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

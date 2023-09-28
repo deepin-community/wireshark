@@ -15,6 +15,7 @@
 #include "proto.h"
 #include "packet_info.h"
 #include "srt_table.h"
+#include <wsutil/ws_assert.h>
 
 struct register_srt {
     int proto_id;              /* protocol id (0-indexed) */
@@ -210,7 +211,7 @@ init_srt_table(const char *name, const char *short_name, GArray *srt_array, int 
     table->short_name = short_name;
     table->proc_column_name = proc_column_name;
     table->num_procs=num_procs;
-    table->procedures=(srt_procedure_t *)g_malloc(sizeof(srt_procedure_t)*num_procs);
+    table->procedures=g_new(srt_procedure_t, num_procs);
     for(i=0;i<num_procs;i++){
         time_stat_init(&table->procedures[i].stats);
         table->procedures[i].proc_index = 0;
@@ -250,7 +251,7 @@ add_srt_table_data(srt_stat_table *rst, int indx, const nstime_t *req_time, pack
     srt_procedure_t *rp;
     nstime_t t, delta;
 
-    g_assert(indx >= 0 && indx < rst->num_procs);
+    ws_assert(indx >= 0 && indx < rst->num_procs);
     rp=&rst->procedures[indx];
 
     /* calculate time delta between request and reply */

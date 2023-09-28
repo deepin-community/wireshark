@@ -9,6 +9,12 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+/*
+ * RFC 6386 - VP8 Data Format and Decoding Guide
+ * RFC 7741 - RTP Payload Format for VP8 Video
+ */
+
+
 #include "config.h"
 
 #include <epan/packet.h>
@@ -38,8 +44,6 @@ void proto_register_vp8(void);
 #define BIT_3BYTE_NO_MASK       0xFFFFFF
 #define BIT_EXT_PICTURE_MASK    0x7FFF
 #define BIT_PARTITION_SIZE_MASK 0xE0FFFF
-
-static range_t *temp_dynamic_payload_type_range = NULL;
 
 static dissector_handle_t vp8_handle;
 
@@ -112,18 +116,27 @@ static const value_string vp8_type_values[] = {
     {  0, NULL }
 };
 
+static const range_string vp8_hdr_version_vals[] = {
+    {  0, 0,   "Bicubic  (Loop Filter=Normal)" },
+    {  1, 1,   "Bilinear (Loop Filter=Simple)" },
+    {  2, 2,   "Bilinear (Loop Filter=None)" },
+    {  3, 3,   "No filters" },
+    {  4, 7,   "Reserved for future use" },
+    {  0, 0,  NULL }
+};
+
 static const true_false_string vp8_x_bit_vals = {
     "Extended control bits present (I L T K)",
     "Extended control bits not present"
 };
 
 static const true_false_string vp8_r_bit_vals = {
-    "Reserved for future use (Error should be zero)",
+    "Reserved for future use (error: should be zero)",
     "Reserved for future use"
 };
 
 static const true_false_string vp8_n_bit_vals = {
-    "Non referenced frame",
+    "Non-reference frame",
     "Reference frame"
 };
 
@@ -143,13 +156,13 @@ static const true_false_string vp8_l_bit_vals = {
 };
 
 static const true_false_string vp8_t_bit_vals = {
-    "TID (temporal layer index) byte present",
-    "TID (temporal layer index) byte not present"
+    "TID (temporal layer index) present",
+    "TID (temporal layer index) not present"
 };
 
 static const true_false_string vp8_k_bit_vals = {
-    "TID/KEYIDX byte present",
-    "TID/KEYIDX byte not present"
+    "KEYIDX present",
+    "KEYIDX not present"
 };
 
 static const true_false_string vp8_hdr_frametype_vals = {
@@ -200,11 +213,11 @@ The first octets after the RTP header are the VP8 payload descriptor,
 
          0 1 2 3 4 5 6 7
         +-+-+-+-+-+-+-+-+
-        |X|R|N|S|PartID | (REQUIRED)
+        |X|R|N|S|R| PID | (REQUIRED), second R bit is parsed as part of PID
         +-+-+-+-+-+-+-+-+
    X:   |I|L|T|K| RSV   | (OPTIONAL)
         +-+-+-+-+-+-+-+-+
-   I:   |   PictureID   | (OPTIONAL)
+   I:   |M|  PictureID  | (OPTIONAL)
         +-+-+-+-+-+-+-+-+
    L:   |   TL0PICIDX   | (OPTIONAL)
         +-+-+-+-+-+-+-+-+
@@ -432,7 +445,7 @@ proto_register_vp8(void)
             NULL, HFILL }
         },
         { &hf_vp8_pld_part_id,
-            { "Part Id",           "vp8.pld.partid",
+            { "2nd R bit and Part Id",           "vp8.pld.partid",
             FT_UINT8, BASE_DEC, NULL, BIT_5678_MASK,
             NULL, HFILL }
         },
@@ -462,12 +475,12 @@ proto_register_vp8(void)
             NULL, HFILL }
         },
         { &hf_vp8_pld_picture_id,
-            { "Picture Id",           "vp8.pld.pictureid",
+            { "Picture ID",           "vp8.pld.pictureid",
             FT_UINT8, BASE_DEC, NULL, BIT_NO_MASK,
             NULL, HFILL }
         },
         { &hf_vp8_pld_extended_picture_id,
-            { "Extended Picture Id",           "vp8.pld.pictureid",
+            { "Extended Picture ID",           "vp8.pld.pictureid",
             FT_UINT8, BASE_DEC, NULL, BIT_EXT_PICTURE_MASK,
             NULL, HFILL }
         },
@@ -482,7 +495,7 @@ proto_register_vp8(void)
             NULL, HFILL }
         },
         { &hf_vp8_pld_y_bit,
-            { "1 Lay Sync Bit (Y)",           "vp8.pld.y",
+            { "1 layer sync bit (Y)",           "vp8.pld.y",
             FT_BOOLEAN, 8, NULL, BIT_3_MASK,
             NULL, HFILL }
         },
@@ -498,13 +511,13 @@ proto_register_vp8(void)
         },
         { &hf_vp8_hdr_version,
             { "version",           "vp8.hdr.version",
-            FT_UINT8, BASE_DEC, NULL, BIT_567_MASK,
+            FT_UINT8, BASE_DEC | BASE_RANGE_STRING, RVALS(vp8_hdr_version_vals), BIT_567_MASK,
             NULL, HFILL }
         },
         { &hf_vp8_hdr_show_bit,
             { "Show bit",           "vp8.hdr.show",
-            FT_BOOLEAN, 8, NULL, BIT_5_MASK,
-            NULL, HFILL }
+            FT_BOOLEAN, 8, NULL, BIT_4_MASK,
+            "Set when current frame is for display", HFILL }
         },
         { &hf_vp8_hdr_first_partition_size,
             { "First partition size",           "vp8.hdr.partition_size",
@@ -556,16 +569,12 @@ proto_register_vp8(void)
     proto_register_field_array(proto_vp8, hf, array_length(hf));
     proto_register_subtree_array(ett, array_length(ett));
 
-    vp8_module = prefs_register_protocol(proto_vp8, proto_reg_handoff_vp8);
+    vp8_module = prefs_register_protocol(proto_vp8, NULL);
 
     expert_vp8 = expert_register_protocol(proto_vp8);
     expert_register_field_array(expert_vp8, ei, array_length(ei));
 
-    prefs_register_range_preference(vp8_module, "dynamic.payload.type",
-                            "vp8 dynamic payload types",
-                            "Dynamic payload types which will be interpreted as vp8"
-                            "; Values must be in the range 1 - 127",
-                            &temp_dynamic_payload_type_range, 127);
+    prefs_register_obsolete_preference(vp8_module, "dynamic.payload.type");
 
     vp8_handle = register_dissector("vp8", dissect_vp8, proto_vp8);
 }
@@ -573,20 +582,9 @@ proto_register_vp8(void)
 void
 proto_reg_handoff_vp8(void)
 {
-    static range_t  *dynamic_payload_type_range = NULL;
-    static gboolean  vp8_prefs_initialized      = FALSE;
+    dissector_add_string("rtp_dyn_payload_type" , "VP8", vp8_handle);
 
-    if (!vp8_prefs_initialized) {
-        dissector_add_string("rtp_dyn_payload_type" , "VP8", vp8_handle);
-        vp8_prefs_initialized = TRUE;
-    } else {
-        dissector_delete_uint_range("rtp.pt", dynamic_payload_type_range, vp8_handle);
-        wmem_free(wmem_epan_scope(), dynamic_payload_type_range);
-    }
-
-    dynamic_payload_type_range = range_copy(wmem_epan_scope(), temp_dynamic_payload_type_range);
-    range_remove_value(wmem_epan_scope(), &dynamic_payload_type_range, 0);
-    dissector_add_uint_range("rtp.pt", dynamic_payload_type_range, vp8_handle);
+    dissector_add_uint_range_with_preference("rtp.pt", "", vp8_handle);
 }
 
 /*

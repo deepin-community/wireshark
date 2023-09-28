@@ -46,7 +46,7 @@ ieee802a_add_oui(guint32 oui, const char *table_name, const char *table_ui_name,
 {
 	oui_info_t *new_info;
 
-	new_info = (oui_info_t *)g_malloc(sizeof (oui_info_t));
+	new_info = g_new(oui_info_t, 1);
 	new_info->table = register_dissector_table(table_name,
 	    table_ui_name, proto, FT_UINT16, BASE_HEX);
 	new_info->field_info = hf_item;
@@ -86,7 +86,7 @@ dissect_ieee802a(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 	pid = tvb_get_ntohs(tvb, 3);
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "OUI %s (%s), PID 0x%04X",
-		tvb_bytes_to_str_punct(wmem_packet_scope(), tvb, 0, 3, ':'),
+		tvb_bytes_to_str_punct(pinfo->pool, tvb, 0, 3, ':'),
 		manuf ? manuf : "Unknown", pid);
 
 	/*

@@ -19,6 +19,7 @@
 #ifndef NDEBUG
 #define NDEBUG
 #endif
+#include "config.h"
 
 #include "mate.h"
 #include "mate_grammar.h"
@@ -78,7 +79,7 @@ static void configuration_error(mate_config* mc, const gchar* fmt, ...) {
 	va_list list;
 
 	va_start( list, fmt );
-	g_vsnprintf(error_buffer,sizeof(error_buffer),fmt,list);
+	vsnprintf(error_buffer,sizeof(error_buffer),fmt,list);
 	va_end( list );
 
 	i = (gint) mc->config_stack->len;
@@ -466,7 +467,7 @@ payload_statement(A) ::= PAYLOAD_KW proto_stack(B) SEMICOLON. { A = B; }
 
 criteria_statement(A) ::= . { A = NULL; }
 criteria_statement(A) ::= CRITERIA_KW accept_mode(B) match_mode(C) avpl(D) SEMICOLON. {
-	A = (pdu_criteria_t *)g_malloc(sizeof(pdu_criteria_t));
+	A = g_new(pdu_criteria_t, 1);
 	A->criterium_avpl = D;
 	A->criterium_match_mode = C;
 	A->criterium_accept_mode = B;
@@ -480,7 +481,7 @@ extraction_statements(A) ::= extraction_statements(B) extraction_statement(C). {
 extraction_statements(A) ::= extraction_statement(B). { A = B; A->last = A; }
 
 extraction_statement(A) ::= EXTRACT_KW NAME(NAME) FROM_KW field(FIELD) SEMICOLON. {
-	A = (extraction_t *)g_malloc(sizeof(extraction_t));
+	A = g_new(extraction_t, 1);
 	A->as = NAME;
 	A->hfi = FIELD;
 	A->next = A->last = NULL;
@@ -497,7 +498,7 @@ last_extracted_statement(A) ::= LAST_PDU_KW true_false(B) SEMICOLON. { A = B; }
 last_extracted_statement(A) ::= . { A = mc->defaults.pdu.last_extracted; }
 
 proto_stack(A) ::= proto_stack(B) SLASH field(C). {
-	int* hfidp = (int *)g_malloc(sizeof(int));
+	int* hfidp = g_new(int, 1);
 
 	*hfidp = C->id;
 	g_ptr_array_add(B,hfidp);
@@ -505,7 +506,7 @@ proto_stack(A) ::= proto_stack(B) SLASH field(C). {
 }
 
 proto_stack(A) ::= field(B). {
-	int* hfidp = (int *)g_malloc(sizeof(int));
+	int* hfidp = g_new(int, 1);
 	*hfidp = B->id;
 
 	A = g_ptr_array_new();
@@ -709,7 +710,7 @@ avp(A) ::= NAME(B) AVP_OPERATOR(C) value(D). { A = new_avp(B,D,*C); }
 avp(A) ::= NAME(B). { A = new_avp(B,"",'?'); }
 avp(A) ::= NAME(B) OPEN_BRACE avp_oneoff(C) CLOSE_BRACE. { A = new_avp(B,C,'|'); }
 
-avp_oneoff(A) ::= avp_oneoff(B) PIPE value(C). { A = g_strdup_printf("%s|%s",B,C); }
+avp_oneoff(A) ::= avp_oneoff(B) PIPE value(C). { A = ws_strdup_printf("%s|%s",B,C); }
 avp_oneoff(A) ::= value(B). { A = g_strdup(B); }
 
 value(A) ::= QUOTED(B). { A = g_strdup(B); }

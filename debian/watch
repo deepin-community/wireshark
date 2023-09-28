@@ -1,2 +1,2 @@
 version=4
- https://gitlab.com/wireshark/wireshark/tags .*?(\d\.[02468]\.[\d.]*)\.tar\.gz
+ https://gitlab.com/wireshark/wireshark/-/tags?sort=updated_desc .*?(\d\.[02468]\.[\d.]*)\.tar\.gz

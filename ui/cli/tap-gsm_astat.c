@@ -50,7 +50,8 @@ gsm_a_stat_packet(
     void                        *tapdata,
     packet_info                 *pinfo _U_,
     epan_dissect_t              *edt _U_,
-    const void                  *data)
+    const void                  *data,
+    tap_flags_t flags  _U_)
 {
     gsm_a_stat_t                *stat_p = (gsm_a_stat_t *)tapdata;
     const gsm_a_tap_rec_t       *tap_p = (const gsm_a_tap_rec_t *)data;
@@ -343,16 +344,3 @@ register_tap_listener_gsm_astat(void)
 {
     register_stat_tap_ui(&gsm_a_stat_ui, NULL);
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

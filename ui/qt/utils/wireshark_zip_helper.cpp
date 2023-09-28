@@ -75,7 +75,17 @@ bool WiresharkZipHelper::unzip(QString zipFile, QString directory, bool (*fileCh
 
             /* Sanity check for the file */
             if (fileInZip.length() == 0 || (fileCheck && ! fileCheck(fileInZip, fileSize)) )
+            {
+                if ((cnt + 1) < nmbr)
+                {
+                    err = unzGoToNextFile(uf);
+                    if (err != UNZ_OK)
+                    {
+                        break;
+                    }
+                }
                 continue;
+            }
 
             if (di.exists())
             {
@@ -139,7 +149,7 @@ bool WiresharkZipHelper::unzip(QString zipFile, QString directory, bool (*fileCh
                             {
                                 QByteArray buf;
                                 buf.resize(IO_BUF_SIZE);
-                                while ((err = unzReadCurrentFile(uf, buf.data(), buf.size())) != UNZ_EOF)
+                                while ((err = unzReadCurrentFile(uf, buf.data(), static_cast<int>(buf.size()))) != UNZ_EOF)
                                     file.write(buf.constData(), err);
 
                                 file.close();
@@ -271,16 +281,3 @@ bool WiresharkZipHelper::zip(QString fileName, QStringList files, QString relati
 }
 
 #endif
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

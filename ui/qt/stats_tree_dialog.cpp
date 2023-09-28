@@ -59,6 +59,8 @@ StatsTreeDialog::StatsTreeDialog(QWidget &parent, CaptureFile &cf, const char *c
     st_cfg_ = stats_tree_get_cfg_by_abbr(cfg_abbr);
     memset(&cfg_pr_, 0, sizeof(struct _tree_cfg_pres));
 
+    addTreeCollapseAllActions();
+
     if (!st_cfg_) {
         QMessageBox::critical(this, tr("Configuration not found"),
                              tr("Unable to find configuration for %1.").arg(cfg_abbr));
@@ -122,7 +124,7 @@ void StatsTreeDialog::fillTree()
     for (int count = 0; count<st_->num_columns; count++) {
         header_labels.push_back(stats_tree_get_column_name(count));
     }
-    statsTreeWidget()->setColumnCount(header_labels.count());
+    statsTreeWidget()->setColumnCount(static_cast<int>(header_labels.count()));
     statsTreeWidget()->setHeaderLabels(header_labels);
     statsTreeWidget()->setSortingEnabled(false);
 
@@ -194,6 +196,9 @@ QByteArray StatsTreeDialog::getTreeAsString(st_format_type format)
 }
 
 extern "C" {
+
+void register_tap_listener_qt_stats_tree_stat(void);
+
 void
 register_tap_listener_qt_stats_tree_stat(void)
 {
@@ -201,17 +206,5 @@ register_tap_listener_qt_stats_tree_stat(void)
                 StatsTreeDialog::setupNode,
                 NULL, NULL);
 }
-}
 
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+}

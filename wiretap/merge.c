@@ -14,6 +14,8 @@
 
 #include "config.h"
 
+#define WS_LOG_DOMAIN LOG_DOMAIN_WIRETAP
+
 #include <stdlib.h>
 #include <errno.h>
 
@@ -24,18 +26,13 @@
 #include <string.h>
 #include "merge.h"
 #include "wtap_opttypes.h"
-#include "pcapng.h"
 #include "wtap-int.h"
 
 #include <wsutil/filesystem.h>
 #include "wsutil/os_version_info.h"
+#include <wsutil/wslog.h>
+#include <wsutil/ws_assert.h>
 
-
-#if 0
-#define merge_debug(...) g_warning(__VA_ARGS__)
-#else
-#define merge_debug(...)
-#endif
 
 
 static const char* idb_merge_mode_strings[] = {
@@ -74,7 +71,7 @@ merge_idb_merge_mode_to_string(const int mode)
 static void
 cleanup_in_file(merge_in_file_t *in_file)
 {
-    g_assert(in_file != NULL);
+    ws_assert(in_file != NULL);
 
     wtap_close(in_file->wth);
     in_file->wth = NULL;
@@ -87,17 +84,17 @@ cleanup_in_file(merge_in_file_t *in_file)
 }
 
 static void
-add_idb_index_map(merge_in_file_t *in_file, const guint orig_index, const guint found_index)
+add_idb_index_map(merge_in_file_t *in_file, const guint orig_index _U_, const guint found_index)
 {
-    g_assert(in_file != NULL);
-    g_assert(in_file->idb_index_map != NULL);
+    ws_assert(in_file != NULL);
+    ws_assert(in_file->idb_index_map != NULL);
 
     /*
      * we didn't really need the orig_index, since just appending to the array
      * should result in the orig_index being its location in the array; but we
      * pass it into this function to do a sanity check here
      */
-    g_assert(orig_index == in_file->idb_index_map->len);
+    ws_assert(orig_index == in_file->idb_index_map->len);
 
     g_array_append_val(in_file->idb_index_map, found_index);
 }
@@ -393,7 +390,7 @@ create_shb_header(const merge_in_file_t *in_files, const guint in_file_count,
     GString *os_info_str;
     guint i;
     char* shb_comment = NULL;
-    wtapng_mandatory_section_t* shb_data;
+    wtapng_section_mandatory_t* shb_data;
     gsize opt_len;
     gchar *opt_str;
 
@@ -425,7 +422,7 @@ create_shb_header(const merge_in_file_t *in_files, const guint in_file_count,
     os_info_str = g_string_new("");
     get_os_version_info(os_info_str);
 
-    shb_data = (wtapng_mandatory_section_t*)wtap_block_get_mandatory_data(shb_hdr);
+    shb_data = (wtapng_section_mandatory_t*)wtap_block_get_mandatory_data(shb_hdr);
     shb_data->section_length = -1;
     /* TODO: handle comments from each file being merged */
     opt_len = comment_gstr->len;
@@ -469,46 +466,46 @@ is_duplicate_idb(const wtap_block_t idb1, const wtap_block_t idb2)
     char *idb1_if_hardware, *idb2_if_hardware;
     char *idb1_if_os, *idb2_if_os;
 
-    g_assert(idb1 && idb2);
+    ws_assert(idb1 && idb2);
     idb1_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(idb1);
     idb2_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(idb2);
 
-    merge_debug("merge::is_duplicate_idb() called");
-    merge_debug("idb1_mand->wtap_encap == idb2_mand->wtap_encap: %s",
+    ws_debug("merge::is_duplicate_idb() called");
+    ws_debug("idb1_mand->wtap_encap == idb2_mand->wtap_encap: %s",
                  (idb1_mand->wtap_encap == idb2_mand->wtap_encap) ? "TRUE":"FALSE");
     if (idb1_mand->wtap_encap != idb2_mand->wtap_encap) {
         /* Clearly not the same interface. */
-        merge_debug("merge::is_duplicate_idb() returning FALSE");
+        ws_debug("returning FALSE");
         return FALSE;
     }
 
-    merge_debug("idb1_mand->time_units_per_second == idb2_mand->time_units_per_second: %s",
+    ws_debug("idb1_mand->time_units_per_second == idb2_mand->time_units_per_second: %s",
                  (idb1_mand->time_units_per_second == idb2_mand->time_units_per_second) ? "TRUE":"FALSE");
     if (idb1_mand->time_units_per_second != idb2_mand->time_units_per_second) {
         /*
          * Probably not the same interface, and we can't combine them
          * in any case.
          */
-        merge_debug("merge::is_duplicate_idb() returning FALSE");
+        ws_debug("returning FALSE");
         return FALSE;
     }
 
-    merge_debug("idb1_mand->tsprecision == idb2_mand->tsprecision: %s",
+    ws_debug("idb1_mand->tsprecision == idb2_mand->tsprecision: %s",
                  (idb1_mand->tsprecision == idb2_mand->tsprecision) ? "TRUE":"FALSE");
     if (idb1_mand->tsprecision != idb2_mand->tsprecision) {
         /*
          * Probably not the same interface, and we can't combine them
          * in any case.
          */
-        merge_debug("merge::is_duplicate_idb() returning FALSE");
+        ws_debug("returning FALSE");
         return FALSE;
     }
 
     /* XXX: should snaplen not be compared? */
-    merge_debug("idb1_mand->snap_len == idb2_mand->snap_len: %s",
+    ws_debug("idb1_mand->snap_len == idb2_mand->snap_len: %s",
                  (idb1_mand->snap_len == idb2_mand->snap_len) ? "TRUE":"FALSE");
     if (idb1_mand->snap_len != idb2_mand->snap_len) {
-        merge_debug("merge::is_duplicate_idb() returning FALSE");
+        ws_debug("returning FALSE");
         return FALSE;
     }
 
@@ -516,10 +513,10 @@ is_duplicate_idb(const wtap_block_t idb1, const wtap_block_t idb2)
     have_idb1_value = (wtap_block_get_uint64_option_value(idb1, OPT_IDB_SPEED, &idb1_if_speed) == WTAP_OPTTYPE_SUCCESS);
     have_idb2_value = (wtap_block_get_uint64_option_value(idb2, OPT_IDB_SPEED, &idb2_if_speed) == WTAP_OPTTYPE_SUCCESS);
     if (have_idb1_value && have_idb2_value) {
-        merge_debug("idb1_if_speed == idb2_if_speed: %s",
+        ws_debug("idb1_if_speed == idb2_if_speed: %s",
                      (idb1_if_speed == idb2_if_speed) ? "TRUE":"FALSE");
         if (idb1_if_speed != idb2_if_speed) {
-            merge_debug("merge::is_duplicate_idb() returning FALSE");
+            ws_debug("returning FALSE");
             return FALSE;
         }
     }
@@ -528,10 +525,10 @@ is_duplicate_idb(const wtap_block_t idb1, const wtap_block_t idb2)
     have_idb1_value = (wtap_block_get_uint8_option_value(idb1, OPT_IDB_TSRESOL, &idb1_if_tsresol) == WTAP_OPTTYPE_SUCCESS);
     have_idb2_value = (wtap_block_get_uint8_option_value(idb2, OPT_IDB_TSRESOL, &idb2_if_tsresol) == WTAP_OPTTYPE_SUCCESS);
     if (have_idb1_value && have_idb2_value) {
-        merge_debug("idb1_if_tsresol == idb2_if_tsresol: %s",
+        ws_debug("idb1_if_tsresol == idb2_if_tsresol: %s",
                      (idb1_if_tsresol == idb2_if_tsresol) ? "TRUE":"FALSE");
         if (idb1_if_tsresol != idb2_if_tsresol) {
-            merge_debug("merge::is_duplicate_idb() returning FALSE");
+            ws_debug("returning FALSE");
             return FALSE;
         }
     }
@@ -540,10 +537,10 @@ is_duplicate_idb(const wtap_block_t idb1, const wtap_block_t idb2)
     have_idb1_value = (wtap_block_get_uint8_option_value(idb1, OPT_IDB_FCSLEN, &idb1_if_fcslen) == WTAP_OPTTYPE_SUCCESS);
     have_idb2_value = (wtap_block_get_uint8_option_value(idb2, OPT_IDB_FCSLEN, &idb2_if_fcslen) == WTAP_OPTTYPE_SUCCESS);
     if (have_idb1_value && have_idb2_value) {
-        merge_debug("idb1_if_fcslen == idb2_if_fcslen: %s",
+        ws_debug("idb1_if_fcslen == idb2_if_fcslen: %s",
                      (idb1_if_fcslen == idb2_if_fcslen) ? "TRUE":"FALSE");
         if (idb1_if_fcslen == idb2_if_fcslen) {
-            merge_debug("merge::is_duplicate_idb() returning FALSE");
+            ws_debug("returning FALSE");
             return FALSE;
         }
     }
@@ -558,10 +555,10 @@ is_duplicate_idb(const wtap_block_t idb1, const wtap_block_t idb2)
     have_idb1_value = (wtap_block_get_nth_string_option_value(idb1, OPT_COMMENT, 0, &idb1_opt_comment) == WTAP_OPTTYPE_SUCCESS);
     have_idb2_value = (wtap_block_get_nth_string_option_value(idb2, OPT_COMMENT, 0, &idb2_opt_comment) == WTAP_OPTTYPE_SUCCESS);
     if (have_idb1_value && have_idb2_value) {
-        merge_debug("g_strcmp0(idb1_opt_comment, idb2_opt_comment) == 0: %s",
+        ws_debug("g_strcmp0(idb1_opt_comment, idb2_opt_comment) == 0: %s",
                      (g_strcmp0(idb1_opt_comment, idb2_opt_comment) == 0) ? "TRUE":"FALSE");
         if (g_strcmp0(idb1_opt_comment, idb2_opt_comment) != 0) {
-            merge_debug("merge::is_duplicate_idb() returning FALSE");
+            ws_debug("returning FALSE");
             return FALSE;
         }
     }
@@ -570,22 +567,22 @@ is_duplicate_idb(const wtap_block_t idb1, const wtap_block_t idb2)
     have_idb1_value = (wtap_block_get_string_option_value(idb1, OPT_IDB_NAME, &idb1_if_name) == WTAP_OPTTYPE_SUCCESS);
     have_idb2_value = (wtap_block_get_string_option_value(idb2, OPT_IDB_NAME, &idb2_if_name) == WTAP_OPTTYPE_SUCCESS);
     if (have_idb1_value && have_idb2_value) {
-        merge_debug("g_strcmp0(idb1_if_name, idb2_if_name) == 0: %s",
+        ws_debug("g_strcmp0(idb1_if_name, idb2_if_name) == 0: %s",
                      (g_strcmp0(idb1_if_name, idb2_if_name) == 0) ? "TRUE":"FALSE");
         if (g_strcmp0(idb1_if_name, idb2_if_name) != 0) {
-            merge_debug("merge::is_duplicate_idb() returning FALSE");
+            ws_debug("returning FALSE");
             return FALSE;
         }
     }
 
     /* XXX - what do to if we have only one value? */
-    have_idb1_value = (wtap_block_get_string_option_value(idb1, OPT_IDB_DESCR, &idb1_if_description) == WTAP_OPTTYPE_SUCCESS);
-    have_idb2_value = (wtap_block_get_string_option_value(idb2, OPT_IDB_DESCR, &idb2_if_description) == WTAP_OPTTYPE_SUCCESS);
+    have_idb1_value = (wtap_block_get_string_option_value(idb1, OPT_IDB_DESCRIPTION, &idb1_if_description) == WTAP_OPTTYPE_SUCCESS);
+    have_idb2_value = (wtap_block_get_string_option_value(idb2, OPT_IDB_DESCRIPTION, &idb2_if_description) == WTAP_OPTTYPE_SUCCESS);
     if (have_idb1_value && have_idb2_value) {
-        merge_debug("g_strcmp0(idb1_if_description, idb2_if_description) == 0: %s",
+        ws_debug("g_strcmp0(idb1_if_description, idb2_if_description) == 0: %s",
                      (g_strcmp0(idb1_if_description, idb2_if_description) == 0) ? "TRUE":"FALSE");
         if (g_strcmp0(idb1_if_description, idb2_if_description) != 0) {
-            merge_debug("merge::is_duplicate_idb() returning FALSE");
+            ws_debug("returning FALSE");
             return FALSE;
         }
     }
@@ -594,10 +591,10 @@ is_duplicate_idb(const wtap_block_t idb1, const wtap_block_t idb2)
     have_idb1_value = (wtap_block_get_string_option_value(idb1, OPT_IDB_HARDWARE, &idb1_if_hardware) == WTAP_OPTTYPE_SUCCESS);
     have_idb2_value = (wtap_block_get_string_option_value(idb2, OPT_IDB_HARDWARE, &idb2_if_hardware) == WTAP_OPTTYPE_SUCCESS);
     if (have_idb1_value && have_idb2_value) {
-        merge_debug("g_strcmp0(idb1_if_hardware, idb2_if_hardware) == 0: %s",
+        ws_debug("g_strcmp0(idb1_if_hardware, idb2_if_hardware) == 0: %s",
                      (g_strcmp0(idb1_if_hardware, idb2_if_hardware) == 0) ? "TRUE":"FALSE");
         if (g_strcmp0(idb1_if_hardware, idb2_if_hardware) != 0) {
-            merge_debug("merge::is_duplicate_idb() returning FALSE");
+            ws_debug("returning FALSE");
             return FALSE;
         }
     }
@@ -606,16 +603,16 @@ is_duplicate_idb(const wtap_block_t idb1, const wtap_block_t idb2)
     have_idb1_value = (wtap_block_get_string_option_value(idb1, OPT_IDB_OS, &idb1_if_os) == WTAP_OPTTYPE_SUCCESS);
     have_idb2_value = (wtap_block_get_string_option_value(idb2, OPT_IDB_OS, &idb2_if_os) == WTAP_OPTTYPE_SUCCESS);
     if (have_idb1_value && have_idb2_value) {
-        merge_debug("g_strcmp0(idb1_if_os, idb2_if_os) == 0: %s",
+        ws_debug("g_strcmp0(idb1_if_os, idb2_if_os) == 0: %s",
                      (g_strcmp0(idb1_if_os, idb2_if_os) == 0) ? "TRUE":"FALSE");
         if (g_strcmp0(idb1_if_os, idb2_if_os) != 0) {
-            merge_debug("merge::is_duplicate_idb() returning FALSE");
+            ws_debug("returning FALSE");
             return FALSE;
         }
     }
 
     /* does not compare filters nor interface statistics */
-    merge_debug("merge::is_duplicate_idb() returning TRUE");
+    ws_debug("returning TRUE");
     return TRUE;
 }
 
@@ -631,22 +628,22 @@ all_idbs_are_duplicates(const merge_in_file_t *in_files, const guint in_file_cou
     wtap_block_t first_file_idb, other_file_idb;
     guint i, j;
 
-    g_assert(in_files != NULL);
+    ws_assert(in_files != NULL);
 
     /* get the first file's info */
     first_idb_list = wtap_file_get_idb_info(in_files[0].wth);
-    g_assert(first_idb_list->interface_data);
+    ws_assert(first_idb_list->interface_data);
 
     first_idb_list_size = first_idb_list->interface_data->len;
 
     /* now compare the other input files with that */
     for (i = 1; i < in_file_count; i++) {
         other_idb_list = wtap_file_get_idb_info(in_files[i].wth);
-        g_assert(other_idb_list->interface_data);
+        ws_assert(other_idb_list->interface_data);
         other_idb_list_size = other_idb_list->interface_data->len;
 
         if (other_idb_list_size != first_idb_list_size) {
-            merge_debug("merge::all_idbs_are_duplicates: sizes of IDB lists don't match: first=%u, other=%u",
+            ws_debug("sizes of IDB lists don't match: first=%u, other=%u",
                          first_idb_list_size, other_idb_list_size);
             g_free(other_idb_list);
             g_free(first_idb_list);
@@ -658,7 +655,7 @@ all_idbs_are_duplicates(const merge_in_file_t *in_files, const guint in_file_cou
             other_file_idb = g_array_index(other_idb_list->interface_data, wtap_block_t, j);
 
             if (!is_duplicate_idb(first_file_idb, other_file_idb)) {
-                merge_debug("merge::all_idbs_are_duplicates: IDBs at index %d do not match, returning FALSE", j);
+                ws_debug("IDBs at index %d do not match, returning FALSE", j);
                 g_free(other_idb_list);
                 g_free(first_idb_list);
                 return FALSE;
@@ -667,7 +664,7 @@ all_idbs_are_duplicates(const merge_in_file_t *in_files, const guint in_file_cou
         g_free(other_idb_list);
     }
 
-    merge_debug("merge::all_idbs_are_duplicates: returning TRUE");
+    ws_debug("returning TRUE");
 
     g_free(first_idb_list);
 
@@ -691,10 +688,10 @@ find_duplicate_idb(const wtap_block_t input_file_idb,
     wtap_block_t merged_idb;
     guint i;
 
-    g_assert(input_file_idb != NULL);
-    g_assert(merged_idb_list != NULL);
-    g_assert(merged_idb_list->interface_data != NULL);
-    g_assert(found_index != NULL);
+    ws_assert(input_file_idb != NULL);
+    ws_assert(merged_idb_list != NULL);
+    ws_assert(merged_idb_list->interface_data != NULL);
+    ws_assert(found_index != NULL);
 
     for (i = 0; i < merged_idb_list->interface_data->len; i++) {
         merged_idb = g_array_index(merged_idb_list->interface_data, wtap_block_t, i);
@@ -708,38 +705,107 @@ find_duplicate_idb(const wtap_block_t input_file_idb,
     return FALSE;
 }
 
-/* adds IDB to merged file info, returns its index */
-static guint
+/* Adds IDB to merged file info. If pdh is not NULL, also tries to
+ * add the IDB to the file (if the file type supports writing IDBs).
+ * returns TRUE on success
+ * (merged_idb_list->interface_data->len - 1 is the new index) */
+static gboolean
 add_idb_to_merged_file(wtapng_iface_descriptions_t *merged_idb_list,
-                       const wtap_block_t input_file_idb)
+                       const wtap_block_t input_file_idb, wtap_dumper *pdh,
+                       int *err, gchar **err_info)
 {
-    wtap_block_t idb = wtap_block_create(WTAP_BLOCK_IF_DESCR);
+    wtap_block_t idb;
     wtapng_if_descr_mandatory_t* idb_mand;
 
-    g_assert(merged_idb_list != NULL);
-    g_assert(merged_idb_list->interface_data != NULL);
-    g_assert(input_file_idb != NULL);
+    ws_assert(merged_idb_list != NULL);
+    ws_assert(merged_idb_list->interface_data != NULL);
+    ws_assert(input_file_idb != NULL);
 
-    wtap_block_copy(idb, input_file_idb);
+    idb = wtap_block_make_copy(input_file_idb);
     idb_mand = (wtapng_if_descr_mandatory_t*)wtap_block_get_mandatory_data(idb);
 
     /* Don't copy filter or stat information */
     idb_mand->num_stat_entries      = 0;          /* Number of ISB:s */
     idb_mand->interface_statistics  = NULL;
 
+    if (pdh != NULL) {
+        if (wtap_file_type_subtype_supports_block(wtap_dump_file_type_subtype(pdh), WTAP_BLOCK_IF_ID_AND_INFO) != BLOCK_NOT_SUPPORTED) {
+            if (!wtap_dump_add_idb(pdh, input_file_idb, err, err_info)) {
+                return FALSE;
+            }
+        }
+    }
     g_array_append_val(merged_idb_list->interface_data, idb);
 
-    return merged_idb_list->interface_data->len - 1;
+    return TRUE;
+}
+
+/*
+ * Create clone IDBs for the merge file for IDBs found in the middle of
+ * input files while processing.
+ */
+static gboolean
+process_new_idbs(wtap_dumper *pdh, merge_in_file_t *in_files, const guint in_file_count, const idb_merge_mode mode, wtapng_iface_descriptions_t *merged_idb_list, int *err, gchar **err_info)
+{
+    wtap_block_t                 input_file_idb;
+    guint                        itf_count, merged_index;
+    guint                        i;
+
+    for (i = 0; i < in_file_count; i++) {
+
+        itf_count = in_files[i].wth->next_interface_data;
+        while ((input_file_idb = wtap_get_next_interface_description(in_files[i].wth)) != NULL) {
+
+            /* If we were initially in ALL mode and all the interfaces
+             * did match, then we set the mode to ANY (merge duplicates).
+             * If the interfaces didn't match, then we are still in ALL
+             * mode, but treat that as NONE (write out all IDBs.)
+             * XXX: Should there be separate modes for "match ALL at the start
+             * and ANY later" vs "match ALL at the beginning and NONE later"?
+             * Should there be a two-pass mode for people who want ALL mode to
+             * work for IDBs in the middle of the file? (See #16542)
+             */
+
+            if (mode == IDB_MERGE_MODE_ANY_SAME &&
+                find_duplicate_idb(input_file_idb, merged_idb_list, &merged_index))
+            {
+                ws_debug("mode ANY set and found a duplicate");
+                /*
+                 * It's the same as a previous IDB, so we're going to "merge"
+                 * them into one by adding a map from its old IDB index to the
+                 * new one. This will be used later to change the rec
+                 * interface_id.
+                 */
+                add_idb_index_map(&in_files[i], itf_count, merged_index);
+            }
+            else {
+                ws_debug("mode NONE or ALL set or did not find a duplicate");
+                /*
+                 * This IDB does not match a previous (or we want to save all
+                 * IDBs), so add the IDB to the merge file, and add a map of
+                 * the indices.
+                 */
+                if (add_idb_to_merged_file(merged_idb_list, input_file_idb, pdh, err, err_info)) {
+                    merged_index = merged_idb_list->interface_data->len - 1;
+                    add_idb_index_map(&in_files[i], itf_count, merged_index);
+                } else {
+                    return FALSE;
+                }
+            }
+            itf_count = in_files[i].wth->next_interface_data;
+        }
+    }
+
+    return TRUE;
 }
 
 /*
  * Create clone IDBs for the merge file, based on the input files and mode.
  */
 static wtapng_iface_descriptions_t *
-generate_merged_idbs(merge_in_file_t *in_files, const guint in_file_count, const idb_merge_mode mode)
+generate_merged_idbs(merge_in_file_t *in_files, const guint in_file_count, idb_merge_mode * const mode)
 {
     wtapng_iface_descriptions_t *merged_idb_list = NULL;
-    wtapng_iface_descriptions_t *input_file_idb_list = NULL;
     wtap_block_t                 input_file_idb;
     guint                        itf_count, merged_index;
     guint                        i;
@@ -748,45 +814,45 @@ generate_merged_idbs(merge_in_file_t *in_files, const guint in_file_count, const
     merged_idb_list = g_new(wtapng_iface_descriptions_t,1);
     merged_idb_list->interface_data = g_array_new(FALSE, FALSE, sizeof(wtap_block_t));
 
-    if (mode == IDB_MERGE_MODE_ALL_SAME && all_idbs_are_duplicates(in_files, in_file_count)) {
-        guint num_idbs;
+    if (*mode == IDB_MERGE_MODE_ALL_SAME && all_idbs_are_duplicates(in_files, in_file_count)) {
+        ws_debug("mode ALL set and all IDBs are duplicates");
 
-        merge_debug("merge::generate_merged_idbs: mode ALL set and all IDBs are duplicates");
+        /* All files have the same interfaces are the same, so merge any
+         * IDBs found later in the files together with duplicates.
+         * (Note this is also the right thing to do if we have some kind
+         * of two-pass mode and all_idbs_are_duplicates actually did
+         * compare all the IDBs instead of just the ones before any packets.)
+         */
+        *mode = IDB_MERGE_MODE_ANY_SAME;
 
         /* they're all the same, so just get the first file's IDBs */
-        input_file_idb_list = wtap_file_get_idb_info(in_files[0].wth);
-        /* this is really one more than number of IDBs, but that's good for the for-loops */
-        num_idbs = input_file_idb_list->interface_data->len;
-
+        itf_count = in_files[0].wth->next_interface_data;
         /* put them in the merged file */
-        for (itf_count = 0; itf_count < num_idbs; itf_count++) {
-            input_file_idb = g_array_index(input_file_idb_list->interface_data,
-                                            wtap_block_t, itf_count);
-            merged_index = add_idb_to_merged_file(merged_idb_list, input_file_idb);
+        while ((input_file_idb = wtap_get_next_interface_description(in_files[0].wth)) != NULL) {
+            add_idb_to_merged_file(merged_idb_list, input_file_idb, NULL, NULL, NULL);
+            merged_index = merged_idb_list->interface_data->len - 1;
             add_idb_index_map(&in_files[0], itf_count, merged_index);
-        }
-
-        /* and set all the other file index maps the same way */
-        for (i = 1; i < in_file_count; i++) {
-            for (itf_count = 0; itf_count < num_idbs; itf_count++) {
-                add_idb_index_map(&in_files[i], itf_count, itf_count);
+            /* and set all the other file index maps the same way */
+            for (i = 1; i < in_file_count; i++) {
+                if (wtap_get_next_interface_description(in_files[i].wth) != NULL) {
+                    add_idb_index_map(&in_files[i], itf_count, merged_index);
+                } else {
+                    ws_assert_not_reached();
+                }
             }
+            itf_count = in_files[0].wth->next_interface_data;
         }
-
-        g_free(input_file_idb_list);
     }
     else {
         for (i = 0; i < in_file_count; i++) {
-            input_file_idb_list = wtap_file_get_idb_info(in_files[i].wth);
 
-            for (itf_count = 0; itf_count < input_file_idb_list->interface_data->len; itf_count++) {
-                input_file_idb = g_array_index(input_file_idb_list->interface_data,
-                                                wtap_block_t, itf_count);
+            itf_count = in_files[i].wth->next_interface_data;
+            while ((input_file_idb = wtap_get_next_interface_description(in_files[i].wth)) != NULL) {
 
-                if (mode == IDB_MERGE_MODE_ANY_SAME &&
+                if (*mode == IDB_MERGE_MODE_ANY_SAME &&
                     find_duplicate_idb(input_file_idb, merged_idb_list, &merged_index))
                 {
-                    merge_debug("merge::generate_merged_idbs: mode ANY set and found a duplicate");
+                    ws_debug("mode ANY set and found a duplicate");
                     /*
                      * It's the same as a previous IDB, so we're going to "merge"
                      * them into one by adding a map from its old IDB index to the new
@@ -795,17 +861,17 @@ generate_merged_idbs(merge_in_file_t *in_files, const guint in_file_count, const
                     add_idb_index_map(&in_files[i], itf_count, merged_index);
                 }
                 else {
-                    merge_debug("merge::generate_merged_idbs: mode NONE set or did not find a duplicate");
+                    ws_debug("mode NONE set or did not find a duplicate");
                     /*
                      * This IDB does not match a previous (or we want to save all IDBs),
                      * so add the IDB to the merge file, and add a map of the indices.
                      */
-                    merged_index = add_idb_to_merged_file(merged_idb_list, input_file_idb);
+                    add_idb_to_merged_file(merged_idb_list, input_file_idb, NULL, NULL, NULL);
+                    merged_index = merged_idb_list->interface_data->len - 1;
                     add_idb_index_map(&in_files[i], itf_count, merged_index);
                 }
+                itf_count = in_files[i].wth->next_interface_data;
             }
-
-            g_free(input_file_idb_list);
         }
     }
 
@@ -816,9 +882,9 @@ static gboolean
 map_rec_interface_id(wtap_rec *rec, const merge_in_file_t *in_file)
 {
     guint current_interface_id = 0;
-    g_assert(rec != NULL);
-    g_assert(in_file != NULL);
-    g_assert(in_file->idb_index_map != NULL);
+    ws_assert(rec != NULL);
+    ws_assert(in_file != NULL);
+    ws_assert(in_file->idb_index_map != NULL);
 
     if (rec->presence_flags & WTAP_HAS_INTERFACE_ID) {
         current_interface_id = rec->rec_header.packet_header.interface_id;
@@ -826,7 +892,7 @@ map_rec_interface_id(wtap_rec *rec, const merge_in_file_t *in_file)
 
     if (current_interface_id >= in_file->idb_index_map->len) {
         /* this shouldn't happen, but in a malformed input file it could */
-        merge_debug("merge::map_rec_interface_id: current_interface_id (%u) >= in_file->idb_index_map->len (%u) (ERROR?)",
+        ws_debug("current_interface_id (%u) >= in_file->idb_index_map->len (%u) (ERROR?)",
             current_interface_id, in_file->idb_index_map->len);
         return FALSE;
     }
@@ -840,8 +906,10 @@ map_rec_interface_id(wtap_rec *rec, const merge_in_file_t *in_file)
 static merge_result
 merge_process_packets(wtap_dumper *pdh, const int file_type,
                       merge_in_file_t *in_files, const guint in_file_count,
-                      const gboolean do_append, guint snaplen,
+                      const gboolean do_append,
+                      const idb_merge_mode mode, guint snaplen,
                       merge_progress_callback_t* cb,
+                      wtapng_iface_descriptions_t *idb_inf,
                       GArray *dsb_combined,
                       int *err, gchar **err_info, guint *err_fileno,
                       guint32 *err_framenum)
@@ -887,6 +955,14 @@ merge_process_packets(wtap_dumper *pdh, const int file_type,
 
         rec = &in_file->rec;
 
+        if (wtap_file_type_subtype_supports_block(file_type,
+                                                  WTAP_BLOCK_IF_ID_AND_INFO) != BLOCK_NOT_SUPPORTED) {
+            if (!process_new_idbs(pdh, in_files, in_file_count, mode, idb_inf, err, err_info)) {
+                status = MERGE_ERR_CANT_WRITE_OUTFILE;
+                break;
+            }
+        }
+
         switch (rec->rec_type) {
 
         case REC_TYPE_PACKET:
@@ -908,7 +984,15 @@ merge_process_packets(wtap_dumper *pdh, const int file_type,
             break;
         }
 
-        if (wtap_uses_interface_ids(file_type)) {
+        /*
+         * Does this file type support identifying the interfaces on
+         * which packets arrive?
+         *
+         * That mean that the abstract interface provided by libwiretap
+         * involves WTAP_BLOCK_IF_ID_AND_INFO blocks.
+         */
+        if (wtap_file_type_subtype_supports_block(file_type,
+                                                  WTAP_BLOCK_IF_ID_AND_INFO) != BLOCK_NOT_SUPPORTED) {
             /*
              * XXX - We should do this only for record types
              * that pertain to a particular interface; for
@@ -940,13 +1024,14 @@ merge_process_packets(wtap_dumper *pdh, const int file_type,
             status = MERGE_ERR_CANT_WRITE_OUTFILE;
             break;
         }
+        wtap_rec_reset(rec);
     }
 
     if (cb)
         cb->callback_func(MERGE_EVENT_DONE, count, in_files, in_file_count, cb->data);
 
     if (status == MERGE_OK || status == MERGE_USER_ABORTED) {
-        if (!wtap_dump_close(pdh, err, err_info))
+        if (!wtap_dump_close(pdh, NULL, err, err_info))
             status = MERGE_ERR_CANT_CLOSE_OUTFILE;
     } else {
         /*
@@ -957,7 +1042,7 @@ merge_process_packets(wtap_dumper *pdh, const int file_type,
          */
         int close_err = 0;
         gchar *close_err_info = NULL;
-        (void)wtap_dump_close(pdh, &close_err, &close_err_info);
+        (void)wtap_dump_close(pdh, NULL, &close_err, &close_err_info);
         g_free(close_err_info);
     }
 
@@ -979,11 +1064,12 @@ merge_process_packets(wtap_dumper *pdh, const int file_type,
 }
 
 static merge_result
-merge_files_common(const gchar* out_filename, /* normal output mode */
+merge_files_common(const gchar* out_filename, /* filename in normal output mode,
+                   optional tempdir in tempfile mode (NULL for OS default) */
                    gchar **out_filenamep, const char *pfx, /* tempfile mode  */
                    const int file_type, const char *const *in_filenames,
                    const guint in_file_count, const gboolean do_append,
-                   const idb_merge_mode mode, guint snaplen,
+                   idb_merge_mode mode, guint snaplen,
                    const gchar *app_name, merge_progress_callback_t* cb,
                    int *err, gchar **err_info, guint *err_fileno,
                    guint32 *err_framenum)
@@ -996,22 +1082,22 @@ merge_files_common(const gchar* out_filename, /* normal output mode */
     wtapng_iface_descriptions_t *idb_inf = NULL;
     GArray             *dsb_combined = NULL;
 
-    g_assert(in_file_count > 0);
-    g_assert(in_filenames != NULL);
-    g_assert(err != NULL);
-    g_assert(err_info != NULL);
-    g_assert(err_fileno != NULL);
-    g_assert(err_framenum != NULL);
+    ws_assert(in_file_count > 0);
+    ws_assert(in_filenames != NULL);
+    ws_assert(err != NULL);
+    ws_assert(err_info != NULL);
+    ws_assert(err_fileno != NULL);
+    ws_assert(err_framenum != NULL);
 
     /* if a callback was given, it has to have a callback function ptr */
-    g_assert((cb != NULL) ? (cb->callback_func != NULL) : TRUE);
+    ws_assert((cb != NULL) ? (cb->callback_func != NULL) : TRUE);
 
-    merge_debug("merge_files: begin");
+    ws_debug("merge_files: begin");
 
     /* open the input files */
     if (!merge_open_in_files(in_file_count, in_filenames, &in_files, cb,
                              err, err_info, err_fileno)) {
-        merge_debug("merge_files: merge_open_in_files() failed with err=%d", *err);
+        ws_debug("merge_open_in_files() failed with err=%d", *err);
         *err_framenum = 0;
         return MERGE_ERR_CANT_OPEN_INFILE;
     }
@@ -1023,13 +1109,20 @@ merge_files_common(const gchar* out_filename, /* normal output mode */
 
     /*
      * This doesn't tell us that much. It tells us what to set the outfile's
-     * encap type to, but that's all - for example, it does *not* tells us
+     * encap type to, but that's all - for example, it does *not* tell us
      * whether the input files had the same number of IDBs, for the same exact
      * interfaces, and only one IDB each, so it doesn't actually tell us
      * whether we can merge IDBs into one or not.
+     *
+     * XXX: In the case that WTAP_ENCAP_PER_PACKET is returned, just because
+     * an output file format (e.g. pcapng) can write WTAP_ENCAP_PER_PACKET,
+     * that doesn't mean that the format can actually write all the IDBs,
+     * and the error in the latter case is currently confusing.
+     * (E.g., if one of the files is a normal packet file and the other is
+     * WTAP_ENCAP_JSON.)
      */
     frame_type = merge_select_frame_type(in_file_count, in_files);
-    merge_debug("merge_files: got frame_type=%d", frame_type);
+    ws_debug("got frame_type=%d", frame_type);
 
     if (cb)
         cb->callback_func(MERGE_EVENT_FRAME_TYPE_SELECTED, frame_type, in_files, in_file_count, cb->data);
@@ -1038,12 +1131,20 @@ merge_files_common(const gchar* out_filename, /* normal output mode */
     wtap_dump_params params = WTAP_DUMP_PARAMS_INIT;
     params.encap = frame_type;
     params.snaplen = snaplen;
-    if (wtap_uses_interface_ids(file_type)) {
+    /*
+     * Does this file type support identifying the interfaces on
+     * which packets arrive?
+     *
+     * That mean that the abstract interface provided by libwiretap
+     * involves WTAP_BLOCK_IF_ID_AND_INFO blocks.
+     */
+    if (wtap_file_type_subtype_supports_block(file_type,
+                                              WTAP_BLOCK_IF_ID_AND_INFO) != BLOCK_NOT_SUPPORTED) {
         shb_hdrs = create_shb_header(in_files, in_file_count, app_name);
-        merge_debug("merge_files: SHB created");
+        ws_debug("SHB created");
 
-        idb_inf = generate_merged_idbs(in_files, in_file_count, mode);
-        merge_debug("merge_files: IDB merge operation complete, got %u IDBs", idb_inf ? idb_inf->interface_data->len : 0);
+        idb_inf = generate_merged_idbs(in_files, in_file_count, &mode);
+        ws_debug("IDB merge operation complete, got %u IDBs", idb_inf ? idb_inf->interface_data->len : 0);
 
         /* XXX other blocks like NRB are now discarded. */
         params.shb_hdrs = shb_hdrs;
@@ -1051,13 +1152,13 @@ merge_files_common(const gchar* out_filename, /* normal output mode */
         dsb_combined = g_array_new(FALSE, FALSE, sizeof(wtap_block_t));
         params.dsbs_growing = dsb_combined;
     }
-    if (out_filename) {
-        pdh = wtap_dump_open(out_filename, file_type, WTAP_UNCOMPRESSED,
-                             &params, err, err_info);
-    } else if (out_filenamep) {
-        pdh = wtap_dump_open_tempfile(out_filenamep, pfx, file_type,
+    if (out_filenamep) {
+        pdh = wtap_dump_open_tempfile(out_filename, out_filenamep, pfx, file_type,
                                       WTAP_UNCOMPRESSED, &params, err,
                                       err_info);
+    } else if (out_filename) {
+        pdh = wtap_dump_open(out_filename, file_type, WTAP_UNCOMPRESSED,
+                             &params, err, err_info);
     } else {
         pdh = wtap_dump_open_stdout(file_type, WTAP_UNCOMPRESSED, &params, err,
                                     err_info);
@@ -1078,7 +1179,9 @@ merge_files_common(const gchar* out_filename, /* normal output mode */
         cb->callback_func(MERGE_EVENT_READY_TO_MERGE, 0, in_files, in_file_count, cb->data);
 
     status = merge_process_packets(pdh, file_type, in_files, in_file_count,
-                                   do_append, snaplen, cb, dsb_combined, err, err_info,
+                                   do_append, mode, snaplen, cb,
+                                   idb_inf, dsb_combined,
+                                   err, err_info,
                                    err_fileno, err_framenum);
 
     g_free(in_files);
@@ -1104,7 +1207,7 @@ merge_files(const gchar* out_filename, const int file_type,
             int *err, gchar **err_info, guint *err_fileno,
             guint32 *err_framenum)
 {
-    g_assert(out_filename != NULL);
+    ws_assert(out_filename != NULL);
 
     return merge_files_common(out_filename, NULL, NULL,
                               file_type, in_filenames, in_file_count,
@@ -1118,7 +1221,7 @@ merge_files(const gchar* out_filename, const int file_type,
  * on failure.
  */
 merge_result
-merge_files_to_tempfile(gchar **out_filenamep, const char *pfx,
+merge_files_to_tempfile(const char *tmpdir, gchar **out_filenamep, const char *pfx,
                         const int file_type, const char *const *in_filenames,
                         const guint in_file_count, const gboolean do_append,
                         const idb_merge_mode mode, guint snaplen,
@@ -1126,12 +1229,12 @@ merge_files_to_tempfile(gchar **out_filenamep, const char *pfx,
                         int *err, gchar **err_info, guint *err_fileno,
                         guint32 *err_framenum)
 {
-    g_assert(out_filenamep != NULL);
+    ws_assert(out_filenamep != NULL);
 
     /* no temporary file name yet */
     *out_filenamep = NULL;
 
-    return merge_files_common(NULL, out_filenamep, pfx,
+    return merge_files_common(tmpdir, out_filenamep, pfx,
                               file_type, in_filenames, in_file_count,
                               do_append, mode, snaplen, app_name, cb, err,
                               err_info, err_fileno, err_framenum);

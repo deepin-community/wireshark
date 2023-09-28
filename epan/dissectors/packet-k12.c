@@ -202,7 +202,7 @@ dissect_k12(tvbuff_t* tvb,packet_info* pinfo,proto_tree* tree, void* data _U_)
 			break;
 		case K12_PORT_ATMPVC:
 		{
-		gchar* circuit_str = wmem_strdup_printf(wmem_packet_scope(), "%u:%u:%u",
+		gchar* circuit_str = wmem_strdup_printf(pinfo->pool, "%u:%u:%u",
 						      (guint)pinfo->pseudo_header->k12.input_info.atm.vp,
 						      (guint)pinfo->pseudo_header->k12.input_info.atm.vc,
 						      (guint)pinfo->pseudo_header->k12.input_info.atm.cid);
@@ -211,7 +211,7 @@ dissect_k12(tvbuff_t* tvb,packet_info* pinfo,proto_tree* tree, void* data _U_)
 			     * XXX: this is prone to collisions!
 			     * we need an uniform way to manage circuits between dissectors
 			     */
-		conversation_create_endpoint_by_id(pinfo, ENDPOINT_NONE, g_str_hash(circuit_str), 0);
+		conversation_set_elements_by_id(pinfo, CONVERSATION_NONE, g_str_hash(circuit_str));
 
 		proto_tree_add_uint(k12_tree, hf_k12_atm_vp, tvb, 0, 0,
 				    pinfo->pseudo_header->k12.input_info.atm.vp);
@@ -230,8 +230,8 @@ dissect_k12(tvbuff_t* tvb,packet_info* pinfo,proto_tree* tree, void* data _U_)
 
 	if (! handles ) {
 		for (i=0 ; i < nk12_handles; i++) {
-			if ( epan_strcasestr(pinfo->pseudo_header->k12.stack_file, k12_handles[i].match)
-			     || epan_strcasestr(pinfo->pseudo_header->k12.input_name, k12_handles[i].match) ) {
+			if ( ws_strcasestr(pinfo->pseudo_header->k12.stack_file, k12_handles[i].match)
+			     || ws_strcasestr(pinfo->pseudo_header->k12.input_name, k12_handles[i].match) ) {
 				handles = k12_handles[i].handles;
 				break;
 			}
@@ -301,13 +301,13 @@ k12_update_cb(void* r, char** err)
 
 	g_free(h->handles);
 	/* Allocate extra space for NULL marker */
-	h->handles = (dissector_handle_t *)g_malloc0(sizeof(dissector_handle_t)*(num_protos+1));
+	h->handles = g_new0(dissector_handle_t, (num_protos+1));
 
 	for (i = 0; i < num_protos; i++) {
 		if ( ! (h->handles[i] = find_dissector(protos[i])) ) {
 			h->handles[i] = data_handle;
 			h->handles[i+1] = NULL;
-			*err = g_strdup_printf("Could not find dissector for: '%s'",protos[i]);
+			*err = ws_strdup_printf("Could not find dissector for: '%s'",protos[i]);
 			g_strfreev(protos);
 			return FALSE;
 		}
@@ -332,7 +332,7 @@ k12_copy_cb(void* dest, const void* orig, size_t len _U_)
 
 	d->match   = g_strdup(o->match);
 	d->protos  = g_strdup(o->protos);
-	d->handles = (dissector_handle_t *)g_memdup(o->handles,(guint)(sizeof(dissector_handle_t)*(num_protos+1)));
+	d->handles = (dissector_handle_t *)g_memdup2(o->handles,(guint)(sizeof(dissector_handle_t)*(num_protos+1)));
 
 	g_strfreev(protos);
 
@@ -374,7 +374,7 @@ protos_chk_cb(void* r _U_, const char* p, guint len, const void* u1 _U_, const v
 
 	for (i = 0; i < num_protos; i++) {
 		if (!find_dissector(protos[i])) {
-			*err = g_strdup_printf("Could not find dissector for: '%s'",protos[i]);
+			*err = ws_strdup_printf("Could not find dissector for: '%s'",protos[i]);
 			wmem_free(NULL, line);
 			g_strfreev(protos);
 			return FALSE;

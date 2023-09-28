@@ -24,6 +24,7 @@
 #include <epan/follow.h>
 #include <epan/stat_tap_ui.h>
 #include <epan/tap.h>
+#include <wsutil/ws_assert.h>
 
 void register_tap_listener_follow(void);
 
@@ -53,6 +54,7 @@ typedef struct _cli_follow_info {
 #define STR_ASCII       ",ascii"
 #define STR_EBCDIC      ",ebcdic"
 #define STR_RAW         ",raw"
+#define STR_YAML        ",yaml"
 
 WS_NORETURN static void follow_exit(const char *strp)
 {
@@ -68,12 +70,13 @@ static const char * follow_str_type(cli_follow_info_t* cli_follow_info)
   case SHOW_ASCII:      return "ascii";
   case SHOW_EBCDIC:     return "ebcdic";
   case SHOW_RAW:        return "raw";
+  case SHOW_YAML:       return "yaml";
   default:
-    g_assert_not_reached();
+    ws_assert_not_reached();
     break;
   }
 
-  g_assert_not_reached();
+  ws_assert_not_reached();
 
   return "<unknown-mode>";
 }
@@ -113,7 +116,7 @@ static void follow_print_hex(const char *prefixp, guint32 offset, void *datap, i
     if ((ii % BYTES_PER_LINE) == 0)
     {
       /* new line */
-      g_snprintf(line, LINE_LEN + 1, "%0*X", OFFSET_LEN, offset);
+      snprintf(line, LINE_LEN + 1, "%0*X", OFFSET_LEN, offset);
       memset(line + HEX_START - OFFSET_SPACE, ' ',
              HEX_LEN + OFFSET_SPACE + HEX_SPACE);
 
@@ -168,22 +171,43 @@ static void follow_draw(void *contextp)
   GList             *cur;
   follow_record_t   *follow_record;
   guint             chunk;
+  gchar             *b64encoded;
+  const guint32     base64_raw_len = 57; /* Encodes to 76 bytes, common in RFCs */
 
-  printf("\n%s", separator);
-  printf("Follow: %s,%s\n", proto_get_protocol_filter_name(get_follow_proto_id(cli_follow_info->follower)), follow_str_type(cli_follow_info));
-  printf("Filter: %s\n", follow_info->filter_out_filter);
+  /* Print header */
+  switch (cli_follow_info->show_type)
+  {
+    case SHOW_YAML:
+      printf("peers:\n");
+      printf("  - peer: 0\n");
+      address_to_str_buf(&follow_info->client_ip, buf, sizeof buf);
+      printf("    host: %s\n", buf);
+      printf("    port: %d\n", follow_info->client_port);
+      printf("  - peer: 1\n");
+      address_to_str_buf(&follow_info->server_ip, buf, sizeof buf);
+      printf("    host: %s\n", buf);
+      printf("    port: %d\n", follow_info->server_port);
+      printf("packets:\n");
+      break;
 
-  address_to_str_buf(&follow_info->client_ip, buf, sizeof buf);
-  if (follow_info->client_ip.type == AT_IPv6)
-    printf("Node 0: [%s]:%u\n", buf, follow_info->client_port);
-  else
-    printf("Node 0: %s:%u\n", buf, follow_info->client_port);
+    default:
+      printf("\n%s", separator);
+      printf("Follow: %s,%s\n", proto_get_protocol_filter_name(get_follow_proto_id(cli_follow_info->follower)), follow_str_type(cli_follow_info));
+      printf("Filter: %s\n", follow_info->filter_out_filter);
 
-  address_to_str_buf(&follow_info->server_ip, buf, sizeof buf);
-  if (follow_info->client_ip.type == AT_IPv6)
-    printf("Node 1: [%s]:%u\n", buf, follow_info->server_port);
-  else
-    printf("Node 1: %s:%u\n", buf, follow_info->server_port);
+      address_to_str_buf(&follow_info->client_ip, buf, sizeof buf);
+      if (follow_info->client_ip.type == AT_IPv6)
+        printf("Node 0: [%s]:%u\n", buf, follow_info->client_port);
+      else
+        printf("Node 0: %s:%u\n", buf, follow_info->client_port);
+
+      address_to_str_buf(&follow_info->server_ip, buf, sizeof buf);
+      if (follow_info->server_ip.type == AT_IPv6)
+        printf("Node 1: [%s]:%u\n", buf, follow_info->server_port);
+      else
+        printf("Node 1: %s:%u\n", buf, follow_info->server_port);
+      break;
+  }
 
   for (cur = g_list_last(follow_info->payload), chunk = 1;
        cur != NULL;
@@ -202,9 +226,11 @@ static void follow_draw(void *contextp)
       continue;
     }
 
+    /* Print start of line */
     switch (cli_follow_info->show_type)
     {
     case SHOW_HEXDUMP:
+    case SHOW_YAML:
       break;
 
     case SHOW_ASCII:
@@ -218,10 +244,12 @@ static void follow_draw(void *contextp)
         putchar('\t');
       }
       break;
+
     default:
-      g_assert_not_reached();
+      ws_assert_not_reached();
     }
 
+    /* Print data */
     switch (cli_follow_info->show_type)
     {
     case SHOW_HEXDUMP:
@@ -271,12 +299,38 @@ static void follow_draw(void *contextp)
       g_free(buffer);
       break;
 
+    case SHOW_YAML:
+      printf("  - packet: %d\n", follow_record->packet_num);
+      printf("    peer: %d\n", follow_record->is_server ? 1 : 0);
+      printf("    timestamp: %.9f\n", nstime_to_sec(&follow_record->abs_ts));
+      printf("    data: !!binary |\n");
+      ii = 0;
+      while (ii < follow_record->data->len) {
+          guint32 len = ii + base64_raw_len < follow_record->data->len
+                ? base64_raw_len
+                : follow_record->data->len - ii;
+          b64encoded = g_base64_encode(&follow_record->data->data[ii], len);
+          printf("      %s\n", b64encoded);
+          g_free(b64encoded);
+          ii += len;
+      }
+      break;
+
     default:
-      g_assert_not_reached();
+      ws_assert_not_reached();
     }
   }
 
-  printf("%s", separator);
+  /* Print footer */
+  switch (cli_follow_info->show_type)
+  {
+    case SHOW_YAML:
+      break;
+
+    default:
+      printf("%s", separator);
+      break;
+  }
 }
 
 static gboolean follow_arg_strncmp(const char **opt_argp, const char *strp)
@@ -312,6 +366,10 @@ follow_arg_mode(const char **opt_argp, follow_info_t *follow_info)
   {
     cli_follow_info->show_type = SHOW_RAW;
   }
+  else if (follow_arg_strncmp(opt_argp, STR_YAML))
+  {
+    cli_follow_info->show_type = SHOW_YAML;
+  }
   else
   {
     follow_exit("Invalid display mode.");
@@ -345,6 +403,7 @@ follow_arg_filter(const char **opt_argp, follow_info_t *follow_info)
         ((*opt_argp)[len] == 0 || (*opt_argp)[len] == ','))
     {
       *opt_argp += len;
+      follow_info->substream_id = cli_follow_info->sub_stream_index;
     }
   }
   else
@@ -463,6 +522,7 @@ static void follow_stream(const char *opt_argp, void *userdata)
   }
   follow_info = g_new0(follow_info_t, 1);
   follow_info->gui_data = cli_follow_info;
+  follow_info->substream_id = SUBSTREAM_UNUSED;
   cli_follow_info->follower = follower;
 
   follow_arg_mode(&opt_argp, follow_info);

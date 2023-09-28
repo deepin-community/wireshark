@@ -62,6 +62,10 @@ static gboolean systemd_journal_read_export_entry(FILE_T fh, wtap_rec *rec,
 #define FLD__REALTIME_TIMESTAMP "__REALTIME_TIMESTAMP="
 #define FLD__MONOTONIC_TIMESTAMP "__MONOTONIC_TIMESTAMP="
 
+static int systemd_journal_file_type_subtype = -1;
+
+void register_systemd_journal(void);
+
 wtap_open_return_val systemd_journal_open(wtap *wth, int *err _U_, gchar **err_info _U_)
 {
     gchar *entry_buff = (gchar*) g_malloc(MAX_EXPORT_ENTRY_LENGTH);
@@ -97,7 +101,7 @@ wtap_open_return_val systemd_journal_open(wtap *wth, int *err _U_, gchar **err_i
         return WTAP_OPEN_NOT_MINE;
     }
 
-    wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_SYSTEMD_JOURNAL;
+    wth->file_type_subtype = systemd_journal_file_type_subtype;
     wth->subtype_read = systemd_journal_read;
     wth->subtype_seek_read = systemd_journal_seek_read;
     wth->file_encap = WTAP_ENCAP_SYSTEMD_JOURNAL;
@@ -191,7 +195,7 @@ systemd_journal_read_export_entry(FILE_T fh, wtap_rec *rec, Buffer *buf, int *er
             // Start of binary data.
             if (fld_end >= MAX_EXPORT_ENTRY_LENGTH - 8) {
                 *err = WTAP_ERR_BAD_FILE;
-                *err_info = g_strdup_printf("systemd: binary length too long");
+                *err_info = ws_strdup_printf("systemd: binary length too long");
                 return FALSE;
             }
             guint64 data_len, le_data_len;
@@ -203,7 +207,7 @@ systemd_journal_read_export_entry(FILE_T fh, wtap_rec *rec, Buffer *buf, int *er
             data_len = pletoh64(&le_data_len);
             if (data_len < 1 || data_len - 1 >= MAX_EXPORT_ENTRY_LENGTH - fld_end) {
                 *err = WTAP_ERR_BAD_FILE;
-                *err_info = g_strdup_printf("systemd: binary data too long");
+                *err_info = ws_strdup_printf("systemd: binary data too long");
                 return FALSE;
             }
             // Data + trailing \n
@@ -225,11 +229,37 @@ systemd_journal_read_export_entry(FILE_T fh, wtap_rec *rec, Buffer *buf, int *er
         return FALSE;
     }
 
-    rec->rec_type = REC_TYPE_SYSTEMD_JOURNAL;
+    rec->rec_type = REC_TYPE_SYSTEMD_JOURNAL_EXPORT;
+    rec->block = wtap_block_create(WTAP_BLOCK_SYSTEMD_JOURNAL_EXPORT);
     rec->presence_flags = WTAP_HAS_TS|WTAP_HAS_CAP_LEN;
-    rec->rec_header.systemd_journal_header.record_len = (guint32) fld_end;
+    rec->rec_header.systemd_journal_export_header.record_len = (guint32) fld_end;
 
     return TRUE;
+}
+
+static const struct supported_block_type systemd_journal_blocks_supported[] = {
+    /*
+     * We support systemd journal blocks, with no comments or other options.
+     */
+    { WTAP_BLOCK_SYSTEMD_JOURNAL_EXPORT, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info systemd_journal_info = {
+    "systemd journal export", "systemd_journal", NULL, NULL,
+    FALSE, BLOCKS_SUPPORTED(systemd_journal_blocks_supported),
+    NULL, NULL, NULL
+};
+
+void register_systemd_journal(void)
+{
+  systemd_journal_file_type_subtype = wtap_register_file_type_subtype(&systemd_journal_info);
+
+  /*
+   * Register name for backwards compatibility with the
+   * wtap_filetypes table in Lua.
+   */
+  wtap_register_backwards_compatibility_lua_name("SYSTEMD_JOURNAL",
+                                                 systemd_journal_file_type_subtype);
 }
 
 /*

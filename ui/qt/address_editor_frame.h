@@ -1,4 +1,4 @@
-/* address_editor_frame.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -43,7 +43,7 @@ private slots:
     void displayPreviousUserDefinedHostname();
     void updateWidgets();
     void on_nameResolutionPreferencesToolButton_clicked();
-    void on_addressComboBox_currentIndexChanged(const QString &);
+    void on_addressComboBox_currentIndexChanged(int idx);
     void on_nameLineEdit_textEdited(const QString &);
     void on_buttonBox_accepted();
     void on_buttonBox_rejected();
@@ -56,16 +56,3 @@ private:
 };
 
 #endif // ADDRESS_EDITOR_FRAME_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

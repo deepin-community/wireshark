@@ -17,7 +17,9 @@
 #include "compiled_filter_output.h"
 #include "manage_interfaces_dialog.h"
 
-#include "wireshark_application.h"
+#include "main_application.h"
+
+#include "extcap.h"
 
 #ifdef HAVE_LIBPCAP
 
@@ -45,6 +47,7 @@
 #include <wiretap/wtap.h>
 
 #include <ui/qt/utils/qt_ui_utils.h>
+#include <ui/qt/utils/stock_icon.h>
 #include <ui/qt/models/sparkline_delegate.h>
 #include "ui/qt/widgets/wireshark_file_dialog.h"
 
@@ -70,7 +73,8 @@ const int stat_update_interval_ = 1000; // ms
  */
 enum
 {
-    col_interface_ = 0,
+    col_extcap_ = 0,
+    col_interface_,
     col_traffic_,
     col_link_,
     col_pmode_,
@@ -157,7 +161,7 @@ public:
     }
 
     void setApplicable(int column, bool applicable = false) {
-        QPalette palette = wsApp->palette();
+        QPalette palette = mainApp->palette();
 
         if (applicable) {
             setText(column, QString());
@@ -177,7 +181,7 @@ CaptureOptionsDialog::CaptureOptionsDialog(QWidget *parent) :
 {
     ui->setupUi(this);
     loadGeometry();
-    setWindowTitle(wsApp->windowTitleString(tr("Capture Options")));
+    setWindowTitle(mainApp->windowTitleString(tr("Capture Options")));
 
     stat_timer_ = NULL;
     stat_cache_ = NULL;
@@ -187,8 +191,9 @@ CaptureOptionsDialog::CaptureOptionsDialog(QWidget *parent) :
     // Start out with the list *not* sorted, so they show up in the order
     // in which they were provided
     ui->interfaceTree->sortByColumn(-1, Qt::AscendingOrder);
+    ui->interfaceTree->setItemDelegateForColumn(col_extcap_, &interface_item_delegate_);
     ui->interfaceTree->setItemDelegateForColumn(col_interface_, &interface_item_delegate_);
-    ui->interfaceTree->setItemDelegateForColumn(col_traffic_, new SparkLineDelegate());
+    ui->interfaceTree->setItemDelegateForColumn(col_traffic_, new SparkLineDelegate(this));
     ui->interfaceTree->setItemDelegateForColumn(col_link_, &interface_item_delegate_);
 
     ui->interfaceTree->setItemDelegateForColumn(col_snaplen_, &interface_item_delegate_);
@@ -206,6 +211,11 @@ CaptureOptionsDialog::CaptureOptionsDialog(QWidget *parent) :
 
     ui->filenameLineEdit->setPlaceholderText(tr("Leave blank to use a temporary file"));
 
+    ui->rbCompressionNone->setChecked(true);
+
+    ui->tempDirLineEdit->setPlaceholderText(g_get_tmp_dir());
+    ui->tempDirLineEdit->setText(global_capture_opts.temp_dir);
+
     // Changes in interface selections or capture filters should be propagated
     // to the main welcome screen where they will be applied to the global
     // capture options.
@@ -220,10 +230,20 @@ CaptureOptionsDialog::CaptureOptionsDialog(QWidget *parent) :
     connect(&interface_item_delegate_, SIGNAL(filterChanged(QString)),
             this, SIGNAL(captureFilterTextEdited(QString)));
     connect(this, SIGNAL(ifsChanged()), this, SLOT(refreshInterfaceList()));
-    connect(wsApp, SIGNAL(localInterfaceListChanged()), this, SLOT(updateLocalInterfaces()));
+    connect(mainApp, SIGNAL(localInterfaceListChanged()), this, SLOT(updateLocalInterfaces()));
     connect(ui->browseButton, SIGNAL(clicked()), this, SLOT(browseButtonClicked()));
+    connect(ui->interfaceTree, SIGNAL(itemClicked(QTreeWidgetItem*,int)), this, SLOT(itemClicked(QTreeWidgetItem*,int)));
+    connect(ui->interfaceTree, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(itemDoubleClicked(QTreeWidgetItem*,int)));
+    connect(ui->tempDirBrowseButton, SIGNAL(clicked()), this, SLOT(tempDirBrowseButtonClicked()));
+
+    ui->tabWidget->setCurrentIndex(0);
 
     updateWidgets();
+}
+
+CaptureOptionsDialog::~CaptureOptionsDialog()
+{
+    delete ui;
 }
 
 /* Update global device selections based on the TreeWidget selection. */
@@ -327,16 +347,6 @@ void CaptureOptionsDialog::updateWidgets()
     ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(can_capture);
 }
 
-CaptureOptionsDialog::~CaptureOptionsDialog()
-{
-    delete ui;
-}
-
-void CaptureOptionsDialog::setTab(int idx)
-{
-    ui->tabWidget->setCurrentIndex(idx);
-}
-
 void CaptureOptionsDialog::on_capturePromModeCheckBox_toggled(bool checked)
 {
     interface_t *device;
@@ -370,6 +380,12 @@ void CaptureOptionsDialog::browseButtonClicked()
     }
     QString file_name = WiresharkFileDialog::getSaveFileName(this, tr("Specify a Capture File"), open_dir);
     ui->filenameLineEdit->setText(file_name);
+}
+
+void CaptureOptionsDialog::tempDirBrowseButtonClicked()
+{
+    QString specified_dir = WiresharkFileDialog::getExistingDirectory(this, tr("Specify temporary directory"));
+    ui->tempDirLineEdit->setText(specified_dir);
 }
 
 void CaptureOptionsDialog::interfaceItemChanged(QTreeWidgetItem *item, int column)
@@ -408,11 +424,11 @@ void CaptureOptionsDialog::interfaceItemChanged(QTreeWidgetItem *item, int colum
 
     #ifdef HAVE_PCAP_REMOTE
         if (device->remote_opts.remote_host_opts.auth_type == CAPTURE_AUTH_PWD) {
-            auth_str = g_strdup_printf("%s:%s", device->remote_opts.remote_host_opts.auth_username,
+            auth_str = ws_strdup_printf("%s:%s", device->remote_opts.remote_host_opts.auth_username,
                                        device->remote_opts.remote_host_opts.auth_password);
         }
     #endif
-        caps = capture_get_if_capabilities(device->name, monitor_mode, auth_str, NULL, main_window_update);
+        caps = capture_get_if_capabilities(device->name, monitor_mode, auth_str, NULL, NULL, main_window_update);
         g_free(auth_str);
 
         if (caps != Q_NULLPTR) {
@@ -446,7 +462,7 @@ void CaptureOptionsDialog::interfaceItemChanged(QTreeWidgetItem *item, int colum
                 } else {
                     gchar *str;
                     /* XXX - should we just omit them? */
-                    str = g_strdup_printf("%s (not supported)", data_link_info->name);
+                    str = ws_strdup_printf("%s (not supported)", data_link_info->name);
                     linkr->dlt = -1;
                     linkr->name = g_strdup(str);
                     g_free(str);
@@ -471,6 +487,74 @@ void CaptureOptionsDialog::interfaceItemChanged(QTreeWidgetItem *item, int colum
     }
 }
 
+void CaptureOptionsDialog::itemClicked(QTreeWidgetItem *item, int column)
+{
+    InterfaceTreeWidgetItem *ti = dynamic_cast<InterfaceTreeWidgetItem *>(item);
+    if (!ti) return;
+
+#ifdef HAVE_LIBPCAP
+    interface_t *device;
+    QString interface_name = ti->text(col_interface_);
+    device = find_device_by_if_name(interface_name);
+    if (!device) return;
+
+    switch(column) {
+
+    case col_extcap_:
+        if (device->if_info.type == IF_EXTCAP) {
+            /* this checks if configuration is required and not yet provided or saved via prefs */
+            QString device_name = ti->data(col_extcap_, Qt::UserRole).value<QString>();
+            if (extcap_has_configuration((const char *)(device_name.toStdString().c_str()), FALSE))
+            {
+                emit showExtcapOptions(device_name, false);
+                return;
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+#endif /* HAVE_LIBPCAP */
+}
+
+void CaptureOptionsDialog::itemDoubleClicked(QTreeWidgetItem *item, int column)
+{
+    InterfaceTreeWidgetItem *ti = dynamic_cast<InterfaceTreeWidgetItem *>(item);
+    if (!ti) return;
+
+    switch(column) {
+
+    // Double click starts capture just on columns which are not editable
+    case col_interface_:
+    case col_traffic_:
+    {
+#ifdef HAVE_LIBPCAP
+        interface_t *device;
+        QString interface_name = ti->text(col_interface_);
+        device = find_device_by_if_name(interface_name);
+        if (!device) return;
+
+        if (device->if_info.type == IF_EXTCAP) {
+            /* this checks if configuration is required and not yet provided or saved via prefs */
+            QString device_name = ti->data(col_extcap_, Qt::UserRole).value<QString>();
+            if (extcap_has_configuration((const char *)(device_name.toStdString().c_str()), TRUE))
+            {
+                emit showExtcapOptions(device_name, true);
+                return;
+            }
+        }
+#endif /* HAVE_LIBPCAP */
+        emit startCapture();
+        close();
+        break;
+    }
+
+    default:
+        break;
+    }
+}
+
 void CaptureOptionsDialog::on_gbStopCaptureAuto_toggled(bool checked)
 {
     global_capture_opts.has_file_interval = checked;
@@ -482,6 +566,13 @@ void CaptureOptionsDialog::on_gbNewFileAuto_toggled(bool checked)
     ui->stopMBCheckBox->setEnabled(checked?false:true);
     ui->stopMBSpinBox->setEnabled(checked?false:true);
     ui->stopMBComboBox->setEnabled(checked?false:true);
+    ui->gbCompression->setEnabled(checked);
+    ui->rbCompressionNone->setEnabled(checked);
+#ifdef HAVE_ZLIB
+    ui->rbCompressionGzip->setEnabled(checked);
+#else
+    ui->rbCompressionGzip->setEnabled(false);
+#endif
 }
 
 void CaptureOptionsDialog::on_cbUpdatePacketsRT_toggled(bool checked)
@@ -517,6 +608,26 @@ void CaptureOptionsDialog::on_cbResolveTransportNames_toggled(bool checked)
 void CaptureOptionsDialog::on_buttonBox_accepted()
 {
     if (saveOptionsToPreferences()) {
+
+#ifdef HAVE_LIBPCAP
+        InterfaceTreeWidgetItem *ti = dynamic_cast<InterfaceTreeWidgetItem *>(ui->interfaceTree->currentItem());
+        if (ti) {
+            interface_t *device;
+
+            QString interface_name = ti->text(col_interface_);
+            device = find_device_by_if_name(interface_name);
+            if (device && device->if_info.type == IF_EXTCAP) {
+                /* this checks if configuration is required and not yet provided or saved via prefs */
+                QString device_name = ti->data(col_extcap_, Qt::UserRole).value<QString>();
+                if (extcap_has_configuration((const char *)(device_name.toStdString().c_str()), TRUE))
+                {
+                    emit showExtcapOptions(device_name, true);
+                    return;
+                }
+            }
+        }
+#endif /* HAVE_LIBPCAP */
+
         emit setFilterValid(true, ui->captureFilterComboBox->lineEdit()->text());
         accept();
     }
@@ -533,7 +644,7 @@ void CaptureOptionsDialog::on_buttonBox_rejected()
 void CaptureOptionsDialog::on_buttonBox_helpRequested()
 {
     // Probably the wrong URL.
-    wsApp->helpTopicAction(HELP_CAPTURE_OPTIONS_DIALOG);
+    mainApp->helpTopicAction(HELP_CAPTURE_OPTIONS_DIALOG);
 }
 
 void CaptureOptionsDialog::updateInterfaces()
@@ -624,7 +735,7 @@ void CaptureOptionsDialog::updateInterfaces()
 
     if (global_capture_opts.has_autostop_duration) {
         ui->stopSecsCheckBox->setChecked(true);
-        int value = global_capture_opts.file_interval;
+        int value = global_capture_opts.autostop_duration;
         if (value > 3600 && value % 3600 == 0) {
             ui->stopSecsSpinBox->setValue(value / 3600);
             ui->stopSecsComboBox->setCurrentIndex(2);
@@ -682,10 +793,18 @@ void CaptureOptionsDialog::updateInterfaces()
             // Traffic sparklines
             InterfaceTreeWidgetItem *ti = new InterfaceTreeWidgetItem(ui->interfaceTree);
             ti->setFlags(ti->flags() | Qt::ItemIsEditable);
-            ti->setData(col_interface_, Qt::UserRole, QString(device->name));
-            ti->setData(col_traffic_, Qt::UserRole, QVariant::fromValue(ti->points));
+
+            if (device->if_info.type == IF_EXTCAP) {
+              ti->setIcon(col_extcap_,  QIcon(StockIcon("x-capture-options")));
+              ti->setData(col_extcap_, Qt::UserRole, QString(device->if_info.name));
+              ti->setToolTip(col_extcap_, QString("Extcap interface settings"));
+            }
 
             ti->setText(col_interface_, device->display_name);
+            ti->setData(col_interface_, Qt::UserRole, QString(device->name));
+            if (device->if_info.type != IF_EXTCAP)
+                ti->setData(col_traffic_, Qt::UserRole, QVariant::fromValue(ti->points));
+
             if (device->no_addresses > 0) {
                 QString addr_str = tr("%1: %2").arg(device->no_addresses > 1 ? tr("Addresses") : tr("Address")).arg(device->addresses);
                 QTreeWidgetItem *addr_ti = new QTreeWidgetItem(ti);
@@ -852,6 +971,14 @@ bool CaptureOptionsDialog::saveOptionsToPreferences()
         global_capture_opts.orig_save_file = NULL;
     }
 
+    QString tempdir = ui->tempDirLineEdit->text();
+    if (tempdir.length() > 0) {
+        global_capture_opts.temp_dir = qstring_strdup(tempdir);
+    }
+    else {
+        global_capture_opts.temp_dir = NULL;
+    }
+
     global_capture_opts.has_ring_num_files = ui->RbCheckBox->isChecked();
 
     if (global_capture_opts.has_ring_num_files) {
@@ -865,10 +992,21 @@ bool CaptureOptionsDialog::saveOptionsToPreferences()
     }
     global_capture_opts.multi_files_on = ui->gbNewFileAuto->isChecked();
     if (global_capture_opts.multi_files_on) {
-        global_capture_opts.has_file_interval = ui->SecsCheckBox->isChecked();
-        if (global_capture_opts.has_file_interval) {
-            global_capture_opts.file_interval = ui->SecsSpinBox->value();
+        global_capture_opts.has_file_duration = ui->SecsCheckBox->isChecked();
+        if (global_capture_opts.has_file_duration) {
+            global_capture_opts.file_duration = ui->SecsSpinBox->value();
             int index = ui->SecsComboBox->currentIndex();
+            switch (index) {
+            case 1: global_capture_opts.file_duration *= 60;
+                break;
+            case 2: global_capture_opts.file_duration *= 3600;
+                break;
+            }
+         }
+        global_capture_opts.has_file_interval = ui->IntervalSecsCheckBox->isChecked();
+        if (global_capture_opts.has_file_interval) {
+            global_capture_opts.file_interval = ui->IntervalSecsSpinBox->value();
+            int index = ui->IntervalSecsComboBox->currentIndex();
             switch (index) {
             case 1: global_capture_opts.file_interval *= 60;
                 break;
@@ -1089,6 +1227,17 @@ bool CaptureOptionsDialog::saveOptionsToPreferences()
 #endif
         }
     }
+
+    g_free(global_capture_opts.compress_type);
+
+    if (ui->rbCompressionNone->isChecked() )  {
+        global_capture_opts.compress_type = NULL;
+    } else if (ui->rbCompressionGzip->isChecked() )  {
+        global_capture_opts.compress_type = qstring_strdup("gzip");
+    }  else {
+        global_capture_opts.compress_type = NULL;
+    }
+
     prefs_main_write();
     return true;
 }
@@ -1225,6 +1374,7 @@ QWidget* InterfaceTreeDelegate::createEditor(QWidget *parent, const QStyleOption
             links = device->links;
         }
         switch (idx.column()) {
+        case col_extcap_:
         case col_interface_:
         case col_traffic_:
             break;
@@ -1370,16 +1520,3 @@ void InterfaceTreeDelegate::bufferSizeChanged(int value)
 #endif
 
 #endif /* HAVE_LIBPCAP */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

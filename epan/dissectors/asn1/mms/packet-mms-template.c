@@ -84,7 +84,7 @@ static void
 private_data_add_preCinfo(asn1_ctx_t *actx, guint32 val)
 {
 	mms_private_data_t *private_data = (mms_private_data_t*)mms_get_private_data(actx);
-	g_snprintf(private_data->preCinfo, BUFFER_SIZE_PRE, "%02d ", val);
+	snprintf(private_data->preCinfo, BUFFER_SIZE_PRE, "%02d ", val);
 }
 
 static char*
@@ -98,8 +98,8 @@ static void
 private_data_add_moreCinfo_id(asn1_ctx_t *actx, tvbuff_t *tvb)
 {
 	mms_private_data_t *private_data = (mms_private_data_t*)mms_get_private_data(actx);
-	g_strlcat(private_data->moreCinfo, " ", BUFFER_SIZE_MORE);
-	g_strlcat(private_data->moreCinfo, tvb_get_string_enc(wmem_packet_scope(),
+	(void) g_strlcat(private_data->moreCinfo, " ", BUFFER_SIZE_MORE);
+	(void) g_strlcat(private_data->moreCinfo, tvb_get_string_enc(actx->pinfo->pool,
 				tvb, 2, tvb_get_guint8(tvb, 1), ENC_STRING), BUFFER_SIZE_MORE);
 }
 
@@ -107,7 +107,7 @@ static void
 private_data_add_moreCinfo_float(asn1_ctx_t *actx, tvbuff_t *tvb)
 {
 	mms_private_data_t *private_data = (mms_private_data_t*)mms_get_private_data(actx);
-	g_snprintf(private_data->moreCinfo, BUFFER_SIZE_MORE,
+	snprintf(private_data->moreCinfo, BUFFER_SIZE_MORE,
 				" %f", tvb_get_ieee_float(tvb, 1, ENC_BIG_ENDIAN));
 }
 

@@ -1,8 +1,0 @@
-# Typo directly on IANA enterprise-numbers (epan/enterprise-numbers)
-
-libwireshark14: spelling-error-in-binary usr/lib/x86_64-linux-gnu/libwireshark.so.* Nam Name
-libwireshark14: spelling-error-in-binary usr/lib/x86_64-linux-gnu/libwireshark.so.* Informations Information
-libwireshark14: spelling-error-in-binary usr/lib/x86_64-linux-gnu/libwireshark.so.* Dont Don't
-
-# Those are plugins
-libwireshark14: library-not-linked-against-libc usr/lib/*/wireshark/plugins/*/codecs/*.so

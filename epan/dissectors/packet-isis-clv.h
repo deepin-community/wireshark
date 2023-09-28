@@ -35,6 +35,7 @@
 #define ISIS_CLV_LSP_ENTRIES         9   /* iso10589 */
 #define ISIS_CLV_AUTHENTICATION      10  /* iso10589, rfc3567 */
 #define ISIS_CLV_CHECKSUM            12  /* rfc3358 */
+#define ISIS_CLV_PURGE_ORIG_ID       13  /* rfc6232 */
 #define ISIS_CLV_LSP_BUFFERSIZE      14  /* iso10589 rev2 */
 #define ISIS_CLV_REVERSE_METRIC      16  /* rfc8500 */
 #define ISIS_CLV_EXTD_IS_REACH       22  /* draft-ietf-isis-traffic-05 */
@@ -45,7 +46,7 @@
 #define ISIS_CLV_EXT_IP_REACH        130 /* rfc1195, rfc2966 */
 #define ISIS_CLV_IDRP_INFO           131 /* rfc1195 */
 #define ISIS_CLV_IP_ADDR             132 /* rfc1195 */
-#define ISIS_CLV_IP_AUTHENTICATION   133 /* rfc1195, depreciated */
+#define ISIS_CLV_IP_AUTHENTICATION   133 /* rfc1195, deprecated in rfc3787 */
 #define ISIS_CLV_TE_ROUTER_ID        134 /* draft-ietf-isis-traffic-05 */
 #define ISIS_CLV_EXTD_IP_REACH       135 /* draft-ietf-isis-traffic-05 */
 #define ISIS_CLV_HOSTNAME            137 /* rfc2763 */
@@ -56,8 +57,12 @@
 #define ISIS_CLV_MT_PORT_CAP         143 /* rfc6165, rfc7176 */
 #define ISIS_CLV_MT_CAP              144 /* rfc6329, rfc7176 */
 #define ISIS_CLV_TRILL_NEIGHBOR      145 /* rfc7176 */
+#define ISIS_CLV_MAC_RI              147 /* rfc6165: MAC Reachability */
 #define ISIS_CLV_BFD_ENABLED         148 /* rfc6213 */
 #define ISIS_CLV_SID_LABEL_BINDING   149 /* draft-previdi-isis-segment-routing-extensions-05 */
+#define ISIS_CLV_AVAYA_IPVPN         184 /* Avaya/Extremenetworks proprietary: Reverse engineered */
+#define ISIS_CLV_AVAYA_IPVPN_MC      185 /* Avaya/Extremenetworks proprietary: Reverse engineered */
+#define ISIS_CLV_AVAYA_IP_GRT_MC     186 /* Avaya/Extremenetworks proprietary: Reverse engineered */
 #define ISIS_CLV_RESTART             211 /* draft-ietf-isis-restart-01 */
 #define ISIS_CLV_MT_IS_REACH         222 /* draft-ietf-isis-wg-multi-topology-05 */
 #define ISIS_CLV_MT_SUPPORTED        229 /* draft-ietf-isis-wg-multi-topology-05 */
@@ -90,7 +95,7 @@ extern void isis_dissect_clvs(tvbuff_t *tvb, packet_info* pinfo, proto_tree *tre
         const isis_clv_handle_t *opts, expert_field *expert_short_len, isis_data_t *isis,
         int unknown_tree_id,  int tree_type, int tree_length, expert_field *ei_unknown);
 
-extern void isis_dissect_nlpid_clv(tvbuff_t *tvb, proto_tree *tree,
+extern void isis_dissect_nlpid_clv(tvbuff_t *tvb, proto_tree *tree, gint ett_nlpid,
         int hf_nlpid, int offset, int length);
 extern void isis_dissect_te_router_id_clv(proto_tree *tree, packet_info* pinfo, tvbuff_t *tvb, expert_field* expert,
         int offset, int length, int tree_id);

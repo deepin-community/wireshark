@@ -12,8 +12,10 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+#include "config.h"
 
 #include "wslua_file_common.h"
+#include <lua.h>
 
 
 /* WSLUA_CONTINUE_MODULE File */
@@ -25,7 +27,7 @@ WSLUA_CLASS_DEFINE(FrameInfo,FAIL_ON_NULL_OR_EXPIRED("FrameInfo"));
     functions (e.g., `read`, `seek_read`, etc.).
 
     This object represents frame data and meta-data (data about the frame/packet)
-    for a given `read`/`seek_read`/`write`'s frame.
+    for a given `read`/`seek_read`/`write`++'++s frame.
 
     This object's fields are written-to/set when used by read function callbacks, and
     read-from/get when used by file write function callbacks.  In other words, when
@@ -55,8 +57,8 @@ WSLUA_METAMETHOD FrameInfo__tostring(lua_State* L) {
         lua_pushstring(L,"FrameInfo pointer is NULL!");
     } else {
         if (fi->rec)
-            lua_pushfstring(L, "FrameInfo: rec_type=%u, presence_flags=%d, caplen=%d, len=%d, pkt_encap=%d, opt_comment='%s'",
-                fi->rec->rec_type, fi->rec->presence_flags, fi->rec->rec_header.packet_header.caplen, fi->rec->rec_header.packet_header.len, fi->rec->rec_header.packet_header.pkt_encap, fi->rec->opt_comment);
+            lua_pushfstring(L, "FrameInfo: rec_type=%u, presence_flags=%d, caplen=%d, len=%d, pkt_encap=%d, block='%p'",
+                fi->rec->rec_type, fi->rec->presence_flags, fi->rec->rec_header.packet_header.caplen, fi->rec->rec_header.packet_header.len, fi->rec->rec_header.packet_header.pkt_encap, fi->rec->block);
         else
             lua_pushstring(L, "FrameInfo rec pointer is NULL!");
     }
@@ -103,6 +105,82 @@ static int FrameInfo__gc(lua_State* L) {
     return 0;
 }
 
+/* WSLUA_ATTRIBUTE FrameInfo_comment RW Table of comments in this frame. */
+static int FrameInfo_get_comment (lua_State* L) {
+    FrameInfo fi = checkFrameInfo(L,1);
+#define FRAMEINFO_COMMENTS_TABLE 2
+    gchar *comment = NULL;
+    wtap_block_t block = NULL;
+    guint i = 0;
+    guint n_comments = 0;
+
+    block = fi->rec->block;
+    // XXX - how to get the user-edited block, if any?
+    n_comments = wtap_block_count_option(block, OPT_COMMENT);
+    lua_createtable(L, n_comments, 0);
+    for (i = 0; i < n_comments; i++) {
+        comment = NULL;
+        lua_pushnumber(L, i+1);
+        if (WTAP_OPTTYPE_SUCCESS ==
+                wtap_block_get_nth_string_option_value(block, OPT_COMMENT, i, &comment)) {
+            lua_pushstring(L, comment);
+        }
+        else {
+            lua_pushnil(L);
+        }
+        lua_settable(L, FRAMEINFO_COMMENTS_TABLE);
+    }
+
+    return 1;
+}
+
+static int FrameInfo_set_comment (lua_State* L) {
+    FrameInfo fi = checkFrameInfo(L,1);
+#define FRAMEINFO_COMMENTS_NEWTABLE 2
+#define FRAMEINFO_COMMENTS_NEWCOMMENT 2
+    size_t len = 0;
+    gchar *comment = NULL;
+    wtap_block_t block = NULL;
+    guint i = 0;
+    guint n_comments = 0;
+
+    if(fi->rec->block != NULL) {
+        block = fi->rec->block;
+    }
+    else {
+        block = wtap_block_create(WTAP_BLOCK_PACKET);
+        fi->rec->block = block;
+    }
+
+    /* Strip off old comments */
+    n_comments = wtap_block_count_option(block, OPT_COMMENT);
+    for (i = 0; i < n_comments; i++) {
+        wtap_block_remove_nth_option_instance(block, OPT_COMMENT, 0);
+    }
+
+    /* Add new comment(s) */
+    if (lua_istable(L, FRAMEINFO_COMMENTS_NEWTABLE)) {
+        for (lua_pushnil(L); lua_next(L, FRAMEINFO_COMMENTS_NEWTABLE); ) {
+            if (lua_isstring(L,-1)) {
+                comment = (gchar *)luaL_checklstring(L,-1,&len);
+                wtap_block_add_string_option(block, OPT_COMMENT, comment, len);
+            } else if (! lua_isnil(L,-1) ) {
+                return luaL_error(L,"only strings should be in the table");
+            }
+            lua_pop(L, 1);
+        }
+    }
+    else if (lua_isstring(L, FRAMEINFO_COMMENTS_NEWCOMMENT)) {
+        comment = (gchar *)luaL_checklstring(L,FRAMEINFO_COMMENTS_NEWCOMMENT,&len);
+        wtap_block_add_string_option(block, OPT_COMMENT, comment, len);
+    }
+    else {
+        return luaL_error(L,"comment must be either a string or an array of strings");
+    }
+
+    return 0;
+}
+
 /* WSLUA_ATTRIBUTE FrameInfo_time RW The packet timestamp as an NSTime object.
 
     Note: Set the `FileHandler.time_precision` to the appropriate `wtap_file_tsprec` value as well.
@@ -144,12 +222,12 @@ static int FrameInfo_set_data (lua_State* L) {
     FrameInfo fi = checkFrameInfo(L,1);
 
     if (!fi->rec) {
-        g_warning("Error in FrameInfo set data: NULL pointer");
+        ws_warning("Error in FrameInfo set data: NULL pointer");
         return 0;
     }
 
     if (!fi->buf) {
-        g_warning("Error in FrameInfo set data: NULL frame_buffer pointer");
+        ws_warning("Error in FrameInfo set data: NULL frame_buffer pointer");
         return 0;
     }
 
@@ -207,12 +285,6 @@ WSLUA_ATTRIBUTE_NAMED_NUMBER_SETTER(FrameInfo,original_length,rec->rec_header.pa
 WSLUA_ATTRIBUTE_NAMED_NUMBER_GETTER(FrameInfo,encap,rec->rec_header.packet_header.pkt_encap);
 WSLUA_ATTRIBUTE_NAMED_NUMBER_SETTER(FrameInfo,encap,rec->rec_header.packet_header.pkt_encap,int);
 
-// rec->opt_comment will be freed by wtap_sequential_close -> wtap_rec_cleanup.
-/* WSLUA_ATTRIBUTE FrameInfo_comment RW A string comment for the packet, if the
-    `wtap_presence_flags.COMMENTS` was set in the presence flags; nil if there is no comment. */
-WSLUA_ATTRIBUTE_NAMED_STRING_GETTER(FrameInfo,comment,rec->opt_comment);
-WSLUA_ATTRIBUTE_NAMED_STRING_SETTER(FrameInfo,comment,rec->opt_comment,TRUE);
-
 /* This table is ultimately registered as a sub-table of the class' metatable,
  * and if __index/__newindex is invoked then it calls the appropriate function
  * from this table for getting/setting the members.
@@ -269,8 +341,8 @@ WSLUA_METAMETHOD FrameInfoConst__tostring(lua_State* L) {
         lua_pushstring(L,"FrameInfo pointer is NULL!");
     } else {
         if (fi->rec && !fi->expired)
-            lua_pushfstring(L, "FrameInfo: rec_type=%u, presence_flags=%d, caplen=%d, len=%d, pkt_encap=%d, opt_comment='%s'",
-                fi->rec->rec_type, fi->rec->presence_flags, fi->rec->rec_header.packet_header.caplen, fi->rec->rec_header.packet_header.len, fi->rec->rec_header.packet_header.pkt_encap, fi->rec->opt_comment);
+            lua_pushfstring(L, "FrameInfo: rec_type=%u, presence_flags=%d, caplen=%d, len=%d, pkt_encap=%d, block='%p'",
+                fi->rec->rec_type, fi->rec->presence_flags, fi->rec->rec_header.packet_header.caplen, fi->rec->rec_header.packet_header.len, fi->rec->rec_header.packet_header.pkt_encap, fi->rec->block);
         else
             lua_pushfstring(L, "FrameInfo has %s", fi->rec?"expired":"null rec pointer");
     }
@@ -315,6 +387,36 @@ static int FrameInfoConst__gc(lua_State* L) {
     return 0;
 }
 
+/* WSLUA_ATTRIBUTE FrameInfoConst_comment RO The first string comment for the packet, if any;
+    nil if there is no comment. */
+static int FrameInfoConst_get_comment (lua_State* L) {
+    FrameInfoConst fi = checkFrameInfoConst(L,1);
+#define FRAMEINFOCONST_COMMENTS_TABLE 2
+    gchar *comment = NULL;
+    wtap_block_t block = NULL;
+    guint i = 0;
+    guint n_comments = 0;
+
+    block = fi->rec->block;
+    // XXX - how to get the user-edited block, if any?
+    n_comments = wtap_block_count_option(block, OPT_COMMENT);
+    lua_createtable(L, n_comments, 0);
+    for (i = 0; i < n_comments; i++) {
+        comment = NULL;
+        lua_pushnumber(L, i+1);
+        if (WTAP_OPTTYPE_SUCCESS ==
+                wtap_block_get_nth_string_option_value(block, OPT_COMMENT, i, &comment)) {
+            lua_pushstring(L, comment);
+        }
+        else {
+            lua_pushnil(L);
+        }
+        lua_settable(L, FRAMEINFOCONST_COMMENTS_TABLE);
+    }
+
+    return 1;
+}
+
 /* WSLUA_ATTRIBUTE FrameInfoConst_time RO The packet timestamp as an NSTime object. */
 static int FrameInfoConst_get_time (lua_State* L) {
     FrameInfoConst fi = checkFrameInfoConst(L,1);
@@ -357,9 +459,6 @@ WSLUA_ATTRIBUTE_NAMED_NUMBER_GETTER(FrameInfoConst,original_length,rec->rec_head
 
       See `wtap_encaps` in `init.lua` for possible packet encapsulation types to use as the value for this field. */
 WSLUA_ATTRIBUTE_NAMED_NUMBER_GETTER(FrameInfoConst,encap,rec->rec_header.packet_header.pkt_encap);
-
-/* WSLUA_ATTRIBUTE FrameInfoConst_comment RO A comment for the packet; nil if there is none. */
-WSLUA_ATTRIBUTE_NAMED_STRING_GETTER(FrameInfoConst,comment,rec->opt_comment);
 
 WSLUA_ATTRIBUTES FrameInfoConst_attributes[] = {
     WSLUA_ATTRIBUTE_ROREG(FrameInfoConst,rec_type),

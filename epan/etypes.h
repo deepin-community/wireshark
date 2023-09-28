@@ -1,4 +1,4 @@
-/* etypes.h
+/** @file
  * Defines ethernet packet types, similar to tcpdump's ethertype.h
  *
  * Wireshark - Network traffic analyzer
@@ -111,8 +111,8 @@ extern "C" {
 #define ETHERTYPE_MSRP			0x22EA
 #endif
 
-#ifndef ETHERTYPE_AVBTP
-#define ETHERTYPE_AVBTP			0x22F0
+#ifndef ETHERTYPE_AVTP
+#define ETHERTYPE_AVTP			0x22F0
 #endif
 
 #ifndef ETHERTYPE_ROHC				/* ROHC (Robust Header Compression) is an IP header compression protocol specified in */
@@ -215,6 +215,18 @@ extern "C" {
 
 #ifndef ETHERTYPE_VLAN
 #define ETHERTYPE_VLAN			0x8100	/* 802.1Q Virtual LAN */
+#endif
+
+#ifndef ETHERTYPE_SLPP
+#define ETHERTYPE_SLPP			0x8102	/* Nortel/Avaya/Extremenetworks Simple Loop Protection Protocol */
+#endif
+
+#ifndef ETHERTYPE_VLACP
+#define ETHERTYPE_VLACP			0x8103	/* Nortel/Avaya/Extremenetworks virtual LACP */
+#endif
+
+#ifndef ETHERTYPE_OLDSLPP
+#define ETHERTYPE_OLDSLPP		0x8104	/* Nortel/Avaya/Extremenetworks Simple Loop Protection Protocol */
 #endif
 
 #ifndef ETHERTYPE_NSRP
@@ -363,6 +375,10 @@ extern "C" {
 
 #ifndef ETHERTYPE_IEEE_802_1AD
 #define ETHERTYPE_IEEE_802_1AD		0x88A8	/* IEEE 802.1ad Provider Bridge, Q-in-Q */
+#endif
+
+#ifndef ETHERTYPE_IEEE_EXTREME_MESH
+#define ETHERTYPE_IEEE_EXTREME_MESH     0x88A9  /* Ethernet type for Extreme Mesh */
 #endif
 
 #ifndef ETHERTYPE_EPL_V2
@@ -640,6 +656,10 @@ extern "C" {
 
 #ifndef ETHERTYPE_AVSP
 #define ETHERTYPE_AVSP			0xD28B /* Ethernet type for Arista vendor specific packet frames */
+#endif
+
+#ifndef ETHERTYPE_EXEH
+#define ETHERTYPE_EXEH			0xE555	/* EXos internal Extra Header */
 #endif
 
 #ifndef ETHERTYPE_FCFT

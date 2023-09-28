@@ -1,4 +1,4 @@
-/* overlay_scroll_bar.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -35,8 +35,9 @@ public:
      *        means no packet is selected.
      * @param positions The positions of the selected packets within the
      *        image.
+     * @param rowHeight The row height to be used for displaying the mark
      */
-    void setNearOverlayImage(QImage &overlay_image, int packet_count = -1, int start_pos = -1, int end_pos = -1, QList<int> positions = QList<int>());
+    void setNearOverlayImage(QImage &overlay_image, int packet_count = -1, int start_pos = -1, int end_pos = -1, QList<int> positions = QList<int>(), int rowHeight = 1);
 
     /** Set the "far" overlay image.
      * @param mp_image An image showing the position of marked, ignored,
@@ -72,20 +73,7 @@ private:
     int start_pos_;
     int end_pos_;
     QList<int> positions_;
-
+    int row_height_;
 };
 
 #endif // __OVERLAY_SCROLL_BAR_H__
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

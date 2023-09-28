@@ -25,6 +25,8 @@
 #include <epan/stat_tap_ui.h>
 #include <epan/dissectors/packet-rtsp.h>
 
+#include <wsutil/wslog.h>
+
 #include <ui/cmdarg_err.h>
 
 void register_tap_listener_rtspstat(void);
@@ -85,7 +87,7 @@ static void
 rtsp_draw_hash_responses( gpointer* key _U_ , rtsp_response_code_t *data, char * format)
 {
 	if (data == NULL) {
-		g_warning("No data available, key=%d\n", GPOINTER_TO_INT(key));
+		ws_warning("No data available, key=%d\n", GPOINTER_TO_INT(key));
 		exit(EXIT_FAILURE);
 	}
 	if (data->packets == 0)
@@ -127,7 +129,7 @@ rtspstat_reset(void *psp  )
 }
 
 static tap_packet_status
-rtspstat_packet(void *psp , packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *pri)
+rtspstat_packet(void *psp , packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *pri, tap_flags_t flags _U_)
 {
 	const rtsp_info_value_t *value = (const rtsp_info_value_t *)pri;
 	rtspstat_t *sp = (rtspstat_t *) psp;
@@ -200,17 +202,17 @@ rtspstat_draw(void *psp  )
 	rtspstat_t *sp = (rtspstat_t *)psp;
 	printf("\n");
 	printf("===================================================================\n");
-	if (! sp->filter[0])
+	if (!sp->filter || !sp->filter[0])
 		printf("RTSP Statistics\n");
 	else
 		printf("RTSP Statistics with filter %s\n", sp->filter);
 
-	printf(	"* RTSP Status Codes in reply packets\n");
+	printf("* RTSP Response Status Codes                Packets\n");
 	g_hash_table_foreach( sp->hash_responses, (GHFunc)rtsp_draw_hash_responses,
-		(gpointer)"    RTSP %3d %s\n");
-	printf("* List of RTSP Request methods\n");
+		(gpointer)"  %3d %-35s %9d\n");
+	printf("* RTSP Request Methods                      Packets\n");
 	g_hash_table_foreach( sp->hash_requests,  (GHFunc)rtsp_draw_hash_requests,
-		(gpointer)"    %9s %d \n");
+		(gpointer)"  %-39s %9d\n");
 	printf("===================================================================\n");
 }
 
@@ -231,7 +233,7 @@ rtspstat_init(const char *opt_arg, void *userdata _U_)
 		filter = NULL;
 	}
 
-	sp = (rtspstat_t *)g_malloc( sizeof(rtspstat_t) );
+	sp = g_new(rtspstat_t, 1);
 	sp->filter = g_strdup(filter);
 	/*g_hash_table_foreach( rtsp_status, (GHFunc)rtsp_reset_hash_responses, NULL);*/
 

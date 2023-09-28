@@ -1,4 +1,5 @@
-/* tap-tcp-stream.h
+/** @file
+ *
  * TCP stream statistics
  * Originally from tcp_graph.c by Pavel Mores <pvl@uh.cz>
  * Win32 port:  rwh@unifiedtech.com
@@ -32,7 +33,7 @@ struct segment {
     guint32 rel_secs;
     guint32 rel_usecs;
     /* Currently unused.
-    guint32 abs_secs;
+    time_t abs_secs;
     guint32 abs_usecs;
     */
 
@@ -125,16 +126,3 @@ static inline int tcp_seq_before_or_eq(guint32 s1, guint32 s2) {
 #endif /* __cplusplus */
 
 #endif /* __TAP_TCP_STREAM_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

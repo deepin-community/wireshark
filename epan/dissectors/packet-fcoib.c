@@ -134,7 +134,7 @@ dissect_fcoib(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
     ver = "";
     version = tvb_get_guint8(tvb, 0 + FCOIB_VER_OFFSET) >> 4;
     if (version != 0)
-        ver = wmem_strdup_printf(wmem_packet_scope(), ver, "ver %d ", version);
+        ver = wmem_strdup_printf(pinfo->pool, ver, "ver %d ", version);
 
     if (tvb_bytes_exist(tvb, 0, 1))
         sig = tvb_get_guint8(tvb, 0) >> 6;
@@ -313,7 +313,7 @@ proto_register_fcoib(void)
     expert_fcoib = expert_register_protocol(proto_fcoib);
     expert_register_field_array(expert_fcoib, ei, array_length(ei));
 
-    fcoib_module = prefs_register_protocol(proto_fcoib, proto_reg_handoff_fcoib);
+    fcoib_module = prefs_register_protocol(proto_fcoib, NULL);
 
     prefs_register_static_text_preference(fcoib_module, "use_decode_as",
         "Heuristic matching preferences removed.  Use Infiniband protocol preferences or Decode As.",

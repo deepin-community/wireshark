@@ -112,7 +112,7 @@ find_path(PCAP_INCLUDE_DIR
 )
 
 # On Windows we load wpcap.dll explicitly and probe its functions in
-# caputils\capture-wpcap.c. We don't want to link with pcap.lib since
+# capture\capture-wpcap.c. We don't want to link with pcap.lib since
 # that would bring in the non-capturing (null) pcap.dll from the vcpkg
 # library.
 if(WIN32)
@@ -201,7 +201,7 @@ if(PCAP_FOUND)
     set(HAVE_PCAP_SET_TSTAMP_TYPE TRUE)
   else(WIN32)
     #
-    # Make sure we have at least libpcap 0.8, because we we require at
+    # Make sure we have at least libpcap 0.8, because we require at
     # least libpcap 0.8's APIs.
     #
     # We check whether pcap_lib_version is defined in the pcap header,
@@ -223,7 +223,7 @@ if(PCAP_FOUND)
       # remote capture support.
       #
       # However, 1) the sampling options are treated as remote options
-      # in the GUI and and 2) having pcap_setsampling() doesn't mean
+      # in the GUI and 2) having pcap_setsampling() doesn't mean
       # you have sampling support.  libpcap needs a way to indicate
       # whether a given device supports sampling, and the GUI should
       # be changed to decouple them.

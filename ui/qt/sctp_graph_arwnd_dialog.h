@@ -1,4 +1,4 @@
-/* sctp_graph_arwn_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -40,7 +40,7 @@ public slots:
 private slots:
     void on_pushButton_4_clicked();
 
-    void graphClicked(QCPAbstractPlottable* plottable, QMouseEvent* event);
+    void graphClicked(QCPAbstractPlottable* plottable, int, QMouseEvent* event);
 
     void on_saveButton_clicked();
 
@@ -60,16 +60,3 @@ private:
 };
 
 #endif // SCTP_GRAPH_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

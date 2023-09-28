@@ -33,20 +33,15 @@
 #include <sys/resource.h>
 #endif
 
-#ifdef HAVE_GETOPT_H
-#include <getopt.h>
-#endif
-
 #include <errno.h>
 
-#ifndef HAVE_GETOPT_LONG
-#include "wsutil/wsgetopt.h"
-#endif
+#include <wsutil/ws_getopt.h>
 
 #include <glib.h>
 #include <epan/epan.h>
 
 #include <ui/cmdarg_err.h>
+#include <ui/exit_codes.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/file_util.h>
 #include <wsutil/socket.h>
@@ -54,11 +49,16 @@
 #include <wsutil/privileges.h>
 #include <wsutil/report_message.h>
 #include <wsutil/please_report_bug.h>
+#include <wsutil/wslog.h>
 #include <ui/clopts_common.h>
+
+#ifdef _WIN32
+#include <wsutil/unicode-utils.h>
+#endif
 
 #include "globals.h"
 #include <epan/packet.h>
-#include <epan/ftypes/ftypes-int.h>
+#include <epan/ftypes/ftypes.h>
 #include "file.h"
 #include "frame_tvbuff.h"
 #include <epan/disabled_protos.h>
@@ -84,19 +84,16 @@
 #include <wiretap/pcap-encap.h>
 
 #include <cli_main.h>
-#include <version_info.h>
+#include <ui/version_info.h>
 
-#include "caputils/capture-pcap-util.h"
-
-#include "extcap.h"
+#include "capture/capture-pcap-util.h"
 
 #ifdef HAVE_LIBPCAP
 #include <setjmp.h>
 #ifdef _WIN32
-#include "caputils/capture-wpcap.h"
+#include "capture/capture-wpcap.h"
 #endif /* _WIN32 */
 #endif /* HAVE_LIBPCAP */
-#include "log.h"
 
 #if 0
 /*
@@ -106,11 +103,9 @@
 static const gchar decode_as_arg_template[] = "<layer_type>==<selector>,<decode_as_protocol>";
 #endif
 
-#define INVALID_OPTION 1
-#define INIT_ERROR 2
+/* Additional exit codes */
 #define INVALID_DFILTER 2
-#define OPEN_ERROR 2
-#define FORMAT_ERROR 2
+#define FORMAT_ERROR    2
 
 capture_file cfile;
 
@@ -139,11 +134,6 @@ static gboolean process_packet(capture_file *cf, epan_dissect_t *edt, gint64 off
                                wtap_rec *rec, Buffer *buf);
 static void show_print_file_io_error(int err);
 
-static void failure_warning_message(const char *msg_format, va_list ap);
-static void open_failure_message(const char *filename, int err,
-                                 gboolean for_writing);
-static void read_failure_message(const char *filename, int err);
-static void write_failure_message(const char *filename, int err);
 static void rawshark_cmdarg_err(const char *fmt, va_list ap);
 static void rawshark_cmdarg_err_cont(const char *fmt, va_list ap);
 static void protocolinfo_init(char *field);
@@ -185,7 +175,7 @@ print_usage(FILE *output)
     fprintf(output, "  -d <encap:linktype>|<proto:protoname>\n");
     fprintf(output, "                           packet encapsulation or protocol\n");
     fprintf(output, "  -F <field>               field to display\n");
-#ifndef _WIN32
+#if !defined(_WIN32) && defined(RLIMIT_AS)
     fprintf(output, "  -m                       virtual memory limit, in bytes\n");
 #endif
     fprintf(output, "  -n                       disable all name resolution (def: all enabled)\n");
@@ -201,18 +191,16 @@ print_usage(FILE *output)
     fprintf(output, "  -S                       format string for fields\n");
     fprintf(output, "                           (%%D - name, %%S - stringval, %%N numval)\n");
     fprintf(output, "  -t ad|a|r|d|dd|e         output format of time stamps (def: r: rel. to first)\n");
+    fprintf(output, "\n");
+
+    ws_log_print_usage(output);
+    fprintf(output, "\n");
 
     fprintf(output, "\n");
     fprintf(output, "Miscellaneous:\n");
     fprintf(output, "  -h                       display this help and exit\n");
     fprintf(output, "  -o <name>:<value> ...    override preference setting\n");
     fprintf(output, "  -v                       display version info and exit\n");
-}
-
-static void
-log_func_ignore (const gchar *log_domain _U_, GLogLevelFlags log_level _U_,
-                 const gchar *message _U_, gpointer user_data _U_)
-{
 }
 
 /**
@@ -235,7 +223,7 @@ raw_pipe_open(const char *pipe_name)
 #endif
     int          rfd;
 
-    g_log(LOG_DOMAIN_CAPTURE_CHILD, G_LOG_LEVEL_DEBUG, "open_raw_pipe: %s", pipe_name);
+    ws_log(LOG_DOMAIN_CAPCHILD, LOG_LEVEL_DEBUG, "open_raw_pipe: %s", pipe_name);
 
     /*
      * XXX Rawshark blocks until we return
@@ -410,7 +398,7 @@ main(int argc, char *argv[])
     char                *err_msg;
     int                  opt, i;
 
-#ifndef _WIN32
+#if !defined(_WIN32) && defined(RLIMIT_AS)
     struct rlimit limit;
 #endif  /* !_WIN32 */
 
@@ -418,20 +406,31 @@ main(int argc, char *argv[])
     gchar               *rfilters[64];
     e_prefs             *prefs_p;
     char                 badopt;
-    int                  log_flags;
     GPtrArray           *disp_fields = g_ptr_array_new();
     guint                fc;
     gboolean             skip_pcap_header = FALSE;
     int                  ret = EXIT_SUCCESS;
-    static const struct option long_options[] = {
-      {"help", no_argument, NULL, 'h'},
-      {"version", no_argument, NULL, 'v'},
+    static const struct ws_option long_options[] = {
+      {"help", ws_no_argument, NULL, 'h'},
+      {"version", ws_no_argument, NULL, 'v'},
       {0, 0, 0, 0 }
     };
 
 #define OPTSTRING_INIT "d:F:hlm:nN:o:pr:R:sS:t:v"
 
     static const char    optstring[] = OPTSTRING_INIT;
+    static const struct report_message_routines rawshark_report_routines = {
+      failure_message,
+      failure_message,
+      open_failure_message,
+      read_failure_message,
+      write_failure_message,
+      cfile_open_failure_message,
+      cfile_dump_open_failure_message,
+      cfile_read_failure_message,
+      cfile_write_failure_message,
+      cfile_close_failure_message
+    };
 
     /*
      * Set the C-language locale to the native environment and set the
@@ -445,9 +444,15 @@ main(int argc, char *argv[])
 
     cmdarg_err_init(rawshark_cmdarg_err, rawshark_cmdarg_err_cont);
 
+    /* Initialize log handler early so we can have proper logging during startup. */
+    ws_log_init("rawshark", vcmdarg_err);
+
+    /* Early logging command-line initialization. */
+    ws_log_parse_args(&argc, argv, vcmdarg_err, INVALID_OPTION);
+
     /* Initialize the version information. */
-    ws_init_version_info("Rawshark (Wireshark)", NULL,
-                         epan_get_compiled_version_info,
+    ws_init_version_info("Rawshark",
+                         epan_gather_compile_info,
                          NULL);
 
 #ifdef _WIN32
@@ -476,34 +481,28 @@ main(int argc, char *argv[])
      * Attempt to get the pathname of the directory containing the
      * executable file.
      */
-    err_msg = init_progfile_dir(argv[0]);
+    err_msg = configuration_init(argv[0], NULL);
     if (err_msg != NULL) {
         fprintf(stderr, "rawshark: Can't get pathname of rawshark program: %s.\n",
                 err_msg);
     }
 
-    /* nothing more than the standard GLib handler, but without a warning */
-    log_flags =
-        G_LOG_LEVEL_WARNING |
-        G_LOG_LEVEL_MESSAGE |
-        G_LOG_LEVEL_INFO |
-        G_LOG_LEVEL_DEBUG;
-
-    g_log_set_handler(NULL,
-                      (GLogLevelFlags)log_flags,
-                      log_func_ignore, NULL /* user_data */);
-    g_log_set_handler(LOG_DOMAIN_CAPTURE_CHILD,
-                      (GLogLevelFlags)log_flags,
-                      log_func_ignore, NULL /* user_data */);
-
-    init_report_message(failure_warning_message, failure_warning_message,
-                        open_failure_message, read_failure_message,
-                        write_failure_message);
+    init_report_message("rawshark", &rawshark_report_routines);
 
     timestamp_set_type(TS_RELATIVE);
     timestamp_set_precision(TS_PREC_AUTO);
     timestamp_set_seconds_type(TS_SECONDS_DEFAULT);
 
+    /*
+     * XXX - is this necessary, given that we're not reading a
+     * regular capture file, we're reading rawshark's packet
+     * stream format?
+     *
+     * If it is, note that libwiretap must be initialized before
+     * libwireshark is, so that dissection-time handlers for
+     * file-type-dependent blocks can register using the file
+     * type/subtype value for the file type.
+     */
     wtap_init(FALSE);
 
     /* Register all dissectors; we must do this before checking for the
@@ -511,7 +510,7 @@ main(int argc, char *argv[])
        dissectors, and we must do it before we read the preferences, in
        case any dissectors register preferences. */
     if (!epan_init(NULL, NULL, TRUE)) {
-        ret = INIT_ERROR;
+        ret = INIT_FAILED;
         goto clean_exit;
     }
 
@@ -534,17 +533,17 @@ main(int argc, char *argv[])
 
     /* Now get our args */
     /* XXX - We should probably have an option to dump libpcap link types */
-    while ((opt = getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
+    while ((opt = ws_getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
         switch (opt) {
             case 'd':        /* Payload type */
-                if (!set_link_type(optarg)) {
-                    cmdarg_err("Invalid link type or protocol \"%s\"", optarg);
+                if (!set_link_type(ws_optarg)) {
+                    cmdarg_err("Invalid link type or protocol \"%s\"", ws_optarg);
                     ret = INVALID_OPTION;
                     goto clean_exit;
                 }
                 break;
             case 'F':        /* Read field to display */
-                g_ptr_array_add(disp_fields, g_strdup(optarg));
+                g_ptr_array_add(disp_fields, g_strdup(ws_optarg));
                 break;
             case 'h':        /* Print help and exit */
                 show_help_header("Dump and analyze network traffic.");
@@ -566,13 +565,14 @@ main(int argc, char *argv[])
                    and the output buffer is only flushed when it fills up). */
                 line_buffered = TRUE;
                 break;
-#ifndef _WIN32
+#if !defined(_WIN32) && defined(RLIMIT_AS)
             case 'm':
-                limit.rlim_cur = get_positive_int(optarg, "memory limit");
-                limit.rlim_max = get_positive_int(optarg, "memory limit");
+                limit.rlim_cur = get_positive_int(ws_optarg, "memory limit");
+                limit.rlim_max = get_positive_int(ws_optarg, "memory limit");
 
                 if(setrlimit(RLIMIT_AS, &limit) != 0) {
-                    cmdarg_err("setrlimit() returned error");
+                    cmdarg_err("setrlimit(RLIMIT_AS) failed: %s",
+                               g_strerror(errno));
                     ret = INVALID_OPTION;
                     goto clean_exit;
                 }
@@ -582,7 +582,7 @@ main(int argc, char *argv[])
                 disable_name_resolution();
                 break;
             case 'N':        /* Select what types of addresses/port #s to resolve */
-                badopt = string_to_name_resolve(optarg, &gbl_resolv_flags);
+                badopt = string_to_name_resolve(ws_optarg, &gbl_resolv_flags);
                 if (badopt != '\0') {
                     cmdarg_err("-N specifies unknown resolving option '%c'; valid options are 'd', m', 'n', 'N', and 't'",
                                badopt);
@@ -594,13 +594,13 @@ main(int argc, char *argv[])
             {
                 char *errmsg = NULL;
 
-                switch (prefs_set_pref(optarg, &errmsg)) {
+                switch (prefs_set_pref(ws_optarg, &errmsg)) {
 
                     case PREFS_SET_OK:
                         break;
 
                     case PREFS_SET_SYNTAX_ERR:
-                        cmdarg_err("Invalid -o flag \"%s\"%s%s", optarg,
+                        cmdarg_err("Invalid -o flag \"%s\"%s%s", ws_optarg,
                                 errmsg ? ": " : "", errmsg ? errmsg : "");
                         g_free(errmsg);
                         ret = INVALID_OPTION;
@@ -608,8 +608,13 @@ main(int argc, char *argv[])
                         break;
 
                     case PREFS_SET_NO_SUCH_PREF:
+                        cmdarg_err("-o flag \"%s\" specifies unknown preference", ws_optarg);
+                        ret = INVALID_OPTION;
+                        goto clean_exit;
+                        break;
+
                     case PREFS_SET_OBSOLETE:
-                        cmdarg_err("-o flag \"%s\" specifies unknown preference", optarg);
+                        cmdarg_err("-o flag \"%s\" specifies obsolete preference", ws_optarg);
                         ret = INVALID_OPTION;
                         goto clean_exit;
                         break;
@@ -620,11 +625,11 @@ main(int argc, char *argv[])
                 want_pcap_pkthdr = TRUE;
                 break;
             case 'r':        /* Read capture file xxx */
-                pipe_name = g_strdup(optarg);
+                pipe_name = g_strdup(ws_optarg);
                 break;
             case 'R':        /* Read file filter */
                 if(n_rfilters < (int) sizeof(rfilters) / (int) sizeof(rfilters[0])) {
-                    rfilters[n_rfilters++] = optarg;
+                    rfilters[n_rfilters++] = ws_optarg;
                 }
                 else {
                     cmdarg_err("Too many display filters");
@@ -636,36 +641,36 @@ main(int argc, char *argv[])
                 skip_pcap_header = TRUE;
                 break;
             case 'S':        /* Print string representations */
-                if (!parse_field_string_format(optarg)) {
+                if (!parse_field_string_format(ws_optarg)) {
                     cmdarg_err("Invalid field string format");
                     ret = INVALID_OPTION;
                     goto clean_exit;
                 }
                 break;
             case 't':        /* Time stamp type */
-                if (strcmp(optarg, "r") == 0)
+                if (strcmp(ws_optarg, "r") == 0)
                     timestamp_set_type(TS_RELATIVE);
-                else if (strcmp(optarg, "a") == 0)
+                else if (strcmp(ws_optarg, "a") == 0)
                     timestamp_set_type(TS_ABSOLUTE);
-                else if (strcmp(optarg, "ad") == 0)
+                else if (strcmp(ws_optarg, "ad") == 0)
                     timestamp_set_type(TS_ABSOLUTE_WITH_YMD);
-                else if (strcmp(optarg, "adoy") == 0)
+                else if (strcmp(ws_optarg, "adoy") == 0)
                     timestamp_set_type(TS_ABSOLUTE_WITH_YDOY);
-                else if (strcmp(optarg, "d") == 0)
+                else if (strcmp(ws_optarg, "d") == 0)
                     timestamp_set_type(TS_DELTA);
-                else if (strcmp(optarg, "dd") == 0)
+                else if (strcmp(ws_optarg, "dd") == 0)
                     timestamp_set_type(TS_DELTA_DIS);
-                else if (strcmp(optarg, "e") == 0)
+                else if (strcmp(ws_optarg, "e") == 0)
                     timestamp_set_type(TS_EPOCH);
-                else if (strcmp(optarg, "u") == 0)
+                else if (strcmp(ws_optarg, "u") == 0)
                     timestamp_set_type(TS_UTC);
-                else if (strcmp(optarg, "ud") == 0)
+                else if (strcmp(ws_optarg, "ud") == 0)
                     timestamp_set_type(TS_UTC_WITH_YMD);
-                else if (strcmp(optarg, "udoy") == 0)
+                else if (strcmp(ws_optarg, "udoy") == 0)
                     timestamp_set_type(TS_UTC_WITH_YDOY);
                 else {
                     cmdarg_err("Invalid time stamp type \"%s\"",
-                               optarg);
+                               ws_optarg);
                     cmdarg_err_cont(
 "It must be \"a\" for absolute, \"ad\" for absolute with YYYY-MM-DD date,");
                     cmdarg_err_cont(
@@ -712,7 +717,7 @@ main(int argc, char *argv[])
        still command-line arguments, treat them as the tokens of a capture
        filter (if no "-r" flag was specified) or a read filter (if a "-r"
        flag was specified. */
-    if (optind < argc) {
+    if (ws_optind < argc) {
         if (pipe_name != NULL) {
             if (n_rfilters != 0) {
                 cmdarg_err("Read filters were specified both with \"-R\" "
@@ -720,7 +725,7 @@ main(int argc, char *argv[])
                 ret = INVALID_OPTION;
                 goto clean_exit;
             }
-            rfilters[n_rfilters] = get_args_as_string(argc, argv, optind);
+            rfilters[n_rfilters] = get_args_as_string(argc, argv, ws_optind);
         }
     }
 
@@ -737,7 +742,7 @@ main(int argc, char *argv[])
         cmdarg_err("%s", err_msg);
         g_free(err_msg);
         cmdarg_err_cont("%s", please_report_bug());
-        ret = INIT_ERROR;
+        ret = INIT_FAILED;
         goto clean_exit;
     }
 
@@ -810,7 +815,6 @@ clean_exit:
     g_free(pipe_name);
     epan_free(cfile.epan);
     epan_cleanup();
-    extcap_cleanup();
     wtap_cleanup();
     return ret;
 }
@@ -893,14 +897,14 @@ raw_pipe_read(wtap_rec *rec, Buffer *buf, int *err, gchar **err_info, gint64 *da
 
 #if 0
     printf("mem_hdr: %lu disk_hdr: %lu\n", sizeof(mem_hdr), sizeof(disk_hdr));
-    printf("tv_sec: %u (%04x)\n", (unsigned int) rec->ts.secs, (unsigned int) rec->ts.secs);
+    printf("tv_sec: %d (%04x)\n", (unsigned int) rec->ts.secs, (unsigned int) rec->ts.secs);
     printf("tv_nsec: %d (%04x)\n", rec->ts.nsecs, rec->ts.nsecs);
     printf("caplen: %d (%04x)\n", rec->rec_header.packet_header.caplen, rec->rec_header.packet_header.caplen);
     printf("len: %d (%04x)\n", rec->rec_header.packet_header.len, rec->rec_header.packet_header.len);
 #endif
     if (bytes_needed > WTAP_MAX_PACKET_SIZE_STANDARD) {
         *err = WTAP_ERR_BAD_FILE;
-        *err_info = g_strdup_printf("Bad packet length: %lu",
+        *err_info = ws_strdup_printf("Bad packet length: %lu",
                    (unsigned long) bytes_needed);
         return FALSE;
     }
@@ -951,7 +955,7 @@ load_cap_file(capture_file *cf)
     ws_buffer_free(&buf);
     if (err != 0) {
         /* Print a message noting that the read failed somewhere along the line. */
-        cfile_read_failure_message("Rawshark", cf->filename, err, err_info);
+        cfile_read_failure_message(cf->filename, err, err_info);
         return FALSE;
     }
 
@@ -971,9 +975,8 @@ process_packet(capture_file *cf, epan_dissect_t *edt, gint64 offset,
         /* The user sends an empty packet when he wants to get output from us even if we don't currently have
            packets to process. We spit out a line with the timestamp and the text "void"
         */
-        printf("%lu %lu %lu void -\n", (unsigned long int)cf->count,
-               (unsigned long int)rec->ts.secs,
-               (unsigned long int)rec->ts.nsecs);
+        printf("%lu %" PRIu64 " %d void -\n", (unsigned long int)cf->count,
+               (guint64)rec->ts.secs, rec->ts.nsecs);
 
         fflush(stdout);
 
@@ -1101,11 +1104,11 @@ static void field_display_to_string(header_field_info *hfi, char* buf, int size)
 {
     if (hfi->type != FT_BOOLEAN)
     {
-        g_strlcpy(buf, proto_field_display_to_string(hfi->display), size);
+        (void) g_strlcpy(buf, proto_field_display_to_string(hfi->display), size);
     }
     else
     {
-        g_snprintf(buf, size, "(Bit count: %d)", hfi->display);
+        snprintf(buf, size, "(Bit count: %d)", hfi->display);
     }
 }
 
@@ -1117,10 +1120,10 @@ static void field_display_to_string(header_field_info *hfi, char* buf, int size)
 static gboolean print_field_value(field_info *finfo, int cmd_line_index)
 {
     header_field_info   *hfinfo;
-    char                *fs_buf = NULL;
+    char                *fs_buf;
     char                *fs_ptr = NULL;
     static GString     *label_s = NULL;
-    int                 fs_len;
+    size_t              fs_len;
     guint              i;
     string_fmt_t       *sf;
     guint32            uvalue;
@@ -1135,19 +1138,18 @@ static gboolean print_field_value(field_info *finfo, int cmd_line_index)
         label_s = g_string_new("");
     }
 
-    if(finfo->value.ftype->val_to_string_repr)
-    {
+    fs_buf = fvalue_to_string_repr(NULL, &finfo->value,
+                          FTREPR_DFILTER, finfo->hfinfo->display);
+    if (fs_buf != NULL) {
         /*
          * this field has an associated value,
          * e.g: ip.hdr_len
          */
-        fs_len = fvalue_string_repr_len(&finfo->value, FTREPR_DFILTER, finfo->hfinfo->display);
-        fs_buf = fvalue_to_string_repr(NULL, &finfo->value,
-                              FTREPR_DFILTER, finfo->hfinfo->display);
+        fs_len = strlen(fs_buf);
         fs_ptr = fs_buf;
 
         /* String types are quoted. Remove them. */
-        if (IS_FT_STRING(finfo->value.ftype->ftype) && fs_len > 2) {
+        if (IS_FT_STRING(fvalue_type_ftenum(&finfo->value)) && fs_len > 2) {
             fs_buf[fs_len - 1] = '\0';
             fs_ptr++;
         }
@@ -1236,7 +1238,7 @@ static gboolean print_field_value(field_info *finfo, int cmd_line_index)
         return TRUE;
     }
 
-    if(finfo->value.ftype->val_to_string_repr)
+    if(fs_buf)
     {
         printf(" %d=\"%s\"", cmd_line_index, fs_ptr);
         wmem_free(NULL, fs_buf);
@@ -1253,7 +1255,7 @@ static gboolean print_field_value(field_info *finfo, int cmd_line_index)
 }
 
 static tap_packet_status
-protocolinfo_packet(void *prs, packet_info *pinfo _U_, epan_dissect_t *edt, const void *dummy _U_)
+protocolinfo_packet(void *prs, packet_info *pinfo _U_, epan_dissect_t *edt, const void *dummy _U_, tap_flags_t flags _U_)
 {
     pci_t *rs=(pci_t *)prs;
     GPtrArray *gp;
@@ -1300,7 +1302,7 @@ protocolinfo_init(char *field)
             ftenum_to_string(hfi),
             hfibuf);
 
-    rs=(pci_t *)g_malloc(sizeof(pci_t));
+    rs=g_new(pci_t, 1);
     rs->hf_index=hfi->id;
     rs->filter=field;
     rs->cmd_line_index = g_cmd_line_index++;
@@ -1327,7 +1329,7 @@ protocolinfo_init(char *field)
 
 static void
 add_string_fmt(string_fmt_e format, gchar *plain) {
-    string_fmt_t *sf = (string_fmt_t *)g_malloc(sizeof(string_fmt_t));
+    string_fmt_t *sf = g_new(string_fmt_t, 1);
 
     sf->format = format;
     sf->plain = g_strdup(plain);
@@ -1416,29 +1418,6 @@ show_print_file_io_error(int err)
     }
 }
 
-/*
- * General errors and warnings are reported with an console message
- * in Rawshark.
- */
-static void
-failure_warning_message(const char *msg_format, va_list ap)
-{
-    fprintf(stderr, "rawshark: ");
-    vfprintf(stderr, msg_format, ap);
-    fprintf(stderr, "\n");
-}
-
-/*
- * Open/create errors are reported with an console message in Rawshark.
- */
-static void
-open_failure_message(const char *filename, int err, gboolean for_writing)
-{
-    fprintf(stderr, "rawshark: ");
-    fprintf(stderr, file_open_error_message(err, for_writing), filename);
-    fprintf(stderr, "\n");
-}
-
 static const nstime_t *
 raw_get_frame_ts(struct packet_provider_data *prov, guint32 frame_num)
 {
@@ -1505,26 +1484,6 @@ raw_cf_open(capture_file *cf, const char *fname)
     cf->provider.prev_cap = NULL;
 
     return CF_OK;
-}
-
-/*
- * Read errors are reported with an console message in Rawshark.
- */
-static void
-read_failure_message(const char *filename, int err)
-{
-    cmdarg_err("An error occurred while reading from the file \"%s\": %s.",
-               filename, g_strerror(err));
-}
-
-/*
- * Write errors are reported with an console message in Rawshark.
- */
-static void
-write_failure_message(const char *filename, int err)
-{
-    cmdarg_err("An error occurred while writing to the file \"%s\": %s.",
-               filename, g_strerror(err));
 }
 
 /*

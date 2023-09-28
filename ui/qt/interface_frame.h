@@ -1,4 +1,5 @@
-/* interface_frame.h
+/** @file
+ *
  * Display of interfaces, including their respective data, and the
  * capability to filter interfaces by type
  *
@@ -45,8 +46,8 @@ public:
     void ensureSelectedInterface();
 
 Q_SIGNALS:
-    void showExtcapOptions(QString device_name);
-    void startCapture();
+    void showExtcapOptions(QString device_name, bool startCaptureOnClose);
+    void startCapture(QStringList);
     void itemSelectionChanged();
     void typeSelectionChanged();
 
@@ -57,7 +58,6 @@ public slots:
 #ifdef HAVE_PCAP_REMOTE
     void toggleRemoteInterfaces();
 #endif
-    void getPoints(int idx, PointList *pts);
     void showRunOnFile();
     void showContextMenu(QPoint pos);
 
@@ -97,16 +97,3 @@ private slots:
 };
 
 #endif // INTERFACE_FRAME_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -1,4 +1,4 @@
-/* stock_icon_tool_button.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -14,7 +14,6 @@
 
 class StockIconToolButton : public QToolButton
 {
-    Q_OBJECT
 public:
     explicit StockIconToolButton(QWidget * parent = 0, QString stock_icon_name = QString());
 
@@ -27,21 +26,6 @@ protected:
 private:
     QIcon base_icon_;
     QString icon_name_;
-    int leave_timer_;
-    static const int leave_interval_ = 500; // ms
 };
 
 #endif // STOCKICONTOOLBUTTON_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

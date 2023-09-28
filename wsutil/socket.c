@@ -10,14 +10,12 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-#include <config.h>
+#include "config.h"
+#include "socket.h"
 
 #include <stdlib.h>
-#include <string.h>
 #include <errno.h>
-#include <glib.h>
 
-#include <wsutil/socket.h>
 #include <wsutil/inet_addr.h>
 
 #ifdef _WIN32
@@ -37,7 +35,7 @@ ws_init_sockets(void)
     wVersionRequested = MAKEWORD(2, 2);
     err = WSAStartup(wVersionRequested, &wsaData);
     if (err != 0) {
-        errmsg = g_strdup_printf("Couldn't initialize Windows Sockets: %s",
+        errmsg = ws_strdup_printf("Couldn't initialize Windows Sockets: %s",
                                  win32strerror(err));
     }
 #endif
@@ -143,7 +141,7 @@ ws_socket_ptoa(struct sockaddr_storage *dst, const gchar *src,
         ret = 0;
     }
     else {
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
 out:

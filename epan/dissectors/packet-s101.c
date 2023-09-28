@@ -75,19 +75,17 @@ typedef struct _s101_fragment_t {
 /* (Required to prevent [-Wmissing-prototypes] warnings */
 void proto_reg_handoff_S101(void);
 void proto_register_S101(void);
-tvbuff_t *decode_s101_escaped_buffer(tvbuff_t *tvb, packet_info *pinfo, int *offset, guint16 *crc);
-guint32 get_fragment_pdu_id(packet_info *pinfo);
-s101_fragment_t* new_fragment_info(packet_info *pinfo);
-void display_expert_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset, int len);
+static tvbuff_t *decode_s101_escaped_buffer(tvbuff_t *tvb, packet_info *pinfo, int *offset, guint16 *crc);
+static guint32 get_fragment_pdu_id(packet_info *pinfo);
+static s101_fragment_t* new_fragment_info(packet_info *pinfo);
+static void display_expert_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset, int len);
 
 /* Initialize the protocol and registered fields */
 static int proto_S101 = -1;
 
-/* Global sample port preference - real port preferences should generally
- * default to 0 unless there is an IANA-registered (or equivalent) port for your
- * protocol. */
-#define S101_TCP_PORT 9000
-static guint tcp_port_pref = S101_TCP_PORT;
+/* Real port preferences should generally default to 0 unless there is an
+ * IANA-registered (or equivalent) port for your protocol. */
+#define S101_TCP_PORT 9000 /* Not IANA-registered */
 
 /* Initialize the subtree pointers */
 static gint ett_S101 = -1;
@@ -141,7 +139,7 @@ static const fragment_items msg_frag_items = {
  | SRCPORT (16) | SRC_ADDRESS (16) |
  SRC_ADDRESS is last 2 bytes of the src address.
  */
-guint32 get_fragment_pdu_id(packet_info *pinfo) {
+static guint32 get_fragment_pdu_id(packet_info *pinfo) {
     guint32 id = pinfo->srcport << 16;
     const guint8 *data = (const guint8*)pinfo->src.data;
     if (pinfo->src.len >= 2) {
@@ -152,7 +150,7 @@ guint32 get_fragment_pdu_id(packet_info *pinfo) {
 
 static wmem_map_t* s101_fragment_info_hash = NULL;
 
-s101_fragment_t* new_fragment_info(packet_info *pinfo) {
+static s101_fragment_t* new_fragment_info(packet_info *pinfo) {
     s101_fragment_t* fi = wmem_new(wmem_file_scope(), s101_fragment_t);
     if (NULL == fi) { return fi; }
     fi->id = pinfo->num;
@@ -212,7 +210,7 @@ static const value_string dtd_type_vs[] = {
 
 
 
-void
+static void
 display_expert_info(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset, int len) {
     proto_item* pi;
     proto_tree *error_tree;
@@ -287,7 +285,7 @@ find_s101_packet_header(tvbuff_t *tvb, int* offset, guint8 *start, guint8 *slot,
     return 1;
 }
 
-tvbuff_t *
+static tvbuff_t *
 decode_s101_escaped_buffer(tvbuff_t *tvb, packet_info *pinfo, int *offset, guint16 *crc) {
     tvbuff_t *next_tvb;
     int len;
@@ -496,7 +494,6 @@ dissect_S101(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 void
 proto_register_S101(void)
 {
-    module_t        *S101_module;
     expert_module_t* expert_s101;
 
     /* Setup list of header fields  See Section 1.5 of README.dissector for
@@ -639,41 +636,22 @@ proto_register_S101(void)
     s101_fragment_info_hash = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(),
                                                      g_direct_hash, g_direct_equal);
 
-    S101_module = prefs_register_protocol(proto_S101,
-            proto_reg_handoff_S101);
+    /* S101_module = prefs_register_protocol(proto_S101, NULL); */
 
     expert_s101 = expert_register_protocol(proto_S101);
     expert_register_field_array(expert_s101, ei, array_length(ei));
-
-    /* Register an example port preference */
-    prefs_register_uint_preference(S101_module, "tcp.port", "S101 TCP Port",
-            "S101 TCP port if other than the default",
-            10, &tcp_port_pref);
 }
 
 void
 proto_reg_handoff_S101(void)
 {
-    static gboolean initialized = FALSE;
     static dissector_handle_t S101_handle;
-    static int current_port;
 
-    if (!initialized) {
+    S101_handle = create_dissector_handle(dissect_S101,
+            proto_S101);
 
-        S101_handle = create_dissector_handle(dissect_S101,
-                proto_S101);
-
-        glow_handle = find_dissector_add_dependency("glow", proto_S101);
-
-        initialized = TRUE;
-
-    } else {
-        dissector_delete_uint("tcp.port", current_port, S101_handle);
-    }
-
-    current_port = tcp_port_pref;
-
-    dissector_add_uint("tcp.port", current_port, S101_handle);
+    glow_handle = find_dissector_add_dependency("glow", proto_S101);
+    dissector_add_uint_with_preference("tcp.port", S101_TCP_PORT, S101_handle);
 }
 
 /*

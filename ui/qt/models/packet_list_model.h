@@ -1,4 +1,4 @@
-/* packet_list_model.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -32,6 +32,11 @@ class PacketListModel : public QAbstractItemModel
 {
     Q_OBJECT
 public:
+
+    enum {
+        HEADER_CAN_RESOLVE = Qt::UserRole,
+    };
+
     explicit PacketListModel(QObject *parent = 0, capture_file *cf = NULL);
     ~PacketListModel();
     void setCaptureFile(capture_file *cf);
@@ -113,16 +118,3 @@ private slots:
 };
 
 #endif // PACKET_LIST_MODEL_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

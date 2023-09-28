@@ -40,7 +40,7 @@
 #include <wsutil/strtoi.h>
 #include <wsutil/wsgcrypt.h>
 #include <wsutil/rsa.h>
-#include <version_info.h>
+#include <wsutil/ws_assert.h>
 #include "packet-ber.h"
 #include "packet-x509af.h"
 #include "packet-x509if.h"
@@ -53,11 +53,23 @@
 #include <gnutls/abstract.h>
 #endif
 
+/* JA3/JA3S calculations must ignore GREASE values
+ * as described in RFC 8701.
+ */
+#define IS_GREASE_TLS(x) ((((x) & 0x0f0f) == 0x0a0a) && \
+                        (((x) & 0xff) == (((x)>>8) & 0xff)))
+
+/* Section 22.3 of RFC 9000 (QUIC) reserves values of this
+ * form for a similar purpose as GREASE.
+ */
+#define IS_GREASE_QUIC(x) ((x) > 27 ? ((((x) - 27) % 31) == 0) : 0)
+
 /* Lookup tables {{{ */
 const value_string ssl_version_short_names[] = {
     { SSLV2_VERSION,        "SSLv2" },
     { SSLV3_VERSION,        "SSLv3" },
     { TLSV1_VERSION,        "TLSv1" },
+    { GMTLSV1_VERSION,      "GMTLSv1" },
     { TLSV1DOT1_VERSION,    "TLSv1.1" },
     { TLSV1DOT2_VERSION,    "TLSv1.2" },
     { TLSV1DOT3_VERSION,    "TLSv1.3" },
@@ -71,6 +83,7 @@ const value_string ssl_versions[] = {
     { SSLV2_VERSION,        "SSL 2.0" },
     { SSLV3_VERSION,        "SSL 3.0" },
     { TLSV1_VERSION,        "TLS 1.0" },
+    { GMTLSV1_VERSION,      "GMTLS" },
     { TLSV1DOT1_VERSION,    "TLS 1.1" },
     { TLSV1DOT2_VERSION,    "TLS 1.2" },
     { TLSV1DOT3_VERSION,    "TLS 1.3" },
@@ -94,6 +107,22 @@ const value_string ssl_versions[] = {
     { DTLSV1DOT0_OPENSSL_VERSION, "DTLS 1.0 (OpenSSL pre 0.9.8f)" },
     { DTLSV1DOT0_VERSION,   "DTLS 1.0" },
     { DTLSV1DOT2_VERSION,   "DTLS 1.2" },
+    { 0x0A0A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0x1A1A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0x2A2A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0x3A3A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0x4A4A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0x5A5A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0x6A6A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0x7A7A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0x8A8A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0x9A9A,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0xAAAA,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0xBABA,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0xCACA,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0xDADA,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0xEAEA,               "Reserved (GREASE)" }, /* RFC 8701 */
+    { 0xFAFA,               "Reserved (GREASE)" }, /* RFC 8701 */
     { 0x00, NULL }
 };
 
@@ -369,6 +398,27 @@ static const value_string ssl_20_cipher_suites[] = {
     { 0x00CCAD, "TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256" },
     { 0x00CCAE, "TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256" },
 
+    /* GM/T 0024-2014 */
+    { 0x00e001, "ECDHE_SM1_SM3"},
+    { 0x00e003, "ECC_SM1_SM3"},
+    { 0x00e005, "IBSDH_SM1_SM3"},
+    { 0x00e007, "IBC_SM1_SM3"},
+    { 0x00e009, "RSA_SM1_SM3"},
+    { 0x00e00a, "RSA_SM1_SHA1"},
+    { 0x00e011, "ECDHE_SM4_CBC_SM3"},
+    { 0x00e013, "ECC_SM4_CBC_SM3"},
+    { 0x00e015, "IBSDH_SM4_CBC_SM3"},
+    { 0x00e017, "IBC_SM4_CBC_SM3"},
+    { 0x00e019, "RSA_SM4_CBC_SM3"},
+    { 0x00e01a, "RSA_SM4_CBC_SHA1"},
+    { 0x00e01c, "RSA_SM4_CBC_SHA256"},
+    { 0x00e051, "ECDHE_SM4_GCM_SM3"},
+    { 0x00e053, "ECC_SM4_GCM_SM3"},
+    { 0x00e055, "IBSDH_SM4_GCM_SM3"},
+    { 0x00e057, "IBC_SM4_GCM_SM3"},
+    { 0x00e059, "RSA_SM4_GCM_SM3"},
+    { 0x00e05a, "RSA_SM4_GCM_SHA256"},
+
     /* https://tools.ietf.org/html/draft-josefsson-salsa20-tls */
     { 0x00E410, "TLS_RSA_WITH_ESTREAM_SALSA20_SHA1" },
     { 0x00E411, "TLS_RSA_WITH_SALSA20_SHA1" },
@@ -448,11 +498,98 @@ const value_string ssl_extension_curves[] = {
     { 28, "brainpoolP512r1" }, /* RFC 7027 */
     { 29, "x25519" }, /* RFC 8446 / RFC 8422 */
     { 30, "x448" }, /* RFC 8446 / RFC 8422 */
+    { 41, "curveSM2" }, /* RFC 8998 */
     { 256, "ffdhe2048" }, /* RFC 7919 */
     { 257, "ffdhe3072" }, /* RFC 7919 */
     { 258, "ffdhe4096" }, /* RFC 7919 */
     { 259, "ffdhe6144" }, /* RFC 7919 */
     { 260, "ffdhe8192" }, /* RFC 7919 */
+    /* PQC key exchange algorithms from OQS-OpenSSL,
+        see https://github.com/open-quantum-safe/openssl/blob/OQS-OpenSSL_1_1_1-stable/oqs-template/oqs-kem-info.md */
+    { 0x0200, "frodo640aes" },
+    { 0x2F00, "p256_frodo640aes" },
+    { 0x0201, "frodo640shake" },
+    { 0x2F01, "p256_frodo640shake" },
+    { 0x0202, "frodo976aes" },
+    { 0x2F02, "p384_frodo976aes" },
+    { 0x0203, "frodo976shake" },
+    { 0x2F03, "p384_frodo976shake" },
+    { 0x0204, "frodo1344aes" },
+    { 0x2F04, "p521_frodo1344aes" },
+    { 0x0205, "frodo1344shake" },
+    { 0x2F05, "p521_frodo1344shake" },
+    { 0x023A, "kyber512" },
+    { 0x2F3A, "p256_kyber512" },
+    { 0x023C, "kyber768" },
+    { 0x2F3C, "p384_kyber768" },
+    { 0x023D, "kyber1024" },
+    { 0x2F3D, "p521_kyber1024" },
+    { 0x0214, "ntru_hps2048509" },
+    { 0x2F14, "p256_ntru_hps2048509" },
+    { 0x0215, "ntru_hps2048677" },
+    { 0x2F15, "p384_ntru_hps2048677" },
+    { 0x0216, "ntru_hps4096821" },
+    { 0x2F16, "p521_ntru_hps4096821" },
+    { 0x0245, "ntru_hps40961229" },
+    { 0x2F45, "p521_ntru_hps40961229" },
+    { 0x0217, "ntru_hrss701" },
+    { 0x2F17, "p384_ntru_hrss701" },
+    { 0x0246, "ntru_hrss1373" },
+    { 0x2F46, "p521_ntru_hrss1373" },
+    { 0x0218, "lightsaber" },
+    { 0x2F18, "p256_lightsaber" },
+    { 0x0219, "saber" },
+    { 0x2F19, "p384_saber" },
+    { 0x021A, "firesaber" },
+    { 0x2F1A, "p521_firesaber" },
+    { 0x021B, "sidhp434" },
+    { 0x2F1B, "p256_sidhp434" },
+    { 0x021C, "sidhp503" },
+    { 0x2F1C, "p256_sidhp503" },
+    { 0x021D, "sidhp610" },
+    { 0x2F1D, "p384_sidhp610" },
+    { 0x021E, "sidhp751" },
+    { 0x2F1E, "p521_sidhp751" },
+    { 0x021F, "sikep434" },
+    { 0x2F1F, "p256_sikep434" },
+    { 0x0220, "sikep503" },
+    { 0x2F20, "p256_sikep503" },
+    { 0x0221, "sikep610" },
+    { 0x2F21, "p384_sikep610" },
+    { 0x0222, "sikep751" },
+    { 0x2F22, "p521_sikep751" },
+    { 0x0238, "bikel1" },
+    { 0x2F38, "p256_bikel1" },
+    { 0x023B, "bikel3" },
+    { 0x2F3B, "p384_bikel3" },
+    { 0x023E, "kyber90s512" },
+    { 0x2F3E, "p256_kyber90s512" },
+    { 0x023F, "kyber90s768" },
+    { 0x2F3F, "p384_kyber90s768" },
+    { 0x0240, "kyber90s1024" },
+    { 0x2F40, "p521_kyber90s1024" },
+    { 0x022C, "hqc128" },
+    { 0x2F2C, "p256_hqc128" },
+    { 0x022D, "hqc192" },
+    { 0x2F2D, "p384_hqc192" },
+    { 0x022E, "hqc256" },
+    { 0x2F2E, "p521_hqc256" },
+    { 0x022F, "ntrulpr653" },
+    { 0x2F2F, "p256_ntrulpr653" },
+    { 0x0230, "ntrulpr761" },
+    { 0x2F43, "p256_ntrulpr761" },
+    { 0x0231, "ntrulpr857" },
+    { 0x2F31, "p384_ntrulpr857" },
+    { 0x0241, "ntrulpr1277" },
+    { 0x2F41, "p521_ntrulpr1277" },
+    { 0x0232, "sntrup653" },
+    { 0x2F32, "p256_sntrup653" },
+    { 0x0233, "sntrup761" },
+    { 0x2F44, "p256_sntrup761" },
+    { 0x0234, "sntrup857" },
+    { 0x2F34, "p384_sntrup857" },
+    { 0x0242, "sntrup1277" },
+    { 0x2F42, "p521_sntrup1277" },
     { 2570, "Reserved (GREASE)" }, /* RFC 8701 */
     { 6682, "Reserved (GREASE)" }, /* RFC 8701 */
     { 10794, "Reserved (GREASE)" }, /* RFC 8701 */
@@ -632,6 +769,7 @@ const value_string ssl_31_client_certificate_type[] = {
     { 64, "ECDSA Sign" },
     { 65, "RSA Fixed ECDH" },
     { 66, "ECDSA Fixed ECDH" },
+    { 80, "IBC Params" },
     { 0x00, NULL }
 };
 
@@ -825,7 +963,7 @@ static const value_string ssl_31_ciphersuite[] = {
     { 0x00C3, "TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA256" },
     { 0x00C4, "TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA256" },
     { 0x00C5, "TLS_DH_anon_WITH_CAMELLIA_256_CBC_SHA256" },
-    /* draft-yang-tls-tls13-sm-suites */
+    /* RFC 8998 */
     { 0x00C6, "TLS_SM4_GCM_SM3" },
     { 0x00C7, "TLS_SM4_CCM_SM3" },
     /* 0x00,0xC8-FE Unassigned */
@@ -1085,6 +1223,26 @@ static const value_string ssl_31_ciphersuite[] = {
     { 0xD005, "TLS_ECDHE_PSK_WITH_AES_128_CCM_SHA256" },
     /* RFC 8701 */
     { 0xDADA, "Reserved (GREASE)" },
+    /* GM/T 0024-2014 */
+    { 0xe001, "ECDHE_SM1_SM3"},
+    { 0xe003, "ECC_SM1_SM3"},
+    { 0xe005, "IBSDH_SM1_SM3"},
+    { 0xe007, "IBC_SM1_SM3"},
+    { 0xe009, "RSA_SM1_SM3"},
+    { 0xe00a, "RSA_SM1_SHA1"},
+    { 0xe011, "ECDHE_SM4_CBC_SM3"},
+    { 0xe013, "ECC_SM4_CBC_SM3"},
+    { 0xe015, "IBSDH_SM4_CBC_SM3"},
+    { 0xe017, "IBC_SM4_CBC_SM3"},
+    { 0xe019, "RSA_SM4_CBC_SM3"},
+    { 0xe01a, "RSA_SM4_CBC_SHA1"},
+    { 0xe01c, "RSA_SM4_CBC_SHA256"},
+    { 0xe051, "ECDHE_SM4_GCM_SM3"},
+    { 0xe053, "ECC_SM4_GCM_SM3"},
+    { 0xe055, "IBSDH_SM4_GCM_SM3"},
+    { 0xe057, "IBC_SM4_GCM_SM3"},
+    { 0xe059, "RSA_SM4_GCM_SM3"},
+    { 0xe05a, "RSA_SM4_GCM_SHA256"},
     /* https://tools.ietf.org/html/draft-josefsson-salsa20-tls */
     { 0xE410, "TLS_RSA_WITH_ESTREAM_SALSA20_SHA1" },
     { 0xE411, "TLS_RSA_WITH_SALSA20_SHA1" },
@@ -1147,6 +1305,7 @@ const value_string tls_hello_extension_types[] = {
     { SSL_HND_HELLO_EXT_CACHED_INFO, "cached_info" }, /* RFC 7924 */
     { SSL_HND_HELLO_EXT_COMPRESS_CERTIFICATE, "compress_certificate" }, /* https://tools.ietf.org/html/draft-ietf-tls-certificate-compression-03 */
     { SSL_HND_HELLO_EXT_RECORD_SIZE_LIMIT, "record_size_limit" }, /* RFC 8449 */
+    { SSL_HND_HELLO_EXT_DELEGATED_CREDENTIALS, "delegated_credentials" }, /* draft-ietf-tls-subcerts-10.txt */
     { SSL_HND_HELLO_EXT_SESSION_TICKET_TLS, "session_ticket" }, /* RFC 5077 / RFC 8447 */
     { SSL_HND_HELLO_EXT_KEY_SHARE_OLD, "Reserved (key_share)" }, /* https://tools.ietf.org/html/draft-ietf-tls-tls13-22 (removed in -23) */
     { SSL_HND_HELLO_EXT_PRE_SHARED_KEY, "pre_shared_key" }, /* RFC 8446 */
@@ -1160,13 +1319,20 @@ const value_string tls_hello_extension_types[] = {
     { SSL_HND_HELLO_EXT_POST_HANDSHAKE_AUTH, "post_handshake_auth" }, /* RFC 8446 */
     { SSL_HND_HELLO_EXT_SIGNATURE_ALGORITHMS_CERT, "signature_algorithms_cert" }, /* RFC 8446 */
     { SSL_HND_HELLO_EXT_KEY_SHARE, "key_share" }, /* RFC 8446 */
-    { SSL_HND_HELLO_EXT_CONNECTION_ID, "connection_id" }, /* draft-ietf-tls-dtls-connection-id-07 */
+    { SSL_HND_HELLO_EXT_TRANSPARENCY_INFO, "transparency_info" }, /* draft-ietf-trans-rfc6962-bis-41 */
+    { SSL_HND_HELLO_EXT_CONNECTION_ID_DEPRECATED, "connection_id (deprecated)" }, /* draft-ietf-tls-dtls-connection-id-07 */
+    { SSL_HND_HELLO_EXT_CONNECTION_ID, "connection_id" }, /* RFC 9146 */
+    { SSL_HND_HELLO_EXT_EXTERNAL_ID_HASH, "external_id_hash" }, /* RFC 8844 */
+    { SSL_HND_HELLO_EXT_EXTERNAL_SESSION_ID, "external_session_id" }, /* RFC 8844 */
     { SSL_HND_HELLO_EXT_QUIC_TRANSPORT_PARAMETERS_V1, "quic_transport_parameters" }, /* draft-ietf-quic-tls-33 */
+    { SSL_HND_HELLO_EXT_TICKET_REQUEST, "ticket_request" }, /* draft-ietf-tls-ticketrequests-07 */
+    { SSL_HND_HELLO_EXT_DNSSEC_CHAIN, "dnssec_chain" }, /* RFC 9102 */
     { SSL_HND_HELLO_EXT_GREASE_0A0A, "Reserved (GREASE)" }, /* RFC 8701 */
     { SSL_HND_HELLO_EXT_GREASE_1A1A, "Reserved (GREASE)" }, /* RFC 8701 */
     { SSL_HND_HELLO_EXT_GREASE_2A2A, "Reserved (GREASE)" }, /* RFC 8701 */
     { SSL_HND_HELLO_EXT_NPN, "next_protocol_negotiation"}, /* https://tools.ietf.org/id/draft-agl-tls-nextprotoneg-03.html */
     { SSL_HND_HELLO_EXT_GREASE_3A3A, "Reserved (GREASE)" }, /* RFC 8701 */
+    { SSL_HND_HELLO_EXT_ALPS, "application_settings" }, /* draft-vvv-tls-alps-01 */
     { SSL_HND_HELLO_EXT_GREASE_4A4A, "Reserved (GREASE)" }, /* RFC 8701 */
     { SSL_HND_HELLO_EXT_GREASE_5A5A, "Reserved (GREASE)" }, /* RFC 8701 */
     { SSL_HND_HELLO_EXT_GREASE_6A6A, "Reserved (GREASE)" }, /* RFC 8701 */
@@ -1225,6 +1391,7 @@ const value_string tls_hash_algorithm[] = {
     { 4, "SHA256" },
     { 5, "SHA384" },
     { 6, "SHA512" },
+    { 7, "SM3" },
     { 0, NULL }
 };
 
@@ -1233,6 +1400,7 @@ const value_string tls_signature_algorithm[] = {
     { 1, "RSA" },
     { 2, "DSA" },
     { 3, "ECDSA" },
+    { 4, "SM2" },
     { 0, NULL }
 };
 
@@ -1246,6 +1414,7 @@ const value_string tls13_signature_algorithm[] = {
     { 0x0503, "ecdsa_secp384r1_sha384" },
     { 0x0601, "rsa_pkcs1_sha512" },
     { 0x0603, "ecdsa_secp521r1_sha512" },
+    { 0x0708, "sm2sig_sm3" },
     { 0x0804, "rsa_pss_rsae_sha256" },
     { 0x0805, "rsa_pss_rsae_sha384" },
     { 0x0806, "rsa_pss_rsae_sha512" },
@@ -1254,6 +1423,47 @@ const value_string tls13_signature_algorithm[] = {
     { 0x0809, "rsa_pss_pss_sha256" },
     { 0x080a, "rsa_pss_pss_sha384" },
     { 0x080b, "rsa_pss_pss_sha512" },
+    /* PQC digital signature algorithms from OQS-OpenSSL,
+        see https://github.com/open-quantum-safe/openssl/blob/OQS-OpenSSL_1_1_1-stable/oqs-template/oqs-sig-info.md */
+    { 0xfea0, "dilithium2" },
+    { 0xfea1, "p256_dilithium2" },
+    { 0xfea2, "rsa3072_dilithium2" },
+    { 0xfea3, "dilithium3" },
+    { 0xfea4, "p384_dilithium3" },
+    { 0xfea5, "dilithium5" },
+    { 0xfea6, "p521_dilithium5" },
+    { 0xfea7, "dilithium2_aes" },
+    { 0xfea8, "p256_dilithium2_aes" },
+    { 0xfea9, "rsa3072_dilithium2_aes" },
+    { 0xfeaa, "dilithium3_aes" },
+    { 0xfeab, "p384_dilithium3_aes" },
+    { 0xfeac, "dilithium5_aes" },
+    { 0xfead, "p521_dilithium5_aes" },
+    { 0xfe0b, "falcon512" },
+    { 0xfe0c, "p256_falcon512" },
+    { 0xfe0d, "rsa3072_falcon512" },
+    { 0xfe0e, "falcon1024" },
+    { 0xfe0f, "p521_falcon1024" },
+    { 0xfe96, "picnicl1full" },
+    { 0xfe97, "p256_picnicl1full" },
+    { 0xfe98, "rsa3072_picnicl1full" },
+    { 0xfe1b, "picnic3l1" },
+    { 0xfe1c, "p256_picnic3l1" },
+    { 0xfe1d, "rsa3072_picnic3l1" },
+    { 0xfe27, "rainbowIclassic" },
+    { 0xfe28, "p256_rainbowIclassic" },
+    { 0xfe29, "rsa3072_rainbowIclassic" },
+    { 0xfe3c, "rainbowVclassic" },
+    { 0xfe3d, "p521_rainbowVclassic" },
+    { 0xfe42, "sphincsharaka128frobust" },
+    { 0xfe43, "p256_sphincsharaka128frobust" },
+    { 0xfe44, "rsa3072_sphincsharaka128frobust" },
+    { 0xfe5e, "sphincssha256128frobust" },
+    { 0xfe5f, "p256_sphincssha256128frobust" },
+    { 0xfe60, "rsa3072_sphincssha256128frobust" },
+    { 0xfe7a, "sphincsshake256128frobust" },
+    { 0xfe7b, "p256_sphincsshake256128frobust" },
+    { 0xfe7c, "rsa3072_sphincsshake256128frobust" },
     { 0, NULL }
 };
 
@@ -1278,26 +1488,8 @@ const value_string tls_cert_status_type[] = {
 };
 
 /* Generated by tools/make-tls-ct-logids.py
- * Last-Modified Fri, 29 May 2020 22:15:00 GMT, 102 entries. */
+ * Last-Modified Sun, 20 Aug 2023 13:18:00 GMT, 134 entries. */
 static const bytes_string ct_logids[] = {
-    { (const guint8[]){
-          0xfa, 0xd4, 0xc9, 0x7c, 0xc4, 0x9e, 0xe2, 0xf8, 0xac, 0x85, 0xc5,
-          0xea, 0x5c, 0xea, 0x09, 0xd0, 0x22, 0x0d, 0xbb, 0xf4, 0xe4, 0x9c,
-          0x6b, 0x50, 0x66, 0x2f, 0xf8, 0x68, 0xf8, 0x6b, 0x8c, 0x28,
-      },
-      32, "Google 'Argon2017' log" },
-    { (const guint8[]){
-          0xa4, 0x50, 0x12, 0x69, 0x05, 0x5a, 0x15, 0x54, 0x5e, 0x62, 0x11,
-          0xab, 0x37, 0xbc, 0x10, 0x3f, 0x62, 0xae, 0x55, 0x76, 0xa4, 0x5e,
-          0x4b, 0x17, 0x14, 0x45, 0x3e, 0x1b, 0x22, 0x10, 0x6a, 0x25,
-      },
-      32, "Google 'Argon2018' log" },
-    { (const guint8[]){
-          0x63, 0xf2, 0xdb, 0xcd, 0xe8, 0x3b, 0xcc, 0x2c, 0xcf, 0x0b, 0x72,
-          0x84, 0x27, 0x57, 0x6b, 0x33, 0xa4, 0x8d, 0x61, 0x77, 0x8f, 0xbd,
-          0x75, 0xa6, 0x38, 0xb1, 0xc7, 0x68, 0x54, 0x4b, 0xd8, 0x8d,
-      },
-      32, "Google 'Argon2019' log" },
     { (const guint8[]){
           0xb2, 0x1e, 0x05, 0xcc, 0x8b, 0xa2, 0xcd, 0x8a, 0x20, 0x4e, 0x87,
           0x66, 0xf9, 0x2b, 0xb9, 0x8a, 0x25, 0x20, 0x67, 0x6b, 0xda, 0xfa,
@@ -1323,17 +1515,23 @@ static const bytes_string ct_logids[] = {
       },
       32, "Google 'Argon2023' log" },
     { (const guint8[]){
-          0xb1, 0x0c, 0xd5, 0x59, 0xa6, 0xd6, 0x78, 0x46, 0x81, 0x1f, 0x7d,
-          0xf9, 0xa5, 0x15, 0x32, 0x73, 0x9a, 0xc4, 0x8d, 0x70, 0x3b, 0xea,
-          0x03, 0x23, 0xda, 0x5d, 0x38, 0x75, 0x5b, 0xc0, 0xad, 0x4e,
+          0xee, 0xcd, 0xd0, 0x64, 0xd5, 0xdb, 0x1a, 0xce, 0xc5, 0x5c, 0xb7,
+          0x9d, 0xb4, 0xcd, 0x13, 0xa2, 0x32, 0x87, 0x46, 0x7c, 0xbc, 0xec,
+          0xde, 0xc3, 0x51, 0x48, 0x59, 0x46, 0x71, 0x1f, 0xb5, 0x9b,
       },
-      32, "Google 'Xenon2018' log" },
+      32, "Google 'Argon2024' log" },
     { (const guint8[]){
-          0x08, 0x41, 0x14, 0x98, 0x00, 0x71, 0x53, 0x2c, 0x16, 0x19, 0x04,
-          0x60, 0xbc, 0xfc, 0x47, 0xfd, 0xc2, 0x65, 0x3a, 0xfa, 0x29, 0x2c,
-          0x72, 0xb3, 0x7f, 0xf8, 0x63, 0xae, 0x29, 0xcc, 0xc9, 0xf0,
+          0x4e, 0x75, 0xa3, 0x27, 0x5c, 0x9a, 0x10, 0xc3, 0x38, 0x5b, 0x6c,
+          0xd4, 0xdf, 0x3f, 0x52, 0xeb, 0x1d, 0xf0, 0xe0, 0x8e, 0x1b, 0x8d,
+          0x69, 0xc0, 0xb1, 0xfa, 0x64, 0xb1, 0x62, 0x9a, 0x39, 0xdf,
       },
-      32, "Google 'Xenon2019' log" },
+      32, "Google 'Argon2025h1' log" },
+    { (const guint8[]){
+          0x12, 0xf1, 0x4e, 0x34, 0xbd, 0x53, 0x72, 0x4c, 0x84, 0x06, 0x19,
+          0xc3, 0x8f, 0x3f, 0x7a, 0x13, 0xf8, 0xe7, 0xb5, 0x62, 0x87, 0x88,
+          0x9c, 0x6d, 0x30, 0x05, 0x84, 0xeb, 0xe5, 0x86, 0x26, 0x3a,
+      },
+      32, "Google 'Argon2025h2' log" },
     { (const guint8[]){
           0x07, 0xb7, 0x5c, 0x1b, 0xe5, 0x7d, 0x68, 0xff, 0xf1, 0xb0, 0xc6,
           0x1d, 0x23, 0x15, 0xc7, 0xba, 0xe6, 0x57, 0x7c, 0x57, 0x94, 0xb7,
@@ -1358,6 +1556,24 @@ static const bytes_string ct_logids[] = {
           0x0c, 0x24, 0xca, 0x85, 0x86, 0x34, 0xeb, 0xdc, 0x82, 0x8a,
       },
       32, "Google 'Xenon2023' log" },
+    { (const guint8[]){
+          0x76, 0xff, 0x88, 0x3f, 0x0a, 0xb6, 0xfb, 0x95, 0x51, 0xc2, 0x61,
+          0xcc, 0xf5, 0x87, 0xba, 0x34, 0xb4, 0xa4, 0xcd, 0xbb, 0x29, 0xdc,
+          0x68, 0x42, 0x0a, 0x9f, 0xe6, 0x67, 0x4c, 0x5a, 0x3a, 0x74,
+      },
+      32, "Google 'Xenon2024' log" },
+    { (const guint8[]){
+          0xcf, 0x11, 0x56, 0xee, 0xd5, 0x2e, 0x7c, 0xaf, 0xf3, 0x87, 0x5b,
+          0xd9, 0x69, 0x2e, 0x9b, 0xe9, 0x1a, 0x71, 0x67, 0x4a, 0xb0, 0x17,
+          0xec, 0xac, 0x01, 0xd2, 0x5b, 0x77, 0xce, 0xcc, 0x3b, 0x08,
+      },
+      32, "Google 'Xenon2025h1' log" },
+    { (const guint8[]){
+          0xdd, 0xdc, 0xca, 0x34, 0x95, 0xd7, 0xe1, 0x16, 0x05, 0xe7, 0x95,
+          0x32, 0xfa, 0xc7, 0x9f, 0xf8, 0x3d, 0x1c, 0x50, 0xdf, 0xdb, 0x00,
+          0x3a, 0x14, 0x12, 0x76, 0x0a, 0x2c, 0xac, 0xbb, 0xc8, 0x2a,
+      },
+      32, "Google 'Xenon2025h2' log" },
     { (const guint8[]){
           0x68, 0xf6, 0x98, 0xf8, 0x1f, 0x64, 0x82, 0xbe, 0x3a, 0x8c, 0xee,
           0xb9, 0x28, 0x1d, 0x4c, 0xfc, 0x71, 0x51, 0x5d, 0x67, 0x93, 0xd4,
@@ -1388,6 +1604,36 @@ static const bytes_string ct_logids[] = {
           0xe8, 0x1a, 0x90, 0x96, 0x64, 0x36, 0x8e, 0x1e, 0xd1, 0x85,
       },
       32, "Google 'Skydiver' log" },
+    { (const guint8[]){
+          0xfa, 0xd4, 0xc9, 0x7c, 0xc4, 0x9e, 0xe2, 0xf8, 0xac, 0x85, 0xc5,
+          0xea, 0x5c, 0xea, 0x09, 0xd0, 0x22, 0x0d, 0xbb, 0xf4, 0xe4, 0x9c,
+          0x6b, 0x50, 0x66, 0x2f, 0xf8, 0x68, 0xf8, 0x6b, 0x8c, 0x28,
+      },
+      32, "Google 'Argon2017' log" },
+    { (const guint8[]){
+          0xa4, 0x50, 0x12, 0x69, 0x05, 0x5a, 0x15, 0x54, 0x5e, 0x62, 0x11,
+          0xab, 0x37, 0xbc, 0x10, 0x3f, 0x62, 0xae, 0x55, 0x76, 0xa4, 0x5e,
+          0x4b, 0x17, 0x14, 0x45, 0x3e, 0x1b, 0x22, 0x10, 0x6a, 0x25,
+      },
+      32, "Google 'Argon2018' log" },
+    { (const guint8[]){
+          0x63, 0xf2, 0xdb, 0xcd, 0xe8, 0x3b, 0xcc, 0x2c, 0xcf, 0x0b, 0x72,
+          0x84, 0x27, 0x57, 0x6b, 0x33, 0xa4, 0x8d, 0x61, 0x77, 0x8f, 0xbd,
+          0x75, 0xa6, 0x38, 0xb1, 0xc7, 0x68, 0x54, 0x4b, 0xd8, 0x8d,
+      },
+      32, "Google 'Argon2019' log" },
+    { (const guint8[]){
+          0xb1, 0x0c, 0xd5, 0x59, 0xa6, 0xd6, 0x78, 0x46, 0x81, 0x1f, 0x7d,
+          0xf9, 0xa5, 0x15, 0x32, 0x73, 0x9a, 0xc4, 0x8d, 0x70, 0x3b, 0xea,
+          0x03, 0x23, 0xda, 0x5d, 0x38, 0x75, 0x5b, 0xc0, 0xad, 0x4e,
+      },
+      32, "Google 'Xenon2018' log" },
+    { (const guint8[]){
+          0x08, 0x41, 0x14, 0x98, 0x00, 0x71, 0x53, 0x2c, 0x16, 0x19, 0x04,
+          0x60, 0xbc, 0xfc, 0x47, 0xfd, 0xc2, 0x65, 0x3a, 0xfa, 0x29, 0x2c,
+          0x72, 0xb3, 0x7f, 0xf8, 0x63, 0xae, 0x29, 0xcc, 0xc9, 0xf0,
+      },
+      32, "Google 'Xenon2019' log" },
     { (const guint8[]){
           0xa8, 0x99, 0xd8, 0x78, 0x0c, 0x92, 0x90, 0xaa, 0xf4, 0x62, 0xf3,
           0x18, 0x80, 0xcc, 0xfb, 0xd5, 0x24, 0x51, 0xe9, 0x70, 0xd0, 0xfb,
@@ -1449,23 +1695,11 @@ static const bytes_string ct_logids[] = {
       },
       32, "Google 'Solera2023' log" },
     { (const guint8[]){
-          0x1f, 0xbc, 0x36, 0xe0, 0x02, 0xed, 0xe9, 0x7f, 0x40, 0x19, 0x9e,
-          0x86, 0xb3, 0x57, 0x3b, 0x8a, 0x42, 0x17, 0xd8, 0x01, 0x87, 0x74,
-          0x6a, 0xd0, 0xda, 0x03, 0xa0, 0x60, 0x54, 0xd2, 0x0d, 0xf4,
+          0x30, 0x24, 0xce, 0x7e, 0xeb, 0x16, 0x88, 0x62, 0x72, 0x4b, 0xea,
+          0x70, 0x2e, 0xff, 0xf9, 0x92, 0xcf, 0xe4, 0x56, 0x43, 0x41, 0x91,
+          0xaa, 0x59, 0x5b, 0x25, 0xf8, 0x02, 0x26, 0xc8, 0x00, 0x17,
       },
-      32, "Cloudflare 'Nimbus2017' Log" },
-    { (const guint8[]){
-          0xdb, 0x74, 0xaf, 0xee, 0xcb, 0x29, 0xec, 0xb1, 0xfe, 0xca, 0x3e,
-          0x71, 0x6d, 0x2c, 0xe5, 0xb9, 0xaa, 0xbb, 0x36, 0xf7, 0x84, 0x71,
-          0x83, 0xc7, 0x5d, 0x9d, 0x4f, 0x37, 0xb6, 0x1f, 0xbf, 0x64,
-      },
-      32, "Cloudflare 'Nimbus2018' Log" },
-    { (const guint8[]){
-          0x74, 0x7e, 0xda, 0x83, 0x31, 0xad, 0x33, 0x10, 0x91, 0x21, 0x9c,
-          0xce, 0x25, 0x4f, 0x42, 0x70, 0xc2, 0xbf, 0xfd, 0x5e, 0x42, 0x20,
-          0x08, 0xc6, 0x37, 0x35, 0x79, 0xe6, 0x10, 0x7b, 0xcc, 0x56,
-      },
-      32, "Cloudflare 'Nimbus2019' Log" },
+      32, "Google 'Solera2024' log" },
     { (const guint8[]){
           0x5e, 0xa7, 0x73, 0xf9, 0xdf, 0x56, 0xc0, 0xe7, 0xb5, 0x36, 0x48,
           0x7d, 0xd0, 0x49, 0xe0, 0x32, 0x7a, 0x91, 0x9a, 0x0c, 0x84, 0xa1,
@@ -1491,6 +1725,30 @@ static const bytes_string ct_logids[] = {
       },
       32, "Cloudflare 'Nimbus2023' Log" },
     { (const guint8[]){
+          0xda, 0xb6, 0xbf, 0x6b, 0x3f, 0xb5, 0xb6, 0x22, 0x9f, 0x9b, 0xc2,
+          0xbb, 0x5c, 0x6b, 0xe8, 0x70, 0x91, 0x71, 0x6c, 0xbb, 0x51, 0x84,
+          0x85, 0x34, 0xbd, 0xa4, 0x3d, 0x30, 0x48, 0xd7, 0xfb, 0xab,
+      },
+      32, "Cloudflare 'Nimbus2024' Log" },
+    { (const guint8[]){
+          0x1f, 0xbc, 0x36, 0xe0, 0x02, 0xed, 0xe9, 0x7f, 0x40, 0x19, 0x9e,
+          0x86, 0xb3, 0x57, 0x3b, 0x8a, 0x42, 0x17, 0xd8, 0x01, 0x87, 0x74,
+          0x6a, 0xd0, 0xda, 0x03, 0xa0, 0x60, 0x54, 0xd2, 0x0d, 0xf4,
+      },
+      32, "Cloudflare 'Nimbus2017' Log" },
+    { (const guint8[]){
+          0xdb, 0x74, 0xaf, 0xee, 0xcb, 0x29, 0xec, 0xb1, 0xfe, 0xca, 0x3e,
+          0x71, 0x6d, 0x2c, 0xe5, 0xb9, 0xaa, 0xbb, 0x36, 0xf7, 0x84, 0x71,
+          0x83, 0xc7, 0x5d, 0x9d, 0x4f, 0x37, 0xb6, 0x1f, 0xbf, 0x64,
+      },
+      32, "Cloudflare 'Nimbus2018' Log" },
+    { (const guint8[]){
+          0x74, 0x7e, 0xda, 0x83, 0x31, 0xad, 0x33, 0x10, 0x91, 0x21, 0x9c,
+          0xce, 0x25, 0x4f, 0x42, 0x70, 0xc2, 0xbf, 0xfd, 0x5e, 0x42, 0x20,
+          0x08, 0xc6, 0x37, 0x35, 0x79, 0xe6, 0x10, 0x7b, 0xcc, 0x56,
+      },
+      32, "Cloudflare 'Nimbus2019' Log" },
+    { (const guint8[]){
           0x56, 0x14, 0x06, 0x9a, 0x2f, 0xd7, 0xc2, 0xec, 0xd3, 0xf5, 0xe1,
           0xbd, 0x44, 0xb2, 0x3e, 0xc7, 0x46, 0x76, 0xb9, 0xbc, 0x99, 0x11,
           0x5c, 0xc0, 0xef, 0x94, 0x98, 0x55, 0xd6, 0x89, 0xd0, 0xdd,
@@ -1502,18 +1760,6 @@ static const bytes_string ct_logids[] = {
           0xb5, 0x60, 0xc1, 0xb4, 0xea, 0xff, 0x5e, 0xa0, 0x83, 0x0f,
       },
       32, "DigiCert Log Server 2" },
-    { (const guint8[]){
-          0xc1, 0x16, 0x4a, 0xe0, 0xa7, 0x72, 0xd2, 0xd4, 0x39, 0x2d, 0xc8,
-          0x0a, 0xc1, 0x07, 0x70, 0xd4, 0xf0, 0xc4, 0x9b, 0xde, 0x99, 0x1a,
-          0x48, 0x40, 0xc1, 0xfa, 0x07, 0x51, 0x64, 0xf6, 0x33, 0x60,
-      },
-      32, "DigiCert Yeti2018 Log" },
-    { (const guint8[]){
-          0xe2, 0x69, 0x4b, 0xae, 0x26, 0xe8, 0xe9, 0x40, 0x09, 0xe8, 0x86,
-          0x1b, 0xb6, 0x3b, 0x83, 0xd4, 0x3e, 0xe7, 0xfe, 0x74, 0x88, 0xfb,
-          0xa4, 0x8f, 0x28, 0x93, 0x01, 0x9d, 0xdd, 0xf1, 0xdb, 0xfe,
-      },
-      32, "DigiCert Yeti2019 Log" },
     { (const guint8[]){
           0xf0, 0x95, 0xa4, 0x59, 0xf2, 0x00, 0xd1, 0x82, 0x40, 0x10, 0x2d,
           0x2f, 0x93, 0x88, 0x8e, 0xad, 0x4b, 0xfe, 0x1d, 0x47, 0xe3, 0x99,
@@ -1539,17 +1785,17 @@ static const bytes_string ct_logids[] = {
       },
       32, "DigiCert Yeti2023 Log" },
     { (const guint8[]){
-          0x6f, 0xf1, 0x41, 0xb5, 0x64, 0x7e, 0x42, 0x22, 0xf7, 0xef, 0x05,
-          0x2c, 0xef, 0xae, 0x7c, 0x21, 0xfd, 0x60, 0x8e, 0x27, 0xd2, 0xaf,
-          0x5a, 0x6e, 0x9f, 0x4b, 0x8a, 0x37, 0xd6, 0x63, 0x3e, 0xe5,
+          0x48, 0xb0, 0xe3, 0x6b, 0xda, 0xa6, 0x47, 0x34, 0x0f, 0xe5, 0x6a,
+          0x02, 0xfa, 0x9d, 0x30, 0xeb, 0x1c, 0x52, 0x01, 0xcb, 0x56, 0xdd,
+          0x2c, 0x81, 0xd9, 0xbb, 0xbf, 0xab, 0x39, 0xd8, 0x84, 0x73,
       },
-      32, "DigiCert Nessie2018 Log" },
+      32, "DigiCert Yeti2024 Log" },
     { (const guint8[]){
-          0xfe, 0x44, 0x61, 0x08, 0xb1, 0xd0, 0x1a, 0xb7, 0x8a, 0x62, 0xcc,
-          0xfe, 0xab, 0x6a, 0xb2, 0xb2, 0xba, 0xbf, 0xf3, 0xab, 0xda, 0xd8,
-          0x0a, 0x4d, 0x8b, 0x30, 0xdf, 0x2d, 0x00, 0x08, 0x83, 0x0c,
+          0x7d, 0x59, 0x1e, 0x12, 0xe1, 0x78, 0x2a, 0x7b, 0x1c, 0x61, 0x67,
+          0x7c, 0x5e, 0xfd, 0xf8, 0xd0, 0x87, 0x5c, 0x14, 0xa0, 0x4e, 0x95,
+          0x9e, 0xb9, 0x03, 0x2f, 0xd9, 0x0e, 0x8c, 0x2e, 0x79, 0xb8,
       },
-      32, "DigiCert Nessie2019 Log" },
+      32, "DigiCert Yeti2025 Log" },
     { (const guint8[]){
           0xc6, 0x52, 0xa0, 0xec, 0x48, 0xce, 0xb3, 0xfc, 0xab, 0x17, 0x09,
           0x92, 0xc4, 0x3a, 0x87, 0x41, 0x33, 0x09, 0xe8, 0x00, 0x65, 0xa2,
@@ -1575,6 +1821,18 @@ static const bytes_string ct_logids[] = {
       },
       32, "DigiCert Nessie2023 Log" },
     { (const guint8[]){
+          0x73, 0xd9, 0x9e, 0x89, 0x1b, 0x4c, 0x96, 0x78, 0xa0, 0x20, 0x7d,
+          0x47, 0x9d, 0xe6, 0xb2, 0xc6, 0x1c, 0xd0, 0x51, 0x5e, 0x71, 0x19,
+          0x2a, 0x8c, 0x6b, 0x80, 0x10, 0x7a, 0xc1, 0x77, 0x72, 0xb5,
+      },
+      32, "DigiCert Nessie2024 Log" },
+    { (const guint8[]){
+          0xe6, 0xd2, 0x31, 0x63, 0x40, 0x77, 0x8c, 0xc1, 0x10, 0x41, 0x06,
+          0xd7, 0x71, 0xb9, 0xce, 0xc1, 0xd2, 0x40, 0xf6, 0x96, 0x84, 0x86,
+          0xfb, 0xba, 0x87, 0x32, 0x1d, 0xfd, 0x1e, 0x37, 0x8e, 0x50,
+      },
+      32, "DigiCert Nessie2025 Log" },
+    { (const guint8[]){
           0xdd, 0xeb, 0x1d, 0x2b, 0x7a, 0x0d, 0x4f, 0xa6, 0x20, 0x8b, 0x81,
           0xad, 0x81, 0x68, 0x70, 0x7e, 0x2e, 0x8e, 0x9d, 0x01, 0xd5, 0x5c,
           0x88, 0x8d, 0x3d, 0x11, 0xc4, 0xcd, 0xb6, 0xec, 0xbe, 0xcc,
@@ -1587,17 +1845,47 @@ static const bytes_string ct_logids[] = {
       },
       32, "Symantec 'Vega' log" },
     { (const guint8[]){
-          0xa7, 0xce, 0x4a, 0x4e, 0x62, 0x07, 0xe0, 0xad, 0xde, 0xe5, 0xfd,
-          0xaa, 0x4b, 0x1f, 0x86, 0x76, 0x87, 0x67, 0xb5, 0xd0, 0x02, 0xa5,
-          0x5d, 0x47, 0x31, 0x0e, 0x7e, 0x67, 0x0a, 0x95, 0xea, 0xb2,
-      },
-      32, "Symantec Deneb" },
-    { (const guint8[]){
           0x15, 0x97, 0x04, 0x88, 0xd7, 0xb9, 0x97, 0xa0, 0x5b, 0xeb, 0x52,
           0x51, 0x2a, 0xde, 0xe8, 0xd2, 0xe8, 0xb4, 0xa3, 0x16, 0x52, 0x64,
           0x12, 0x1a, 0x9f, 0xab, 0xfb, 0xd5, 0xf8, 0x5a, 0xd9, 0x3f,
       },
       32, "Symantec 'Sirius' log" },
+    { (const guint8[]){
+          0x05, 0x9c, 0x01, 0xd3, 0x20, 0xe0, 0x07, 0x84, 0x13, 0x95, 0x80,
+          0x49, 0x8d, 0x11, 0x7c, 0x90, 0x32, 0x66, 0xaf, 0xaf, 0x72, 0x50,
+          0xb5, 0xaf, 0x3b, 0x46, 0xa4, 0x3e, 0x11, 0x84, 0x0d, 0x4a,
+      },
+      32, "DigiCert Yeti2022-2 Log" },
+    { (const guint8[]){
+          0xc1, 0x16, 0x4a, 0xe0, 0xa7, 0x72, 0xd2, 0xd4, 0x39, 0x2d, 0xc8,
+          0x0a, 0xc1, 0x07, 0x70, 0xd4, 0xf0, 0xc4, 0x9b, 0xde, 0x99, 0x1a,
+          0x48, 0x40, 0xc1, 0xfa, 0x07, 0x51, 0x64, 0xf6, 0x33, 0x60,
+      },
+      32, "DigiCert Yeti2018 Log" },
+    { (const guint8[]){
+          0xe2, 0x69, 0x4b, 0xae, 0x26, 0xe8, 0xe9, 0x40, 0x09, 0xe8, 0x86,
+          0x1b, 0xb6, 0x3b, 0x83, 0xd4, 0x3e, 0xe7, 0xfe, 0x74, 0x88, 0xfb,
+          0xa4, 0x8f, 0x28, 0x93, 0x01, 0x9d, 0xdd, 0xf1, 0xdb, 0xfe,
+      },
+      32, "DigiCert Yeti2019 Log" },
+    { (const guint8[]){
+          0x6f, 0xf1, 0x41, 0xb5, 0x64, 0x7e, 0x42, 0x22, 0xf7, 0xef, 0x05,
+          0x2c, 0xef, 0xae, 0x7c, 0x21, 0xfd, 0x60, 0x8e, 0x27, 0xd2, 0xaf,
+          0x5a, 0x6e, 0x9f, 0x4b, 0x8a, 0x37, 0xd6, 0x63, 0x3e, 0xe5,
+      },
+      32, "DigiCert Nessie2018 Log" },
+    { (const guint8[]){
+          0xfe, 0x44, 0x61, 0x08, 0xb1, 0xd0, 0x1a, 0xb7, 0x8a, 0x62, 0xcc,
+          0xfe, 0xab, 0x6a, 0xb2, 0xb2, 0xba, 0xbf, 0xf3, 0xab, 0xda, 0xd8,
+          0x0a, 0x4d, 0x8b, 0x30, 0xdf, 0x2d, 0x00, 0x08, 0x83, 0x0c,
+      },
+      32, "DigiCert Nessie2019 Log" },
+    { (const guint8[]){
+          0xa7, 0xce, 0x4a, 0x4e, 0x62, 0x07, 0xe0, 0xad, 0xde, 0xe5, 0xfd,
+          0xaa, 0x4b, 0x1f, 0x86, 0x76, 0x87, 0x67, 0xb5, 0xd0, 0x02, 0xa5,
+          0x5d, 0x47, 0x31, 0x0e, 0x7e, 0x67, 0x0a, 0x95, 0xea, 0xb2,
+      },
+      32, "Symantec Deneb" },
     { (const guint8[]){
           0xcd, 0xb5, 0x17, 0x9b, 0x7f, 0xc1, 0xc0, 0x46, 0xfe, 0xea, 0x31,
           0x13, 0x6a, 0x3f, 0x8f, 0x00, 0x2e, 0x61, 0x82, 0xfa, 0xf8, 0x89,
@@ -1617,65 +1905,23 @@ static const bytes_string ct_logids[] = {
       },
       32, "Izenpe 'Argi' log" },
     { (const guint8[]){
-          0x9e, 0x4f, 0xf7, 0x3d, 0xc3, 0xce, 0x22, 0x0b, 0x69, 0x21, 0x7c,
-          0x89, 0x9e, 0x46, 0x80, 0x76, 0xab, 0xf8, 0xd7, 0x86, 0x36, 0xd5,
-          0xcc, 0xfc, 0x85, 0xa3, 0x1a, 0x75, 0x62, 0x8b, 0xa8, 0x8b,
-      },
-      32, "WoSign CT log #1" },
-    { (const guint8[]){
           0x41, 0xb2, 0xdc, 0x2e, 0x89, 0xe6, 0x3c, 0xe4, 0xaf, 0x1b, 0xa7,
           0xbb, 0x29, 0xbf, 0x68, 0xc6, 0xde, 0xe6, 0xf9, 0xf1, 0xcc, 0x04,
           0x7e, 0x30, 0xdf, 0xfa, 0xe3, 0xb3, 0xba, 0x25, 0x92, 0x63,
       },
       32, "WoSign log" },
     { (const guint8[]){
+          0x9e, 0x4f, 0xf7, 0x3d, 0xc3, 0xce, 0x22, 0x0b, 0x69, 0x21, 0x7c,
+          0x89, 0x9e, 0x46, 0x80, 0x76, 0xab, 0xf8, 0xd7, 0x86, 0x36, 0xd5,
+          0xcc, 0xfc, 0x85, 0xa3, 0x1a, 0x75, 0x62, 0x8b, 0xa8, 0x8b,
+      },
+      32, "WoSign CT log #1" },
+    { (const guint8[]){
           0x63, 0xd0, 0x00, 0x60, 0x26, 0xdd, 0xe1, 0x0b, 0xb0, 0x60, 0x1f,
           0x45, 0x24, 0x46, 0x96, 0x5e, 0xe2, 0xb6, 0xea, 0x2c, 0xd4, 0xfb,
           0xc9, 0x5a, 0xc8, 0x66, 0xa5, 0x50, 0xaf, 0x90, 0x75, 0xb7,
       },
       32, "WoSign log 2" },
-    { (const guint8[]){
-          0xc9, 0xcf, 0x89, 0x0a, 0x21, 0x10, 0x9c, 0x66, 0x6c, 0xc1, 0x7a,
-          0x3e, 0xd0, 0x65, 0xc9, 0x30, 0xd0, 0xe0, 0x13, 0x5a, 0x9f, 0xeb,
-          0xa8, 0x5a, 0xf1, 0x42, 0x10, 0xb8, 0x07, 0x24, 0x21, 0xaa,
-      },
-      32, "GDCA CT log #1" },
-    { (const guint8[]){
-          0x92, 0x4a, 0x30, 0xf9, 0x09, 0x33, 0x6f, 0xf4, 0x35, 0xd6, 0x99,
-          0x3a, 0x10, 0xac, 0x75, 0xa2, 0xc6, 0x41, 0x72, 0x8e, 0x7f, 0xc2,
-          0xd6, 0x59, 0xae, 0x61, 0x88, 0xff, 0xad, 0x40, 0xce, 0x01,
-      },
-      32, "GDCA CT log #2" },
-    { (const guint8[]){
-          0x71, 0x7e, 0xa7, 0x42, 0x09, 0x75, 0xbe, 0x84, 0xa2, 0x72, 0x35,
-          0x53, 0xf1, 0x77, 0x7c, 0x26, 0xdd, 0x51, 0xaf, 0x4e, 0x10, 0x21,
-          0x44, 0x09, 0x4d, 0x90, 0x19, 0xb4, 0x62, 0xfb, 0x66, 0x68,
-      },
-      32, "GDCA Log 1" },
-    { (const guint8[]){
-          0x14, 0x30, 0x8d, 0x90, 0xcc, 0xd0, 0x30, 0x13, 0x50, 0x05, 0xc0,
-          0x1c, 0xa5, 0x26, 0xd8, 0x1e, 0x84, 0xe8, 0x76, 0x24, 0xe3, 0x9b,
-          0x62, 0x48, 0xe0, 0x8f, 0x72, 0x4a, 0xea, 0x3b, 0xb4, 0x2a,
-      },
-      32, "GDCA Log 2" },
-    { (const guint8[]){
-          0xdb, 0x76, 0xfd, 0xad, 0xac, 0x65, 0xe7, 0xd0, 0x95, 0x08, 0x88,
-          0x6e, 0x21, 0x59, 0xbd, 0x8b, 0x90, 0x35, 0x2f, 0x5f, 0xea, 0xd3,
-          0xe3, 0xdc, 0x5e, 0x22, 0xeb, 0x35, 0x0a, 0xcc, 0x7b, 0x98,
-      },
-      32, "Sectigo 'Dodo' CT log" },
-    { (const guint8[]){
-          0x55, 0x81, 0xd4, 0xc2, 0x16, 0x90, 0x36, 0x01, 0x4a, 0xea, 0x0b,
-          0x9b, 0x57, 0x3c, 0x53, 0xf0, 0xc0, 0xe4, 0x38, 0x78, 0x70, 0x25,
-          0x08, 0x17, 0x2f, 0xa3, 0xaa, 0x1d, 0x07, 0x13, 0xd3, 0x0c,
-      },
-      32, "Sectigo 'Sabre' CT log" },
-    { (const guint8[]){
-          0x6f, 0x53, 0x76, 0xac, 0x31, 0xf0, 0x31, 0x19, 0xd8, 0x99, 0x00,
-          0xa4, 0x51, 0x15, 0xff, 0x77, 0x15, 0x1c, 0x11, 0xd9, 0x02, 0xc1,
-          0x00, 0x29, 0x06, 0x8d, 0xb2, 0x08, 0x9a, 0x37, 0xd9, 0x13,
-      },
-      32, "Sectigo 'Mammoth' CT log" },
     { (const guint8[]){
           0xac, 0x3b, 0x9a, 0xed, 0x7f, 0xa9, 0x67, 0x47, 0x57, 0x15, 0x9e,
           0x6d, 0x7d, 0x57, 0x56, 0x72, 0xf9, 0xd9, 0x81, 0x00, 0x94, 0x1e,
@@ -1700,6 +1946,258 @@ static const bytes_string ct_logids[] = {
           0xd0, 0x1f, 0x7b, 0xfd, 0x1b, 0xce, 0x19, 0xdb, 0x48, 0xef,
       },
       32, "StartCom log" },
+    { (const guint8[]){
+          0x55, 0x81, 0xd4, 0xc2, 0x16, 0x90, 0x36, 0x01, 0x4a, 0xea, 0x0b,
+          0x9b, 0x57, 0x3c, 0x53, 0xf0, 0xc0, 0xe4, 0x38, 0x78, 0x70, 0x25,
+          0x08, 0x17, 0x2f, 0xa3, 0xaa, 0x1d, 0x07, 0x13, 0xd3, 0x0c,
+      },
+      32, "Sectigo 'Sabre' CT log" },
+    { (const guint8[]){
+          0xa2, 0xe2, 0xbf, 0xd6, 0x1e, 0xde, 0x2f, 0x2f, 0x07, 0xa0, 0xd6,
+          0x4e, 0x6d, 0x37, 0xa7, 0xdc, 0x65, 0x43, 0xb0, 0xc6, 0xb5, 0x2e,
+          0xa2, 0xda, 0xb7, 0x8a, 0xf8, 0x9a, 0x6d, 0xf5, 0x17, 0xd8,
+      },
+      32, "Sectigo 'Sabre2024h1'" },
+    { (const guint8[]){
+          0x19, 0x98, 0x10, 0x71, 0x09, 0xf0, 0xd6, 0x52, 0x2e, 0x30, 0x80,
+          0xd2, 0x9e, 0x3f, 0x64, 0xbb, 0x83, 0x6e, 0x28, 0xcc, 0xf9, 0x0f,
+          0x52, 0x8e, 0xee, 0xdf, 0xce, 0x4a, 0x3f, 0x16, 0xb4, 0xca,
+      },
+      32, "Sectigo 'Sabre2024h2'" },
+    { (const guint8[]){
+          0xe0, 0x92, 0xb3, 0xfc, 0x0c, 0x1d, 0xc8, 0xe7, 0x68, 0x36, 0x1f,
+          0xde, 0x61, 0xb9, 0x96, 0x4d, 0x0a, 0x52, 0x78, 0x19, 0x8a, 0x72,
+          0xd6, 0x72, 0xc4, 0xb0, 0x4d, 0xa5, 0x6d, 0x6f, 0x54, 0x04,
+      },
+      32, "Sectigo 'Sabre2025h1'" },
+    { (const guint8[]){
+          0x1a, 0x04, 0xff, 0x49, 0xd0, 0x54, 0x1d, 0x40, 0xaf, 0xf6, 0xa0,
+          0xc3, 0xbf, 0xf1, 0xd8, 0xc4, 0x67, 0x2f, 0x4e, 0xec, 0xee, 0x23,
+          0x40, 0x68, 0x98, 0x6b, 0x17, 0x40, 0x2e, 0xdc, 0x89, 0x7d,
+      },
+      32, "Sectigo 'Sabre2025h2'" },
+    { (const guint8[]){
+          0x6f, 0x53, 0x76, 0xac, 0x31, 0xf0, 0x31, 0x19, 0xd8, 0x99, 0x00,
+          0xa4, 0x51, 0x15, 0xff, 0x77, 0x15, 0x1c, 0x11, 0xd9, 0x02, 0xc1,
+          0x00, 0x29, 0x06, 0x8d, 0xb2, 0x08, 0x9a, 0x37, 0xd9, 0x13,
+      },
+      32, "Sectigo 'Mammoth' CT log" },
+    { (const guint8[]){
+          0x29, 0xd0, 0x3a, 0x1b, 0xb6, 0x74, 0xaa, 0x71, 0x1c, 0xd3, 0x03,
+          0x5b, 0x65, 0x57, 0xc1, 0x4f, 0x8a, 0xa7, 0x8b, 0x4f, 0xe8, 0x38,
+          0x94, 0x49, 0xec, 0xa4, 0x53, 0xf9, 0x44, 0xbd, 0x24, 0x68,
+      },
+      32, "Sectigo 'Mammoth2024h1'" },
+    { (const guint8[]){
+          0xdf, 0xe1, 0x56, 0xeb, 0xaa, 0x05, 0xaf, 0xb5, 0x9c, 0x0f, 0x86,
+          0x71, 0x8d, 0xa8, 0xc0, 0x32, 0x4e, 0xae, 0x56, 0xd9, 0x6e, 0xa7,
+          0xf5, 0xa5, 0x6a, 0x01, 0xd1, 0xc1, 0x3b, 0xbe, 0x52, 0x5c,
+      },
+      32, "Sectigo 'Mammoth2024h2'" },
+    { (const guint8[]){
+          0x13, 0x4a, 0xdf, 0x1a, 0xb5, 0x98, 0x42, 0x09, 0x78, 0x0c, 0x6f,
+          0xef, 0x4c, 0x7a, 0x91, 0xa4, 0x16, 0xb7, 0x23, 0x49, 0xce, 0x58,
+          0x57, 0x6a, 0xdf, 0xae, 0xda, 0xa7, 0xc2, 0xab, 0xe0, 0x22,
+      },
+      32, "Sectigo 'Mammoth2025h1'" },
+    { (const guint8[]){
+          0xaf, 0x18, 0x1a, 0x28, 0xd6, 0x8c, 0xa3, 0xe0, 0xa9, 0x8a, 0x4c,
+          0x9c, 0x67, 0xab, 0x09, 0xf8, 0xbb, 0xbc, 0x22, 0xba, 0xae, 0xbc,
+          0xb1, 0x38, 0xa3, 0xa1, 0x9d, 0xd3, 0xf9, 0xb6, 0x03, 0x0d,
+      },
+      32, "Sectigo 'Mammoth2025h2'" },
+    { (const guint8[]){
+          0xdb, 0x76, 0xfd, 0xad, 0xac, 0x65, 0xe7, 0xd0, 0x95, 0x08, 0x88,
+          0x6e, 0x21, 0x59, 0xbd, 0x8b, 0x90, 0x35, 0x2f, 0x5f, 0xea, 0xd3,
+          0xe3, 0xdc, 0x5e, 0x22, 0xeb, 0x35, 0x0a, 0xcc, 0x7b, 0x98,
+      },
+      32, "Sectigo 'Dodo' CT log" },
+    { (const guint8[]){
+          0xe7, 0x12, 0xf2, 0xb0, 0x37, 0x7e, 0x1a, 0x62, 0xfb, 0x8e, 0xc9,
+          0x0c, 0x61, 0x84, 0xf1, 0xea, 0x7b, 0x37, 0xcb, 0x56, 0x1d, 0x11,
+          0x26, 0x5b, 0xf3, 0xe0, 0xf3, 0x4b, 0xf2, 0x41, 0x54, 0x6e,
+      },
+      32, "Let's Encrypt 'Oak2020' log" },
+    { (const guint8[]){
+          0x94, 0x20, 0xbc, 0x1e, 0x8e, 0xd5, 0x8d, 0x6c, 0x88, 0x73, 0x1f,
+          0x82, 0x8b, 0x22, 0x2c, 0x0d, 0xd1, 0xda, 0x4d, 0x5e, 0x6c, 0x4f,
+          0x94, 0x3d, 0x61, 0xdb, 0x4e, 0x2f, 0x58, 0x4d, 0xa2, 0xc2,
+      },
+      32, "Let's Encrypt 'Oak2021' log" },
+    { (const guint8[]){
+          0xdf, 0xa5, 0x5e, 0xab, 0x68, 0x82, 0x4f, 0x1f, 0x6c, 0xad, 0xee,
+          0xb8, 0x5f, 0x4e, 0x3e, 0x5a, 0xea, 0xcd, 0xa2, 0x12, 0xa4, 0x6a,
+          0x5e, 0x8e, 0x3b, 0x12, 0xc0, 0x20, 0x44, 0x5c, 0x2a, 0x73,
+      },
+      32, "Let's Encrypt 'Oak2022' log" },
+    { (const guint8[]){
+          0xb7, 0x3e, 0xfb, 0x24, 0xdf, 0x9c, 0x4d, 0xba, 0x75, 0xf2, 0x39,
+          0xc5, 0xba, 0x58, 0xf4, 0x6c, 0x5d, 0xfc, 0x42, 0xcf, 0x7a, 0x9f,
+          0x35, 0xc4, 0x9e, 0x1d, 0x09, 0x81, 0x25, 0xed, 0xb4, 0x99,
+      },
+      32, "Let's Encrypt 'Oak2023' log" },
+    { (const guint8[]){
+          0x3b, 0x53, 0x77, 0x75, 0x3e, 0x2d, 0xb9, 0x80, 0x4e, 0x8b, 0x30,
+          0x5b, 0x06, 0xfe, 0x40, 0x3b, 0x67, 0xd8, 0x4f, 0xc3, 0xf4, 0xc7,
+          0xbd, 0x00, 0x0d, 0x2d, 0x72, 0x6f, 0xe1, 0xfa, 0xd4, 0x17,
+      },
+      32, "Let's Encrypt 'Oak2024H1' log" },
+    { (const guint8[]){
+          0x3f, 0x17, 0x4b, 0x4f, 0xd7, 0x22, 0x47, 0x58, 0x94, 0x1d, 0x65,
+          0x1c, 0x84, 0xbe, 0x0d, 0x12, 0xed, 0x90, 0x37, 0x7f, 0x1f, 0x85,
+          0x6a, 0xeb, 0xc1, 0xbf, 0x28, 0x85, 0xec, 0xf8, 0x64, 0x6e,
+      },
+      32, "Let's Encrypt 'Oak2024H2' log" },
+    { (const guint8[]){
+          0xa2, 0xe3, 0x0a, 0xe4, 0x45, 0xef, 0xbd, 0xad, 0x9b, 0x7e, 0x38,
+          0xed, 0x47, 0x67, 0x77, 0x53, 0xd7, 0x82, 0x5b, 0x84, 0x94, 0xd7,
+          0x2b, 0x5e, 0x1b, 0x2c, 0xc4, 0xb9, 0x50, 0xa4, 0x47, 0xe7,
+      },
+      32, "Let's Encrypt 'Oak2025h1'" },
+    { (const guint8[]){
+          0x0d, 0xe1, 0xf2, 0x30, 0x2b, 0xd3, 0x0d, 0xc1, 0x40, 0x62, 0x12,
+          0x09, 0xea, 0x55, 0x2e, 0xfc, 0x47, 0x74, 0x7c, 0xb1, 0xd7, 0xe9,
+          0x30, 0xef, 0x0e, 0x42, 0x1e, 0xb4, 0x7e, 0x4e, 0xaa, 0x34,
+      },
+      32, "Let's Encrypt 'Oak2025h2'" },
+    { (const guint8[]){
+          0x65, 0x9b, 0x33, 0x50, 0xf4, 0x3b, 0x12, 0xcc, 0x5e, 0xa5, 0xab,
+          0x4e, 0xc7, 0x65, 0xd3, 0xfd, 0xe6, 0xc8, 0x82, 0x43, 0x77, 0x77,
+          0x78, 0xe7, 0x20, 0x03, 0xf9, 0xeb, 0x2b, 0x8c, 0x31, 0x29,
+      },
+      32, "Let's Encrypt 'Oak2019' log" },
+    { (const guint8[]){
+          0x84, 0x9f, 0x5f, 0x7f, 0x58, 0xd2, 0xbf, 0x7b, 0x54, 0xec, 0xbd,
+          0x74, 0x61, 0x1c, 0xea, 0x45, 0xc4, 0x9c, 0x98, 0xf1, 0xd6, 0x48,
+          0x1b, 0xc6, 0xf6, 0x9e, 0x8c, 0x17, 0x4f, 0x24, 0xf3, 0xcf,
+      },
+      32, "Let's Encrypt 'Testflume2019' log" },
+    { (const guint8[]){
+          0x23, 0x2d, 0x41, 0xa4, 0xcd, 0xac, 0x87, 0xce, 0xd9, 0xf9, 0x43,
+          0xf4, 0x68, 0xc2, 0x82, 0x09, 0x5a, 0xe0, 0x9d, 0x30, 0xd6, 0x2e,
+          0x2f, 0xa6, 0x5d, 0xdc, 0x3b, 0x91, 0x9c, 0x2e, 0x46, 0x8f,
+      },
+      32, "Let's Encrypt 'Sapling 2022h2' log" },
+    { (const guint8[]){
+          0xc1, 0x83, 0x24, 0x0b, 0xf1, 0xa4, 0x50, 0xc7, 0x6f, 0xbb, 0x00,
+          0x72, 0x69, 0xdc, 0xac, 0x3b, 0xe2, 0x2a, 0x48, 0x05, 0xd4, 0xdb,
+          0xe0, 0x49, 0x66, 0xc3, 0xc8, 0xab, 0xc4, 0x47, 0xb0, 0x0c,
+      },
+      32, "Let's Encrypt 'Sapling 2023h1' log" },
+    { (const guint8[]){
+          0xc6, 0x3f, 0x22, 0x18, 0xc3, 0x7d, 0x56, 0xa6, 0xaa, 0x06, 0xb5,
+          0x96, 0xda, 0x8e, 0x53, 0xd4, 0xd7, 0x15, 0x6d, 0x1e, 0x9b, 0xac,
+          0x8e, 0x44, 0xd2, 0x20, 0x2d, 0xe6, 0x4d, 0x69, 0xd9, 0xdc,
+      },
+      32, "Let's Encrypt 'Testflume2020' log" },
+    { (const guint8[]){
+          0x03, 0xed, 0xf1, 0xda, 0x97, 0x76, 0xb6, 0xf3, 0x8c, 0x34, 0x1e,
+          0x39, 0xed, 0x9d, 0x70, 0x7a, 0x75, 0x70, 0x36, 0x9c, 0xf9, 0x84,
+          0x4f, 0x32, 0x7f, 0xe9, 0xe1, 0x41, 0x38, 0x36, 0x1b, 0x60,
+      },
+      32, "Let's Encrypt 'Testflume2021' log" },
+    { (const guint8[]){
+          0x23, 0x27, 0xef, 0xda, 0x35, 0x25, 0x10, 0xdb, 0xc0, 0x19, 0xef,
+          0x49, 0x1a, 0xe3, 0xff, 0x1c, 0xc5, 0xa4, 0x79, 0xbc, 0xe3, 0x78,
+          0x78, 0x36, 0x0e, 0xe3, 0x18, 0xcf, 0xfb, 0x64, 0xf8, 0xc8,
+      },
+      32, "Let's Encrypt 'Testflume2022' log" },
+    { (const guint8[]){
+          0x55, 0x34, 0xb7, 0xab, 0x5a, 0x6a, 0xc3, 0xa7, 0xcb, 0xeb, 0xa6,
+          0x54, 0x87, 0xb2, 0xa2, 0xd7, 0x1b, 0x48, 0xf6, 0x50, 0xfa, 0x17,
+          0xc5, 0x19, 0x7c, 0x97, 0xa0, 0xcb, 0x20, 0x76, 0xf3, 0xc6,
+      },
+      32, "Let's Encrypt 'Testflume2023' log" },
+    { (const guint8[]){
+          0x29, 0x6a, 0xfa, 0x2d, 0x56, 0x8b, 0xca, 0x0d, 0x2e, 0xa8, 0x44,
+          0x95, 0x6a, 0xe9, 0x72, 0x1f, 0xc3, 0x5f, 0xa3, 0x55, 0xec, 0xda,
+          0x99, 0x69, 0x3a, 0xaf, 0xd4, 0x58, 0xa7, 0x1a, 0xef, 0xdd,
+      },
+      32, "Let's Encrypt 'Clicky' log" },
+    { (const guint8[]){
+          0xa5, 0x95, 0x94, 0x3b, 0x53, 0x70, 0xbe, 0xe9, 0x06, 0xe0, 0x05,
+          0x0d, 0x1f, 0xb5, 0xbb, 0xc6, 0xa4, 0x0e, 0x65, 0xf2, 0x65, 0xae,
+          0x85, 0x2c, 0x76, 0x36, 0x3f, 0xad, 0xb2, 0x33, 0x36, 0xed,
+      },
+      32, "Trust Asia Log2020" },
+    { (const guint8[]){
+          0xa8, 0xdc, 0x52, 0xf6, 0x3d, 0x6b, 0x24, 0x25, 0xe5, 0x31, 0xe3,
+          0x7c, 0xf4, 0xe4, 0x4a, 0x71, 0x4f, 0x14, 0x2a, 0x20, 0x80, 0x3b,
+          0x0d, 0x04, 0xd2, 0xe2, 0xee, 0x06, 0x64, 0x79, 0x4a, 0x23,
+      },
+      32, "Trust Asia CT2021" },
+    { (const guint8[]){
+          0x67, 0x8d, 0xb6, 0x5b, 0x3e, 0x74, 0x43, 0xb6, 0xf3, 0xa3, 0x70,
+          0xd5, 0xe1, 0x3a, 0xb1, 0xb4, 0x3b, 0xe0, 0xa0, 0xd3, 0x51, 0xf7,
+          0xca, 0x74, 0x22, 0x50, 0xc7, 0xc6, 0xfa, 0x51, 0xa8, 0x8a,
+      },
+      32, "Trust Asia Log2021" },
+    { (const guint8[]){
+          0xc3, 0x65, 0xf9, 0xb3, 0x65, 0x4f, 0x32, 0x83, 0xc7, 0x9d, 0xa9,
+          0x8e, 0x93, 0xd7, 0x41, 0x8f, 0x5b, 0xab, 0x7b, 0xe3, 0x25, 0x2c,
+          0x98, 0xe1, 0xd2, 0xf0, 0x4b, 0xb9, 0xeb, 0x42, 0x7d, 0x23,
+      },
+      32, "Trust Asia Log2022" },
+    { (const guint8[]){
+          0xe8, 0x7e, 0xa7, 0x66, 0x0b, 0xc2, 0x6c, 0xf6, 0x00, 0x2e, 0xf5,
+          0x72, 0x5d, 0x3f, 0xe0, 0xe3, 0x31, 0xb9, 0x39, 0x3b, 0xb9, 0x2f,
+          0xbf, 0x58, 0xeb, 0x3b, 0x90, 0x49, 0xda, 0xf5, 0x43, 0x5a,
+      },
+      32, "Trust Asia Log2023" },
+    { (const guint8[]){
+          0x30, 0x6d, 0x29, 0x57, 0x6a, 0xd2, 0x1a, 0x9d, 0x4a, 0xe1, 0x2a,
+          0xca, 0xd8, 0xaa, 0x8a, 0x78, 0x3a, 0xa6, 0x5a, 0x32, 0x11, 0x60,
+          0xac, 0xff, 0x5b, 0x0e, 0xee, 0x4c, 0xa3, 0x20, 0x1d, 0x05,
+      },
+      32, "Trust Asia Log2024" },
+    { (const guint8[]){
+          0x87, 0x4f, 0xb5, 0x0d, 0xc0, 0x29, 0xd9, 0x93, 0x1d, 0xe5, 0x73,
+          0xe9, 0xf2, 0x89, 0x9e, 0x8e, 0x45, 0x33, 0xb3, 0x92, 0xd3, 0x8b,
+          0x0a, 0x46, 0x25, 0x74, 0xbf, 0x0f, 0xee, 0xb2, 0xfc, 0x1e,
+      },
+      32, "Trust Asia Log2024-2" },
+    { (const guint8[]){
+          0x28, 0xe2, 0x81, 0x38, 0xfd, 0x83, 0x21, 0x45, 0xe9, 0xa9, 0xd6,
+          0xaa, 0x75, 0x37, 0x6d, 0x83, 0x77, 0xa8, 0x85, 0x12, 0xb3, 0xc0,
+          0x7f, 0x72, 0x41, 0x48, 0x21, 0xdc, 0xbd, 0xe9, 0x8c, 0x66,
+      },
+      32, "TrustAsia Log2025a" },
+    { (const guint8[]){
+          0x28, 0x2c, 0x8b, 0xdd, 0x81, 0x0f, 0xf9, 0x09, 0x12, 0x0a, 0xce,
+          0x16, 0xd6, 0xe0, 0xec, 0x20, 0x1b, 0xea, 0x82, 0xa3, 0xa4, 0xaf,
+          0x19, 0xd9, 0xef, 0xfb, 0x59, 0xe8, 0x3f, 0xdc, 0x42, 0x68,
+      },
+      32, "TrustAsia Log2025b" },
+    { (const guint8[]){
+          0x45, 0x35, 0x94, 0x98, 0xd9, 0x3a, 0x89, 0xe0, 0x28, 0x03, 0x08,
+          0xd3, 0x7d, 0x62, 0x6d, 0xc4, 0x23, 0x75, 0x47, 0x58, 0xdc, 0xe0,
+          0x37, 0x00, 0x36, 0xfb, 0xab, 0x0e, 0xdf, 0x8a, 0x6b, 0xcf,
+      },
+      32, "Trust Asia Log1" },
+    { (const guint8[]){
+          0xc9, 0xcf, 0x89, 0x0a, 0x21, 0x10, 0x9c, 0x66, 0x6c, 0xc1, 0x7a,
+          0x3e, 0xd0, 0x65, 0xc9, 0x30, 0xd0, 0xe0, 0x13, 0x5a, 0x9f, 0xeb,
+          0xa8, 0x5a, 0xf1, 0x42, 0x10, 0xb8, 0x07, 0x24, 0x21, 0xaa,
+      },
+      32, "GDCA CT log #1" },
+    { (const guint8[]){
+          0x92, 0x4a, 0x30, 0xf9, 0x09, 0x33, 0x6f, 0xf4, 0x35, 0xd6, 0x99,
+          0x3a, 0x10, 0xac, 0x75, 0xa2, 0xc6, 0x41, 0x72, 0x8e, 0x7f, 0xc2,
+          0xd6, 0x59, 0xae, 0x61, 0x88, 0xff, 0xad, 0x40, 0xce, 0x01,
+      },
+      32, "GDCA CT log #2" },
+    { (const guint8[]){
+          0x71, 0x7e, 0xa7, 0x42, 0x09, 0x75, 0xbe, 0x84, 0xa2, 0x72, 0x35,
+          0x53, 0xf1, 0x77, 0x7c, 0x26, 0xdd, 0x51, 0xaf, 0x4e, 0x10, 0x21,
+          0x44, 0x09, 0x4d, 0x90, 0x19, 0xb4, 0x62, 0xfb, 0x66, 0x68,
+      },
+      32, "GDCA Log 1" },
+    { (const guint8[]){
+          0x14, 0x30, 0x8d, 0x90, 0xcc, 0xd0, 0x30, 0x13, 0x50, 0x05, 0xc0,
+          0x1c, 0xa5, 0x26, 0xd8, 0x1e, 0x84, 0xe8, 0x76, 0x24, 0xe3, 0x9b,
+          0x62, 0x48, 0xe0, 0x8f, 0x72, 0x4a, 0xea, 0x3b, 0xb4, 0x2a,
+      },
+      32, "GDCA Log 2" },
     { (const guint8[]){
           0xe0, 0x12, 0x76, 0x29, 0xe9, 0x04, 0x96, 0x56, 0x4e, 0x3d, 0x01,
           0x47, 0x98, 0x44, 0x98, 0xaa, 0x48, 0xf8, 0xad, 0xb1, 0x66, 0x00,
@@ -1742,72 +2240,6 @@ static const bytes_string ct_logids[] = {
           0x4a, 0x48, 0x34, 0xbc, 0xf7, 0x2e, 0x68, 0x1c, 0x83, 0xc9,
       },
       32, "Alpha CT Log" },
-    { (const guint8[]){
-          0x65, 0x9b, 0x33, 0x50, 0xf4, 0x3b, 0x12, 0xcc, 0x5e, 0xa5, 0xab,
-          0x4e, 0xc7, 0x65, 0xd3, 0xfd, 0xe6, 0xc8, 0x82, 0x43, 0x77, 0x77,
-          0x78, 0xe7, 0x20, 0x03, 0xf9, 0xeb, 0x2b, 0x8c, 0x31, 0x29,
-      },
-      32, "Let's Encrypt 'Oak2019' log" },
-    { (const guint8[]){
-          0xe7, 0x12, 0xf2, 0xb0, 0x37, 0x7e, 0x1a, 0x62, 0xfb, 0x8e, 0xc9,
-          0x0c, 0x61, 0x84, 0xf1, 0xea, 0x7b, 0x37, 0xcb, 0x56, 0x1d, 0x11,
-          0x26, 0x5b, 0xf3, 0xe0, 0xf3, 0x4b, 0xf2, 0x41, 0x54, 0x6e,
-      },
-      32, "Let's Encrypt 'Oak2020' log" },
-    { (const guint8[]){
-          0x94, 0x20, 0xbc, 0x1e, 0x8e, 0xd5, 0x8d, 0x6c, 0x88, 0x73, 0x1f,
-          0x82, 0x8b, 0x22, 0x2c, 0x0d, 0xd1, 0xda, 0x4d, 0x5e, 0x6c, 0x4f,
-          0x94, 0x3d, 0x61, 0xdb, 0x4e, 0x2f, 0x58, 0x4d, 0xa2, 0xc2,
-      },
-      32, "Let's Encrypt 'Oak2021' log" },
-    { (const guint8[]){
-          0xdf, 0xa5, 0x5e, 0xab, 0x68, 0x82, 0x4f, 0x1f, 0x6c, 0xad, 0xee,
-          0xb8, 0x5f, 0x4e, 0x3e, 0x5a, 0xea, 0xcd, 0xa2, 0x12, 0xa4, 0x6a,
-          0x5e, 0x8e, 0x3b, 0x12, 0xc0, 0x20, 0x44, 0x5c, 0x2a, 0x73,
-      },
-      32, "Let's Encrypt 'Oak2022' log" },
-    { (const guint8[]){
-          0xb7, 0x3e, 0xfb, 0x24, 0xdf, 0x9c, 0x4d, 0xba, 0x75, 0xf2, 0x39,
-          0xc5, 0xba, 0x58, 0xf4, 0x6c, 0x5d, 0xfc, 0x42, 0xcf, 0x7a, 0x9f,
-          0x35, 0xc4, 0x9e, 0x1d, 0x09, 0x81, 0x25, 0xed, 0xb4, 0x99,
-      },
-      32, "Let's Encrypt 'Oak2023' log" },
-    { (const guint8[]){
-          0x84, 0x9f, 0x5f, 0x7f, 0x58, 0xd2, 0xbf, 0x7b, 0x54, 0xec, 0xbd,
-          0x74, 0x61, 0x1c, 0xea, 0x45, 0xc4, 0x9c, 0x98, 0xf1, 0xd6, 0x48,
-          0x1b, 0xc6, 0xf6, 0x9e, 0x8c, 0x17, 0x4f, 0x24, 0xf3, 0xcf,
-      },
-      32, "Let's Encrypt 'Testflume2019' log" },
-    { (const guint8[]){
-          0xc6, 0x3f, 0x22, 0x18, 0xc3, 0x7d, 0x56, 0xa6, 0xaa, 0x06, 0xb5,
-          0x96, 0xda, 0x8e, 0x53, 0xd4, 0xd7, 0x15, 0x6d, 0x1e, 0x9b, 0xac,
-          0x8e, 0x44, 0xd2, 0x20, 0x2d, 0xe6, 0x4d, 0x69, 0xd9, 0xdc,
-      },
-      32, "Let's Encrypt 'Testflume2020' log" },
-    { (const guint8[]){
-          0x03, 0xed, 0xf1, 0xda, 0x97, 0x76, 0xb6, 0xf3, 0x8c, 0x34, 0x1e,
-          0x39, 0xed, 0x9d, 0x70, 0x7a, 0x75, 0x70, 0x36, 0x9c, 0xf9, 0x84,
-          0x4f, 0x32, 0x7f, 0xe9, 0xe1, 0x41, 0x38, 0x36, 0x1b, 0x60,
-      },
-      32, "Let's Encrypt 'Testflume2021' log" },
-    { (const guint8[]){
-          0x23, 0x27, 0xef, 0xda, 0x35, 0x25, 0x10, 0xdb, 0xc0, 0x19, 0xef,
-          0x49, 0x1a, 0xe3, 0xff, 0x1c, 0xc5, 0xa4, 0x79, 0xbc, 0xe3, 0x78,
-          0x78, 0x36, 0x0e, 0xe3, 0x18, 0xcf, 0xfb, 0x64, 0xf8, 0xc8,
-      },
-      32, "Let's Encrypt 'Testflume2022' log" },
-    { (const guint8[]){
-          0x55, 0x34, 0xb7, 0xab, 0x5a, 0x6a, 0xc3, 0xa7, 0xcb, 0xeb, 0xa6,
-          0x54, 0x87, 0xb2, 0xa2, 0xd7, 0x1b, 0x48, 0xf6, 0x50, 0xfa, 0x17,
-          0xc5, 0x19, 0x7c, 0x97, 0xa0, 0xcb, 0x20, 0x76, 0xf3, 0xc6,
-      },
-      32, "Let's Encrypt 'Testflume2023' log" },
-    { (const guint8[]){
-          0x29, 0x6a, 0xfa, 0x2d, 0x56, 0x8b, 0xca, 0x0d, 0x2e, 0xa8, 0x44,
-          0x95, 0x6a, 0xe9, 0x72, 0x1f, 0xc3, 0x5f, 0xa3, 0x55, 0xec, 0xda,
-          0x99, 0x69, 0x3a, 0xaf, 0xd4, 0x58, 0xa7, 0x1a, 0xef, 0xdd,
-      },
-      32, "Let's Encrypt 'Clicky' log" },
     { (const guint8[]){
           0xb0, 0xb7, 0x84, 0xbc, 0x81, 0xc0, 0xdd, 0xc4, 0x75, 0x44, 0xe8,
           0x83, 0xf0, 0x59, 0x85, 0xbb, 0x90, 0x77, 0xd1, 0x34, 0xd8, 0xab,
@@ -1862,36 +2294,6 @@ static const bytes_string ct_logids[] = {
           0xcf, 0x62, 0x8d, 0x53, 0xef, 0xea, 0x1f, 0x40, 0x3a, 0x8d,
       },
       32, "Qihoo 360 v1 2023" },
-    { (const guint8[]){
-          0x45, 0x35, 0x94, 0x98, 0xd9, 0x3a, 0x89, 0xe0, 0x28, 0x03, 0x08,
-          0xd3, 0x7d, 0x62, 0x6d, 0xc4, 0x23, 0x75, 0x47, 0x58, 0xdc, 0xe0,
-          0x37, 0x00, 0x36, 0xfb, 0xab, 0x0e, 0xdf, 0x8a, 0x6b, 0xcf,
-      },
-      32, "Trust Asia Log1" },
-    { (const guint8[]){
-          0xa5, 0x95, 0x94, 0x3b, 0x53, 0x70, 0xbe, 0xe9, 0x06, 0xe0, 0x05,
-          0x0d, 0x1f, 0xb5, 0xbb, 0xc6, 0xa4, 0x0e, 0x65, 0xf2, 0x65, 0xae,
-          0x85, 0x2c, 0x76, 0x36, 0x3f, 0xad, 0xb2, 0x33, 0x36, 0xed,
-      },
-      32, "Trust Asia Log2020" },
-    { (const guint8[]){
-          0x67, 0x8d, 0xb6, 0x5b, 0x3e, 0x74, 0x43, 0xb6, 0xf3, 0xa3, 0x70,
-          0xd5, 0xe1, 0x3a, 0xb1, 0xb4, 0x3b, 0xe0, 0xa0, 0xd3, 0x51, 0xf7,
-          0xca, 0x74, 0x22, 0x50, 0xc7, 0xc6, 0xfa, 0x51, 0xa8, 0x8a,
-      },
-      32, "Trust Asia Log2021" },
-    { (const guint8[]){
-          0xc3, 0x65, 0xf9, 0xb3, 0x65, 0x4f, 0x32, 0x83, 0xc7, 0x9d, 0xa9,
-          0x8e, 0x93, 0xd7, 0x41, 0x8f, 0x5b, 0xab, 0x7b, 0xe3, 0x25, 0x2c,
-          0x98, 0xe1, 0xd2, 0xf0, 0x4b, 0xb9, 0xeb, 0x42, 0x7d, 0x23,
-      },
-      32, "Trust Asia Log2022" },
-    { (const guint8[]){
-          0xe8, 0x7e, 0xa7, 0x66, 0x0b, 0xc2, 0x6c, 0xf6, 0x00, 0x2e, 0xf5,
-          0x72, 0x5d, 0x3f, 0xe0, 0xe3, 0x31, 0xb9, 0x39, 0x3b, 0xb9, 0x2f,
-          0xbf, 0x58, 0xeb, 0x3b, 0x90, 0x49, 0xda, 0xf5, 0x43, 0x5a,
-      },
-      32, "Trust Asia Log2023" },
     { NULL, 0, NULL }
 };
 
@@ -1945,11 +2347,13 @@ const value_string quic_transport_parameter_id[] = {
     { SSL_HND_QUIC_TP_INITIAL_SOURCE_CONNECTION_ID, "initial_source_connection_id" },
     { SSL_HND_QUIC_TP_RETRY_SOURCE_CONNECTION_ID, "retry_source_connection_id" },
     { SSL_HND_QUIC_TP_MAX_DATAGRAM_FRAME_SIZE, "max_datagram_frame_size" },
+    { SSL_HND_QUIC_TP_CIBIR_ENCODING, "cibir_encoding" },
     { SSL_HND_QUIC_TP_LOSS_BITS, "loss_bits" },
     { SSL_HND_QUIC_TP_GREASE_QUIC_BIT, "grease_quic_bit" },
     { SSL_HND_QUIC_TP_ENABLE_TIME_STAMP, "enable_time_stamp" },
     { SSL_HND_QUIC_TP_ENABLE_TIME_STAMP_V2, "enable_time_stamp_v2" },
-    { SSL_HND_QUIC_TP_MIN_ACK_DELAY, "min_ack_delay" },
+    { SSL_HND_QUIC_TP_VERSION_INFORMATION, "version_information" },
+    { SSL_HND_QUIC_TP_MIN_ACK_DELAY_OLD, "min_ack_delay" },
     { SSL_HND_QUIC_TP_GOOGLE_USER_AGENT, "google_user_agent" },
     { SSL_HND_QUIC_TP_GOOGLE_KEY_UPDATE_NOT_YET_SUPPORTED, "google_key_update_not_yet_supported" },
     { SSL_HND_QUIC_TP_GOOGLE_QUIC_VERSION, "google_quic_version" },
@@ -1958,6 +2362,7 @@ const value_string quic_transport_parameter_id[] = {
     { SSL_HND_QUIC_TP_GOOGLE_QUIC_PARAMS, "google_quic_params" },
     { SSL_HND_QUIC_TP_GOOGLE_CONNECTION_OPTIONS, "google_connection_options" },
     { SSL_HND_QUIC_TP_FACEBOOK_PARTIAL_RELIABILITY, "facebook_partial_reliability" },
+    { SSL_HND_QUIC_TP_MIN_ACK_DELAY, "min_ack_delay" },
     { 0, NULL }
 };
 
@@ -1975,8 +2380,7 @@ void
 quic_transport_parameter_id_base_custom(gchar *result, guint64 parameter_id)
 {
     const char *label;
-    /* GREASE? https://tools.ietf.org/html/draft-ietf-quic-transport-27#section-18.1 */
-    if (((parameter_id - 27) % 31) == 0) {
+    if (IS_GREASE_QUIC(parameter_id)) {
         label = "GREASE";
     } else if (parameter_id > 0xffffffff) {
         // There are no 64-bit Parameter IDs at the moment.
@@ -1984,7 +2388,7 @@ quic_transport_parameter_id_base_custom(gchar *result, guint64 parameter_id)
     } else {
         label = val_to_str_const((guint32)parameter_id, quic_transport_parameter_id, "Unknown");
     }
-    g_snprintf(result, ITEM_LABEL_LENGTH, "%s (0x%02" G_GINT64_MODIFIER "x)", label, parameter_id);
+    snprintf(result, ITEM_LABEL_LENGTH, "%s (0x%02" PRIx64 ")", label, parameter_id);
 }
 
 /* we keep this internal to packet-tls-utils, as there should be
@@ -2462,7 +2866,7 @@ static gboolean from_hex(StringInfo* out, const char* in, gsize hex_len) {
 #define SSL_HMAC gcry_md_hd_t
 
 static inline gint
-ssl_hmac_init(SSL_HMAC* md, const void * key, gint len, gint algo)
+ssl_hmac_init(SSL_HMAC* md, gint algo)
 {
     gcry_error_t  err;
     const char   *err_str, *err_src;
@@ -2474,9 +2878,32 @@ ssl_hmac_init(SSL_HMAC* md, const void * key, gint len, gint algo)
         ssl_debug_printf("ssl_hmac_init(): gcry_md_open failed %s/%s", err_str, err_src);
         return -1;
     }
-    gcry_md_setkey (*(md), key, len);
     return 0;
 }
+
+static inline gint
+ssl_hmac_setkey(SSL_HMAC* md, const void * key, gint len)
+{
+    gcry_error_t  err;
+    const char   *err_str, *err_src;
+
+    err = gcry_md_setkey (*(md), key, len);
+    if (err != 0) {
+        err_str = gcry_strerror(err);
+        err_src = gcry_strsource(err);
+        ssl_debug_printf("ssl_hmac_setkey(): gcry_md_setkey failed %s/%s", err_str, err_src);
+        return -1;
+    }
+    return 0;
+}
+
+static inline gint
+ssl_hmac_reset(SSL_HMAC* md)
+{
+    gcry_md_reset(*md);
+    return 0;
+}
+
 static inline void
 ssl_hmac_update(SSL_HMAC* md, const void* data, gint len)
 {
@@ -2538,6 +2965,12 @@ ssl_md_cleanup(SSL_MD* md)
     gcry_md_close(*(md));
 }
 
+static inline void
+ssl_md_reset(SSL_MD* md)
+{
+    gcry_md_reset(*md);
+}
+
 /* md5 /sha abstraction layer */
 #define SSL_SHA_CTX gcry_md_hd_t
 #define SSL_MD5_CTX gcry_md_hd_t
@@ -2558,6 +2991,13 @@ ssl_sha_final(guchar* buf, SSL_SHA_CTX* md)
     memcpy(buf, gcry_md_read(*(md),  GCRY_MD_SHA1),
            gcry_md_get_algo_dlen(GCRY_MD_SHA1));
 }
+
+static inline void
+ssl_sha_reset(SSL_SHA_CTX* md)
+{
+    gcry_md_reset(*md);
+}
+
 static inline void
 ssl_sha_cleanup(SSL_SHA_CTX* md)
 {
@@ -2580,6 +3020,13 @@ ssl_md5_final(guchar* buf, SSL_MD5_CTX* md)
     memcpy(buf, gcry_md_read(*(md),  GCRY_MD_MD5),
            gcry_md_get_algo_dlen(GCRY_MD_MD5));
 }
+
+static inline void
+ssl_md5_reset(SSL_MD5_CTX* md)
+{
+    gcry_md_reset(*md);
+}
+
 static inline void
 ssl_md5_cleanup(SSL_MD5_CTX* md)
 {
@@ -2626,20 +3073,10 @@ ssl_cipher_init(gcry_cipher_hd_t *cipher, gint algo, guchar* sk,
     gint gcry_modes[] = {
         GCRY_CIPHER_MODE_STREAM,
         GCRY_CIPHER_MODE_CBC,
-#ifdef HAVE_LIBGCRYPT_AEAD
         GCRY_CIPHER_MODE_GCM,
         GCRY_CIPHER_MODE_CCM,
         GCRY_CIPHER_MODE_CCM,
-#else
-        GCRY_CIPHER_MODE_CTR,
-        GCRY_CIPHER_MODE_CTR,
-        GCRY_CIPHER_MODE_CTR,
-#endif
-#ifdef HAVE_LIBGCRYPT_CHACHA20_POLY1305
         GCRY_CIPHER_MODE_POLY1305,
-#else
-        -1,                         /* AEAD_CHACHA20_POLY1305 is unsupported. */
-#endif
     };
     gint err;
     if (algo == -1) {
@@ -2699,6 +3136,7 @@ static const SslDigestAlgo digests[]={
     {"SHA1",    20},
     {"SHA256",  32},
     {"SHA384",  48},
+    {"SM3",     32},
     {"Not Applicable",  0},
 };
 
@@ -2722,6 +3160,8 @@ static const gchar *ciphers[]={
     "CAMELLIA256",
     "SEED",
     "CHACHA20", /* since Libgcrypt 1.7.0 */
+    "SM1",
+    "SM4",
     "*UNKNOWN*"
 };
 
@@ -2867,6 +3307,7 @@ static const SslCipherSuite cipher_suites[]={
     {0x1303,KEX_TLS13,          ENC_CHACHA20,   DIG_SHA256, MODE_POLY1305 }, /* TLS_CHACHA20_POLY1305_SHA256 */
     {0x1304,KEX_TLS13,          ENC_AES,        DIG_SHA256, MODE_CCM   },   /* TLS_AES_128_CCM_SHA256 */
     {0x1305,KEX_TLS13,          ENC_AES,        DIG_SHA256, MODE_CCM_8 },   /* TLS_AES_128_CCM_8_SHA256 */
+    {0x00C6,KEX_TLS13,          ENC_SM4,        DIG_SM3,    MODE_GCM   },   /* TLS_SM4_GCM_SM3 */
 
     {0xC001,KEX_ECDH_ECDSA,     ENC_NULL,       DIG_SHA,    MODE_STREAM},   /* TLS_ECDH_ECDSA_WITH_NULL_SHA */
     {0xC002,KEX_ECDH_ECDSA,     ENC_RC4,        DIG_SHA,    MODE_STREAM},   /* TLS_ECDH_ECDSA_WITH_RC4_128_SHA */
@@ -2894,6 +3335,15 @@ static const SslCipherSuite cipher_suites[]={
     {0xC017,KEX_ECDH_ANON,      ENC_3DES,       DIG_SHA,    MODE_CBC   },   /* TLS_ECDH_anon_WITH_3DES_EDE_CBC_SHA */
     {0xC018,KEX_ECDH_ANON,      ENC_AES,        DIG_SHA,    MODE_CBC   },   /* TLS_ECDH_anon_WITH_AES_128_CBC_SHA */
     {0xC019,KEX_ECDH_ANON,      ENC_AES256,     DIG_SHA,    MODE_CBC   },   /* TLS_ECDH_anon_WITH_AES_256_CBC_SHA */
+    {0xC01A,KEX_SRP_SHA,        ENC_3DES,       DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_WITH_3DES_EDE_CBC_SHA */
+    {0xC01B,KEX_SRP_SHA_RSA,    ENC_3DES,       DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_RSA_WITH_3DES_EDE_CBC_SHA */
+    {0xC01C,KEX_SRP_SHA_DSS,    ENC_3DES,       DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_DSS_WITH_3DES_EDE_CBC_SHA */
+    {0xC01D,KEX_SRP_SHA,        ENC_AES,        DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_WITH_AES_128_CBC_SHA */
+    {0xC01E,KEX_SRP_SHA_RSA,    ENC_AES,        DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_RSA_WITH_AES_128_CBC_SHA */
+    {0xC01F,KEX_SRP_SHA_DSS,    ENC_AES,        DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_DSS_WITH_AES_128_CBC_SHA */
+    {0xC020,KEX_SRP_SHA,        ENC_AES256,     DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_WITH_AES_256_CBC_SHA */
+    {0xC021,KEX_SRP_SHA_RSA,    ENC_AES256,     DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_RSA_WITH_AES_256_CBC_SHA */
+    {0xC022,KEX_SRP_SHA_DSS,    ENC_AES256,     DIG_SHA,    MODE_CBC   },   /* TLS_SRP_SHA_DSS_WITH_AES_256_CBC_SHA */
     {0xC023,KEX_ECDHE_ECDSA,    ENC_AES,        DIG_SHA256, MODE_CBC   },   /* TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256 */
     {0xC024,KEX_ECDHE_ECDSA,    ENC_AES256,     DIG_SHA384, MODE_CBC   },   /* TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384 */
     {0xC025,KEX_ECDH_ECDSA,     ENC_AES,        DIG_SHA256, MODE_CBC   },   /* TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA256 */
@@ -2988,6 +3438,26 @@ static const SslCipherSuite cipher_suites[]={
     {0xCCAC,KEX_ECDHE_PSK,      ENC_CHACHA20,   DIG_SHA256, MODE_POLY1305 }, /* TLS_ECDHE_PSK_WITH_CHACHA20_POLY1305_SHA256 */
     {0xCCAD,KEX_DHE_PSK,        ENC_CHACHA20,   DIG_SHA256, MODE_POLY1305 }, /* TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256 */
     {0xCCAE,KEX_RSA_PSK,        ENC_CHACHA20,   DIG_SHA256, MODE_POLY1305 }, /* TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256 */
+    /* GM */
+    {0xe001,KEX_ECDHE_SM2,      ENC_SM1,        DIG_SM3,    MODE_CBC},        /* ECDHE_SM1_SM3 */
+    {0xe003,KEX_ECC_SM2,        ENC_SM1,        DIG_SM3,    MODE_CBC},        /* ECC_SM1_SM3 */
+    {0xe005,KEX_IBSDH_SM9,      ENC_SM1,        DIG_SM3,    MODE_CBC},        /* IBSDH_SM1_SM3 */
+    {0xe007,KEX_IBC_SM9,        ENC_SM1,        DIG_SM3,    MODE_CBC},        /* IBC_SM1_SM3 */
+    {0xe009,KEX_RSA,            ENC_SM1,        DIG_SM3,    MODE_CBC},        /* RSA_SM1_SM3 */
+    {0xe00a,KEX_RSA,            ENC_SM1,        DIG_SHA,    MODE_CBC},        /* RSA_SM1_SHA1 */
+    {0xe011,KEX_ECDHE_SM2,      ENC_SM4,        DIG_SM3,    MODE_CBC},        /* ECDHE_SM4_CBC_SM3 */
+    {0xe013,KEX_ECC_SM2,        ENC_SM4,        DIG_SM3,    MODE_CBC},        /* ECC_SM4_CBC_SM3 */
+    {0xe015,KEX_IBSDH_SM9,      ENC_SM4,        DIG_SM3,    MODE_CBC},        /* IBSDH_SM4_CBC_SM3 */
+    {0xe017,KEX_IBC_SM9,        ENC_SM4,        DIG_SM3,    MODE_CBC},        /* IBC_SM4_CBC_SM3 */
+    {0xe019,KEX_RSA,            ENC_SM4,        DIG_SM3,    MODE_CBC},        /* RSA_SM4_CBC_SM3 */
+    {0xe01a,KEX_RSA,            ENC_SM4,        DIG_SHA,    MODE_CBC},        /* RSA_SM4_CBC_SHA1 */
+    {0xe01c,KEX_RSA,            ENC_SM4,        DIG_SHA256, MODE_CBC},        /* RSA_SM4_CBC_SHA256 */
+    {0xe051,KEX_ECDHE_SM2,      ENC_SM4,        DIG_SM3,    MODE_GCM},        /* ECDHE_SM4_GCM_SM3 */
+    {0xe053,KEX_ECC_SM2,        ENC_SM4,        DIG_SM3,    MODE_GCM},        /* ECC_SM4_GCM_SM3 */
+    {0xe055,KEX_IBSDH_SM9,      ENC_SM4,        DIG_SM3,    MODE_GCM},        /* IBSDH_SM4_GCM_SM3 */
+    {0xe057,KEX_IBC_SM9,        ENC_SM4,        DIG_SM3,    MODE_GCM},        /* IBC_SM4_GCM_SM3 */
+    {0xe059,KEX_RSA,            ENC_SM4,        DIG_SM3,    MODE_GCM},        /* RSA_SM4_GCM_SM3 */
+    {0xe05a,KEX_RSA,            ENC_SM4,        DIG_SHA256, MODE_GCM},        /* RSA_SM4_GCM_SHA256 */
     {-1,    0,                  0,              0,          MODE_STREAM}
 };
 
@@ -3010,7 +3480,7 @@ ssl_find_cipher(int num)
 int
 ssl_get_cipher_algo(const SslCipherSuite *cipher_suite)
 {
-    return gcry_cipher_map_name(ciphers[cipher_suite->enc - 0x30]);
+    return gcry_cipher_map_name(ciphers[cipher_suite->enc - ENC_START]);
 }
 
 guint
@@ -3018,7 +3488,7 @@ ssl_get_cipher_blocksize(const SslCipherSuite *cipher_suite)
 {
     gint cipher_algo;
     if (cipher_suite->mode != MODE_CBC) return 0;
-    cipher_algo = ssl_get_cipher_by_name(ciphers[cipher_suite->enc - 0x30]);
+    cipher_algo = ssl_get_cipher_by_name(ciphers[cipher_suite->enc - ENC_START]);
     return (guint)gcry_cipher_get_algo_blklen(cipher_algo);
 }
 
@@ -3089,22 +3559,23 @@ tls_hash(StringInfo *secret, StringInfo *seed, gint md,
     A = seed->data;
     A_l = seed->data_len;
 
+    ssl_hmac_init(&hm, md);
     while (left) {
         /* A(i) = HMAC_hash(secret, A(i-1)) */
-        ssl_hmac_init(&hm, secret->data, secret->data_len, md);
+        ssl_hmac_setkey(&hm, secret->data, secret->data_len);
         ssl_hmac_update(&hm, A, A_l);
         A_l = sizeof(_A); /* upper bound len for hash output */
         ssl_hmac_final(&hm, _A, &A_l);
-        ssl_hmac_cleanup(&hm);
         A = _A;
 
         /* HMAC_hash(secret, A(i) + seed) */
-        ssl_hmac_init(&hm, secret->data, secret->data_len, md);
+        ssl_hmac_reset(&hm);
+        ssl_hmac_setkey(&hm, secret->data, secret->data_len);
         ssl_hmac_update(&hm, A, A_l);
         ssl_hmac_update(&hm, seed->data, seed->data_len);
         tmp_l = sizeof(tmp); /* upper bound len for hash output */
         ssl_hmac_final(&hm, tmp, &tmp_l);
-        ssl_hmac_cleanup(&hm);
+        ssl_hmac_reset(&hm);
 
         /* ssl_hmac_final puts the actual digest output size in tmp_l */
         tocpy = MIN(left, tmp_l);
@@ -3112,6 +3583,7 @@ tls_hash(StringInfo *secret, StringInfo *seed, gint md,
         ptr += tocpy;
         left -= tocpy;
     }
+    ssl_hmac_cleanup(&hm);
     out->data_len = out_len;
 
     ssl_print_string("hash out", out);
@@ -3246,6 +3718,8 @@ ssl3_prf(StringInfo* secret, const gchar* usage,
     gint         i = 0,j;
     guint8       buf[20];
 
+    ssl_sha_init(&sha);
+    ssl_md5_init(&md5);
     for (off = 0; off < out_len; off += 16) {
         guchar outbuf[16];
         i++;
@@ -3256,7 +3730,6 @@ ssl3_prf(StringInfo* secret, const gchar* usage,
             buf[j]=64+i;
         }
 
-        ssl_sha_init(&sha);
         ssl_sha_update(&sha,buf,i);
         ssl_sha_update(&sha,secret->data,secret->data_len);
 
@@ -3272,18 +3745,19 @@ ssl3_prf(StringInfo* secret, const gchar* usage,
         }
 
         ssl_sha_final(buf,&sha);
-        ssl_sha_cleanup(&sha);
+        ssl_sha_reset(&sha);
 
         ssl_debug_printf("ssl3_prf: md5_hash(%d) datalen %d\n",i,
             secret->data_len);
-        ssl_md5_init(&md5);
         ssl_md5_update(&md5,secret->data,secret->data_len);
         ssl_md5_update(&md5,buf,20);
         ssl_md5_final(outbuf,&md5);
-        ssl_md5_cleanup(&md5);
+        ssl_md5_reset(&md5);
 
         memcpy(out->data + off, outbuf, MIN(out_len - off, 16));
     }
+    ssl_sha_cleanup(&sha);
+    ssl_md5_cleanup(&md5);
     out->data_len = out_len;
 
     return TRUE;
@@ -3307,6 +3781,13 @@ prf(SslDecryptSession *ssl, StringInfo *secret, const gchar *usage,
 
     default: /* TLSv1.2 */
         switch (ssl->cipher_suite->dig) {
+        case DIG_SM3:
+#if GCRYPT_VERSION_NUMBER >= 0x010900
+            return tls12_prf(GCRY_MD_SM3, secret, usage, rnd1, rnd2,
+                             out, out_len);
+#else
+            return FALSE;
+#endif
         case DIG_SHA384:
             return tls12_prf(GCRY_MD_SHA384, secret, usage, rnd1, rnd2,
                              out, out_len);
@@ -3787,7 +4268,8 @@ ssl_generate_pre_master_secret(SslDecryptSession *ssl_session,
             ssl_session->session.version == TLSV1DOT1_VERSION ||
             ssl_session->session.version == TLSV1DOT2_VERSION ||
             ssl_session->session.version == DTLSV1DOT0_VERSION ||
-            ssl_session->session.version == DTLSV1DOT2_VERSION))
+            ssl_session->session.version == DTLSV1DOT2_VERSION ||
+            ssl_session->session.version == GMTLSV1_VERSION ))
         {
             encrlen  = tvb_get_ntohs(tvb, offset);
             skip = 2;
@@ -3891,6 +4373,7 @@ ssl_generate_keyring_material(SslDecryptSession*ssl_session)
             case TLSV1DOT1_VERSION:
             case DTLSV1DOT0_VERSION:
             case DTLSV1DOT0_OPENSSL_VERSION:
+            case GMTLSV1_VERSION:
                 ret = tls_handshake_hash(ssl_session, &handshake_hashed_data);
                 break;
             default:
@@ -3944,7 +4427,7 @@ ssl_generate_keyring_material(SslDecryptSession*ssl_session)
 
     /* Find the Libgcrypt cipher algorithm for the given SSL cipher suite ID */
     if (cipher_suite->enc != ENC_NULL) {
-        const char *cipher_name = ciphers[cipher_suite->enc-0x30];
+        const char *cipher_name = ciphers[cipher_suite->enc-ENC_START];
         ssl_debug_printf("%s CIPHER: %s\n", G_STRFUNC, cipher_name);
         cipher_algo = ssl_get_cipher_by_name(cipher_name);
         if (cipher_algo == 0) {
@@ -4133,7 +4616,7 @@ create_decoders:
     ssl_debug_printf("%s ssl_create_decoder(server)\n", G_STRFUNC);
     ssl_session->server_new = ssl_create_decoder(cipher_suite, cipher_algo, ssl_session->session.compression, s_mk, s_wk, s_iv, write_iv_len);
     if (!ssl_session->server_new) {
-        ssl_debug_printf("%s can't init client decoder\n", G_STRFUNC);
+        ssl_debug_printf("%s can't init server decoder\n", G_STRFUNC);
         goto fail;
     }
 
@@ -4141,7 +4624,7 @@ create_decoders:
     ssl_session->client_new->flow = ssl_session->client ? ssl_session->client->flow : ssl_create_flow();
     ssl_session->server_new->flow = ssl_session->server ? ssl_session->server->flow : ssl_create_flow();
 
-    ssl_debug_printf("%s: client seq %" G_GUINT64_FORMAT ", server seq %" G_GUINT64_FORMAT "\n",
+    ssl_debug_printf("%s: client seq %" PRIu64 ", server seq %" PRIu64 "\n",
         G_STRFUNC, ssl_session->client_new->seq, ssl_session->server_new->seq);
     g_free(key_block.data);
     ssl_session->state |= SSL_HAVE_SESSION_KEY;
@@ -4181,7 +4664,7 @@ tls13_generate_keys(SslDecryptSession *ssl_session, const StringInfo *secret, gb
     }
 
     /* Find the Libgcrypt cipher algorithm for the given SSL cipher suite ID */
-    const char *cipher_name = ciphers[cipher_suite->enc-0x30];
+    const char *cipher_name = ciphers[cipher_suite->enc-ENC_START];
     ssl_debug_printf("%s CIPHER: %s\n", G_STRFUNC, cipher_name);
     cipher_algo = ssl_get_cipher_by_name(cipher_name);
     if (cipher_algo == 0) {
@@ -4329,7 +4812,9 @@ tls_check_mac(SslDecoder*decoder, gint ct, gint ver, guint8* data,
     ssl_debug_printf("tls_check_mac mac type:%s md %d\n",
         ssl_cipher_suite_dig(decoder->cipher_suite)->name, md);
 
-    if (ssl_hmac_init(&hm,decoder->mac_key.data,decoder->mac_key.data_len,md) != 0)
+    if (ssl_hmac_init(&hm,md) != 0)
+        return -1;
+    if (ssl_hmac_setkey(&hm,decoder->mac_key.data,decoder->mac_key.data_len) != 0)
         return -1;
 
     /* hash sequence number */
@@ -4409,9 +4894,7 @@ ssl3_check_mac(SslDecoder*decoder,int ct,guint8* data,
 
     /* get partial digest */
     ssl_md_final(&mc,dgst,&len);
-    ssl_md_cleanup(&mc);
-
-    ssl_md_init(&mc,md);
+    ssl_md_reset(&mc);
 
     /* hash mac key */
     ssl_md_update(&mc,decoder->mac_key.data,decoder->mac_key.data_len);
@@ -4431,8 +4914,8 @@ ssl3_check_mac(SslDecoder*decoder,int ct,guint8* data,
 }
 
 static gint
-dtls_check_mac(SslDecoder*decoder, gint ct,int ver, guint8* data,
-        guint32 datalen, guint8* mac)
+dtls_check_mac(SslDecryptSession *ssl, SslDecoder*decoder, gint ct, guint8* data,
+        guint32 datalen, guint8* mac, const guchar *cid, guint8 cidl)
 {
     SSL_HMAC hm;
     gint     md;
@@ -4440,33 +4923,76 @@ dtls_check_mac(SslDecoder*decoder, gint ct,int ver, guint8* data,
     guint8   buf[DIGEST_MAX_SIZE];
     gint16   temp;
 
+    int ver = ssl->session.version;
+    gboolean is_cid = ((ct == SSL_ID_TLS12_CID) && (ver == DTLSV1DOT2_VERSION));
+
     md=ssl_get_digest_by_name(ssl_cipher_suite_dig(decoder->cipher_suite)->name);
     ssl_debug_printf("dtls_check_mac mac type:%s md %d\n",
         ssl_cipher_suite_dig(decoder->cipher_suite)->name, md);
 
-    if (ssl_hmac_init(&hm,decoder->mac_key.data,decoder->mac_key.data_len,md) != 0)
+    if (ssl_hmac_init(&hm,md) != 0)
         return -1;
-    ssl_debug_printf("dtls_check_mac seq: %" G_GUINT64_FORMAT " epoch: %d\n",decoder->seq,decoder->epoch);
-    /* hash sequence number */
-    phton64(buf, decoder->seq);
-    buf[0]=decoder->epoch>>8;
-    buf[1]=(guint8)decoder->epoch;
+    if (ssl_hmac_setkey(&hm,decoder->mac_key.data,decoder->mac_key.data_len) != 0)
+        return -1;
 
-    ssl_hmac_update(&hm,buf,8);
+    ssl_debug_printf("dtls_check_mac seq: %" PRIu64 " epoch: %d\n",decoder->seq,decoder->epoch);
 
-    /* hash content type */
-    buf[0]=ct;
-    ssl_hmac_update(&hm,buf,1);
+    if (is_cid && !ssl->session.deprecated_cid) {
+        /* hash seq num placeholder */
+        memset(buf,0xFF,8);
+        ssl_hmac_update(&hm,buf,8);
 
-    /* hash version,data length and data */
-    temp = g_htons(ver);
-    memcpy(buf, &temp, 2);
-    ssl_hmac_update(&hm,buf,2);
+        /* hash content type + cid length + content type */
+        buf[0]=ct;
+        buf[1]=cidl;
+        buf[2]=ct;
+        ssl_hmac_update(&hm,buf,3);
 
+        /* hash version */
+        temp = g_htons(ver);
+        memcpy(buf, &temp, 2);
+        ssl_hmac_update(&hm,buf,2);
+
+        /* hash sequence number */
+        phton64(buf, decoder->seq);
+        buf[0]=decoder->epoch>>8;
+        buf[1]=(guint8)decoder->epoch;
+        ssl_hmac_update(&hm,buf,8);
+
+        /* hash cid */
+        ssl_hmac_update(&hm,cid,cidl);
+    } else {
+        /* hash sequence number */
+        phton64(buf, decoder->seq);
+        buf[0]=decoder->epoch>>8;
+        buf[1]=(guint8)decoder->epoch;
+        ssl_hmac_update(&hm,buf,8);
+
+        /* hash content type */
+        buf[0]=ct;
+        ssl_hmac_update(&hm,buf,1);
+
+        /* hash version */
+        temp = g_htons(ver);
+        memcpy(buf, &temp, 2);
+        ssl_hmac_update(&hm,buf,2);
+
+        if (is_cid && ssl->session.deprecated_cid) {
+            /* hash cid */
+            ssl_hmac_update(&hm,cid,cidl);
+
+            /* hash cid length */
+            buf[0] = cidl;
+            ssl_hmac_update(&hm,buf,1);
+        }
+    }
+
+    /* data length and data */
     temp = g_htons(datalen);
     memcpy(buf, &temp, 2);
     ssl_hmac_update(&hm,buf,2);
     ssl_hmac_update(&hm,data,datalen);
+
     /* get digest and digest len */
     len = sizeof(buf);
     ssl_hmac_final(&hm,buf,&len);
@@ -4482,22 +5008,10 @@ dtls_check_mac(SslDecoder*decoder, gint ct,int ver, guint8* data,
 
 static gboolean
 tls_decrypt_aead_record(SslDecryptSession *ssl, SslDecoder *decoder,
-#ifdef HAVE_LIBGCRYPT_AEAD
         guint8 ct, guint16 record_version,
-#else
-        guint8 ct _U_, guint16 record_version _U_,
-#endif
-        gboolean ignore_mac_failed
-#ifndef HAVE_LIBGCRYPT_AEAD
-        _U_
-#endif
-        ,
+        gboolean ignore_mac_failed,
         const guchar *in, guint16 inl,
-#ifdef HAVE_LIBGCRYPT_AEAD
         const guchar *cid, guint8 cidl,
-#else
-        const guchar *cid _U_, guint8 cidl _U_,
-#endif
         StringInfo *out_str, guint *outl)
 {
     /* RFC 5246 (TLS 1.2) 6.2.3.3 defines the TLSCipherText.fragment as:
@@ -4507,20 +5021,18 @@ tls_decrypt_aead_record(SslDecryptSession *ssl, SslDecoder *decoder,
      * ciphertext and authentication tag.
      */
     const guint16   version = ssl->session.version;
-    const gboolean  is_v12 = version == TLSV1DOT2_VERSION || version == DTLSV1DOT2_VERSION;
+    const gboolean  is_v12 = version == TLSV1DOT2_VERSION || version == DTLSV1DOT2_VERSION || version == GMTLSV1_VERSION;
     gcry_error_t    err;
     const guchar   *explicit_nonce = NULL, *ciphertext;
     guint           ciphertext_len, auth_tag_len;
     guchar          nonce[12];
     const ssl_cipher_mode_t cipher_mode = decoder->cipher_suite->mode;
-#ifdef HAVE_LIBGCRYPT_AEAD
     const gboolean  is_cid = ct == SSL_ID_TLS12_CID && version == DTLSV1DOT2_VERSION;
     const guint8    draft_version = ssl->session.tls13_draft_version;
     const guchar   *auth_tag_wire;
     guchar          auth_tag_calc[16];
-#else
-    guchar          nonce_with_counter[16] = { 0 };
-#endif
+    guchar         *aad = NULL;
+    guint           aad_len = 0;
 
     switch (cipher_mode) {
     case MODE_GCM:
@@ -4557,9 +5069,7 @@ tls_decrypt_aead_record(SslDecryptSession *ssl, SslDecoder *decoder,
         ssl_debug_printf("%s Unexpected TLS version %#x\n", G_STRFUNC, version);
         return FALSE;
     }
-#ifdef HAVE_LIBGCRYPT_AEAD
     auth_tag_wire = ciphertext + ciphertext_len;
-#endif
 
     /*
      * Nonce construction is version-specific. Note that AEAD_CHACHA20_POLY1305
@@ -4571,25 +5081,6 @@ tls_decrypt_aead_record(SslDecryptSession *ssl, SslDecoder *decoder,
         memcpy(nonce, decoder->write_iv.data, IMPLICIT_NONCE_LEN);
         memcpy(nonce + IMPLICIT_NONCE_LEN, explicit_nonce, EXPLICIT_NONCE_LEN);
 
-#ifndef HAVE_LIBGCRYPT_AEAD
-        if (cipher_mode == MODE_GCM) {
-            /* NIST SP 800-38D, sect. 7.2 says that the 32-bit counter part starts
-             * at 1, and gets incremented before passing to the block cipher. */
-            memcpy(nonce_with_counter, nonce, IMPLICIT_NONCE_LEN + EXPLICIT_NONCE_LEN);
-            nonce_with_counter[IMPLICIT_NONCE_LEN + EXPLICIT_NONCE_LEN + 3] = 2;
-        } else if (cipher_mode == MODE_CCM || cipher_mode == MODE_CCM_8) {
-            /* The nonce for CCM and GCM are the same, but the nonce is used as input
-             * in the CCM algorithm described in RFC 3610. The nonce generated here is
-             * the one from RFC 3610 sect 2.3. Encryption. */
-            /* Flags: (L-1) ; L = 16 - 1 - nonceSize */
-            nonce_with_counter[0] = 3 - 1;
-            memcpy(nonce_with_counter + 1, nonce, IMPLICIT_NONCE_LEN + EXPLICIT_NONCE_LEN);
-            /* struct { opaque salt[4]; opaque nonce_explicit[8] } CCMNonce (RFC 6655) */
-            nonce_with_counter[IMPLICIT_NONCE_LEN + EXPLICIT_NONCE_LEN + 3] = 1;
-        } else {
-            g_assert_not_reached();
-        }
-#endif
     } else if (version == TLSV1DOT3_VERSION || cipher_mode == MODE_POLY1305) {
         /*
          * Technically the nonce length must be at least 8 bytes, but for
@@ -4600,11 +5091,10 @@ tls_decrypt_aead_record(SslDecryptSession *ssl, SslDecoder *decoder,
         memcpy(nonce, decoder->write_iv.data, decoder->write_iv.data_len);
         /* Sequence number is left-padded with zeroes and XORed with write_iv */
         phton64(nonce + nonce_len - 8, pntoh64(nonce + nonce_len - 8) ^ decoder->seq);
-        ssl_debug_printf("%s seq %" G_GUINT64_FORMAT "\n", G_STRFUNC, decoder->seq);
+        ssl_debug_printf("%s seq %" PRIu64 "\n", G_STRFUNC, decoder->seq);
     }
 
     /* Set nonce and additional authentication data */
-#ifdef HAVE_LIBGCRYPT_AEAD
     gcry_cipher_reset(decoder->evp);
     ssl_print_data("nonce", nonce, 12);
     err = gcry_cipher_setiv(decoder->evp, nonce, 12);
@@ -4613,34 +5103,34 @@ tls_decrypt_aead_record(SslDecryptSession *ssl, SslDecoder *decoder,
         return FALSE;
     }
 
-    if (decoder->cipher_suite->mode == MODE_CCM || decoder->cipher_suite->mode == MODE_CCM_8) {
-        /* size of plaintext, additional authenticated data and auth tag. */
-        guint64 lengths[3] = { ciphertext_len, is_v12 ? 13 : 0, auth_tag_len };
-        if (is_cid) {
-            lengths[1] = 13 + 1 + cidl; /* cid length (1 byte) + cid (cidl bytes)*/
-        }
-        gcry_cipher_ctl(decoder->evp, GCRYCTL_SET_CCM_LENGTHS, lengths, sizeof(lengths));
-    }
-
     /* (D)TLS 1.2 needs specific AAD, TLS 1.3 (before -25) uses empty AAD. */
     if (is_cid) { /* if connection ID */
-        guchar aad[14+DTLS_MAX_CID_LENGTH];
-        guint aad_len = 14 + cidl;
-        phton64(aad, decoder->seq);         /* record sequence number */
-        phton16(aad, decoder->epoch);       /* DTLS 1.2 includes epoch. */
-        aad[8] = ct;                        /* TLSCompressed.type */
-        phton16(aad + 9, record_version);   /* TLSCompressed.version */
-        memcpy(aad + 11, cid, cidl);        /* cid */
-        aad[11 + cidl] = cidl;              /* cid_length */
-        phton16(aad + 12 + cidl, ciphertext_len);  /* TLSCompressed.length */
-        ssl_print_data("AAD", aad, aad_len);
-        err = gcry_cipher_authenticate(decoder->evp, aad, aad_len);
-        if (err) {
-            ssl_debug_printf("%s failed to set AAD: %s\n", G_STRFUNC, gcry_strerror(err));
-            return FALSE;
+        if (ssl->session.deprecated_cid) {
+            aad_len = 14 + cidl;
+            aad = wmem_alloc(wmem_packet_scope(), aad_len);
+            phton64(aad, decoder->seq);         /* record sequence number */
+            phton16(aad, decoder->epoch);       /* DTLS 1.2 includes epoch. */
+            aad[8] = ct;                        /* TLSCompressed.type */
+            phton16(aad + 9, record_version);   /* TLSCompressed.version */
+            memcpy(aad + 11, cid, cidl);        /* cid */
+            aad[11 + cidl] = cidl;              /* cid_length */
+            phton16(aad + 12 + cidl, ciphertext_len);  /* TLSCompressed.length */
+        } else {
+            aad_len = 23 + cidl;
+            aad = wmem_alloc(wmem_packet_scope(), aad_len);
+            memset(aad, 0xFF, 8);               /* seq_num_placeholder */
+            aad[8] = ct;                        /* TLSCompressed.type */
+            aad[9] = cidl;                      /* cid_length */
+            aad[10] = ct;                       /* TLSCompressed.type */
+            phton16(aad + 11, record_version);  /* TLSCompressed.version */
+            phton64(aad + 13, decoder->seq);    /* record sequence number */
+            phton16(aad + 13, decoder->epoch);  /* DTLS 1.2 includes epoch. */
+            memcpy(aad + 21, cid, cidl);        /* cid */
+            phton16(aad + 21 + cidl, ciphertext_len);  /* TLSCompressed.length */
         }
     } else if (is_v12) {
-        guchar aad[13];
+        aad_len = 13;
+        aad = wmem_alloc(wmem_packet_scope(), aad_len);
         phton64(aad, decoder->seq);         /* record sequence number */
         if (version == DTLSV1DOT2_VERSION) {
             phton16(aad, decoder->epoch);   /* DTLS 1.2 includes epoch. */
@@ -4648,31 +5138,29 @@ tls_decrypt_aead_record(SslDecryptSession *ssl, SslDecoder *decoder,
         aad[8] = ct;                        /* TLSCompressed.type */
         phton16(aad + 9, record_version);   /* TLSCompressed.version */
         phton16(aad + 11, ciphertext_len);  /* TLSCompressed.length */
-        ssl_print_data("AAD", aad, sizeof(aad));
-        err = gcry_cipher_authenticate(decoder->evp, aad, sizeof(aad));
-        if (err) {
-            ssl_debug_printf("%s failed to set AAD: %s\n", G_STRFUNC, gcry_strerror(err));
-            return FALSE;
-        }
     } else if (draft_version >= 25 || draft_version == 0) {
-        guchar aad[5];
+        aad_len = 5;
+        aad = wmem_alloc(wmem_packet_scope(), aad_len);
         aad[0] = ct;                        /* TLSCiphertext.opaque_type (23) */
         phton16(aad + 1, record_version);   /* TLSCiphertext.legacy_record_version (0x0303) */
         phton16(aad + 3, inl);              /* TLSCiphertext.length */
-        ssl_print_data("AAD", aad, sizeof(aad));
-        err = gcry_cipher_authenticate(decoder->evp, aad, sizeof(aad));
+    }
+
+    if (decoder->cipher_suite->mode == MODE_CCM || decoder->cipher_suite->mode == MODE_CCM_8) {
+        /* size of plaintext, additional authenticated data and auth tag. */
+        guint64 lengths[3] = { ciphertext_len, aad_len, auth_tag_len };
+
+        gcry_cipher_ctl(decoder->evp, GCRYCTL_SET_CCM_LENGTHS, lengths, sizeof(lengths));
+    }
+
+    if (aad && aad_len > 0) {
+        ssl_print_data("AAD", aad, aad_len);
+        err = gcry_cipher_authenticate(decoder->evp, aad, aad_len);
         if (err) {
             ssl_debug_printf("%s failed to set AAD: %s\n", G_STRFUNC, gcry_strerror(err));
             return FALSE;
         }
     }
-#else
-    err = gcry_cipher_setctr(decoder->evp, nonce_with_counter, 16);
-    if (err) {
-        ssl_debug_printf("%s failed: failed to set CTR: %s\n", G_STRFUNC, gcry_strerror(err));
-        return FALSE;
-    }
-#endif
 
     /* Decrypt now that nonce and AAD are set. */
     err = gcry_cipher_decrypt(decoder->evp, out_str->data, out_str->data_len, ciphertext, ciphertext_len);
@@ -4682,7 +5170,6 @@ tls_decrypt_aead_record(SslDecryptSession *ssl, SslDecoder *decoder,
     }
 
     /* Check authentication tag for authenticity (replaces MAC) */
-#ifdef HAVE_LIBGCRYPT_AEAD
     err = gcry_cipher_gettag(decoder->evp, auth_tag_calc, auth_tag_len);
     if (err == 0 && !memcmp(auth_tag_calc, auth_tag_wire, auth_tag_len)) {
         ssl_print_data("auth_tag(OK)", auth_tag_calc, auth_tag_len);
@@ -4700,16 +5187,13 @@ tls_decrypt_aead_record(SslDecryptSession *ssl, SslDecoder *decoder,
             return FALSE;
         }
     }
-#else
-    ssl_debug_printf("Libgcrypt is older than 1.6, unable to verify auth tag!\n");
-#endif
 
     /*
-     * Increment the (implicit) sequence number for TLS 1.2/1.3. This is done
+     * Increment the (implicit) sequence number for TLS 1.2/1.3 and GMTLSv1. This is done
      * after successful authentication to ensure that early data is skipped when
      * CLIENT_EARLY_TRAFFIC_SECRET keys are unavailable.
      */
-    if (version == TLSV1DOT2_VERSION || version == TLSV1DOT3_VERSION) {
+    if (version == TLSV1DOT2_VERSION || version == TLSV1DOT3_VERSION || version == GMTLSV1_VERSION) {
         decoder->seq++;
     }
 
@@ -4784,6 +5268,7 @@ ssl_decrypt_record(SslDecryptSession *ssl, SslDecoder *decoder, guint8 ct, guint
         case DTLSV1DOT0_VERSION:
         case DTLSV1DOT2_VERSION:
         case DTLSV1DOT0_OPENSSL_VERSION:
+        case GMTLSV1_VERSION:
             blocksize = ssl_get_cipher_blocksize(decoder->cipher_suite);
             if (inl < blocksize) {
                 ssl_debug_printf("ssl_decrypt_record failed: input %d has no space for IV %d\n",
@@ -4878,7 +5363,7 @@ ssl_decrypt_record(SslDecryptSession *ssl, SslDecoder *decoder, guint8 ct, guint
     }
 
     /* Now check the MAC */
-    ssl_debug_printf("checking mac (len %d, version %X, ct %d seq %" G_GUINT64_FORMAT ")\n",
+    ssl_debug_printf("checking mac (len %d, version %X, ct %d seq %" PRIu64 ")\n",
         worklen, ssl->session.version, ct, decoder->seq);
     if(ssl->session.version==SSLV3_VERSION){
         if(ssl3_check_mac(decoder,ct,mac_frag,mac_fraglen,mac) < 0) {
@@ -4894,7 +5379,7 @@ ssl_decrypt_record(SslDecryptSession *ssl, SslDecoder *decoder, guint8 ct, guint
             ssl_debug_printf("ssl_decrypt_record: mac ok\n");
         }
     }
-    else if(ssl->session.version==TLSV1_VERSION || ssl->session.version==TLSV1DOT1_VERSION || ssl->session.version==TLSV1DOT2_VERSION){
+    else if(ssl->session.version==TLSV1_VERSION || ssl->session.version==TLSV1DOT1_VERSION || ssl->session.version==TLSV1DOT2_VERSION || ssl->session.version==GMTLSV1_VERSION){
         if(tls_check_mac(decoder,ct,ssl->session.version,mac_frag,mac_fraglen,mac)< 0) {
             if(ignore_mac_failed) {
                 ssl_debug_printf("ssl_decrypt_record: mac failed, but ignored for troubleshooting ;-)\n");
@@ -4912,7 +5397,7 @@ ssl_decrypt_record(SslDecryptSession *ssl, SslDecoder *decoder, guint8 ct, guint
         ssl->session.version==DTLSV1DOT2_VERSION ||
         ssl->session.version==DTLSV1DOT0_OPENSSL_VERSION){
         /* Try rfc-compliant mac first, and if failed, try old openssl's non-rfc-compliant mac */
-        if(dtls_check_mac(decoder,ct,ssl->session.version,mac_frag,mac_fraglen,mac)>= 0) {
+        if(dtls_check_mac(ssl,decoder,ct,mac_frag,mac_fraglen,mac,cid,cidl)>= 0) {
             ssl_debug_printf("ssl_decrypt_record: mac ok\n");
         }
         else if(tls_check_mac(decoder,ct,TLSV1_VERSION,mac_frag,mac_fraglen,mac)>= 0) {
@@ -5058,8 +5543,7 @@ ssl_get_session(conversation_t *conversation, dissector_handle_t tls_handle)
     return ssl_session;
 }
 
-/* Resets the decryption parameters for the next decoder. */
-static void ssl_reset_session(SslSession *session, SslDecryptSession *ssl, gboolean is_client)
+void ssl_reset_session(SslSession *session, SslDecryptSession *ssl, gboolean is_client)
 {
     if (ssl) {
         /* Ensure that secrets are not restored using stale identifiers. Split
@@ -5073,6 +5557,13 @@ static void ssl_reset_session(SslSession *session, SslDecryptSession *ssl, gbool
             ssl->master_secret.data_len = 0;
             ssl->client_random.data_len = 0;
             ssl->has_early_data = FALSE;
+            if (ssl->handshake_data.data_len > 0) {
+                // The EMS handshake hash starts with at the Client Hello,
+                // ensure that any messages before it are forgotten.
+                wmem_free(wmem_file_scope(), ssl->handshake_data.data);
+                ssl->handshake_data.data = NULL;
+                ssl->handshake_data.data_len = 0;
+            }
         } else {
             clear_flags |= SSL_SERVER_EXTENDED_MASTER_SECRET | SSL_NEW_SESSION_TICKET;
             ssl->server_random.data_len = 0;
@@ -5269,7 +5760,7 @@ int
 ssl_packet_from_server(SslSession *session, dissector_table_t table, packet_info *pinfo)
 {
     gint ret;
-    if (session->srv_addr.type != AT_NONE) {
+    if (session && session->srv_addr.type != AT_NONE) {
         ret = (session->srv_ptype == pinfo->ptype) &&
               (session->srv_port == pinfo->srcport) &&
               addresses_equal(&session->srv_addr, &pinfo->src);
@@ -5685,7 +6176,7 @@ tls13_load_secret(SslDecryptSession *ssl, ssl_master_key_map_t *mk_map,
         }
         break;
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     /* Transitioning to new keys, mark old ones as unusable. */
@@ -5792,8 +6283,19 @@ tls13_key_update(SslDecryptSession *ssl, gboolean is_from_server)
         return;
     }
     ssl_data_set(app_secret, new_secret, hash_len);
+    if (tls13_generate_keys(ssl, app_secret, is_from_server)) {
+        /*
+         * Remember the application traffic secret on the new decoder to
+         * support another Key Update.
+         */
+        decoder = is_from_server ? ssl->server : ssl->client;
+        app_secret = &decoder->app_traffic_secret;
+        app_secret->data = (guchar *) wmem_realloc(wmem_file_scope(),
+                                                   app_secret->data,
+                                                   hash_len);
+        ssl_data_set(app_secret, new_secret, hash_len);
+    }
     wmem_free(NULL, new_secret);
-    tls13_generate_keys(ssl, app_secret, is_from_server);
 }
 
 /** SSL keylog file handling. {{{ */
@@ -5974,7 +6476,7 @@ tls_keylog_process_lines(const ssl_master_key_map_t *mk_map, const guint8 *data,
 
             g_hash_table_insert(ht, key, pre_ms_or_ms);
 
-        } else {
+        } else if (linelen > 0 && line[0] != '#') {
             ssl_debug_printf("    unrecognized line\n");
         }
         /* always free match info even if there is no match. */
@@ -6062,7 +6564,6 @@ ssl_set_debug(const gchar* name)
         debug_file_must_be_closed = 0;
 
     ssl_debug_printf("Wireshark SSL debug log \n\n");
-    ssl_debug_printf("Wireshark version: %s\n", get_ws_vcs_version_info());
 #ifdef HAVE_LIBGNUTLS
     ssl_debug_printf("GnuTLS version:    %s\n", gnutls_check_version(NULL));
 #endif
@@ -6164,7 +6665,7 @@ ssldecrypt_uat_fld_fileopen_chk_cb(void* r _U_, const char* p, guint len _U_, co
         return FALSE;
     } else {
         if (ws_stat64(p, &st) != 0) {
-            *err = g_strdup_printf("File '%s' does not exist or access is denied.", p);
+            *err = ws_strdup_printf("File '%s' does not exist or access is denied.", p);
             return FALSE;
         }
     }
@@ -6187,7 +6688,7 @@ ssldecrypt_uat_fld_password_chk_cb(void *r _U_, const char *p _U_, guint len _U_
             gnutls_x509_privkey_t priv_key = rsa_load_pkcs12(fp, p, &msg);
             if (!priv_key) {
                 fclose(fp);
-                *err = g_strdup_printf("Could not load PKCS#12 key file: %s", msg);
+                *err = ws_strdup_printf("Could not load PKCS#12 key file: %s", msg);
                 g_free(msg);
                 return FALSE;
             }
@@ -6195,7 +6696,7 @@ ssldecrypt_uat_fld_password_chk_cb(void *r _U_, const char *p _U_, guint len _U_
             gnutls_x509_privkey_deinit(priv_key);
             fclose(fp);
         } else {
-            *err = g_strdup_printf("Leave this field blank if the keyfile is not PKCS#12.");
+            *err = ws_strdup_printf("Leave this field blank if the keyfile is not PKCS#12.");
             return FALSE;
         }
     }
@@ -6226,7 +6727,7 @@ ssl_association_info_(const gchar *table _U_, gpointer handle, gpointer user_dat
 {
     ssl_association_info_callback_data_t* data = (ssl_association_info_callback_data_t*)user_data;
     const int l = (const int)strlen(data->str);
-    g_snprintf(data->str+l, SSL_ASSOC_MAX_LEN-l, "'%s' %s\n", dissector_handle_get_short_name((dissector_handle_t)handle), data->table_protocol);
+    snprintf(data->str+l, SSL_ASSOC_MAX_LEN-l, "'%s' %s\n", dissector_handle_get_description((dissector_handle_t)handle), data->table_protocol);
 }
 
 /**
@@ -6256,8 +6757,14 @@ ssl_add_vector(ssl_common_dissect_t *hf, tvbuff_t *tvb, packet_info *pinfo, prot
     guint32     veclen_value;
     proto_item *pi;
 
-    DISSECTOR_ASSERT(offset <= offset_end);
-    DISSECTOR_ASSERT(min_value <= max_value);
+    DISSECTOR_ASSERT_CMPUINT(min_value, <=, max_value);
+    if (offset > offset_end) {
+        expert_add_info_format(pinfo, tree, &hf->ei.malformed_buffer_too_small,
+                               "Vector offset is past buffer end offset (%u > %u)",
+                               offset, offset_end);
+        *ret_length = 0;
+        return FALSE;   /* Cannot read length. */
+    }
 
     if (max_value > 0xffffff) {
         veclen_size = 4;
@@ -6538,6 +7045,127 @@ ssl_dissect_hnd_hello_ext_sig_hash_algs(ssl_common_dissect_t *hf, tvbuff_t *tvb,
                                         proto_tree *tree, packet_info* pinfo, guint32 offset, guint32 offset_end)
 {
     return ssl_dissect_hash_alg_list(hf, tvb, tree, pinfo, offset, offset_end);
+}
+
+static gint
+ssl_dissect_hnd_ext_delegated_credentials(ssl_common_dissect_t *hf, tvbuff_t *tvb,
+                                          proto_tree *tree, packet_info* pinfo, guint32 offset, guint32 offset_end, guint8 hnd_type)
+{
+    if (hnd_type == SSL_HND_CLIENT_HELLO) {
+        /*
+         *  struct {
+         *    SignatureScheme supported_signature_algorithm<2..2^16-2>;
+         *  } SignatureSchemeList;
+         */
+
+        return ssl_dissect_hash_alg_list(hf, tvb, tree, pinfo, offset, offset_end);
+    } else {
+        asn1_ctx_t asn1_ctx;
+        guint pubkey_length, sign_length;
+
+        /*
+         *  struct {
+         *    uint32 valid_time;
+         *    SignatureScheme expected_cert_verify_algorithm;
+         *    opaque ASN1_subjectPublicKeyInfo<1..2^24-1>;
+         *  } Credential;
+         *
+         *  struct {
+         *    Credential cred;
+         *    SignatureScheme algorithm;
+         *    opaque signature<0..2^16-1>;
+         *  } DelegatedCredential;
+         */
+
+        asn1_ctx_init(&asn1_ctx, ASN1_ENC_BER, TRUE, pinfo);
+
+        proto_tree_add_item(tree, hf->hf.hs_cred_valid_time, tvb, offset, 4, ENC_BIG_ENDIAN);
+        offset += 4;
+
+        tls_dissect_signature_algorithm(hf, tvb, tree, offset);
+        offset += 2;
+
+        if (!ssl_add_vector(hf, tvb, pinfo, tree, offset, offset_end, &pubkey_length,
+                            hf->hf.hs_cred_pubkey_len, 1, G_MAXUINT24)) {
+            return offset_end;
+        }
+        offset += 3;
+        dissect_x509af_SubjectPublicKeyInfo(FALSE, tvb, offset, &asn1_ctx, tree, hf->hf.hs_cred_pubkey);
+        offset += pubkey_length;
+
+        tls_dissect_signature_algorithm(hf, tvb, tree, offset);
+        offset += 2;
+
+        if (!ssl_add_vector(hf, tvb, pinfo, tree, offset, offset_end, &sign_length,
+                            hf->hf.hs_cred_signature_len, 1, G_MAXUINT16)) {
+            return offset_end;
+        }
+        offset += 2;
+        proto_tree_add_item(tree, hf->hf.hs_cred_signature,
+                            tvb, offset, sign_length, ENC_ASCII|ENC_NA);
+        offset += sign_length;
+
+        return offset;
+    }
+}
+
+static gint
+ssl_dissect_hnd_hello_ext_alps(ssl_common_dissect_t *hf, tvbuff_t *tvb,
+                               packet_info *pinfo, proto_tree *tree,
+                               guint32 offset, guint32 offset_end,
+                               guint8 hnd_type)
+{
+
+    /* https://datatracker.ietf.org/doc/html/draft-vvv-tls-alps-01#section-4 */
+
+    switch (hnd_type) {
+    case SSL_HND_CLIENT_HELLO: {
+        proto_tree *alps_tree;
+        proto_item *ti;
+        guint32     next_offset, alps_length, name_length;
+
+       /*
+        *  opaque ProtocolName<1..2^8-1>;
+        *  struct {
+        *      ProtocolName supported_protocols<2..2^16-1>
+        *  } ApplicationSettingsSupport;
+        */
+
+        if (!ssl_add_vector(hf, tvb, pinfo, tree, offset, offset_end, &alps_length,
+                            hf->hf.hs_ext_alps_len, 2, G_MAXUINT16)) {
+            return offset_end;
+        }
+        offset += 2;
+        next_offset = offset + alps_length;
+
+        ti = proto_tree_add_item(tree, hf->hf.hs_ext_alps_alpn_list,
+                                 tvb, offset, alps_length, ENC_NA);
+        alps_tree = proto_item_add_subtree(ti, hf->ett.hs_ext_alps);
+
+        /* Parse list (note missing check for end of vector, ssl_add_vector below
+         * ensures that data is always available.) */
+        while (offset < next_offset) {
+            if (!ssl_add_vector(hf, tvb, pinfo, alps_tree, offset, next_offset, &name_length,
+                                hf->hf.hs_ext_alps_alpn_str_len, 1, G_MAXUINT8)) {
+                return next_offset;
+            }
+            offset++;
+
+            proto_tree_add_item(alps_tree, hf->hf.hs_ext_alps_alpn_str,
+                                tvb, offset, name_length, ENC_ASCII|ENC_NA);
+            offset += name_length;
+        }
+
+        return offset;
+    }
+    case SSL_HND_ENCRYPTED_EXTS:
+	/* Opaque blob */
+        proto_tree_add_item(tree, hf->hf.hs_ext_alps_settings,
+                            tvb, offset, offset_end - offset, ENC_ASCII|ENC_NA);
+        break;
+    }
+
+    return offset_end;
 }
 
 static gint
@@ -7348,15 +7976,14 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
             proto_item_set_len(parameter_tree, 4 + parameter_length);
         }
 
-        /* GREASE? https://tools.ietf.org/html/draft-ietf-quic-transport-27#section-18.1 */
-        if (((parameter_type - 27) % 31) == 0) {
+        if (IS_GREASE_QUIC(parameter_type)) {
             proto_item_append_text(parameter_tree, ": GREASE");
         } else if (parameter_type > G_MAXUINT) {
             /* There are currently no known TP larger than 32 bits, therefore
              * quic_transport_parameter_id assumes that. If larger (up to 62
              * bits) TPs are available, then it needs to be revisited.
              */
-            proto_item_append_text(parameter_tree, ": Unknown 0x%08" G_GINT64_MODIFIER "x", parameter_type);
+            proto_item_append_text(parameter_tree, ": Unknown 0x%08" PRIx64, parameter_type);
         } else {
             proto_item_append_text(parameter_tree, ": %s", val_to_str((guint32)parameter_type, quic_transport_parameter_id, "Unknown 0x%04x"));
         }
@@ -7376,55 +8003,56 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
             case SSL_HND_QUIC_TP_MAX_IDLE_TIMEOUT:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_max_idle_timeout,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u ms", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64 " ms", value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_STATELESS_RESET_TOKEN:
                 proto_tree_add_item(parameter_tree, hf->hf.hs_ext_quictp_parameter_stateless_reset_token,
                                     tvb, offset, 16, ENC_BIG_ENDIAN);
+                quic_add_stateless_reset_token(pinfo, tvb, offset, NULL);
                 offset += 16;
             break;
             case SSL_HND_QUIC_TP_MAX_UDP_PAYLOAD_SIZE:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_max_udp_payload_size,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 /*TODO display expert info about invalid value (< 1252 or >65527) ? */
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_INITIAL_MAX_DATA:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_initial_max_data,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_INITIAL_MAX_STREAM_DATA_BIDI_LOCAL:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_initial_max_stream_data_bidi_local,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_INITIAL_MAX_STREAM_DATA_BIDI_REMOTE:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_initial_max_stream_data_bidi_remote,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_INITIAL_MAX_STREAM_DATA_UNI:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_initial_max_stream_data_uni,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_INITIAL_MAX_STREAMS_UNI:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_initial_max_streams_uni,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_INITIAL_MAX_STREAMS_BIDI:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_initial_max_streams_bidi,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_ACK_DELAY_EXPONENT:
@@ -7436,7 +8064,7 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
             case SSL_HND_QUIC_TP_MAX_ACK_DELAY:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_max_ack_delay,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_DISABLE_ACTIVE_MIGRATION:
@@ -7476,13 +8104,16 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
 
                 proto_tree_add_item(parameter_tree, hf->hf.hs_ext_quictp_parameter_pa_statelessresettoken,
                                     tvb, offset, 16, ENC_NA);
+                if (connectionid_length >= 1 && connectionid_length <= QUIC_MAX_CID_LENGTH) {
+                    quic_add_stateless_reset_token(pinfo, tvb, offset, &cid);
+                }
                 offset += 16;
             }
             break;
             case SSL_HND_QUIC_TP_ACTIVE_CONNECTION_ID_LIMIT:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_active_connection_id_limit,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_INITIAL_SOURCE_CONNECTION_ID:
@@ -7498,7 +8129,17 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
             case SSL_HND_QUIC_TP_MAX_DATAGRAM_FRAME_SIZE:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_max_datagram_frame_size,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
+                offset += len;
+            break;
+            case SSL_HND_QUIC_TP_CIBIR_ENCODING:
+                proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_cibir_encoding_length,
+                                               tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
+                proto_item_append_text(parameter_tree, " Length: %" PRIu64, value);
+                offset += len;
+                proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_cibir_encoding_offset,
+                                               tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
+                proto_item_append_text(parameter_tree, ", Offset: %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_LOSS_BITS:
@@ -7509,10 +8150,11 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
                 }
                 offset += 1;
             break;
-            case SSL_HND_QUIC_TP_MIN_ACK_DELAY:
+            case SSL_HND_QUIC_TP_MIN_ACK_DELAY_OLD:
+            case SSL_HND_QUIC_TP_MIN_ACK_DELAY  :
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_min_ack_delay,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64, value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_GOOGLE_USER_AGENT:
@@ -7526,16 +8168,26 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
                 offset += parameter_length;
             break;
             case SSL_HND_QUIC_TP_GOOGLE_QUIC_VERSION:
-                for (i = 0; i < parameter_length; i += 4) {
-                    proto_tree_add_item(parameter_tree, hf->hf.hs_ext_quictp_parameter_google_quic_version,
-                                        tvb, offset + i, 4, ENC_BIG_ENDIAN);
-		}
-                offset += parameter_length;
+                proto_tree_add_item(parameter_tree, hf->hf.hs_ext_quictp_parameter_google_quic_version,
+                                    tvb, offset, 4, ENC_BIG_ENDIAN);
+                offset += 4;
+                if (hnd_type == SSL_HND_ENCRYPTED_EXTENSIONS) { /* From server */
+                    guint32 versions_length;
+
+                    proto_tree_add_item_ret_uint(parameter_tree, hf->hf.hs_ext_quictp_parameter_google_supported_versions_length,
+                                                 tvb, offset, 1, ENC_NA, &versions_length);
+                    offset += 1;
+                    for (i = 0; i < versions_length / 4; i++) {
+                        quic_proto_tree_add_version(tvb, parameter_tree,
+                                                    hf->hf.hs_ext_quictp_parameter_google_supported_version, offset);
+                        offset += 4;
+                    }
+                }
             break;
             case SSL_HND_QUIC_TP_GOOGLE_INITIAL_RTT:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_google_initial_rtt,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
-                proto_item_append_text(parameter_tree, " %" G_GINT64_MODIFIER "u us", value);
+                proto_item_append_text(parameter_tree, " %" PRIu64 " us", value);
                 offset += len;
             break;
             case SSL_HND_QUIC_TP_GOOGLE_SUPPORT_HANDSHAKE_DONE:
@@ -7568,6 +8220,16 @@ ssl_dissect_hnd_hello_ext_quic_transport_parameters(ssl_common_dissect_t *hf, tv
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
                 offset += parameter_length;
             break;
+            case SSL_HND_QUIC_TP_VERSION_INFORMATION:
+                quic_proto_tree_add_version(tvb, parameter_tree,
+                                            hf->hf.hs_ext_quictp_parameter_chosen_version, offset);
+                offset += 4;
+                for (i = 4; i < parameter_length; i += 4) {
+                    quic_proto_tree_add_version(tvb, parameter_tree,
+                                                hf->hf.hs_ext_quictp_parameter_other_version, offset);
+                    offset += 4;
+                }
+            break;
             case SSL_HND_QUIC_TP_FACEBOOK_PARTIAL_RELIABILITY:
                 proto_tree_add_item_ret_varint(parameter_tree, hf->hf.hs_ext_quictp_parameter_facebook_partial_reliability,
                                                tvb, offset, -1, ENC_VARINT_QUIC, &value, &len);
@@ -7598,9 +8260,6 @@ ssl_dissect_hnd_hello_common(ssl_common_dissect_t *hf, tvbuff_t *tvb,
     proto_tree  *rnd_tree;
     proto_tree  *ti_rnd;
     guint8       draft_version = session->tls13_draft_version;
-
-    /* Prepare for renegotiation by resetting the state. */
-    ssl_reset_session(session, ssl, !from_server);
 
     if (ssl) {
         StringInfo *rnd;
@@ -7853,7 +8512,8 @@ tls_dissect_hnd_certificate_status(ssl_common_dissect_t *hf, tvbuff_t *tvb, pack
 
 static guint
 ssl_dissect_hnd_hello_ext_supported_groups(ssl_common_dissect_t *hf, tvbuff_t *tvb, packet_info *pinfo,
-                                           proto_tree *tree, guint32 offset, guint32 offset_end)
+                                           proto_tree *tree, guint32 offset, guint32 offset_end,
+                                           wmem_strbuf_t *ja3)
 {
     /* RFC 8446 Section 4.2.7
      *  enum { ..., (0xFFFF) } NamedGroup;
@@ -7867,6 +8527,8 @@ ssl_dissect_hnd_hello_ext_supported_groups(ssl_common_dissect_t *hf, tvbuff_t *t
     guint32     groups_length, next_offset;
     proto_tree *groups_tree;
     proto_item *ti;
+    guint32     ja3_value;
+    gchar      *ja3_dash = "";
 
     /* NamedGroup named_group_list<2..2^16-1> */
     if (!ssl_add_vector(hf, tvb, pinfo, tree, offset, offset_end, &groups_length,
@@ -7886,10 +8548,18 @@ ssl_dissect_hnd_hello_ext_supported_groups(ssl_common_dissect_t *hf, tvbuff_t *t
     /* make this a subtree */
     groups_tree = proto_item_add_subtree(ti, hf->ett.hs_ext_groups);
 
+    if (ja3) {
+        wmem_strbuf_append_c(ja3, ',');
+    }
     /* loop over all groups */
     while (offset + 2 <= offset_end) {
-        proto_tree_add_item(groups_tree, hf->hf.hs_ext_supported_group, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item_ret_uint(groups_tree, hf->hf.hs_ext_supported_group, tvb, offset, 2,
+                                     ENC_BIG_ENDIAN, &ja3_value);
         offset += 2;
+        if (ja3 && !IS_GREASE_TLS(ja3_value)) {
+            wmem_strbuf_append_printf(ja3, "%s%i",ja3_dash, ja3_value);
+            ja3_dash = "-";
+        }
     }
     if (!ssl_end_vector(hf, tvb, pinfo, groups_tree, offset, next_offset)) {
         offset = next_offset;
@@ -7900,11 +8570,12 @@ ssl_dissect_hnd_hello_ext_supported_groups(ssl_common_dissect_t *hf, tvbuff_t *t
 
 static gint
 ssl_dissect_hnd_hello_ext_ec_point_formats(ssl_common_dissect_t *hf, tvbuff_t *tvb,
-                                           proto_tree *tree, guint32 offset)
+                                           proto_tree *tree, guint32 offset, wmem_strbuf_t *ja3)
 {
     guint8      ecpf_length;
     proto_tree *ecpf_tree;
     proto_item *ti;
+    guint32     ja3_value;
 
     ecpf_length = tvb_get_guint8(tvb, offset);
     proto_tree_add_item(tree, hf->hf.hs_ext_ec_point_formats_len,
@@ -7920,13 +8591,47 @@ ssl_dissect_hnd_hello_ext_ec_point_formats(ssl_common_dissect_t *hf, tvbuff_t *t
     /* make this a subtree */
     ecpf_tree = proto_item_add_subtree(ti, hf->ett.hs_ext_curves_point_formats);
 
+    if (ja3) {
+        wmem_strbuf_append_c(ja3, ',');
+    }
+
     /* loop over all point formats */
     while (ecpf_length > 0)
     {
-        proto_tree_add_item(ecpf_tree, hf->hf.hs_ext_ec_point_format, tvb, offset, 1, ENC_BIG_ENDIAN);
+        proto_tree_add_item_ret_uint(ecpf_tree, hf->hf.hs_ext_ec_point_format, tvb, offset, 1,
+                                     ENC_BIG_ENDIAN, &ja3_value);
         offset++;
         ecpf_length--;
+        if (ja3) {
+            wmem_strbuf_append_printf(ja3, "%i", ja3_value);
+            if (ecpf_length > 0) {
+                wmem_strbuf_append_c(ja3, '-');
+            }
+        }
     }
+
+    return offset;
+}
+
+static gint
+ssl_dissect_hnd_hello_ext_srp(ssl_common_dissect_t *hf, tvbuff_t *tvb,
+                               packet_info *pinfo, proto_tree *tree,
+                               guint32 offset, guint32 next_offset)
+{
+    /* https://tools.ietf.org/html/rfc5054#section-2.8.1
+     *  opaque srp_I<1..2^8-1>;
+     */
+    guint32 username_len;
+
+    if (!ssl_add_vector(hf, tvb, pinfo, tree, offset, next_offset, &username_len,
+                        hf->hf.hs_ext_srp_len, 1, G_MAXUINT8)) {
+        return next_offset;
+    }
+    offset++;
+
+    proto_tree_add_item(tree, hf->hf.hs_ext_srp_username,
+                        tvb, offset, username_len, ENC_UTF_8|ENC_NA);
+    offset += username_len;
 
     return offset;
 }
@@ -8101,9 +8806,11 @@ ssl_dissect_ext_connection_id(ssl_common_dissect_t *hf, tvbuff_t *tvb, packet_in
                         tvb, offset, 1, ENC_NA);
     offset++;
 
-    proto_tree_add_item(tree, hf->hf.hs_ext_connection_id,
-                        tvb, offset, cidl, ENC_NA);
-    offset += cidl;
+    if (cidl > 0) {
+        proto_tree_add_item(tree, hf->hf.hs_ext_connection_id,
+                            tvb, offset, cidl, ENC_NA);
+        offset += cidl;
+    }
 
     return offset;
 }
@@ -8117,9 +8824,11 @@ ssl_dissect_hnd_hello_ext_connection_id(ssl_common_dissect_t *hf, tvbuff_t *tvb,
 
     switch (hnd_type) {
     case SSL_HND_CLIENT_HELLO:
+        session->client_cid_len_present = TRUE;
         return ssl_dissect_ext_connection_id(hf, tvb, pinfo, tree, offset, ssl,
                                              cidl, &session->client_cid, &session->client_cid_len);
     case SSL_HND_SERVER_HELLO:
+        session->server_cid_len_present = TRUE;
         return ssl_dissect_ext_connection_id(hf, tvb, pinfo, tree, offset, ssl,
                                              cidl, &session->server_cid, &session->server_cid_len);
     default:
@@ -8270,6 +8979,7 @@ ssl_try_set_version(SslSession *session, SslDecryptSession *ssl,
     case TLSV1DOT1_VERSION:
     case TLSV1DOT2_VERSION:
     case TLSV1DOT3_VERSION:
+    case GMTLSV1_VERSION:
         if (is_dtls)
             return;
         break;
@@ -8368,7 +9078,7 @@ static gint
 ssl_dissect_hnd_extension(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tree,
                           packet_info* pinfo, guint32 offset, guint32 offset_end, guint8 hnd_type,
                           SslSession *session, SslDecryptSession *ssl,
-                          gboolean is_dtls);
+                          gboolean is_dtls, wmem_strbuf_t *ja3);
 void
 ssl_dissect_hnd_cli_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
                           packet_info *pinfo, proto_tree *tree, guint32 offset,
@@ -8391,11 +9101,16 @@ ssl_dissect_hnd_cli_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
     guint32     compression_methods_length;
     guint8      compression_method;
     guint32     next_offset;
+    guint32     ja3_value;
+    wmem_strbuf_t *ja3 = wmem_strbuf_new(wmem_packet_scope(), "");
+    gchar      *ja3_hash;
+    gchar      *ja3_dash = "";
 
     /* show the client version */
-    proto_tree_add_item(tree, hf->hf.hs_client_version, tvb,
-                        offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf->hf.hs_client_version, tvb,
+                        offset, 2, ENC_BIG_ENDIAN, &ja3_value);
     offset += 2;
+    wmem_strbuf_append_printf(ja3, "%i,", ja3_value);
 
     /* dissect fields that are also present in ClientHello */
     offset = ssl_dissect_hnd_hello_common(hf, tvb, tree, offset, session, ssl, FALSE, FALSE);
@@ -8431,9 +9146,15 @@ ssl_dissect_hnd_cli_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
                                     plurality(cipher_suite_length/2, "", "s"));
     cs_tree = proto_item_add_subtree(ti, hf->ett.cipher_suites);
     while (offset + 2 <= next_offset) {
-        proto_tree_add_item(cs_tree, hf->hf.hs_cipher_suite, tvb, offset, 2, ENC_BIG_ENDIAN);
+        proto_tree_add_item_ret_uint(cs_tree, hf->hf.hs_cipher_suite, tvb, offset, 2,
+                                     ENC_BIG_ENDIAN, &ja3_value);
         offset += 2;
+        if (!IS_GREASE_TLS(ja3_value)) {
+            wmem_strbuf_append_printf(ja3, "%s%i",ja3_dash, ja3_value);
+            ja3_dash = "-";
+        }
     }
+    wmem_strbuf_append_c(ja3, ',');
     if (!ssl_end_vector(hf, tvb, pinfo, cs_tree, offset, next_offset)) {
         offset = next_offset;
     }
@@ -8474,8 +9195,18 @@ ssl_dissect_hnd_cli_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
     if (offset < offset_end) {
         ssl_dissect_hnd_extension(hf, tvb, tree, pinfo, offset,
                                   offset_end, SSL_HND_CLIENT_HELLO,
-                                  session, ssl, dtls_hfs != NULL);
+                                  session, ssl, dtls_hfs != NULL, ja3);
+    } else {
+        wmem_strbuf_append_printf(ja3, ",,");
     }
+
+    ja3_hash = g_compute_checksum_for_string(G_CHECKSUM_MD5, wmem_strbuf_get_str(ja3),
+            wmem_strbuf_get_len(ja3));
+    ti = proto_tree_add_string(tree, hf->hf.hs_ja3_full, tvb, offset, 0, wmem_strbuf_get_str(ja3));
+    proto_item_set_generated(ti);
+    ti = proto_tree_add_string(tree, hf->hf.hs_ja3_hash, tvb, offset, 0, ja3_hash);
+    proto_item_set_generated(ti);
+    g_free(ja3_hash);
 }
 
 void
@@ -8494,6 +9225,10 @@ ssl_dissect_hnd_srv_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
      * } ServerHello;
      */
     guint8  draft_version = session->tls13_draft_version;
+    proto_item *ti;
+    guint32     ja3_value;
+    wmem_strbuf_t *ja3 = wmem_strbuf_new(wmem_packet_scope(), "");
+    gchar      *ja3_hash;
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL,
                 val_to_str_const(session->version, ssl_version_short_names, "SSL"));
@@ -8504,9 +9239,10 @@ ssl_dissect_hnd_srv_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
     session->is_session_resumed = TRUE;
 
     /* show the server version */
-    proto_tree_add_item(tree, hf->hf.hs_server_version, tvb,
-                        offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf->hf.hs_server_version, tvb,
+                        offset, 2, ENC_BIG_ENDIAN, &ja3_value);
     offset += 2;
+    wmem_strbuf_append_printf(ja3, "%i", ja3_value);
 
     /* dissect fields that are also present in ClientHello */
     offset = ssl_dissect_hnd_hello_common(hf, tvb, tree, offset, session, ssl, TRUE, is_hrr);
@@ -8517,9 +9253,10 @@ ssl_dissect_hnd_srv_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
     }
 
     /* now the server-selected cipher suite */
-    proto_tree_add_item(tree, hf->hf.hs_cipher_suite,
-                        tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf->hf.hs_cipher_suite,
+                        tvb, offset, 2, ENC_BIG_ENDIAN, &ja3_value);
     offset += 2;
+    wmem_strbuf_append_printf(ja3, ",%i,", ja3_value);
 
     /* No compression with TLS 1.3 before draft -22 */
     if (!(session->version == TLSV1DOT3_VERSION && draft_version > 0 && draft_version < 22)) {
@@ -8538,8 +9275,16 @@ ssl_dissect_hnd_srv_hello(ssl_common_dissect_t *hf, tvbuff_t *tvb,
         ssl_dissect_hnd_extension(hf, tvb, tree, pinfo, offset,
                                   offset_end,
                                   is_hrr ? SSL_HND_HELLO_RETRY_REQUEST : SSL_HND_SERVER_HELLO,
-                                  session, ssl, is_dtls);
+                                  session, ssl, is_dtls, ja3);
     }
+
+    ja3_hash = g_compute_checksum_for_string(G_CHECKSUM_MD5, wmem_strbuf_get_str(ja3),
+            wmem_strbuf_get_len(ja3));
+    ti = proto_tree_add_string(tree, hf->hf.hs_ja3s_full, tvb, offset, 0, wmem_strbuf_get_str(ja3));
+    proto_item_set_generated(ti);
+    ti = proto_tree_add_string(tree, hf->hf.hs_ja3s_hash, tvb, offset, 0, ja3_hash);
+    proto_item_set_generated(ti);
+    g_free(ja3_hash);
 }
 /* Client Hello and Server Hello dissections. }}} */
 
@@ -8640,7 +9385,7 @@ ssl_dissect_hnd_new_ses_ticket(ssl_common_dissect_t *hf, tvbuff_t *tvb, packet_i
     if (is_tls13) {
         ssl_dissect_hnd_extension(hf, tvb, subtree, pinfo, offset,
                                   offset_end, SSL_HND_NEWSESSION_TICKET,
-                                  session, ssl, is_dtls);
+                                  session, ssl, is_dtls, NULL);
     }
 } /* }}} */
 
@@ -8674,7 +9419,7 @@ ssl_dissect_hnd_hello_retry_request(ssl_common_dissect_t *hf, tvbuff_t *tvb,
 
     ssl_dissect_hnd_extension(hf, tvb, tree, pinfo, offset,
                               offset_end, SSL_HND_HELLO_RETRY_REQUEST,
-                              session, ssl, is_dtls);
+                              session, ssl, is_dtls, NULL);
 }
 
 void
@@ -8690,7 +9435,7 @@ ssl_dissect_hnd_encrypted_extensions(ssl_common_dissect_t *hf, tvbuff_t *tvb,
      */
     ssl_dissect_hnd_extension(hf, tvb, tree, pinfo, offset,
                               offset_end, SSL_HND_ENCRYPTED_EXTENSIONS,
-                              session, ssl, is_dtls);
+                              session, ssl, is_dtls, NULL);
 }
 
 /* Certificate and Certificate Request dissections. {{{ */
@@ -8839,7 +9584,7 @@ ssl_dissect_hnd_cert(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tree,
         if (session->version == TLSV1DOT3_VERSION) {
             offset = ssl_dissect_hnd_extension(hf, tvb, subtree, pinfo, offset,
                                                next_offset, SSL_HND_CERTIFICATE,
-                                               session, ssl, is_dtls);
+                                               session, ssl, is_dtls, NULL);
         }
 
         certificate_index++;
@@ -8975,7 +9720,7 @@ ssl_dissect_hnd_cert_req(ssl_common_dissect_t *hf, tvbuff_t *tvb, packet_info *p
          */
         ssl_dissect_hnd_extension(hf, tvb, tree, pinfo, offset,
                                   offset_end, SSL_HND_CERT_REQUEST,
-                                  session, NULL, is_dtls);
+                                  session, NULL, is_dtls, NULL);
     } else if (is_tls13 && draft_version <= 18) {
         /*
          * TLS 1.3 draft 18 and older: certificate_authorities and
@@ -9100,11 +9845,21 @@ ssl_dissect_hnd_cert_url(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tr
 void
 ssl_dissect_hnd_compress_certificate(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tree,
                                       guint32 offset, guint32 offset_end, packet_info *pinfo,
-                                      SslSession *session _U_, SslDecryptSession *ssl _U_,
-                                      gboolean is_from_server _U_, gboolean is_dtls _U_)
+                                      SslSession *session, SslDecryptSession *ssl,
+                                      gboolean is_from_server, gboolean is_dtls)
 {
+    guint32 algorithm, uncompressed_length;
     guint32 compressed_certificate_message_length;
+    tvbuff_t *uncompressed_tvb = NULL;
+    proto_item *ti;
     /*
+     * enum {
+     *     zlib(1),
+     *     brotli(2),
+     *     zstd(3),
+     *     (65535)
+     * } CertificateCompressionAlgorithm;
+     *
      * struct {
      *       CertificateCompressionAlgorithm algorithm;
      *       uint24 uncompressed_length;
@@ -9112,12 +9867,12 @@ ssl_dissect_hnd_compress_certificate(ssl_common_dissect_t *hf, tvbuff_t *tvb, pr
      * } CompressedCertificate;
      */
 
-    proto_tree_add_item(tree, hf->hf.hs_ext_compress_certificate_algorithm,
-                        tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf->hf.hs_ext_compress_certificate_algorithm,
+                                 tvb, offset, 2, ENC_BIG_ENDIAN, &algorithm);
     offset += 2;
 
-    proto_tree_add_item(tree, hf->hf.hs_ext_compress_certificate_uncompressed_length,
-                       tvb, offset, 3, ENC_BIG_ENDIAN);
+    proto_tree_add_item_ret_uint(tree, hf->hf.hs_ext_compress_certificate_uncompressed_length,
+                                 tvb, offset, 3, ENC_BIG_ENDIAN, &uncompressed_length);
     offset += 3;
 
     /* opaque compressed_certificate_message<1..2^24-1>; */
@@ -9127,10 +9882,33 @@ ssl_dissect_hnd_compress_certificate(ssl_common_dissect_t *hf, tvbuff_t *tvb, pr
     }
     offset += 3;
 
-    proto_tree_add_item(tree, hf->hf.hs_ext_compress_certificate_compressed_certificate_message,
-                        tvb, offset, compressed_certificate_message_length, ENC_NA);
+    ti = proto_tree_add_item(tree, hf->hf.hs_ext_compress_certificate_compressed_certificate_message,
+                             tvb, offset, compressed_certificate_message_length, ENC_NA);
 
-    /* TODO: Add Certificate decompression following algo... (Need to implement brotli too)*/
+    /* Certificate decompression following algorithm */
+    switch (algorithm) {
+    case 2: /* brotli */
+        uncompressed_tvb = tvb_child_uncompress_brotli(tvb, tvb, offset, compressed_certificate_message_length);
+	break;
+    /* TODO: add other algorithms */
+    }
+
+    if (uncompressed_tvb) {
+        proto_tree *uncompressed_tree;
+
+        if (uncompressed_length != tvb_captured_length(uncompressed_tvb)) {
+            proto_tree_add_expert_format(tree, pinfo, &hf->ei.decompression_error,
+                                         tvb, offset, offset_end - offset,
+                                         "Invalid uncompressed length %u (expected %u)",
+                                         tvb_captured_length(uncompressed_tvb),
+                                         uncompressed_length);
+        } else {
+            uncompressed_tree = proto_item_add_subtree(ti, hf->ett.uncompressed_certificates);
+            ssl_dissect_hnd_cert(hf, uncompressed_tvb, uncompressed_tree,
+                                 0, uncompressed_length, pinfo, session, ssl, is_from_server, is_dtls);
+            add_new_data_source(pinfo, uncompressed_tvb, "Uncompressed certificate(s)");
+        }
+    }
 }
 
 /* Dissection of TLS Extensions in Client Hello, Server Hello, etc. {{{ */
@@ -9138,7 +9916,7 @@ static gint
 ssl_dissect_hnd_extension(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *tree,
                           packet_info* pinfo, guint32 offset, guint32 offset_end, guint8 hnd_type,
                           SslSession *session, SslDecryptSession *ssl,
-                          gboolean is_dtls)
+                          gboolean is_dtls, wmem_strbuf_t *ja3)
 {
     guint32     exts_len;
     guint16     ext_type;
@@ -9146,6 +9924,9 @@ ssl_dissect_hnd_extension(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *t
     guint32     next_offset;
     proto_tree *ext_tree;
     gboolean    is_tls13 = session->version == TLSV1DOT3_VERSION;
+    wmem_strbuf_t *ja3_sg = wmem_strbuf_new(wmem_packet_scope(), "");
+    wmem_strbuf_t *ja3_ecpf = wmem_strbuf_new(wmem_packet_scope(), "");
+    gchar      *ja3_dash = "";
 
     /* Extension extensions<0..2^16-2> (for TLS 1.3 HRR/CR min-length is 2) */
     if (!ssl_add_vector(hf, tvb, pinfo, tree, offset, offset_end, &exts_len,
@@ -9168,6 +9949,10 @@ ssl_dissect_hnd_extension(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *t
         proto_tree_add_uint(ext_tree, hf->hf.hs_ext_type,
                             tvb, offset, 2, ext_type);
         offset += 2;
+        if (ja3 && !IS_GREASE_TLS(ext_type)) {
+            wmem_strbuf_append_printf(ja3, "%s%i",ja3_dash, ext_type);
+            ja3_dash = "-";
+        }
 
         /* opaque extension_data<0..2^16-1> */
         if (!ssl_add_vector(hf, tvb, pinfo, ext_tree, offset, offset_end, &ext_len,
@@ -9199,18 +9984,39 @@ ssl_dissect_hnd_extension(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *t
                                                          session);
             break;
         case SSL_HND_HELLO_EXT_SUPPORTED_GROUPS:
-            offset = ssl_dissect_hnd_hello_ext_supported_groups(hf, tvb, pinfo, ext_tree, offset, next_offset);
+            if (hnd_type == SSL_HND_CLIENT_HELLO) {
+                offset = ssl_dissect_hnd_hello_ext_supported_groups(hf, tvb, pinfo, ext_tree, offset,
+                        next_offset, ja3_sg);
+            } else {
+                offset = ssl_dissect_hnd_hello_ext_supported_groups(hf, tvb, pinfo, ext_tree, offset,
+                        next_offset, NULL);
+            }
             break;
         case SSL_HND_HELLO_EXT_EC_POINT_FORMATS:
-            offset = ssl_dissect_hnd_hello_ext_ec_point_formats(hf, tvb, ext_tree, offset);
+            if (hnd_type == SSL_HND_CLIENT_HELLO) {
+                offset = ssl_dissect_hnd_hello_ext_ec_point_formats(hf, tvb, ext_tree, offset, ja3_ecpf);
+            } else {
+                offset = ssl_dissect_hnd_hello_ext_ec_point_formats(hf, tvb, ext_tree, offset, NULL);
+            }
+            break;
+            break;
+        case SSL_HND_HELLO_EXT_SRP:
+            offset = ssl_dissect_hnd_hello_ext_srp(hf, tvb, pinfo, ext_tree, offset, next_offset);
             break;
         case SSL_HND_HELLO_EXT_SIGNATURE_ALGORITHMS:
         case SSL_HND_HELLO_EXT_SIGNATURE_ALGORITHMS_CERT: /* since TLS 1.3 draft -23 */
             offset = ssl_dissect_hnd_hello_ext_sig_hash_algs(hf, tvb, ext_tree, pinfo, offset, next_offset);
             break;
+        case SSL_HND_HELLO_EXT_DELEGATED_CREDENTIALS:
+            offset = ssl_dissect_hnd_ext_delegated_credentials(hf, tvb, ext_tree, pinfo, offset, next_offset, hnd_type);
+            break;
         case SSL_HND_HELLO_EXT_USE_SRTP:
             if (is_dtls) {
-                offset = dtls_dissect_hnd_hello_ext_use_srtp(tvb, ext_tree, offset, next_offset);
+                if (hnd_type == SSL_HND_CLIENT_HELLO) {
+                    offset = dtls_dissect_hnd_hello_ext_use_srtp(pinfo, tvb, ext_tree, offset, next_offset, FALSE);
+                } else if (hnd_type == SSL_HND_SERVER_HELLO) {
+                    offset = dtls_dissect_hnd_hello_ext_use_srtp(pinfo, tvb, ext_tree, offset, next_offset, TRUE);
+                }
             } else {
                 // XXX expert info: This extension MUST only be used with DTLS, and not with TLS.
             }
@@ -9318,12 +10124,18 @@ ssl_dissect_hnd_extension(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *t
         case SSL_HND_HELLO_EXT_NPN:
             offset = ssl_dissect_hnd_hello_ext_npn(hf, tvb, pinfo, ext_tree, offset, next_offset);
             break;
+        case SSL_HND_HELLO_EXT_ALPS:
+            offset = ssl_dissect_hnd_hello_ext_alps(hf, tvb, pinfo, ext_tree, offset, next_offset, hnd_type);
+            break;
         case SSL_HND_HELLO_EXT_RENEGOTIATION_INFO:
             offset = ssl_dissect_hnd_hello_ext_reneg_info(hf, tvb, pinfo, ext_tree, offset, next_offset);
             break;
         case SSL_HND_HELLO_EXT_ENCRYPTED_SERVER_NAME:
             offset = ssl_dissect_hnd_hello_ext_esni(hf, tvb, pinfo, ext_tree, offset, next_offset, hnd_type, ssl);
             break;
+        case SSL_HND_HELLO_EXT_CONNECTION_ID_DEPRECATED:
+            session->deprecated_cid = TRUE;
+            /* FALLTHRU */
         case SSL_HND_HELLO_EXT_CONNECTION_ID:
             offset = ssl_dissect_hnd_hello_ext_connection_id(hf, tvb, pinfo, ext_tree, offset, hnd_type, session, ssl);
             break;
@@ -9337,6 +10149,21 @@ ssl_dissect_hnd_extension(ssl_common_dissect_t *hf, tvbuff_t *tvb, proto_tree *t
         if (!ssl_end_vector(hf, tvb, pinfo, ext_tree, offset, next_offset)) {
             /* Dissection did not end at expected location, fix it. */
             offset = next_offset;
+        }
+    }
+
+    if (ja3) {
+        if (hnd_type == SSL_HND_CLIENT_HELLO) {
+            if(wmem_strbuf_get_len(ja3_sg) > 0) {
+                wmem_strbuf_append_printf(ja3, "%s", wmem_strbuf_get_str(ja3_sg));
+            } else {
+                wmem_strbuf_append_c(ja3, ',');
+            }
+            if(wmem_strbuf_get_len(ja3_ecpf) > 0) {
+                wmem_strbuf_append_printf(ja3, "%s", wmem_strbuf_get_str(ja3_ecpf));
+            } else {
+                wmem_strbuf_append_c(ja3, ',');
+            }
         }
     }
 

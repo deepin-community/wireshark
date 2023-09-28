@@ -22,29 +22,25 @@
 #include <QWidget>
 #include <QRect>
 #include <QAction>
+#include <QStackedWidget>
 #include <QToolBar>
 
 #include <ui/qt/byte_view_tab.h>
 #include <ui/qt/packet_list.h>
 #include <ui/qt/packet_diagram.h>
 #include <ui/qt/proto_tree.h>
+#include <ui/qt/welcome_page.h>
 
-/*
- * The generated Ui_MainWindow::setupUi() can grow larger than our configured limit,
- * so turn off -Wframe-larger-than= for ui_main_window.h.
- */
-DIAG_OFF(frame-larger-than=)
-#include <ui_main_window.h>
-DIAG_ON(frame-larger-than=)
+#include <wsutil/ws_assert.h>
 
 void MainWindow::showWelcome()
 {
-    main_ui_->mainStack->setCurrentWidget(welcome_page_);
+    main_stack_->setCurrentWidget(welcome_page_);
 }
 
 void MainWindow::showCapture()
 {
-    main_ui_->mainStack->setCurrentWidget(&master_split_);
+    main_stack_->setCurrentWidget(&master_split_);
 }
 
 QWidget* MainWindow::getLayoutWidget(layout_pane_content_e type) {
@@ -60,7 +56,7 @@ QWidget* MainWindow::getLayoutWidget(layout_pane_content_e type) {
         case layout_pane_content_pdiagram:
             return packet_diagram_;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             return NULL;
     }
 }
@@ -89,12 +85,12 @@ void MainWindow::layoutPanes()
     // Reparent all widgets and add them back in the proper order below.
     // This hides each widget as well.
     packet_list_->freeze(); // Clears tree, byte view tabs, and diagram.
-    packet_list_->setParent(main_ui_->mainStack);
-    proto_tree_->setParent(main_ui_->mainStack);
-    byte_view_tab_->setParent(main_ui_->mainStack);
-    packet_diagram_->setParent(main_ui_->mainStack);
-    empty_pane_.setParent(main_ui_->mainStack);
-    extra_split_.setParent(main_ui_->mainStack);
+    packet_list_->setParent(main_stack_);
+    proto_tree_->setParent(main_stack_);
+    byte_view_tab_->setParent(main_stack_);
+    packet_diagram_->setParent(main_stack_);
+    empty_pane_.setParent(main_stack_);
+    extra_split_.setParent(main_stack_);
 
     // XXX We should try to preserve geometries if we can, e.g. by
     // checking to see if the layout type is the same.
@@ -116,7 +112,7 @@ void MainWindow::layoutPanes()
         break;
 
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     switch(prefs.gui_layout_type) {
@@ -139,7 +135,7 @@ void MainWindow::layoutPanes()
         parents[2] = &master_split_;
         break;
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     if (parents[0] == &extra_split_) {
@@ -187,12 +183,12 @@ void MainWindow::applyRecentPaneGeometry()
     // each.
 
     // Force a geometry recalculation
-    QWidget *cur_w = main_ui_->mainStack->currentWidget();
+    QWidget *cur_w = main_stack_->currentWidget();
     showCapture();
-    QRect geom = main_ui_->mainStack->geometry();
+    QRect geom = main_stack_->geometry();
     QList<int> master_sizes = master_split_.sizes();
     QList<int> extra_sizes = extra_split_.sizes();
-    main_ui_->mainStack->setCurrentWidget(cur_w);
+    main_stack_->setCurrentWidget(cur_w);
 
     int master_last_size = master_split_.orientation() == Qt::Vertical ? geom.height() : geom.width();
     master_last_size -= master_split_.handleWidth() * (master_sizes.length() - 1);
@@ -233,16 +229,3 @@ void MainWindow::applyRecentPaneGeometry()
     master_split_.setSizes(master_sizes);
     extra_split_.setSizes(extra_sizes);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

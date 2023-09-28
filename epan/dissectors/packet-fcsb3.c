@@ -640,7 +640,7 @@ static void dissect_fc_sbccs_dib_link_hdr (tvbuff_t *tvb, packet_info *pinfo,
                 proto_tree_add_bytes_format(tree, hf_sbccs_logical_path, tvb, offset, 4,
                                      NULL, "Logical Paths %d-%d: %s",
                                      i*8, ((i+4)*8) - 1,
-                                     tvb_bytes_to_str_punct(wmem_packet_scope(), tvb, offset, 4, ':'));
+                                     tvb_bytes_to_str_punct(pinfo->pool, tvb, offset, 4, ':'));
                 i += 4;
                 offset += 4;
             }
@@ -675,7 +675,7 @@ static int dissect_fc_sbccs (tvbuff_t *tvb, packet_info *pinfo,
 
     /* Retrieve conversation state to determine expected payload */
     conversation = find_conversation (pinfo->num, &pinfo->src, &pinfo->dst,
-                                      ENDPOINT_SBCCS, ch_cu_id, dev_addr, 0);
+                                      CONVERSATION_SBCCS, ch_cu_id, dev_addr, 0);
 
     if (conversation) {
 #if 0
@@ -689,7 +689,7 @@ static int dissect_fc_sbccs (tvbuff_t *tvb, packet_info *pinfo,
         conversation =
 #endif
                        conversation_new (pinfo->num, &pinfo->src, &pinfo->dst,
-                                         ENDPOINT_SBCCS, ch_cu_id, dev_addr, 0);
+                                         CONVERSATION_SBCCS, ch_cu_id, dev_addr, 0);
 #if 0
         task_key.conv_id = conversation->index;
         task_key.task_id = ccw;

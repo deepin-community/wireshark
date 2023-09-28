@@ -79,7 +79,7 @@ int decode_dcerpc(packet_info *pinfo _U_, proto_tree *tree, PKT_INFO* pkt_info)
 
         if (is_dcerpc_context_zero(pkt_info->dcerpc_pkt_type))
         { /* This is needed to overcome an apparent Wireshark bug
-             found in the LUA code - is this still true in C? */
+             found in the Lua code - is this still true in C? */
             pkt_info->rrpd.session_id = 1;
         }
         else
@@ -217,14 +217,25 @@ int decode_gtcp(packet_info *pinfo, proto_tree *tree, PKT_INFO* pkt_info)
             pkt_info->tcp_flags_reset = field_bool[0];
     }
 
-    if (!extract_bool(tree, hf_of_interest[HF_INTEREST_TCP_RETRAN].hf, field_bool, &field_value_count)) {
+    /*
+     * This is an expert info, not a field with a value, so it's either
+     * present or not; if present, it's a retransmission.
+     */
+    if (!extract_instance_count(tree, hf_of_interest[HF_INTEREST_TCP_RETRAN].hf, &field_value_count)) {
         if (field_value_count)
-            pkt_info->tcp_retran = field_bool[0];
+            pkt_info->tcp_retran = TRUE;
+        else
+            pkt_info->tcp_retran = FALSE;
     }
 
-    if (!extract_bool(tree, hf_of_interest[HF_INTEREST_TCP_KEEP_ALIVE].hf, field_bool, &field_value_count)) {
+    /*
+     * Another expert info.
+     */
+    if (!extract_instance_count(tree, hf_of_interest[HF_INTEREST_TCP_KEEP_ALIVE].hf, &field_value_count)) {
         if (field_value_count)
-            pkt_info->tcp_keep_alive = field_bool[0];
+            pkt_info->tcp_retran = TRUE;
+        else
+            pkt_info->tcp_retran = FALSE;
     }
 
     /* we use the SSL Content Type to detect SSL Alerts */

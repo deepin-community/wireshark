@@ -45,6 +45,11 @@ typedef struct{
 #define ZBEE_ZCL_CMD_WRITE_ATTR_STRUCT_RESP     0x10
 #define ZBEE_ZCL_CMD_DISCOVER_CMDS_REC          0x11
 #define ZBEE_ZCL_CMD_DISCOVER_CMDS_REC_RESP     0x12
+#define ZBEE_ZCL_CMD_DISCOVER_CMDS_GEN          0X13
+#define ZBEE_ZCL_CMD_DISCOVER_CMDS_GEN_RESP     0X14
+#define ZBEE_ZCL_CMD_DISCOVER_ATTR_EXTENDED     0x15
+#define ZBEE_ZCL_CMD_DISCOVER_ATTR_EXTENDED_RESP 0x16
+
 
 /* ZCL Data Types */
 #define ZBEE_ZCL_NO_DATA            0x00
@@ -123,6 +128,7 @@ typedef struct{
 #define ZBEE_ZCL_INVALID_LONG_STR_LENGTH        0xffff
 #define ZBEE_ZCL_NUM_INDIVIDUAL_ETT             2
 #define ZBEE_ZCL_NUM_ATTR_ETT                   64
+#define ZBEE_ZCL_NUM_IND_FIELD                  16
 #define ZBEE_ZCL_NUM_ARRAY_ELEM_ETT             16
 #define ZBEE_ZCL_NUM_TOTAL_ETT                  (ZBEE_ZCL_NUM_INDIVIDUAL_ETT + ZBEE_ZCL_NUM_ATTR_ETT + ZBEE_ZCL_NUM_ARRAY_ELEM_ETT)
 #define ZBEE_ZCL_DIR_REPORTED                   0
@@ -208,7 +214,6 @@ extern void dissect_zcl_attr_data_type_val(tvbuff_t *tvb, proto_tree *tree, guin
 extern guint dissect_zcl_attr_uint8 (tvbuff_t *tvb, proto_tree *tree, guint *offset, int *length);
 
 /* Helper functions */
-zbee_zcl_cluster_desc *zbee_zcl_get_cluster_desc(guint16 cluster_id, guint16 mfr_code);
 
 /* Exported DLL functions */
 WS_DLL_PUBLIC void decode_zcl_time_in_100ms (gchar *s, guint16 value);

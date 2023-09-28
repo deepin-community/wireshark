@@ -16,7 +16,7 @@
 
 #include <ui/qt/utils/qt_ui_utils.h>
 #include <ui/qt/widgets/syntax_line_edit.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 
 enum {
     col_src_addr_,
@@ -229,9 +229,10 @@ MulticastStatisticsDialog::MulticastStatisticsDialog(QWidget &parent, CaptureFil
             << buffer_alarm_threshold_le_ << stream_empty_speed_le_
             << total_empty_speed_le_;
 
-    foreach (QWidget *line_edit, line_edits_) {
+    foreach (QWidget *w, line_edits_) {
+        QLineEdit *line_edit = qobject_cast<QLineEdit *>(w);
         line_edit->setMinimumWidth(one_em * 5);
-        connect(line_edit, SIGNAL(textEdited(QString)), this, SLOT(updateWidgets()));
+        connect(line_edit, &QLineEdit::textEdited, this, &MulticastStatisticsDialog::updateWidgets);
     }
 
     addFilterActions();
@@ -240,11 +241,8 @@ MulticastStatisticsDialog::MulticastStatisticsDialog(QWidget &parent, CaptureFil
         setDisplayFilter(filter);
     }
 
-    connect(this, SIGNAL(updateFilter(QString)),
-            this, SLOT(updateMulticastParameters()));
-
-    connect(&cap_file_, SIGNAL(captureEvent(CaptureEvent)),
-            this, SLOT(captureEvent(CaptureEvent)));
+    connect(this, &MulticastStatisticsDialog::updateFilter,
+            this, &MulticastStatisticsDialog::updateMulticastParameters);
 
     /* Register the tap listener */
     register_tap_listener_mcast_stream(tapinfo_);
@@ -449,17 +447,12 @@ void MulticastStatisticsDialog::fillTree()
     updateWidgets();
 }
 
-void MulticastStatisticsDialog::captureEvent(CaptureEvent e)
+void MulticastStatisticsDialog::captureFileClosing()
 {
-    if ((e.captureContext() == CaptureEvent::File) &&
-            (e.eventType() == CaptureEvent::Closing))
-    {
-        /* Remove the stream tap listener */
-        remove_tap_listener_mcast_stream(tapinfo_);
+    /* Remove the stream tap listener */
+    remove_tap_listener_mcast_stream(tapinfo_);
 
-        updateWidgets();
-        WiresharkDialog::captureFileClosing();
-    }
+    WiresharkDialog::captureFileClosing();
 }
 
 // Stat command + args
@@ -471,7 +464,7 @@ multicast_statistics_init(const char *args, void*) {
     if (args_l.length() > 2) {
         filter = QStringList(args_l.mid(2)).join(",").toUtf8();
     }
-    wsApp->emitStatCommandSignal("MulticastStatistics", filter.constData(), NULL);
+    mainApp->emitStatCommandSignal("MulticastStatistics", filter.constData(), NULL);
 }
 
 static stat_tap_ui multicast_statistics_ui = {
@@ -484,22 +477,13 @@ static stat_tap_ui multicast_statistics_ui = {
 };
 
 extern "C" {
+
+void register_tap_listener_qt_multicast_statistics(void);
+
 void
 register_tap_listener_qt_multicast_statistics(void)
 {
     register_stat_tap_ui(&multicast_statistics_ui, NULL);
 }
-}
 
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+}

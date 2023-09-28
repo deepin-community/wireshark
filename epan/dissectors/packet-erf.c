@@ -1704,7 +1704,7 @@ dissect_channelised_ex_header(tvbuff_t *tvb,  packet_info *pinfo, proto_tree *tr
   guint8             vc_size          = (guint8)((hdr >> 16) & 0xFF);
   guint8             line_rate        = (guint8)((hdr >> 8) & 0xFF);
   sdh_g707_format_t  g707_format;
-  wmem_strbuf_t     *vc_id_string = wmem_strbuf_new_label(wmem_packet_scope());
+  wmem_strbuf_t     *vc_id_string = wmem_strbuf_new_label(pinfo->pool);
 
   channelised_fill_sdh_g707_format(&g707_format, vc_id, vc_size, line_rate);
   channelised_fill_vc_id_string(vc_id_string, &g707_format);
@@ -1853,7 +1853,7 @@ static void dissect_host_anchor_id(tvbuff_t *tvb, packet_info *pinfo, proto_tree
     proto_tree *subtree;
 
     /* TODO: top level linking to most recent frame like we have for Host ID? */
-    subtree = proto_tree_add_subtree_format(tree, tvb, 0, 0, ett_erf_anchor, &pi, "Host ID: 0x%012" G_GINT64_MODIFIER "x, Anchor ID: 0x%012" G_GINT64_MODIFIER "x", host_id & ERF_EHDR_HOST_ID_MASK, anchor_id & ERF_EHDR_ANCHOR_ID_MASK);
+    subtree = proto_tree_add_subtree_format(tree, tvb, 0, 0, ett_erf_anchor, &pi, "Host ID: 0x%012" PRIx64 ", Anchor ID: 0x%012" PRIx64, host_id & ERF_EHDR_HOST_ID_MASK, anchor_id & ERF_EHDR_ANCHOR_ID_MASK);
     proto_item_set_generated(pi);
 
     pi = proto_tree_add_uint64(subtree, hf_erf_anchor_hostid, tvb, 0, 0, host_id & ERF_EHDR_HOST_ID_MASK);
@@ -1907,12 +1907,12 @@ dissect_host_id_source_id(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, g
 
     if (fnum_current != G_MAXUINT32) {
       pi = proto_tree_add_uint_format(tree, hf_erf_source_current, tvb, 0, 0, fnum_current,
-          "Host ID: 0x%012" G_GINT64_MODIFIER "x, Source ID: %u", host_id, source_id&0xFF);
+          "Host ID: 0x%012" PRIx64 ", Source ID: %u", host_id, source_id&0xFF);
       hostid_tree = proto_item_add_subtree(pi, ett_erf_source);
     } else {
       /* If we have no frame number to link against, just add a static subtree */
       hostid_tree = proto_tree_add_subtree_format(tree, tvb, 0, 0, ett_erf_source, &pi,
-          "Host ID: 0x%012" G_GINT64_MODIFIER "x, Source ID: %u", host_id, source_id&0xFF);
+          "Host ID: 0x%012" PRIx64 ", Source ID: %u", host_id, source_id&0xFF);
     }
     proto_item_set_generated(pi);
 
@@ -2775,8 +2775,8 @@ dissect_meta_record_tags(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
       case ERF_META_TAG_if_speed:
       case ERF_META_TAG_if_tx_speed:
         value64 = tvb_get_ntoh64(tvb, offset + 4);
-        tmp = format_size((gint64) value64, (format_size_flags_e)(format_size_unit_bits_s|format_size_prefix_si));
-        tag_pi = proto_tree_add_uint64_format_value(section_tree, tag_info->hf_value, tvb, offset + 4, taglength, value64, "%s (%" G_GINT64_MODIFIER "u bps)", tmp, value64);
+        tmp = format_size((int64_t)value64, FORMAT_SIZE_UNIT_BITS_S, FORMAT_SIZE_PREFIX_SI);
+        tag_pi = proto_tree_add_uint64_format_value(section_tree, tag_info->hf_value, tvb, offset + 4, taglength, value64, "%s (%" PRIu64 " bps)", tmp, value64);
         g_free(tmp);
         break;
 
@@ -2806,8 +2806,8 @@ dissect_meta_record_tags(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
 
       case ERF_META_TAG_mem:
         value64 = tvb_get_ntoh64(tvb, offset + 4);
-        tmp = format_size((gint64) value64, (format_size_flags_e)(format_size_unit_bytes|format_size_prefix_iec));
-        tag_pi = proto_tree_add_uint64_format_value(section_tree, tag_info->hf_value, tvb, offset + 4, taglength, value64, "%s (%" G_GINT64_MODIFIER"u bytes)", tmp, value64);
+        tmp = format_size((int64_t)value64, FORMAT_SIZE_UNIT_BYTES, FORMAT_SIZE_PREFIX_IEC);
+        tag_pi = proto_tree_add_uint64_format_value(section_tree, tag_info->hf_value, tvb, offset + 4, taglength, value64, "%s (%" PRIu64" bytes)", tmp, value64);
         g_free(tmp);
         break;
 
@@ -2866,7 +2866,7 @@ dissect_meta_record_tags(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree) {
           /* Set top level label e.g IPv4 Name: hostname Address: 1.2.3.4 */
           /* TODO: Name is unescaped here but escaped in actual field */
           proto_item_append_text(tag_pi, ": %s, %s",
-              tvb_get_stringzpad(wmem_packet_scope(), tvb, offset + 4 + addr_len, taglength - addr_len, ENC_UTF_8), pi_label /* Includes ": " */);
+              tvb_get_stringzpad(pinfo->pool, tvb, offset + 4 + addr_len, taglength - addr_len, ENC_UTF_8), pi_label /* Includes ": " */);
         }
 
         break;
@@ -3863,9 +3863,13 @@ proto_register_erf(void)
 void
 proto_reg_handoff_erf(void)
 {
+  int file_type_subtype_erf;
+
   dissector_add_uint("wtap_encap", WTAP_ENCAP_ERF, erf_handle);
   /* Also register dissector for Provenance non-packet records */
-  dissector_add_uint("wtap_fts_rec", WTAP_FILE_TYPE_SUBTYPE_ERF, erf_handle);
+  file_type_subtype_erf = wtap_name_to_file_type_subtype("erf");
+  if (file_type_subtype_erf != -1)
+    dissector_add_uint("wtap_fts_rec", file_type_subtype_erf, erf_handle);
 
   /* Get handles for serial line protocols */
   chdlc_handle  = find_dissector_add_dependency("chdlc", proto_erf);

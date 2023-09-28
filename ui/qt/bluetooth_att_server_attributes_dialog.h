@@ -1,4 +1,4 @@
-/* bluetooth_att_server_attributes_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -53,6 +53,7 @@ signals:
 
 protected:
     void keyPressEvent(QKeyEvent *event);
+    void captureFileClosed();
 
 protected slots:
     void changeEvent(QEvent* event);
@@ -64,10 +65,9 @@ private:
     QMenu        context_menu_;
 
     static void     tapReset(void *tapinfo_ptr);
-    static tap_packet_status tapPacket(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *, const void *data);
+    static tap_packet_status tapPacket(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *, const void *data, tap_flags_t flags);
 
 private slots:
-    void captureFileClosing();
     void on_tableTreeWidget_itemActivated(QTreeWidgetItem *item, int);
     void on_buttonBox_clicked(QAbstractButton *button);
     void on_actionMark_Unmark_Cell_triggered();
@@ -83,16 +83,3 @@ private slots:
 };
 
 #endif // BLUETOOTH_ATT_SERVER_ATTRIBUTES_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -70,10 +70,13 @@ def wireshark_k(wireshark_command):
     return tuple(list(wireshark_command) + ['-k'])
 
 
-def capture_command(*cmd_args, shell=False):
+def capture_command(*args, shell=False):
+    cmd_args = list(args)
     if type(cmd_args[0]) != str:
         # Assume something like ['wireshark', '-k']
         cmd_args = list(cmd_args[0]) + list(cmd_args)[1:]
+    if sys.platform == "win32":
+        cmd_args[0] = '"{}"'.format(cmd_args[0])
     if shell:
         cmd_args = ' '.join(cmd_args)
     return cmd_args
@@ -165,7 +168,7 @@ def check_capture_stdin(cmd_dumpcap):
         )
         is_gui = type(cmd) != str and '-k' in cmd[0]
         if is_gui:
-            capture_cmd += ' -o console.log.level:127'
+            capture_cmd += ' --log-level=info'
         pipe_proc = self.assertRun(slow_dhcp_cmd + ' | ' + capture_cmd, shell=True)
         if is_gui:
             self.assertTrue(self.grepOutput('Wireshark is up and ready to go'), 'No startup message.')
@@ -243,7 +246,8 @@ def check_dumpcap_autostop_stdin(cmd_dumpcap):
         elif filesize is not None:
             condition = 'filesize:{}'.format(filesize)
 
-        capture_cmd = ' '.join((cmd_dumpcap,
+        cmd_ = '"{}"'.format(cmd_dumpcap)
+        capture_cmd = ' '.join((cmd_,
             '-i', '-',
             '-w', testout_file,
             '-a', condition,
@@ -277,7 +281,8 @@ def check_dumpcap_ringbuffer_stdin(cmd_dumpcap):
         elif filesize is not None:
             condition = 'filesize:{}'.format(filesize)
 
-        capture_cmd = ' '.join((cmd_dumpcap,
+        cmd_ = '"{}"'.format(cmd_dumpcap)
+        capture_cmd = ' '.join((cmd_,
             '-i', '-',
             '-w', testout_file,
             '-a', 'files:2',
@@ -382,7 +387,7 @@ def check_dumpcap_pcapng_sections(cmd_dumpcap, cmd_tshark, capture_file):
                 '-w', testout_file
             )
             check_vals[0]['packet_count'] = 88
-            check_vals[0]['idb_count'] = 35
+            check_vals[0]['idb_count'] = 33
             check_vals[0]['ua_dc_count'] = 1
         else:
             # Dumpcap SHBs, multiple output files
@@ -394,10 +399,10 @@ def check_dumpcap_pcapng_sections(cmd_dumpcap, cmd_tshark, capture_file):
                 '-b', 'packets:53'
             )
             check_vals[0]['packet_count'] = 53
-            check_vals[0]['idb_count'] = 13
+            check_vals[0]['idb_count'] = 11
             check_vals[0]['ua_dc_count'] = 1
             check_vals[1]['packet_count'] = 35
-            check_vals[1]['idb_count'] = 35
+            check_vals[1]['idb_count'] = 33
             check_vals[1]['ua_dc_count'] = 1
 
         capture_cmd = capture_command(cmd_dumpcap, *capture_cmd_args)

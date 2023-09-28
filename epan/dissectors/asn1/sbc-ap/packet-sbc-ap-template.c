@@ -71,6 +71,7 @@ enum{
 
 struct sbc_ap_private_data {
   guint8 data_coding_scheme;
+  e212_number_type_t number_type;
 };
 
 /* Global variables */
@@ -196,7 +197,7 @@ void proto_register_sbc_ap(void) {
         NULL, HFILL }},
     { &hf_sbc_ap_Warning_Message_Contents_decoded_page,
       { "Decoded Page", "sbc-ap.WarningMessageContents.decoded_page",
-        FT_STRING, STR_UNICODE, NULL, 0,
+        FT_STRING, BASE_NONE, NULL, 0,
         NULL, HFILL }},
 #include "packet-sbc-ap-hfarr.c"
   };

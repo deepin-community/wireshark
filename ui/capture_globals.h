@@ -1,4 +1,5 @@
-/* capture_globals.h
+/** @file
+ *
  * Capture-related globals.
  *
  * Wireshark - Network traffic analyzer
@@ -24,16 +25,3 @@ extern capture_options global_capture_opts;
 #endif /* __cplusplus */
 
 #endif /* __CAPTURE_GLOBALS_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

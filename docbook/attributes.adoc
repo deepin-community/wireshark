@@ -1,9 +1,18 @@
 // Common attributes
 
-:wireshark-version: 3.4.9
+:wireshark-version: 4.0.8
+:logray-version: 0.9.0
 
 // Required for btn, kbd:, and menu: macros.
 :experimental:
+
+// We want footers (which include page numbers) in our PDF output but
+// not elsewhere, particularly in our man pages.
+// We could use the "reproducible" attribute here, but it generates an
+// empty black box.
+ifndef::backend-pdf[]
+:nofooter:
+endif::[]
 
 // Create PA4 (210 × 280mm) pages: https://en.wikipedia.org/wiki/Paper_size#PA4_or_L4
 // This is the approximate intersection of A4 (210 × 297mm) and U.S. Letter
@@ -16,17 +25,18 @@
 
 // Wireshark top level URLs (sites)
 :wireshark-main-url: https://www.wireshark.org/
-:wireshark-bugs-url: https://gitlab.com/wireshark/wireshark/issues
-:wireshark-code-review-url: https://gitlab.com/wireshark/wireshark/-/merge_requests
-:wireshark-qa-url: https://ask.wireshark.org/
-:wireshark-wiki-url: https://gitlab.com/wireshark/wireshark/wikis/
 :wireshark-gitlab-project-url: https://gitlab.com/wireshark/wireshark
+:wireshark-qa-url: https://ask.wireshark.org/
 
 // Wireshark secondary URLs (pages)
+:wireshark-bugs-url: {wireshark-gitlab-project-url}/-/issues
+:wireshark-code-review-url: {wireshark-gitlab-project-url}/-/merge_requests
+:wireshark-wiki-url: {wireshark-gitlab-project-url}/-/wikis/
 :wireshark-authors-url: {wireshark-main-url}about.html#authors
-:wireshark-buildbot-url: https://buildbot.wireshark.org/wireshark-master/waterfall
-:wireshark-code-browse-url: https://gitlab.com/wireshark/wireshark/tree/master
-:wireshark-merge-request-url: https://gitlab.com/wireshark/wireshark/merge_requests
+:wireshark-code-browse-url: {wireshark-gitlab-project-url}/-/tree/master
+:wireshark-code-file-url: {wireshark-gitlab-project-url}/-/blob/master/
+:wireshark-commits-url: {wireshark-gitlab-project-url}/-/commits/master
+:wireshark-merge-request-url: {wireshark-gitlab-project-url}/-/merge_requests
 :wireshark-developers-guide-url: {wireshark-main-url}docs/wsdg_html_chunked/
 :wireshark-display-filter-reference-url: {wireshark-main-url}docs/dfref/
 :wireshark-download-url: {wireshark-main-url}download.html
@@ -44,11 +54,10 @@
 :pcap-filter-man-page-url: {tcpdump-main-url}manpages/pcap-filter.7.html
 :tcpdump-man-page-url: {tcpdump-main-url}manpages/tcpdump.1.html
 
-:npcap-main-url: https://nmap.org/npcap/
+:npcap-main-url: https://npcap.com/
 :npcap-development-url: https://github.com/nmap/npcap
 :npcap-license-url: https://raw.githubusercontent.com/nmap/npcap/master/LICENSE
-:winpcap-main-url: https://www.winpcap.org/
-:winpcap-download-url: {winpcap-main-url}install/
+:vcpkg-main-url: https://github.com/Microsoft/vcpkg/
 
 :sysfs-main-url: http://linux-diag.sourceforge.net/Sysfsutils.html
 :wikipedia-main-url: https://en.wikipedia.org/wiki/

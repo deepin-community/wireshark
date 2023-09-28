@@ -16,81 +16,39 @@ find_package( XSLTPROC )
 
 function(set_docbook_target_properties _target)
 	set_target_properties(${_target} PROPERTIES
-		FOLDER "Docbook"
+		FOLDER "Documentation"
 		EXCLUDE_FROM_DEFAULT_BUILD True
 		)
 endfunction(set_docbook_target_properties)
 
-if(WIN32)
-	find_package( HTMLHelp )
-	if(HTML_HELP_COMPILER)
-		# We do not need the HTML Help headers and library, just the
-		# compiler. To avoid confusion, report the package as found.
-		# https://gitlab.kitware.com/cmake/cmake/issues/15886
-		set(HTMLHelp_FOUND 1)
-	endif()
-	macro( HHP2CHM _hhpsource )
-		get_filename_component( _source_base_name ${_hhpsource} NAME_WE )
-
-		add_custom_command(
-			OUTPUT ${_output_chm}
-			WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-			# The number and order of arguments MUST match hhc.cmake.
-			COMMAND ${CMAKE_COMMAND} -P
-				${CMAKE_SOURCE_DIR}/cmake/modules/hhc.cmake
-					"${HTML_HELP_COMPILER}"
-					${_hhpsource}
-			DEPENDS
-				${_hhpsource}
-		)
-	endmacro()
-else()
-	macro( HHP2CHM _hhpsource )
-	# Dummy.
-	endmacro()
-endif()
-
 set(COMMON_FILES
-	common_src/GPL_appendix.adoc
-)
-
-set(COMMON_GRAPHICS
-	common_graphics/note.svg
-	common_graphics/tip.svg
-	common_graphics/warning.svg
+	common_src/gpl_appendix.adoc
+	common_src/typographic_conventions.adoc
 )
 
 set(GUIDE_INSTALL_DIRS)
 
-# This is automatically updated each week. You probably don't need to run it
-# or depend on it.
-add_custom_target(update_tools_help
-	COMMAND ${CMAKE_COMMAND} -E env PYTHONIOENCODING=UTF-8
-		${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/update-tools-help.py
-		--program-path $<TARGET_FILE_DIR:tshark>
-	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-set_docbook_target_properties(update_tools_help)
+set(WSUG_TITLE "Wireshark User's Guide")
 
 set(WSUG_FILES
-	wsug_src/WSUG_app_files.adoc
-	wsug_src/WSUG_app_howitworks.adoc
-	wsug_src/WSUG_app_protocols.adoc
-	wsug_src/WSUG_app_messages.adoc
-	wsug_src/WSUG_app_tools.adoc
-	wsug_src/WSUG_chapter_advanced.adoc
-	wsug_src/WSUG_chapter_build_install.adoc
-	wsug_src/WSUG_chapter_capture.adoc
-	wsug_src/WSUG_chapter_customize.adoc
-	wsug_src/WSUG_chapter_introduction.adoc
-	wsug_src/WSUG_chapter_io.adoc
-	wsug_src/WSUG_chapter_mate.adoc
-	wsug_src/WSUG_chapter_statistics.adoc
-	wsug_src/WSUG_chapter_telephony.adoc
-	wsug_src/WSUG_chapter_troubleshoot.adoc
-	wsug_src/WSUG_chapter_use.adoc
-	wsug_src/WSUG_chapter_work.adoc
-	wsug_src/WSUG_preface.adoc
+	wsug_src/wsug_advanced.adoc
+	wsug_src/wsug_build_install.adoc
+	wsug_src/wsug_capture.adoc
+	wsug_src/wsug_customize.adoc
+	wsug_src/wsug_files.adoc
+	wsug_src/wsug_howitworks.adoc
+	wsug_src/wsug_introduction.adoc
+	wsug_src/wsug_io.adoc
+	wsug_src/wsug_mate.adoc
+	wsug_src/wsug_messages.adoc
+	wsug_src/wsug_preface.adoc
+	wsug_src/wsug_protocols.adoc
+	wsug_src/wsug_statistics.adoc
+	wsug_src/wsug_telephony.adoc
+	wsug_src/wsug_tools.adoc
+	wsug_src/wsug_troubleshoot.adoc
+	wsug_src/wsug_use.adoc
+	wsug_src/wsug_work.adoc
 	wsug_src/capinfos-h.txt
 	wsug_src/dumpcap-h.txt
 	wsug_src/editcap-F.txt
@@ -105,169 +63,193 @@ set(WSUG_FILES
 	${COMMON_FILES}
 )
 
-# Note: Images should be minimized using tools/compress-pngs.sh.
+# Note: Images should be minimized using tools/compress-pngs.py.
 set(WSUG_GRAPHICS
-	wsug_graphics/related-ack.png
-	wsug_graphics/related-current.png
-	wsug_graphics/related-dup-ack.png
-	wsug_graphics/related-first.png
-	wsug_graphics/related-last.png
-	wsug_graphics/related-other.png
-	wsug_graphics/related-request.png
-	wsug_graphics/related-response.png
-	wsug_graphics/related-segment.png
-	wsug_graphics/ws-analyze-menu.png
-	wsug_graphics/ws-bytes-pane-popup-menu.png
-	wsug_graphics/ws-bytes-pane-tabs.png
-	wsug_graphics/ws-bytes-pane.png
-	wsug_graphics/ws-capture-file-properties.png
-	wsug_graphics/ws-capture-info.png
-	wsug_graphics/ws-capture-interfaces-main-macos.png
-	wsug_graphics/ws-capture-interfaces-main-win32.png
-	wsug_graphics/ws-capture-menu.png
-	wsug_graphics/ws-capture-options.png
-	wsug_graphics/ws-capture-options-output.png
-	wsug_graphics/ws-capture-options-options.png
-	wsug_graphics/ws-capture-options-compile-selected-bpfs.png
-	wsug_graphics/ws-capture-options-output.png
-	wsug_graphics/ws-choose-color-rule.png
-	wsug_graphics/ws-coloring-fields.png
-	wsug_graphics/ws-coloring-rules-dialog.png
-	wsug_graphics/ws-column-header-popup-menu.png
-	wsug_graphics/ws-decode-as.png
-	wsug_graphics/ws-details-pane-popup-menu.png
-	wsug_graphics/ws-details-pane.png
-	wsug_graphics/ws-display-filter-tcp.png # GTK+
-	wsug_graphics/ws-edit-menu.png
-	wsug_graphics/ws-enabled-protocols.png
-	wsug_graphics/ws-expert-colored-tree.png
-	wsug_graphics/ws-expert-column.png
-	wsug_graphics/ws-expert-information.png
-	wsug_graphics/ws-export-objects.png
-	wsug_graphics/ws-export-packet-dissections.png
-	wsug_graphics/ws-export-specified-packets.png
-	wsug_graphics/ws-export-selected.png
-	wsug_graphics/ws-file-import.png
-	wsug_graphics/ws-file-menu.png
-	wsug_graphics/ws-file-set-dialog.png # GTK+
-	wsug_graphics/ws-filter-add-expression.png # GTK+
-	wsug_graphics/ws-filter-toolbar.png
-	wsug_graphics/ws-filters.png # GTK+
-	wsug_graphics/ws-find-packet.png
-	wsug_graphics/ws-follow-stream.png
-	wsug_graphics/ws-follow-http2-stream.png
-	wsug_graphics/ws-go-menu.png
-	wsug_graphics/ws-goto-packet.png
-	wsug_graphics/ws-gui-preferences.png
-	wsug_graphics/ws-gui-preferences-advanced.png
-	wsug_graphics/ws-help-menu.png
-	wsug_graphics/ws-list-pane.png # Outdated
-	wsug_graphics/ws-main-toolbar.png
-	wsug_graphics/ws-main.png
-	wsug_graphics/ws-manage-interfaces.png
-	wsug_graphics/ws-mate-analysis.png
-	wsug_graphics/ws-mate-dns_pane.png
-	wsug_graphics/ws-mate-dns_pdu.png
-	wsug_graphics/ws-mate-ftp_over_gre.png
-	wsug_graphics/ws-mate-gop_analysis.png
-	wsug_graphics/ws-mate-isup_over_mtp3_over_ip.png
-	wsug_graphics/ws-mate-mmse_over_http.png
-	wsug_graphics/ws-mate-pdu_analysis.png
-	wsug_graphics/ws-mate-tcp-output.png
-	wsug_graphics/ws-mate-transform.png
-	wsug_graphics/ws-menu.png
-	wsug_graphics/ws-merge-qt5.png
-	wsug_graphics/ws-merge-win32.png
-	wsug_graphics/ws-open-qt5.png
-	wsug_graphics/ws-open-win32.png
-	wsug_graphics/ws-packet-format.png
-	wsug_graphics/ws-packet-pane-popup-menu.png
-	wsug_graphics/ws-packet-range.png
-	wsug_graphics/ws-packet-selected.png
-	wsug_graphics/ws-packet-sep-win.png
-	wsug_graphics/ws-print.png
-	wsug_graphics/ws-save-as-qt5.png
-	wsug_graphics/ws-save-as-win32.png
-	wsug_graphics/ws-statistics-menu.png
-	wsug_graphics/ws-stats-conversations.png
-	wsug_graphics/ws-stats-endpoints.png
-	wsug_graphics/ws-stats-hierarchy.png
-	wsug_graphics/ws-stats-iographs.png
-	wsug_graphics/ws-stats-packet-lengths.png
-	wsug_graphics/ws-stats-srt-smb2.png
-	wsug_graphics/ws-stats-lte-mac-traffic.png
-	wsug_graphics/ws-stats-lte-rlc-traffic.png
-	wsug_graphics/ws-stats-wlan-traffic.png # GTK+
-	wsug_graphics/ws-statusbar-empty.png
-	wsug_graphics/ws-statusbar-filter.png
-	wsug_graphics/ws-statusbar-loaded.png
-	wsug_graphics/ws-statusbar-profile.png
-	wsug_graphics/ws-statusbar-selected.png
-	wsug_graphics/ws-tcp-analysis.png
-	wsug_graphics/ws-tel-rtpstream-analysis.png # GTK+
-	wsug_graphics/ws-telephony-menu.png
-	wsug_graphics/ws-time-reference.png # GTK+
-	wsug_graphics/ws-tools-menu.png
-	wsug_graphics/ws-view-menu.png
-	wsug_graphics/toolbar/document-open.png
-	wsug_graphics/toolbar/edit-find.png
-	wsug_graphics/toolbar/filter-toolbar-add.png
-	wsug_graphics/toolbar/filter-toolbar-apply.png
-	wsug_graphics/toolbar/filter-toolbar-bookmark.png
-	wsug_graphics/toolbar/filter-toolbar-clear.png
-	wsug_graphics/toolbar/filter-toolbar-input.png
-	wsug_graphics/toolbar/filter-toolbar-recent.png
-	wsug_graphics/toolbar/go-first.png
-	wsug_graphics/toolbar/go-jump.png
-	wsug_graphics/toolbar/go-last.png
-	wsug_graphics/toolbar/go-next.png
-	wsug_graphics/toolbar/go-previous.png
-	wsug_graphics/toolbar/x-capture-file-close.png
-	wsug_graphics/toolbar/x-capture-file-reload.png
-	wsug_graphics/toolbar/x-capture-file-save.png
-	wsug_graphics/toolbar/x-capture-options.png
-	wsug_graphics/toolbar/x-capture-restart.png
-	wsug_graphics/toolbar/x-capture-start.png
-	wsug_graphics/toolbar/x-capture-stop.png
-	wsug_graphics/toolbar/x-colorize-packets.png
-	wsug_graphics/toolbar/x-resize-columns.png
-	wsug_graphics/toolbar/x-stay-last.png
-	wsug_graphics/toolbar/zoom-in.png
-	wsug_graphics/toolbar/zoom-original.png
-	wsug_graphics/toolbar/zoom-out.png
-	${COMMON_GRAPHICS}
+	wsug_src/images/caution.svg
+	wsug_src/images/important.svg
+	wsug_src/images/note.svg
+	wsug_src/images/related-ack.png
+	wsug_src/images/related-current.png
+	wsug_src/images/related-dup-ack.png
+	wsug_src/images/related-first.png
+	wsug_src/images/related-last.png
+	wsug_src/images/related-other.png
+	wsug_src/images/related-request.png
+	wsug_src/images/related-response.png
+	wsug_src/images/related-segment.png
+	wsug_src/images/tip.svg
+	wsug_src/images/toolbar/document-open.png
+	wsug_src/images/toolbar/edit-find.png
+	wsug_src/images/toolbar/filter-toolbar-add.png
+	wsug_src/images/toolbar/filter-toolbar-apply.png
+	wsug_src/images/toolbar/filter-toolbar-bookmark.png
+	wsug_src/images/toolbar/filter-toolbar-clear.png
+	wsug_src/images/toolbar/filter-toolbar-input.png
+	wsug_src/images/toolbar/filter-toolbar-recent.png
+	wsug_src/images/toolbar/go-first.png
+	wsug_src/images/toolbar/go-jump.png
+	wsug_src/images/toolbar/go-last.png
+	wsug_src/images/toolbar/go-next.png
+	wsug_src/images/toolbar/go-previous.png
+	wsug_src/images/toolbar/x-capture-file-close.png
+	wsug_src/images/toolbar/x-capture-file-reload.png
+	wsug_src/images/toolbar/x-capture-file-save.png
+	wsug_src/images/toolbar/x-capture-options.png
+	wsug_src/images/toolbar/x-capture-restart.png
+	wsug_src/images/toolbar/x-capture-start.png
+	wsug_src/images/toolbar/x-capture-stop.png
+	wsug_src/images/toolbar/x-colorize-packets.png
+	wsug_src/images/toolbar/x-resize-columns.png
+	wsug_src/images/toolbar/x-stay-last.png
+	wsug_src/images/toolbar/zoom-in.png
+	wsug_src/images/toolbar/zoom-original.png
+	wsug_src/images/toolbar/zoom-out.png
+	wsug_src/images/warning.svg
+	wsug_src/images/ws-about-codecs.png
+	wsug_src/images/ws-analyze-menu.png
+	wsug_src/images/ws-bytes-pane-popup-menu.png
+	wsug_src/images/ws-bytes-pane-tabs.png
+	wsug_src/images/ws-bytes-pane.png
+	wsug_src/images/ws-capture-file-properties.png
+	wsug_src/images/ws-capture-info.png
+	wsug_src/images/ws-capture-interfaces-main-macos.png
+	wsug_src/images/ws-capture-interfaces-main-win32.png
+	wsug_src/images/ws-capture-menu.png
+	wsug_src/images/ws-capture-options-compile-selected-bpfs.png
+	wsug_src/images/ws-capture-options-options.png
+	wsug_src/images/ws-capture-options-output.png
+	wsug_src/images/ws-capture-options-output.png
+	wsug_src/images/ws-capture-options.png
+	wsug_src/images/ws-choose-color-rule.png
+	wsug_src/images/ws-coloring-fields.png
+	wsug_src/images/ws-coloring-rules-dialog.png
+	wsug_src/images/ws-column-header-popup-menu.png
+	wsug_src/images/ws-decode-as.png
+	wsug_src/images/ws-details-pane-popup-menu.png
+	wsug_src/images/ws-details-pane.png
+	wsug_src/images/ws-diagram-pane-popup-menu.png
+	wsug_src/images/ws-diagram-pane.png
+	wsug_src/images/ws-display-filter-tcp.png # GTK+
+	wsug_src/images/ws-edit-menu.png
+	wsug_src/images/ws-enabled-protocols.png
+	wsug_src/images/ws-expert-colored-tree.png
+	wsug_src/images/ws-expert-column.png
+	wsug_src/images/ws-expert-information.png
+	wsug_src/images/ws-export-objects.png
+	wsug_src/images/ws-export-packet-dissections.png
+	wsug_src/images/ws-export-selected.png
+	wsug_src/images/ws-export-specified-packets.png
+	wsug_src/images/ws-file-import.png
+	wsug_src/images/ws-file-menu.png
+	wsug_src/images/ws-file-set-dialog.png # GTK+
+	wsug_src/images/ws-filter-add-expression.png # GTK+
+	wsug_src/images/ws-filter-toolbar.png
+	wsug_src/images/ws-filters.png # GTK+
+	wsug_src/images/ws-find-packet.png
+	wsug_src/images/ws-follow-http2-stream.png
+	wsug_src/images/ws-follow-sip-stream.png
+	wsug_src/images/ws-follow-stream.png
+	wsug_src/images/ws-go-menu.png
+	wsug_src/images/ws-goto-packet.png
+	wsug_src/images/ws-gui-preferences-advanced.png
+	wsug_src/images/ws-gui-preferences.png
+	wsug_src/images/ws-help-menu.png
+	wsug_src/images/ws-list-pane.png # Outdated
+	wsug_src/images/ws-main-toolbar.png
+	wsug_src/images/ws-main.png
+	wsug_src/images/ws-manage-interfaces.png
+	wsug_src/images/ws-mate-analysis.png
+	wsug_src/images/ws-mate-dns_pane.png
+	wsug_src/images/ws-mate-dns_pdu.png
+	wsug_src/images/ws-mate-ftp_over_gre.png
+	wsug_src/images/ws-mate-gop_analysis.png
+	wsug_src/images/ws-mate-isup_over_mtp3_over_ip.png
+	wsug_src/images/ws-mate-mmse_over_http.png
+	wsug_src/images/ws-mate-pdu_analysis.png
+	wsug_src/images/ws-mate-tcp-output.png
+	wsug_src/images/ws-mate-transform.png
+	wsug_src/images/ws-menu.png
+	wsug_src/images/ws-merge-qt5.png
+	wsug_src/images/ws-merge-win32.png
+	wsug_src/images/ws-open-qt5.png
+	wsug_src/images/ws-open-win32.png
+	wsug_src/images/ws-packet-format.png
+	wsug_src/images/ws-packet-pane-popup-menu.png
+	wsug_src/images/ws-packet-range.png
+	wsug_src/images/ws-packet-selected.png
+	wsug_src/images/ws-packet-sep-win.png
+	wsug_src/images/ws-print.png
+	wsug_src/images/ws-save-as-qt5.png
+	wsug_src/images/ws-save-as-win32.png
+	wsug_src/images/ws-statistics-menu.png
+	wsug_src/images/ws-stats-conversations.png
+	wsug_src/images/ws-stats-endpoints.png
+	wsug_src/images/ws-stats-hierarchy.png
+	wsug_src/images/ws-stats-iographs.png
+	wsug_src/images/ws-stats-lte-mac-traffic.png
+	wsug_src/images/ws-stats-lte-rlc-traffic.png
+	wsug_src/images/ws-stats-packet-lengths.png
+	wsug_src/images/ws-stats-srt-smb2.png
+	wsug_src/images/ws-stats-wlan-traffic.png # GTK+
+	wsug_src/images/ws-statusbar-empty.png
+	wsug_src/images/ws-statusbar-filter.png
+	wsug_src/images/ws-statusbar-loaded.png
+	wsug_src/images/ws-statusbar-profile.png
+	wsug_src/images/ws-statusbar-selected.png
+	wsug_src/images/ws-tcp-analysis.png
+	wsug_src/images/ws-tel-playlist.png
+	wsug_src/images/ws-tel-rtp-player_1.png
+	wsug_src/images/ws-tel-rtp-player_2.png
+	wsug_src/images/ws-tel-rtp-player_3.png
+	wsug_src/images/ws-tel-rtp-player_button.png
+	wsug_src/images/ws-tel-rtp-streams.png
+	wsug_src/images/ws-tel-rtpstream-analysis_1.png
+	wsug_src/images/ws-tel-rtpstream-analysis_2.png
+	wsug_src/images/ws-tel-rtpstream-analysis_3.png
+	wsug_src/images/ws-tel-seq-dialog.png
+	wsug_src/images/ws-tel-voip-calls.png
+	wsug_src/images/ws-telephony-menu.png
+	wsug_src/images/ws-time-reference.png # GTK+
+	wsug_src/images/ws-tools-menu.png
+	wsug_src/images/ws-view-menu.png
 )
 
+set(WSDG_TITLE "Wireshark Developer's Guide")
+
 set(WSDG_FILES
-	wsdg_src/WSDG_chapter_asn2wrs.adoc
-	wsdg_src/WSDG_chapter_build_intro.adoc
-	wsdg_src/WSDG_chapter_capture.adoc
-	wsdg_src/WSDG_chapter_dissection.adoc
-	wsdg_src/WSDG_chapter_env_intro.adoc
-	wsdg_src/WSDG_chapter_libraries.adoc
-	wsdg_src/WSDG_chapter_quick_setup.adoc
-	wsdg_src/WSDG_chapter_sources.adoc
-	wsdg_src/WSDG_chapter_tests.adoc
-	wsdg_src/WSDG_chapter_tools.adoc
-	wsdg_src/WSDG_chapter_userinterface.adoc
-	wsdg_src/WSDG_chapter_works.adoc
-	wsdg_src/WSDG_preface.adoc
-	wsluarm.adoc
+	wsdg_src/wsdg_asn2wrs.adoc
+	wsdg_src/wsdg_build_intro.adoc
+	wsdg_src/wsdg_capture.adoc
+	wsdg_src/wsdg_dissection.adoc
+	wsdg_src/wsdg_env_intro.adoc
+	wsdg_src/wsdg_libraries.adoc
+	wsdg_src/wsdg_lua_support.adoc
+	wsdg_src/wsdg_preface.adoc
+	wsdg_src/wsdg_quick_setup.adoc
+	wsdg_src/wsdg_sources.adoc
+	wsdg_src/wsdg_tests.adoc
+	wsdg_src/wsdg_tools.adoc
+	wsdg_src/wsdg_userinterface.adoc
+	wsdg_src/wsdg_works.adoc
 	${COMMON_FILES}
 )
 
 set(WSDG_GRAPHICS
-	wsdg_graphics/git-triangular-workflow.gv
-	wsdg_graphics/git-triangular-workflow.svg
-	wsdg_graphics/ws-capture-sync.png
-	wsdg_graphics/ws-capture-sync.dia
-	wsdg_graphics/ws-capture-sync.png
-	wsdg_graphics/ws-capture_internals.dia
-	wsdg_graphics/ws-capture_internals.png
-	wsdg_graphics/ws-function-blocks.dia
-	wsdg_graphics/ws-function-blocks.png
-	wsdg_graphics/ws-logo.png
-	${COMMON_GRAPHICS}
+	wsdg_src/images/caution.svg
+	wsdg_src/images/git-triangular-workflow.gv
+	wsdg_src/images/git-triangular-workflow.svg
+	wsdg_src/images/important.svg
+	wsdg_src/images/note.svg
+	wsdg_src/images/tip.svg
+	wsdg_src/images/warning.svg
+	wsdg_src/images/ws-capture_internals.dia
+	wsdg_src/images/ws-capture_internals.png
+	wsdg_src/images/ws-capture-sync.dia
+	wsdg_src/images/ws-capture-sync.png
+	wsdg_src/images/ws-capture-sync.png
+	wsdg_src/images/ws-function-blocks.dia
+	wsdg_src/images/ws-function-blocks.png
+	wsdg_src/images/ws-logo.png
 )
 
 set(WSUG_SOURCE
@@ -324,7 +306,7 @@ set(WSLUA_MODULES
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_capture_info.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_dir.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_wtap.c
-	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_util.c
+	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_utility.c
 	${CMAKE_SOURCE_DIR}/epan/wslua/wslua_struct.c
 )
 
@@ -333,13 +315,14 @@ ADD_CUSTOM_COMMAND(
 	OUTPUT
 		wsluarm
 	COMMAND ${CMAKE_COMMAND} -E make_directory wsluarm_src
-	COMMAND ${PERL_EXECUTABLE}
-		${CMAKE_CURRENT_SOURCE_DIR}/make-wsluarm.pl
+	COMMAND ${PYTHON_EXECUTABLE}
+		${CMAKE_CURRENT_SOURCE_DIR}/make-wsluarm.py
+		--output-directory wsluarm_src
 		${WSLUA_MODULES}
 	COMMAND ${CMAKE_COMMAND} -E touch
 		wsluarm
 	DEPENDS
-		${CMAKE_CURRENT_SOURCE_DIR}/make-wsluarm.pl
+		${CMAKE_CURRENT_SOURCE_DIR}/make-wsluarm.py
 		${WSLUA_MODULES}
 )
 
@@ -353,11 +336,11 @@ set( ASCIIDOC_CONF_FILES
 if(ASCIIDOCTOR_FOUND)
 	# Generate the DocBook sources of user and developer guides
 
-	ASCIIDOCTOR2DOCBOOK(user-guide.adoc ${ASCIIDOC_CONF_FILES} ${WSUG_SOURCE} ${WSUG_BUILT_DEPS})
+	ASCIIDOCTOR2DOCBOOK(wsug_src/user-guide.adoc ${ASCIIDOC_CONF_FILES} ${WSUG_SOURCE} ${WSUG_BUILT_DEPS})
 	add_custom_target(user_guide_docbook DEPENDS generate_user-guide.xml)
 	set_docbook_target_properties(user_guide_docbook)
 
-	ASCIIDOCTOR2DOCBOOK(developer-guide.adoc ${ASCIIDOC_CONF_FILES} ${WSDG_SOURCE} ${WSDG_BUILT_DEPS})
+	ASCIIDOCTOR2DOCBOOK(wsdg_src/developer-guide.adoc ${ASCIIDOC_CONF_FILES} ${WSDG_SOURCE} ${WSDG_BUILT_DEPS})
 	add_custom_target(developer_guide_docbook DEPENDS generate_developer-guide.xml)
 	set_docbook_target_properties(developer_guide_docbook)
 
@@ -402,27 +385,27 @@ if(ASCIIDOCTOR_FOUND AND XSLTPROC_EXECUTABLE)
 endif()
 
 if(ASCIIDOCTOR_FOUND AND ASCIIDOCTOR_PDF_EXECUTABLE)
-	ASCIIDOCTOR2PDF(user-guide.adoc ${WSUG_SOURCE} ${WSUG_BUILT_DEPS})
+	ASCIIDOCTOR2PDF(${WSUG_TITLE} wsug_src/user-guide.adoc ${WSUG_SOURCE} ${WSUG_BUILT_DEPS})
 
 	add_custom_target(
 		user_guide_pdf
 		DEPENDS
-			user-guide.pdf
+			"${WSUG_TITLE}.pdf"
 	)
 	set_docbook_target_properties(user_guide_pdf)
 	add_dependencies(user_guides user_guide_pdf)
 endif()
 
-if(WIN32 AND ASCIIDOCTOR_FOUND)
-	XML2HHP(user_guide wsug "Wireshark User's Guide" user-guide.xml)
-	HHP2CHM(user-guide.hhp)
+if(ASCIIDOCTOR_FOUND AND ASCIIDOCTOR_EPUB_EXECUTABLE)
+	ASCIIDOCTOR2EPUB(${WSUG_TITLE} wsug_src/user-guide.adoc ${WSUG_SOURCE} ${WSUG_BUILT_DEPS})
+
 	add_custom_target(
-		user_guide_chm
+		user_guide_epub
 		DEPENDS
-			user-guide.chm
+			"${WSUG_TITLE}.epub"
 	)
-	set_docbook_target_properties(user_guide_chm)
-	add_dependencies(user_guides user_guide_chm)
+	set_docbook_target_properties(user_guide_epub)
+	add_dependencies(user_guides user_guide_epub)
 endif()
 
 # Developer's Guide chain.
@@ -454,27 +437,27 @@ if(ASCIIDOCTOR_FOUND AND XSLTPROC_EXECUTABLE)
 endif()
 
 if(ASCIIDOCTOR_FOUND AND ASCIIDOCTOR_PDF_EXECUTABLE)
-	ASCIIDOCTOR2PDF(developer-guide.adoc ${WSDG_SOURCE} ${WSDG_BUILT_DEPS})
+	ASCIIDOCTOR2PDF(${WSDG_TITLE} wsdg_src/developer-guide.adoc ${WSDG_SOURCE} ${WSDG_BUILT_DEPS})
 
 	add_custom_target(
 		developer_guide_pdf
 		DEPENDS
-			developer-guide.pdf
+			"${WSDG_TITLE}.pdf"
 	)
 	set_docbook_target_properties(developer_guide_pdf)
 	add_dependencies(developer_guides developer_guide_pdf)
 endif()
 
-if(WIN32 AND ASCIIDOCTOR_FOUND)
-	XML2HHP(developer_guide	wsdg "Wireshark Developer's Guide" developer-guide.xml)
-	HHP2CHM(developer-guide.hhp)
+if(ASCIIDOCTOR_FOUND AND ASCIIDOCTOR_EPUB_EXECUTABLE)
+	ASCIIDOCTOR2EPUB(${WSDG_TITLE} wsdg_src/developer-guide.adoc ${WSDG_SOURCE} ${WSDG_BUILT_DEPS})
+
 	add_custom_target(
-		developer_guide_chm
+		developer_guide_epub
 		DEPENDS
-			developer-guide.chm
+			"${WSDG_TITLE}.epub"
 	)
-	set_docbook_target_properties(developer_guide_chm)
-	add_dependencies(developer_guides developer_guide_chm)
+	set_docbook_target_properties(developer_guide_epub)
+	add_dependencies(developer_guides developer_guide_epub)
 endif()
 
 if (GUIDE_INSTALL_DIRS)
@@ -517,7 +500,7 @@ add_custom_target(
 set_docbook_target_properties(news)
 
 if( ASCIIDOCTOR_FOUND )
-	ASCIIDOCTOR2HTML( release-notes.adoc copy_ws.css )
+	ASCIIDOCTOR2HTML( release-notes.adoc )
 	ASCIIDOCTOR2TXT( release-notes.adoc )
 endif()
 
@@ -531,7 +514,7 @@ set_docbook_target_properties(faq)
 add_dependencies ( faq faq_html )
 
 if( ASCIIDOCTOR_FOUND )
-	ASCIIDOCTOR2HTML( faq.adoc copy_ws.css )
+	ASCIIDOCTOR2HTML( faq.adoc )
 endif()
 
 #

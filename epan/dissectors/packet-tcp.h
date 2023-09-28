@@ -13,8 +13,8 @@
 #include "ws_symbol_export.h"
 
 #include <epan/conversation.h>
-#include <epan/wmem/wmem.h>
-#include <epan/wmem/wmem_interval_tree.h>
+#include <epan/reassemble.h>
+#include <epan/wmem_scopes.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,9 +27,9 @@ extern "C" {
 #define TH_PUSH 0x0008
 #define TH_ACK  0x0010
 #define TH_URG  0x0020
-#define TH_ECN  0x0040
+#define TH_ECE  0x0040
 #define TH_CWR  0x0080
-#define TH_NS   0x0100
+#define TH_AE   0x0100
 #define TH_RES  0x0E00 /* 3 reserved bits */
 #define TH_MASK 0x0FFF
 
@@ -49,8 +49,12 @@ struct mptcpheader {
 	gboolean mh_mpc;         /* true if seen an mp_capable option */
 	gboolean mh_join;        /* true if seen an mp_join option */
 	gboolean mh_dss;         /* true if seen a dss */
-	gboolean mh_fastclose;   /* true if seen a fastclose */
+	gboolean mh_add;         /* true if seen an MP_ADD */
+	gboolean mh_remove;      /* true if seen an MP_REMOVE */
+	gboolean mh_prio;        /* true if seen an MP_PRIO */
 	gboolean mh_fail;        /* true if seen an MP_FAIL */
+	gboolean mh_fastclose;   /* true if seen a fastclose */
+	gboolean mh_tcprst;      /* true if seen a MP_TCPRST */
 
 	guint8  mh_capable_flags; /* to get hmac version for instance */
 	guint8  mh_dss_flags; /* data sequence signal flag */
@@ -85,6 +89,7 @@ typedef struct tcpheader {
 	guint16 th_sport;
 	guint16 th_dport;
 	guint8  th_hlen;
+	gboolean th_use_ace;
 	guint16 th_flags;
 	guint32 th_stream; /* this stream index field is included to help differentiate when address/port pairs are reused */
 	address ip_src;
@@ -140,6 +145,9 @@ tcp_dissect_pdus(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		 guint (*get_pdu_len)(packet_info *, tvbuff_t *, int, void*),
 		 dissector_t dissect_pdu, void* dissector_data);
 
+extern const reassembly_table_functions
+tcp_reassembly_table_functions;
+
 extern struct tcp_multisegment_pdu *
 pdu_store_sequencenumber_of_next_pdu(packet_info *pinfo, guint32 seq, guint32 nxtpdu, wmem_tree_t *multisegment_pdus);
 
@@ -163,6 +171,9 @@ struct tcp_acked {
 	guint32 dupack_frame;	/* dup ack to frame # */
 	guint32 bytes_in_flight; /* number of bytes in flight */
 	guint32 push_bytes_sent; /* bytes since the last PSH flag */
+
+	guint32 new_data_seq; /* For segments with old data,
+				 where new data starts */
 };
 
 /* One instance of this structure is created for each pdu that spans across
@@ -309,6 +320,14 @@ typedef struct tcp_analyze_seq_flow_info_t {
 				 * fast retransmissions and outoforder
 				 */
 
+	/*
+	 * Handling of SACK blocks
+	 * Copied from tcpheader
+	 */
+	guint8  num_sack_ranges;
+	guint32 sack_left_edge[MAX_TCP_SACK_RANGES];
+	guint32 sack_right_edge[MAX_TCP_SACK_RANGES];
+
 } tcp_analyze_seq_flow_info_t;
 
 	/* Process info, currently discovered via IPFIX */
@@ -323,7 +342,7 @@ typedef struct tcp_process_info_t {
 typedef struct _tcp_flow_t {
 	guint8 static_flags; /* true if base seq set */
 	guint32 base_seq;	/* base seq number (used by relative sequence numbers)*/
-#define TCP_MAX_UNACKED_SEGMENTS 1000 /* The most unacked segments we'll store */
+#define TCP_MAX_UNACKED_SEGMENTS 10000 /* The most unacked segments we'll store */
 	guint32 fin;		/* frame number of the final FIN */
 	guint32 window;		/* last seen window */
 	gint16	win_scale;	/* -1 is we don't know, -2 is window scaling is not used */
@@ -332,6 +351,9 @@ typedef struct _tcp_flow_t {
 	gboolean valid_bif;     /* if lost pkts, disable BiF until ACK is recvd */
 	guint32 push_bytes_sent; /* bytes since the last PSH flag */
 	gboolean push_set_last; /* tracking last time PSH flag was set */
+	guint8 mp_operations; /* tracking of the MPTCP operations */
+	gboolean is_first_ack;  /* indicates if this is the first ACK */
+	gboolean closing_initiator; /* tracking who is responsible of the connection end */
 
 	tcp_analyze_seq_flow_info_t* tcp_analyze_seq_info;
 
@@ -353,6 +375,9 @@ typedef struct _tcp_flow_t {
 	 * all pdus spanning multiple segments for this flow.
 	 */
 	wmem_tree_t *multisegment_pdus;
+
+	/* A sorted list of pending out-of-order segments. */
+	wmem_list_t *ooo_segments;
 
 	/* Process info, currently discovered via IPFIX */
 	tcp_process_info_t* process_info;
@@ -378,6 +403,9 @@ struct mptcp_analysis {
 
 	/* identifier of the tcp stream that saw the initial 3WHS with MP_CAPABLE option */
 	struct tcp_analysis *master;
+
+	/* Keep track of the last TCP operations seen in order to avoid false DUP ACKs */
+	guint8 mp_operations;
 };
 
 struct tcp_analysis {
@@ -456,6 +484,18 @@ struct tcp_analysis {
 	 * can exist without any meta
 	 */
 	struct mptcp_analysis* mptcp_analysis;
+
+	/* Track the TCP conversation completeness, as the capture might
+	 * contain all parts of a TCP flow (establishment, data, clearing) or
+	 * just some parts if we jumped on the bandwagon of an already established
+	 * connection or left before it was terminated explicitly
+	 */
+	guint8          conversation_completeness;
+
+	/* Track AccECN support */
+	gboolean had_acc_ecn_setup_syn;
+	gboolean had_acc_ecn_setup_syn_ack;
+	gboolean had_acc_ecn_option;
 };
 
 /* Structure that keeps per packet data. First used to be able
@@ -515,7 +555,7 @@ WS_DLL_PUBLIC guint32 get_tcp_stream_count(void);
 WS_DLL_PUBLIC guint32 get_mptcp_stream_count(void);
 
 /* Follow Stream functionality shared with HTTP (and SSL?) */
-extern gchar *tcp_follow_conv_filter(packet_info *pinfo, guint *stream, guint *sub_stream);
+extern gchar *tcp_follow_conv_filter(epan_dissect_t *edt, packet_info *pinfo, guint *stream, guint *sub_stream);
 extern gchar *tcp_follow_index_filter(guint stream, guint sub_stream);
 extern gchar *tcp_follow_address_filter(address *src_addr, address *dst_addr, int src_port, int dst_port);
 

@@ -18,11 +18,12 @@
 #include "init_wslua.h"
 #include <epan/dissectors/packet-frame.h>
 #include <math.h>
+#include <stdio.h>
 #include <epan/expert.h>
 #include <epan/ex-opt.h>
 #include <wsutil/privileges.h>
 #include <wsutil/file_util.h>
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
+#include <wsutil/wslog.h>
 
 /* linked list of Lua plugins */
 typedef struct _wslua_plugin {
@@ -117,6 +118,18 @@ static expert_field ei_lua_proto_comments_chat    = EI_INIT;
 static expert_field ei_lua_proto_comments_note    = EI_INIT;
 static expert_field ei_lua_proto_comments_warn    = EI_INIT;
 static expert_field ei_lua_proto_comments_error   = EI_INIT;
+
+static expert_field ei_lua_proto_decryption_comment = EI_INIT;
+static expert_field ei_lua_proto_decryption_chat    = EI_INIT;
+static expert_field ei_lua_proto_decryption_note    = EI_INIT;
+static expert_field ei_lua_proto_decryption_warn    = EI_INIT;
+static expert_field ei_lua_proto_decryption_error   = EI_INIT;
+
+static expert_field ei_lua_proto_assumption_comment = EI_INIT;
+static expert_field ei_lua_proto_assumption_chat    = EI_INIT;
+static expert_field ei_lua_proto_assumption_note    = EI_INIT;
+static expert_field ei_lua_proto_assumption_warn    = EI_INIT;
+static expert_field ei_lua_proto_assumption_error   = EI_INIT;
 
 static expert_field ei_lua_proto_deprecated_comment = EI_INIT;
 static expert_field ei_lua_proto_deprecated_chat    = EI_INIT;
@@ -224,7 +237,7 @@ gboolean heur_dissect_lua(tvbuff_t* tvb, packet_info* pinfo, proto_tree* tree, v
     lua_tvb = tvb;
     lua_pinfo = pinfo;
 
-    g_assert(tvb && pinfo);
+    ws_assert(tvb && pinfo);
 
     if (!pinfo->heur_list_name || !pinfo->current_proto) {
         proto_tree_add_expert_format(tree, pinfo, &ei_lua_error, tvb, 0, 0,
@@ -417,7 +430,7 @@ static void wslua_add_plugin(const gchar *name, const gchar *version, const gcha
     wslua_plugin *new_plug, *lua_plug;
 
     lua_plug = wslua_plugin_list;
-    new_plug = (wslua_plugin *)g_malloc(sizeof(wslua_plugin));
+    new_plug = g_new(wslua_plugin, 1);
 
     if (!lua_plug) { /* the list is empty */
         wslua_plugin_list = new_plug;
@@ -449,7 +462,7 @@ static void wslua_clear_plugin_list(void)
 }
 
 static int lua_script_push_args(const int script_num) {
-    gchar* argname = g_strdup_printf("lua_script%d", script_num);
+    gchar* argname = ws_strdup_printf("lua_script%d", script_num);
     const gchar* argvalue = NULL;
     int i, count = ex_opt_count(argname);
 
@@ -605,17 +618,21 @@ static gboolean lua_load_plugin_script(const gchar* name,
 }
 
 
-static void basic_logger(const gchar *log_domain _U_,
-                          GLogLevelFlags log_level _U_,
+static void basic_logger(const gchar *log_domain,
+                          enum ws_log_level log_level,
                           const gchar *message,
                           gpointer user_data _U_) {
-    fputs(message,stderr);
+    ws_log(log_domain, log_level, "%s", message);
 }
 
 static int wslua_panic(lua_State* LS) {
-    g_error("LUA PANIC: %s",lua_tostring(LS,-1));
-    /** g_error() does an abort() and thus never returns **/
+    ws_error("LUA PANIC: %s",lua_tostring(LS,-1));
+    /** ws_error() does an abort() and thus never returns **/
     return 0; /* keep gcc happy */
+}
+
+static gint string_compare(gconstpointer a, gconstpointer b) {
+    return strcmp((const char*)a, (const char*)b);
 }
 
 static int lua_load_plugins(const char *dirname, register_cb cb, gpointer client_data,
@@ -626,6 +643,9 @@ static int lua_load_plugins(const char *dirname, register_cb cb, gpointer client
     gchar         *filename, *dot;
     const gchar   *name;
     int            plugins_counter = 0;
+    GList         *sorted_dirnames = NULL;
+    GList         *sorted_filenames = NULL;
+    GList         *l = NULL;
 
     if ((dir = ws_dir_open(dirname, 0, NULL)) != NULL) {
         while ((file = ws_dir_read_name(dir)) != NULL) {
@@ -634,10 +654,9 @@ static int lua_load_plugins(const char *dirname, register_cb cb, gpointer client
             if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
                 continue;        /* skip "." and ".." */
 
-            filename = g_strdup_printf("%s" G_DIR_SEPARATOR_S "%s", dirname, name);
+            filename = ws_strdup_printf("%s" G_DIR_SEPARATOR_S "%s", dirname, name);
             if (test_for_directory(filename) == EISDIR) {
-                plugins_counter += lua_load_plugins(filename, cb, client_data, count_only, is_user, loaded_files);
-                g_free(filename);
+                sorted_dirnames = g_list_prepend(sorted_dirnames, (gpointer)filename);
                 continue;
             }
 
@@ -654,26 +673,49 @@ static int lua_load_plugins(const char *dirname, register_cb cb, gpointer client
                 continue;
             }
 
+            if (file_exists(filename)) {
+                sorted_filenames = g_list_prepend(sorted_filenames, (gpointer)filename);
+            }
+            else {
+                g_free(filename);
+            }
+        }
+        ws_dir_close(dir);
+    }
+
+    /* Depth first; ie, process subdirectories (in ASCIIbetical order) before files */
+    if (sorted_dirnames != NULL) {
+        sorted_dirnames = g_list_sort(sorted_dirnames, string_compare);
+        for (l = sorted_dirnames; l != NULL; l = l->next) {
+            plugins_counter += lua_load_plugins((const char *)l->data, cb, client_data, count_only, is_user, loaded_files);
+        }
+        g_list_free_full(sorted_dirnames, g_free);
+    }
+
+    /* Process files in ASCIIbetical order */
+    if (sorted_filenames != NULL) {
+        sorted_filenames = g_list_sort(sorted_filenames, string_compare);
+        for (l = sorted_filenames; l != NULL; l = l->next) {
+            filename = (gchar *)l->data;
+            name = strrchr(filename, G_DIR_SEPARATOR) + 1;
+
             /* Check if we have already loaded this file name, if provided with a set */
             if (loaded_files && g_hash_table_lookup_extended(loaded_files, name, NULL, NULL)) {
-                g_free(filename);
                 continue;
             }
 
-            if (file_exists(filename)) {
-                if (!count_only) {
-                    if (cb)
-                        (*cb)(RA_LUA_PLUGINS, name, client_data);
-                    lua_load_plugin_script(name, filename, is_user ? dirname : NULL, 0);
-                }
+            if (!count_only) {
+                if (cb)
+                    (*cb)(RA_LUA_PLUGINS, name, client_data);
+                lua_load_plugin_script(name, filename, is_user ? dirname : NULL, 0);
+
                 if (loaded_files) {
                     g_hash_table_insert(loaded_files, g_strdup(name), NULL);
                 }
-                plugins_counter++;
             }
-            g_free(filename);
+            plugins_counter++;
         }
-        ws_dir_close(dir);
+        g_list_free_full(sorted_filenames, g_free);
     }
 
     return plugins_counter;
@@ -746,7 +788,7 @@ print_wslua_plugin_description(const char *name, const char *version,
                                const char *description, const char *filename,
                                void *user_data _U_)
 {
-    ws_debug_printf("%s\t%s\t%s\t%s\n", name, version, description, filename);
+    printf("%s\t%s\t%s\t%s\n", name, version, description, filename);
 }
 
 void
@@ -768,7 +810,7 @@ wslua_get_expert_field(const int group, const int severity)
     int i;
     const ei_register_info *ei = ws_lua_ei;
 
-    g_assert(ei);
+    ws_assert(ei);
 
     for (i=0; i < ws_lua_ei_len; i++, ei++) {
         if (ei->eiinfo.group == group && ei->eiinfo.severity == severity)
@@ -882,6 +924,18 @@ void wslua_init(register_cb cb, gpointer client_data) {
         { &ei_lua_proto_comments_warn,      { "_ws.lua.proto.warning", PI_COMMENTS_GROUP, PI_WARN    ,"Protocol Warning", EXPFILL }},
         { &ei_lua_proto_comments_error,     { "_ws.lua.proto.error",   PI_COMMENTS_GROUP, PI_ERROR   ,"Protocol Error",   EXPFILL }},
 
+        { &ei_lua_proto_decryption_comment, { "_ws.lua.proto.comment", PI_DECRYPTION, PI_COMMENT ,"Protocol Comment", EXPFILL }},
+        { &ei_lua_proto_decryption_chat,    { "_ws.lua.proto.chat",    PI_DECRYPTION, PI_CHAT    ,"Protocol Chat",    EXPFILL }},
+        { &ei_lua_proto_decryption_note,    { "_ws.lua.proto.note",    PI_DECRYPTION, PI_NOTE    ,"Protocol Note",    EXPFILL }},
+        { &ei_lua_proto_decryption_warn,    { "_ws.lua.proto.warning", PI_DECRYPTION, PI_WARN    ,"Protocol Warning", EXPFILL }},
+        { &ei_lua_proto_decryption_error,   { "_ws.lua.proto.error",   PI_DECRYPTION, PI_ERROR   ,"Protocol Error",   EXPFILL }},
+
+        { &ei_lua_proto_assumption_comment, { "_ws.lua.proto.comment", PI_ASSUMPTION, PI_COMMENT ,"Protocol Comment", EXPFILL }},
+        { &ei_lua_proto_assumption_chat,    { "_ws.lua.proto.chat",    PI_ASSUMPTION, PI_CHAT    ,"Protocol Chat",    EXPFILL }},
+        { &ei_lua_proto_assumption_note,    { "_ws.lua.proto.note",    PI_ASSUMPTION, PI_NOTE    ,"Protocol Note",    EXPFILL }},
+        { &ei_lua_proto_assumption_warn,    { "_ws.lua.proto.warning", PI_ASSUMPTION, PI_WARN    ,"Protocol Warning", EXPFILL }},
+        { &ei_lua_proto_assumption_error,   { "_ws.lua.proto.error",   PI_ASSUMPTION, PI_ERROR   ,"Protocol Error",   EXPFILL }},
+
         { &ei_lua_proto_deprecated_comment, { "_ws.lua.proto.comment", PI_DEPRECATED, PI_COMMENT ,"Protocol Comment", EXPFILL }},
         { &ei_lua_proto_deprecated_chat,    { "_ws.lua.proto.chat",    PI_DEPRECATED, PI_CHAT    ,"Protocol Chat",    EXPFILL }},
         { &ei_lua_proto_deprecated_note,    { "_ws.lua.proto.note",    PI_DEPRECATED, PI_NOTE    ,"Protocol Note",    EXPFILL }},
@@ -923,7 +977,30 @@ void wslua_init(register_cb cb, gpointer client_data) {
 
     lua_atpanic(L,wslua_panic);
 
-    /* the init_routines table (accessible by the user) */
+    /*
+     * The init_routines table (accessible by the user).
+     *
+     * For a table a, a.init is syntactic sugar for a["init"], and
+     *
+     *    function t.a.b.c.f () body end
+     *
+     * is syntactic sugar for
+     *
+     *    t.a.b.c.f = function () body end
+     *
+     * so
+     *
+     *    function proto.init () body end
+     *
+     * means
+     *
+     *    proto["init"] = function () body end
+     *
+     * and the Proto class has an "init" method, with Proto_set_init()
+     * being the setter for that method; that routine adds the Lua
+     * function passed to it as a Lua argument to the WSLUA_INIT_ROUTINES
+     * table - i.e., "init_routines".
+     */
     lua_newtable (L);
     lua_setglobal(L, WSLUA_INIT_ROUTINES);
 

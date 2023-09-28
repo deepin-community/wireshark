@@ -266,6 +266,7 @@ static const value_string CANopenType[] =
    {   ETHERCAT_COE_TYPE_RXPDO, "RxPDO" },
    {   ETHERCAT_COE_TYPE_TXPDO_RTR, "TxPDO_RTR" },
    {   ETHERCAT_COE_TYPE_RXPDO_RTR, "RxPDO_RTR" },
+   {   ETHERCAT_COE_TYPE_SDOINFO, "SDO Information" },
    {   0, NULL }
 };
 
@@ -338,22 +339,22 @@ static void CANopenSdoReqFormatter(PETHERCAT_SDO_HEADER pSdo, char *szText, gint
    switch ( pSdo->anSdoHeaderUnion.Idq.Ccs )
    {
    case SDO_CCS_INITIATE_DOWNLOAD:
-      g_snprintf ( szText, nMax, "SDO Req : 'Initiate Download' (%d) Idx=0x%x Sub=%d", pSdo->anSdoHeaderUnion.Idq.Ccs, pSdo->Index,  pSdo->SubIndex);
+      snprintf ( szText, nMax, "SDO Req : 'Initiate Download' (%d) Idx=0x%x Sub=%d", pSdo->anSdoHeaderUnion.Idq.Ccs, pSdo->Index,  pSdo->SubIndex);
       break;
    case SDO_CCS_INITIATE_UPLOAD:
-      g_snprintf ( szText, nMax, "SDO Req : 'Initiate Upload' (%d) Idx=0x%x Sub=%d", pSdo->anSdoHeaderUnion.Idq.Ccs, pSdo->Index,  pSdo->SubIndex);
+      snprintf ( szText, nMax, "SDO Req : 'Initiate Upload' (%d) Idx=0x%x Sub=%d", pSdo->anSdoHeaderUnion.Idq.Ccs, pSdo->Index,  pSdo->SubIndex);
       break;
    case SDO_CCS_DOWNLOAD_SEGMENT:
-      g_snprintf ( szText, nMax, "SDO Req : 'Download Segment' (%d)", pSdo->anSdoHeaderUnion.Idq.Ccs);
+      snprintf ( szText, nMax, "SDO Req : 'Download Segment' (%d)", pSdo->anSdoHeaderUnion.Idq.Ccs);
       break;
    case SDO_CCS_UPLOAD_SEGMENT:
-      g_snprintf ( szText, nMax, "SDO Req : 'Upload Segment' (%d)", pSdo->anSdoHeaderUnion.Idq.Ccs);
+      snprintf ( szText, nMax, "SDO Req : 'Upload Segment' (%d)", pSdo->anSdoHeaderUnion.Idq.Ccs);
       break;
    case SDO_CCS_ABORT_TRANSFER:
-      g_snprintf ( szText, nMax, "SDO Req : 'Abort Transfer' (%d)", pSdo->anSdoHeaderUnion.Idq.Ccs);
+      snprintf ( szText, nMax, "SDO Req : 'Abort Transfer' (%d)", pSdo->anSdoHeaderUnion.Idq.Ccs);
       break;
    default:
-      g_snprintf ( szText, nMax, "SDO Req : Ccs %d", pSdo->anSdoHeaderUnion.Idq.Ccs);
+      snprintf ( szText, nMax, "SDO Req : Ccs %d", pSdo->anSdoHeaderUnion.Idq.Ccs);
    }
 }
 
@@ -378,37 +379,37 @@ static void FoeFormatter(tvbuff_t *tvb, gint offset, char *szText, gint nMax, gu
    switch ( foe.OpMode )
    {
    case ECAT_FOE_OPMODE_RRQ:
-      g_snprintf ( szText, nMax, "FoE RRQ (%d) : '%s'", foe.aFoeHeaderDataUnion.FileLength, tmp);
+      snprintf ( szText, nMax, "FoE RRQ (%d) : '%s'", foe.aFoeHeaderDataUnion.FileLength, tmp);
       break;
    case ECAT_FOE_OPMODE_WRQ:
-      g_snprintf ( szText, nMax, "FoE WRQ (%d) : '%s'", foe.aFoeHeaderDataUnion.FileLength, tmp);
+      snprintf ( szText, nMax, "FoE WRQ (%d) : '%s'", foe.aFoeHeaderDataUnion.FileLength, tmp);
       break;
    case ECAT_FOE_OPMODE_DATA:
-      g_snprintf ( szText, nMax, "FoE DATA (%d) : %d Bytes", foe.aFoeHeaderDataUnion.v.PacketNo, foe_length-ETHERCAT_FOE_HEADER_LEN);
+      snprintf ( szText, nMax, "FoE DATA (%d) : %d Bytes", foe.aFoeHeaderDataUnion.v.PacketNo, foe_length-ETHERCAT_FOE_HEADER_LEN);
       break;
    case ECAT_FOE_OPMODE_ACK:
-      g_snprintf ( szText, nMax, "FoE ACK (%d)", foe.aFoeHeaderDataUnion.v.PacketNo);
+      snprintf ( szText, nMax, "FoE ACK (%d)", foe.aFoeHeaderDataUnion.v.PacketNo);
       break;
    case ECAT_FOE_OPMODE_ERR:
-      g_snprintf ( szText, nMax, "FoE ERR (%d) : '%s'", foe.aFoeHeaderDataUnion.ErrorCode, tmp);
+      snprintf ( szText, nMax, "FoE ERR (%d) : '%s'", foe.aFoeHeaderDataUnion.ErrorCode, tmp);
       break;
    case ECAT_FOE_OPMODE_BUSY:
       if ( foe.aFoeHeaderDataUnion.v2.Entire > 0 )
-         g_snprintf ( szText, nMax, "FoE BUSY (%d%%)", ((guint32)foe.aFoeHeaderDataUnion.v2.Done*100)/foe.aFoeHeaderDataUnion.v2.Entire);
+         snprintf ( szText, nMax, "FoE BUSY (%d%%)", ((guint32)foe.aFoeHeaderDataUnion.v2.Done*100)/foe.aFoeHeaderDataUnion.v2.Entire);
       else
-         g_snprintf ( szText, nMax, "FoE BUSY (%d/%d)", foe.aFoeHeaderDataUnion.v2.Done, foe.aFoeHeaderDataUnion.v2.Entire);
+         snprintf ( szText, nMax, "FoE BUSY (%d/%d)", foe.aFoeHeaderDataUnion.v2.Done, foe.aFoeHeaderDataUnion.v2.Entire);
       break;
    default:
-      g_snprintf ( szText, nMax, "FoE Unknown");
+      snprintf ( szText, nMax, "FoE Unknown");
    }
 }
 
 static void SoEIdToString( char* txt, guint16 id, int nMax)
 {
    if ( id & 0x8000 )
-      g_snprintf(txt, nMax, "P-%d-%04d", (id>>12) & 0x0007, id & 0x0FFF );
+      snprintf(txt, nMax, "P-%d-%04d", (id>>12) & 0x0007, id & 0x0FFF );
    else
-      g_snprintf(txt, nMax, "S-%d-%04d", id>>12, id & 0x0FFF );
+      snprintf(txt, nMax, "S-%d-%04d", id>>12, id & 0x0FFF );
 }
 
 static void SoeFormatter(tvbuff_t *tvb, gint offset, char *szText, gint nMax, guint soe_length)
@@ -428,48 +429,48 @@ static void SoeFormatter(tvbuff_t *tvb, gint offset, char *szText, gint nMax, gu
          SoEIdToString(tmp, soe.anSoeHeaderDataUnion.IDN, sizeof(tmp)-1);
          elm[0] = '\0';
          if ( soe.anSoeHeaderControlUnion.v.DataState )
-            g_strlcat(elm, "D", 50);
+            (void) g_strlcat(elm, "D", 50);
          if ( soe.anSoeHeaderControlUnion.v.Name )
-            g_strlcat(elm, "N", 50);
+            (void) g_strlcat(elm, "N", 50);
          if ( soe.anSoeHeaderControlUnion.v.Attribute )
-            g_strlcat(elm, "A", 50);
+            (void) g_strlcat(elm, "A", 50);
          if ( soe.anSoeHeaderControlUnion.v.Unit )
-            g_strlcat(elm, "U", 50);
+            (void) g_strlcat(elm, "U", 50);
          if ( soe.anSoeHeaderControlUnion.v.Min )
-            g_strlcat(elm, "I", 50);
+            (void) g_strlcat(elm, "I", 50);
          if ( soe.anSoeHeaderControlUnion.v.Max )
-            g_strlcat(elm, "X", 50);
+            (void) g_strlcat(elm, "X", 50);
          if ( soe.anSoeHeaderControlUnion.v.Value )
-            g_strlcat(elm, "V", 50);
+            (void) g_strlcat(elm, "V", 50);
          switch ( soe.anSoeHeaderControlUnion.v.OpCode )
          {
          case ECAT_SOE_OPCODE_RRQ:
-            g_snprintf ( szText, nMax, "SoE: RRQ (%s, '%s')", tmp, elm);
+            snprintf ( szText, nMax, "SoE: RRQ (%s, '%s')", tmp, elm);
             break;
          case ECAT_SOE_OPCODE_RRS:
-            g_snprintf ( szText, nMax, "SoE: RRS (%s, '%s') : %u Bytes", tmp, elm, (guint)(soe_length-ETHERCAT_SOE_HEADER_LEN));
+            snprintf ( szText, nMax, "SoE: RRS (%s, '%s') : %u Bytes", tmp, elm, (guint)(soe_length-ETHERCAT_SOE_HEADER_LEN));
             break;
          case ECAT_SOE_OPCODE_WRS:
-            g_snprintf ( szText, nMax, "SoE: WRS (%s, '%s')", tmp, elm);
+            snprintf ( szText, nMax, "SoE: WRS (%s, '%s')", tmp, elm);
             break;
          case ECAT_SOE_OPCODE_WRQ:
-            g_snprintf ( szText, nMax, "SoE: WRQ (%s, '%s') : %u Bytes", tmp, elm, (guint)(soe_length-ETHERCAT_SOE_HEADER_LEN));
+            snprintf ( szText, nMax, "SoE: WRQ (%s, '%s') : %u Bytes", tmp, elm, (guint)(soe_length-ETHERCAT_SOE_HEADER_LEN));
             break;
          case ECAT_SOE_OPCODE_NFC:
-            g_snprintf ( szText, nMax, "SoE: NFC (%s, '%s') : %u Bytes", tmp, elm, (guint)(soe_length-ETHERCAT_SOE_HEADER_LEN));
+            snprintf ( szText, nMax, "SoE: NFC (%s, '%s') : %u Bytes", tmp, elm, (guint)(soe_length-ETHERCAT_SOE_HEADER_LEN));
             break;
          case 6:
-            g_snprintf ( szText, nMax, "SoE: EMGCY");
+            snprintf ( szText, nMax, "SoE: EMGCY");
             break;
          default:
-            g_snprintf ( szText, nMax, "SoE:");
+            snprintf ( szText, nMax, "SoE:");
          }
       }
       else
-         g_snprintf ( szText, nMax, "SoE: FragmentsLeft %d", soe.anSoeHeaderDataUnion.FragmentsLeft);
+         snprintf ( szText, nMax, "SoE: FragmentsLeft %d", soe.anSoeHeaderDataUnion.FragmentsLeft);
    }
    else
-      g_snprintf ( szText, nMax, "SoE: Error %04x", tvb_get_letohs(tvb, offset));
+      snprintf ( szText, nMax, "SoE: Error %04x", tvb_get_letohs(tvb, offset));
 }
 
 /* ethercat mailbox */
@@ -1527,27 +1528,27 @@ void proto_register_ecat_mailbox(void)
       },
       { &hf_ecat_mailbox_coe_sdoccsid_sizeind,
       { "Size Ind.", "ecat_mailbox.coe.sdoccsid.sizeind",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000001,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x01,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoccsid_expedited,
       { "Expedited", "ecat_mailbox.coe.sdoccsid.expedited",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000002,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x02,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoccsid_size0,
       { "Bytes", "ecat_mailbox.coe.sdoccsid.size0",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000004,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x04,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoccsid_size1,
       { "Bytes", "ecat_mailbox.coe.sdoccsid.size1",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000008,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x08,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoccsid_complete,
       { "Access", "ecat_mailbox.coe.sdoccsid.complete",
-      FT_BOOLEAN, 8, TFS(&tfs_complete), 0x00000010,
+      FT_BOOLEAN, 8, TFS(&tfs_complete), 0x10,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoccsds,
@@ -1557,17 +1558,17 @@ void proto_register_ecat_mailbox(void)
       },
       { &hf_ecat_mailbox_coe_sdoccsds_lastseg,
       { "Last Segment", "ecat_mailbox.coe.sdoccsds.lastseg",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000001,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x01,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoccsds_size,
       { "Size", "ecat_mailbox.coe.sdoccsds.size",
-      FT_UINT8, BASE_DEC, NULL, 0x0000000E,
+      FT_UINT8, BASE_DEC, NULL, 0x0E,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoccsds_toggle,
       { "Toggle Bit", "ecat_mailbox.coe.sdoccsds.toggle",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000010,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x10,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoccsiu,
@@ -1577,8 +1578,8 @@ void proto_register_ecat_mailbox(void)
       },
 #if 0
       { &hf_ecat_mailbox_coe_sdoccsiu_complete,
-      { "Toggle Bit", "ecat_mailbox.coe.sdoccsiu_complete",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000010,
+      { "Toggle Bit", "ecat_mailbox.coe.sdoccsiu.complete",
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x10,
       NULL, HFILL }
       },
 #endif
@@ -1589,7 +1590,7 @@ void proto_register_ecat_mailbox(void)
       },
       { &hf_ecat_mailbox_coe_sdoccsus_toggle,
       { "Toggle Bit", "ecat_mailbox.coe.sdoccsus_toggle",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000010,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x10,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoidx,
@@ -1651,27 +1652,27 @@ void proto_register_ecat_mailbox(void)
       },
       { &hf_ecat_mailbox_coe_sdoscsiu_sizeind,
       { "Size Ind.", "ecat_mailbox.coe.sdoscsiu_sizeind",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000001,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x01,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoscsiu_expedited,
       { "Expedited", "ecat_mailbox.coe.sdoscsiu_expedited",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000002,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x02,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoscsiu_size0,
       { "Bytes", "ecat_mailbox.coe.sdoscsiu_size0",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000004,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x04,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoscsiu_size1,
       { "Bytes", "ecat_mailbox.coe.sdoscsiu_size1",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000008,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x08,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoscsiu_complete,
       { "Access", "ecat_mailbox.coe.sdoscsiu_complete",
-      FT_BOOLEAN, 8, TFS(&tfs_complete), 0x00000010,
+      FT_BOOLEAN, 8, TFS(&tfs_complete), 0x10,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoscsds,
@@ -1681,7 +1682,7 @@ void proto_register_ecat_mailbox(void)
       },
       { &hf_ecat_mailbox_coe_sdoscsds_toggle,
       { "Toggle Bit", "ecat_mailbox.coe.sdoscsds_toggle",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000010,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x10,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoscsus,
@@ -1691,17 +1692,17 @@ void proto_register_ecat_mailbox(void)
       },
       { &hf_ecat_mailbox_coe_sdoscsus_lastseg,
       { "Last Segment", "ecat_mailbox.coe.sdoscsus_lastseg",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000001,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x01,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoscsus_bytes,
       { "Bytes", "ecat_mailbox.coe.sdoscsus_bytes",
-      FT_UINT8, BASE_DEC, NULL, 0x0000000E,
+      FT_UINT8, BASE_DEC, NULL, 0x0E,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoscsus_toggle,
       { "Toggle Bit", "ecat_mailbox.coe.sdoscsus_toggle",
-      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x00000010,
+      FT_BOOLEAN, 8, TFS(&flags_set_truth), 0x10,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_coe_sdoinfoopcode,
@@ -1790,7 +1791,7 @@ void proto_register_ecat_mailbox(void)
       FT_UINT8, BASE_HEX, VALS(FoEOpMode), 0x0, "Op modes", HFILL }
       },
       { &hf_ecat_mailbox_foe_filelength,
-      { "Foe FileLength" , "ecat_mailbox.foe_filelength",
+      { "Foe FileLength", "ecat_mailbox.foe_filelength",
       FT_UINT32, BASE_DEC, NULL, 0x0, NULL, HFILL }
       },
       { &hf_ecat_mailbox_foe_filename,
@@ -1855,59 +1856,59 @@ void proto_register_ecat_mailbox(void)
       },
       { &hf_ecat_mailbox_soe_header_opcode,
       { "SoE OpCode", "ecat_mailbox.soe_opcode",
-      FT_UINT16, BASE_DEC, VALS(SoeOpcode), 0x00000007, NULL, HFILL }
+      FT_UINT16, BASE_DEC, VALS(SoeOpcode), 0x0007, NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_incomplete,
       { "More Follows...", "ecat_mailbox.soe_header_incomplete",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00000008, NULL, HFILL }
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x0008, NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_error,
       { "Error", "ecat_mailbox.soe_header_error",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00000010,
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x0010,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_driveno,
       { "Drive No", "ecat_mailbox.soe_header_driveno",
-      FT_UINT16, BASE_DEC, NULL, 0x000000e0, NULL, HFILL }
+      FT_UINT16, BASE_DEC, NULL, 0x00e0, NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_datastate,
       { "Datastate", "ecat_mailbox.soe_header_datastate",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00000100,
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x0100,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_name,
       { "Name", "ecat_mailbox.soe_header_name",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00000200,
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x0200,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_attribute,
       { "Attribute", "ecat_mailbox.soe_header_attribute",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00000400,
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x0400,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_unit,
       { "Unit", "ecat_mailbox.soe_header_unit",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00000800,
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x0800,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_min,
       { "Min", "ecat_mailbox.soe_header_min",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00001000,
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x1000,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_max,
       { "Max", "ecat_mailbox.soe_header_max",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00002000,
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x2000,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_value,
       { "Value", "ecat_mailbox.soe_header_value",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00004000,
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x4000,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_header_reserved,
       { "Reserved", "ecat_mailbox.soe_header_reserved",
-      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x00008000,
+      FT_BOOLEAN, 16, TFS(&flags_set_truth), 0x8000,
       NULL, HFILL }
       },
       { &hf_ecat_mailbox_soe_idn,

@@ -11,26 +11,24 @@
 # that way.
 #
 
-if [ "$1" = "--help" ]
-then
+set -e -u -o pipefail
+
+function print_usage() {
 	printf "\\nUtility to setup a alpine system for Wireshark Development.\\n"
 	printf "The basic usage installs the needed software\\n\\n"
 	printf "Usage: %s [--install-optional] [--install-deb-deps] [...other options...]\\n" "$0"
 	printf "\\t--install-optional: install optional software as well\\n"
 	printf "\\t[other]: other options are passed as-is to apt\\n"
-	exit 1
-fi
-
-# Check if the user is root
-if [ "$(id -u)" -ne 0 ]
-then
-	echo "You must be root."
-	exit 1
-fi
+}
 
 ADDITIONAL=0
+OPTIONS=
 for arg; do
 	case $arg in
+		--help)
+			print_usage
+			exit 0
+			;;
 		--install-optional)
 			ADDITIONAL=1
 			;;
@@ -40,6 +38,13 @@ for arg; do
 	esac
 done
 
+# Check if the user is root
+if [ "$(id -u)" -ne 0 ]
+then
+	echo "You must be root."
+	exit 1
+fi
+
 BASIC_LIST="cmake \
 	ninja \
 	gcc \
@@ -47,10 +52,9 @@ BASIC_LIST="cmake \
 	glib-dev \
 	libgcrypt-dev \
 	flex \
-	bison \
-	perl \
 	tiff-dev \
 	c-ares-dev \
+	pcre2-dev \
 	qt5-qtbase-dev \
 	qt5-qttools-dev \
 	qt5-qtmultimedia-dev \
@@ -76,7 +80,15 @@ ADDITIONAL_LIST="
 	minizip-dev \
 	speexdsp-dev \
 	brotli-dev \
+	perl \
 	"
+
+# Uncomment to add PNG compression utilities used by compress-pngs:
+# ADDITIONAL_LIST="$ADDITIONAL_LIST \
+#	advancecomp \
+#	optipng \
+#	oxipng \
+#	pngcrush"
 
 # Adds package $2 to list variable $1 if the package is found.
 # If $3 is given, then this version requirement must be satisfied.

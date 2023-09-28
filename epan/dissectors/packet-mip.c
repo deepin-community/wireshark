@@ -146,6 +146,12 @@ typedef enum {
   MIP_REGIONAL_REG_REP = 19,
   MIP_FAST_BINDING_UPD = 20,
   MIP_FAST_BINDING_ACK = 21,
+  MIP_GENERIC_NOTIFICATION = 22,
+  MIP_GENERIC_NOTIICATION_ACK = 23,
+  MIP_HOME_TEST_INIT = 24,
+  MIP_CAREOF_TEST_INIT = 25,
+  MIP_HOME_TEST = 26,
+  MIP_CAREOF_TEST = 27,
   MIP_EXPERIMENTAL_MESSAGE = 255
 } mipMessageTypes;
 
@@ -155,12 +161,18 @@ static const value_string mip_types[] = {
   {MIP_NATT_TUNNEL_DATA,                "NAT Traversal Tunnel Data"},
   {MIP_REGISTRATION_REVOCATION,         "Registration Revocation"},
   {MIP_REGISTRATION_REVOCATION_ACK,     "Registration Revocation Acknowledgement"},
-  {MIP_HANDOFF_REQUEST,                 "NAT Traversal Tunnel Data"},
-  {MIP_HANDOFF_REPLY,                   "NAT Traversal Tunnel Data"},
-  {MIP_REGIONAL_REG_REQ,                "NAT Traversal Tunnel Data"},
-  {MIP_REGIONAL_REG_REP,                "NAT Traversal Tunnel Data"},
-  {MIP_FAST_BINDING_UPD,                "NAT Traversal Tunnel Data"},
-  {MIP_FAST_BINDING_ACK,                "NAT Traversal Tunnel Data"},
+  {MIP_HANDOFF_REQUEST,                 "Handoff Request"},
+  {MIP_HANDOFF_REPLY,                   "Handoff Reply"},
+  {MIP_REGIONAL_REG_REQ,                "Regional Registration Request"},
+  {MIP_REGIONAL_REG_REP,                "Regional Registration Reply"},
+  {MIP_FAST_BINDING_UPD,                "Fast Binding Update"},
+  {MIP_FAST_BINDING_ACK,                "Fast Binding Acknowledgement"},
+  {MIP_GENERIC_NOTIFICATION,            "Generic Notification"},
+  {MIP_GENERIC_NOTIICATION_ACK,         "Generic Notification Acknowledgement"},
+  {MIP_HOME_TEST_INIT,                  "Home Test Init message"},
+  {MIP_CAREOF_TEST_INIT,                "Care-of Test Init message"},
+  {MIP_HOME_TEST,                       "Home Test message"},
+  {MIP_CAREOF_TEST,                     "Care-of Test message"},
   {MIP_EXPERIMENTAL_MESSAGE,            "Message for Experimental Use"},
   {0, NULL}
 };
@@ -581,7 +593,7 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
       break;
     case MN_NAI_EXT:
       proto_tree_add_item(ext_tree, hf_mip_next_nai, tvb, offset,
-                          ext_len, ENC_ASCII|ENC_NA);
+                          ext_len, ENC_ASCII);
       break;
 
     case GEN_AUTH_EXT:      /* RFC 3012 */
@@ -626,7 +638,7 @@ dissect_mip_extensions( tvbuff_t *tvb, int offset, proto_tree *tree, packet_info
       proto_tree_add_item(ext_tree, hf_mip_mstrext_stype, tvb, offset, 1, ENC_BIG_ENDIAN);
 
       /* text */
-      proto_tree_add_item(ext_tree, hf_mip_mstrext_text, tvb, offset + 1, ext_len-1, ENC_ASCII|ENC_NA);
+      proto_tree_add_item(ext_tree, hf_mip_mstrext_text, tvb, offset + 1, ext_len-1, ENC_ASCII);
       break;
     case UDP_TUN_REQ_EXT:   /* RFC 3519 */
       {
@@ -839,9 +851,9 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
   case MIP_REGISTRATION_REQUEST:
     col_add_fstr(pinfo->cinfo, COL_INFO,
                "Reg Request: HoA=%s HA=%s CoA=%s",
-               tvb_ip_to_str(tvb, 4),
-               tvb_ip_to_str(tvb, 8),
-               tvb_ip_to_str(tvb, 12));
+               tvb_ip_to_str(pinfo->pool, tvb, 4),
+               tvb_ip_to_str(pinfo->pool, tvb, 8),
+               tvb_ip_to_str(pinfo->pool, tvb, 12));
 
     if (tree) {
       static int * const flags[] = {
@@ -894,8 +906,8 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
   case MIP_REGISTRATION_REPLY:
     col_add_fstr(pinfo->cinfo, COL_INFO,
                "Reg Reply: HoA=%s HA=%s, Code=%u",
-               tvb_ip_to_str(tvb, 4),
-               tvb_ip_to_str(tvb, 8),
+               tvb_ip_to_str(pinfo->pool, tvb, 4),
+               tvb_ip_to_str(pinfo->pool, tvb, 8),
                tvb_get_guint8(tvb,1));
 
     if (tree) {
@@ -961,9 +973,9 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
   case MIP_REGISTRATION_REVOCATION:
     col_add_fstr(pinfo->cinfo, COL_INFO,
                "Reg Revocation: HoA=%s HDA=%s FDA=%s",
-               tvb_ip_to_str(tvb, 4),
-               tvb_ip_to_str(tvb, 8),
-               tvb_ip_to_str(tvb, 12));
+               tvb_ip_to_str(pinfo->pool, tvb, 4),
+               tvb_ip_to_str(pinfo->pool, tvb, 8),
+               tvb_ip_to_str(pinfo->pool, tvb, 12));
 
     if (tree) {
       static int * const mip_flags[] = {
@@ -1009,7 +1021,7 @@ dissect_mip( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
     break;
   case MIP_REGISTRATION_REVOCATION_ACK:
       col_add_fstr(pinfo->cinfo, COL_INFO, "Reg Revocation Ack: HoA=%s",
-               tvb_ip_to_str(tvb, 4));
+               tvb_ip_to_str(pinfo->pool, tvb, 4));
 
     if (tree) {
       static int * const mip_flags[] = {

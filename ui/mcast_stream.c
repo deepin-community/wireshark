@@ -132,7 +132,7 @@ mcaststream_draw(void *ti_ptr)
 /****************************************************************************/
 /* whenever a udp packet is seen by the tap listener */
 static tap_packet_status
-mcaststream_packet(void *arg, packet_info *pinfo, epan_dissect_t *edt _U_, const void *arg2 _U_)
+mcaststream_packet(void *arg, packet_info *pinfo, epan_dissect_t *edt _U_, const void *arg2 _U_, tap_flags_t flags _U_)
 {
     mcaststream_tapinfo_t *tapinfo = (mcaststream_tapinfo_t *)arg;
     mcast_stream_info_t tmp_strinfo;
@@ -196,7 +196,7 @@ mcaststream_packet(void *arg, packet_info *pinfo, epan_dissect_t *edt _U_, const
         tmp_strinfo.total_bytes = 0;
 
         /* reset slidingwindow and buffer parameters */
-        tmp_strinfo.element.buff = (nstime_t *)g_malloc(buffsize * sizeof(nstime_t));
+        tmp_strinfo.element.buff = g_new(nstime_t, buffsize);
         tmp_strinfo.element.first=0;
         tmp_strinfo.element.last=0;
         tmp_strinfo.element.burstsize=1;
@@ -210,16 +210,16 @@ mcaststream_packet(void *arg, packet_info *pinfo, epan_dissect_t *edt _U_, const
         tmp_strinfo.element.buffstatus=0;
         tmp_strinfo.element.maxbw=0;
 
-        strinfo = (mcast_stream_info_t *)g_malloc(sizeof(mcast_stream_info_t));
+        strinfo = g_new(mcast_stream_info_t, 1);
         *strinfo = tmp_strinfo;  /* memberwise copy of struct */
         tapinfo->strinfo_list = g_list_append(tapinfo->strinfo_list, strinfo);
-        strinfo->element.buff = (nstime_t *)g_malloc(buffsize * sizeof(nstime_t));
+        strinfo->element.buff = g_new(nstime_t, buffsize);
 
         /* set time with the first packet */
         if (tapinfo->npackets == 0) {
-            tapinfo->allstreams = (mcast_stream_info_t *)g_malloc(sizeof(mcast_stream_info_t));
+            tapinfo->allstreams = g_new(mcast_stream_info_t, 1);
             tapinfo->allstreams->element.buff =
-                    (nstime_t *)g_malloc(buffsize * sizeof(nstime_t));
+                    g_new(nstime_t, buffsize);
             tapinfo->allstreams->start_rel = pinfo->rel_ts;
             tapinfo->allstreams->total_bytes = 0;
             tapinfo->allstreams->element.first=0;
@@ -247,7 +247,7 @@ mcaststream_packet(void *arg, packet_info *pinfo, epan_dissect_t *edt _U_, const
 
     /* increment the packets counter for this stream and calculate average pps */
     ++(strinfo->npackets);
-    
+
     if (deltatime > 0) {
         strinfo->apackets = strinfo->npackets / deltatime;
         strinfo->average_bw = ((double)(strinfo->total_bytes*8) / deltatime);
@@ -446,16 +446,3 @@ slidingwindow(mcast_stream_info_t *strinfo, packet_info *pinfo)
 
     strinfo->element.count++;
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

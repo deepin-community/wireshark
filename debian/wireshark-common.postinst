@@ -24,7 +24,7 @@ if ! dpkg-statoverride --list $PROGRAM > /dev/null; then
                 fi
 	    fi
 	    chown root:$GROUP $PROGRAM
-	    if which setcap > /dev/null ; then
+	    if command -v setcap > /dev/null ; then
                 chmod u=rwx,g=rx,o=r $PROGRAM
                 if ! setcap cap_net_raw,cap_net_admin=eip $PROGRAM; then
                     db_input high wireshark-common/setcap-failed || true

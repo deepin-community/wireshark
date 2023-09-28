@@ -24,8 +24,9 @@
 void proto_register_e212(void);
 
 /*
- * Annex to ITU Operational Bulletin
- * No. 1162 - 15.XII.2018
+ * Annexes to ITU Operational Bulletin
+ * No. 1117 - 1.II.2017 (List of Mobile Country Codes)
+ * No. 1162 - 15.XII.2018 (Mobile Network Codes)
  *
  * With Amendment No. 1 (T-SP-OB 1164 - 15.I.2019) up to and
  * including Amendment No. 34 (T-SP-OB 1198 - 15.VI.2020)
@@ -38,8 +39,13 @@ void proto_register_e212(void);
  * Amended with information from http://www.mcc-mnc.com
  * - Chinese PLMN codes
  * - Iranian PLMN codes
+ * - Kazakhstani PLMN codes (see also [1] and [2])
+ *
+ * [1] https://ru.wikipedia.org/wiki/MNC
+ * [2] https://htmlweb.ru/geo/oper.php?country=KZ
  */
 static const value_string E212_codes[] = {
+    /* 001 is used by some telecoms for internal TEST networks. */
     {  202, "Greece" },
     {  203, "Unassigned" },
     {  204, "Netherlands" },
@@ -63,7 +69,7 @@ static const value_string E212_codes[] = {
     {  222, "Italy" },
     {  223, "Unassigned" },
     {  224, "Unassigned" },
-    {  225, "Unassigned" },
+    {  225, "Vatican City" },
     {  226, "Romania" },
     {  227, "Unassigned" },
     {  228, "Switzerland" },
@@ -121,18 +127,20 @@ static const value_string E212_codes[] = {
     {  280, "Cyprus" },
     {  281, "Unassigned" },
     {  282, "Georgia" },
-    {  283, "Unassigned" },
+    {  283, "Armenia" },
     {  284, "Bulgaria" },
     {  285, "Unassigned" },
     {  286, "Turkey" },
     {  287, "Unassigned" },
     {  288, "Faroe Islands" },
     {  289, "Unassigned" },
+    /* Abkhazia uses MCC 289; ITU does not list the number due to status
+     * as disputed territory. */
     {  290, "Greenland" },
     {  291, "Unassigned" },
     {  292, "San Marino" },
     {  293, "Slovenia" },
-    {  294, "The Former Yugoslav Republic of Macedonia" },
+    {  294, "North Macedonia" },
     {  295, "Liechtenstein" },
     {  296, "Unassigned" },
     {  297, "Montenegro" },
@@ -153,7 +161,7 @@ static const value_string E212_codes[] = {
     {  312, "United States" },
     {  313, "United States" },
     {  314, "United States" },
-    {  315, "Unassigned" },
+    {  315, "United States" },
     {  316, "United States" },
     {  317, "Unassigned" },
     {  318, "Unassigned" },
@@ -168,9 +176,11 @@ static const value_string E212_codes[] = {
     {  327, "Unassigned" },
     {  328, "Unassigned" },
     {  329, "Unassigned" },
-    {  330, "Unassigned" },
+    {  330, "Puerto Rico" },
+    /* Some local operators use USA MCCs, some use assigned MCC 330. */
     {  331, "Unassigned" },
-    {  332, "Unassigned" },
+    {  332, "United States Virgin Islands" },
+    /* MCC 332 assigned to USVI but local operators use the USA MCCs */
     {  333, "Unassigned" },
     {  334, "Mexico" },
     {  335, "Unassigned" },
@@ -179,6 +189,8 @@ static const value_string E212_codes[] = {
     {  338, "Jamaica" },
     {  339, "Unassigned" },
     {  340, "French Guiana / Guadeloupe / Martinique" },
+    /* French Guiana has been assigned MCC 742, but some networks
+     * still operate on MCC 340. */
     {  341, "Unassigned" },
     {  342, "Barbados" },
     {  343, "Unassigned" },
@@ -200,7 +212,7 @@ static const value_string E212_codes[] = {
     {  359, "Unassigned" },
     {  360, "Saint Vincent and the Grenadines" },
     {  361, "Unassigned" },
-    {  362, "Curaçao" },
+    {  362, "Curaçao / Sint Maarten / Bonaire, Sint Eustatius and Saba" },
     {  363, "Aruba" },
     {  364, "Bahamas" },
     {  365, "Anguilla" },
@@ -244,7 +256,7 @@ static const value_string E212_codes[] = {
     {  403, "Unassigned" },
     {  404, "India" },
     {  405, "India" },
-    {  406, "Unassigned" },
+    {  406, "India" },
     {  407, "Unassigned" },
     {  408, "Unassigned" },
     {  409, "Unassigned" },
@@ -268,8 +280,8 @@ static const value_string E212_codes[] = {
     {  427, "Qatar" },
     {  428, "Mongolia" },
     {  429, "Nepal" },
-    {  430, "Unassigned" },
-    {  431, "Unassigned" },
+    {  430, "United Arab Emirates (Abu Dhabi)" },
+    {  431, "United Arab Emirates (Dubai)" },
     {  432, "Iran (Islamic Republic of)" },
     {  433, "Unassigned" },
     {  434, "Uzbekistan" },
@@ -299,13 +311,13 @@ static const value_string E212_codes[] = {
     {  458, "Unassigned" },
     {  459, "Unassigned" },
     {  460, "China" },
-    {  461, "Unassigned" },
+    {  461, "China" },
     {  462, "Unassigned" },
     {  463, "Unassigned" },
     {  464, "Unassigned" },
     {  465, "Unassigned" },
-    {  466, "Unassigned" },
-    {  467, "Unassigned" },
+    {  466, "Taiwan" },
+    {  467, "Dem. People's Rep. of Korea" },
     {  468, "Unassigned" },
     {  469, "Unassigned" },
     {  470, "Bangladesh" },
@@ -374,7 +386,7 @@ static const value_string E212_codes[] = {
     {  533, "Unassigned" },
     {  534, "Unassigned" },
     {  535, "Unassigned" },
-    {  536, "Unassigned" },
+    {  536, "Nauru" },
     {  537, "Papua New Guinea" },
     {  538, "Unassigned" },
     {  539, "Tonga" },
@@ -382,14 +394,15 @@ static const value_string E212_codes[] = {
     {  541, "Vanuatu" },
     {  542, "Fiji" },
     {  543, "Wallis and Futuna" },
-    {  544, "Unassigned" },
+    {  544, "American Samoa" },
+    /* Some operators use a USA MCC, some use the assigned */
     {  545, "Kiribati" },
     {  546, "New Caledonia" },
     {  547, "French Polynesia" },
     {  548, "Cook Islands" },
     {  549, "Samoa" },
     {  550, "Micronesia" },
-    {  551, "Unassigned" },
+    {  551, "Marshall Islands" },
     {  552, "Palau" },
     {  553, "Tuvalu" },
     {  554, "Tokelau" },
@@ -444,7 +457,7 @@ static const value_string E212_codes[] = {
     {  603, "Algeria" },
     {  604, "Morocco" },
     {  605, "Tunisia" },
-    {  606, "Unassigned" },
+    {  606, "Libya" },
     {  607, "Gambia" },
     {  608, "Senegal" },
     {  609, "Mauritania" },
@@ -475,7 +488,7 @@ static const value_string E212_codes[] = {
     {  634, "Sudan" },
     {  635, "Rwanda" },
     {  636, "Ethiopia" },
-    {  637, "Unassigned" },
+    {  637, "Somalia" },
     {  638, "Djibouti" },
     {  639, "Kenya" },
     {  640, "Tanzania" },
@@ -495,8 +508,8 @@ static const value_string E212_codes[] = {
     {  654, "Comoros" },
     {  655, "South Africa" },
     {  656, "Unassigned" },
-    {  657, "Unassigned" },
-    {  658, "Tristan da Cunha" },
+    {  657, "Eritrea" },
+    {  658, "Saint Helena, Ascension and Tristan da Cunha" },
     {  659, "South Sudan" },
     {  660, "Unassigned" },
     {  661, "Unassigned" },
@@ -572,15 +585,17 @@ static const value_string E212_codes[] = {
     {  731, "Unassigned" },
     {  732, "Colombia" },
     {  733, "Unassigned" },
-    {  734, "Venezuela (Bolivarian Republic of)" },
+    {  734, "Venezuela" },
     {  735, "Unassigned" },
-    {  736, "Bolivia (Plurinational State of)" },
+    {  736, "Bolivia" },
     {  737, "Unassigned" },
     {  738, "Guyana" },
     {  739, "Unassigned" },
     {  740, "Ecuador" },
     {  741, "Unassigned" },
-    {  742, "Unassigned" },
+    {  742, "French Guiana" },
+    /* French Guiana has been assigned MCC 742, but some networks
+     * still operate on MCC 340. */
     {  743, "Unassigned" },
     {  744, "Paraguay" },
     {  745, "Unassigned" },
@@ -1530,8 +1545,11 @@ static const value_string mcc_mnc_2digits_codes[] = {
     { 40004, "\"Azerfon\" LLC" },
     { 40005, "Special State Protection Service of the Republic of Azerbaijan" },
     { 40006, "\"Nakhtel\" LLC" },
-    { 40101, "Kar-Tel llc" },
-    { 40102, "TSC Kazak Telecom" },
+    { 40101, "Beeline / K-Mobile" },
+    { 40102, "Kcell / Activ" },
+    { 40107, "Altel / Dalacom" },
+    { 40108, "Kazakhtelecom CDMA2000" },
+    { 40177, "Tele2 / NEO" },
     { 40211, "Bhutan Telecom Ltd" },
     { 40217, "B-Mobile of Bhutan Telecom" },
     { 40400, "Dishnet Wireless Ltd, Madhya Pradesh" },
@@ -3027,6 +3045,9 @@ static int hf_E212_mcc_cgi = -1;
 static int hf_E212_mcc_ecgi = -1;
 static int hf_E212_mcc_tai = -1;
 static int hf_E212_mcc_nrcgi = -1;
+static int hf_E212_mcc_5gstai = -1;
+static int hf_E212_mcc_gummei = -1;
+static int hf_E212_mcc_guami = -1;
 static int hf_E212_mnc  = -1;
 static int hf_E212_mnc_lai = -1;
 static int hf_E212_mnc_sai = -1;
@@ -3035,6 +3056,9 @@ static int hf_E212_mnc_cgi = -1;
 static int hf_E212_mnc_ecgi = -1;
 static int hf_E212_mnc_tai = -1;
 static int hf_E212_mnc_nrcgi = -1;
+static int hf_E212_mnc_5gstai = -1;
+static int hf_E212_mnc_gummei = -1;
+static int hf_E212_mnc_guami = -1;
 
 static int ett_e212_imsi = -1;
 
@@ -3140,6 +3164,18 @@ dissect_e212_mcc_mnc_wmem_packet_str(tvbuff_t *tvb, packet_info *pinfo, proto_tr
         hf_E212_mcc_id = hf_E212_mcc_nrcgi;
         hf_E212_mnc_id = hf_E212_mnc_nrcgi;
         break;
+    case E212_5GSTAI:
+        hf_E212_mcc_id = hf_E212_mcc_5gstai;
+        hf_E212_mnc_id = hf_E212_mnc_5gstai;
+        break;
+    case E212_GUMMEI:
+        hf_E212_mcc_id = hf_E212_mcc_gummei;
+        hf_E212_mnc_id = hf_E212_mnc_gummei;
+        break;
+    case E212_GUAMI:
+        hf_E212_mcc_id = hf_E212_mcc_guami;
+        hf_E212_mnc_id = hf_E212_mnc_guami;
+        break;
     default:
         hf_E212_mcc_id = hf_E212_mcc;
         hf_E212_mnc_id = hf_E212_mnc;
@@ -3182,7 +3218,7 @@ dissect_e212_mcc_mnc_wmem_packet_str(tvbuff_t *tvb, packet_info *pinfo, proto_tr
         /* Prepare a string with the MCC and MNC including the country and Operator if
          * known, do NOT print unknown.
          */
-        mcc_mnc_str = wmem_strdup_printf(wmem_packet_scope(), "MCC %u %s, MNC %03u %s",
+        mcc_mnc_str = wmem_strdup_printf(pinfo->pool, "MCC %u %s, MNC %03u %s",
             mcc,
             val_to_str_ext_const(mcc,&E212_codes_ext,""),
             mnc,
@@ -3195,7 +3231,7 @@ dissect_e212_mcc_mnc_wmem_packet_str(tvbuff_t *tvb, packet_info *pinfo, proto_tr
         /* Prepare a string with the MCC and MNC including the country and Operator if
          * known, do NOT print unknown.
          */
-        mcc_mnc_str = wmem_strdup_printf(wmem_packet_scope(), "MCC %u %s, MNC %02u %s",
+        mcc_mnc_str = wmem_strdup_printf(pinfo->pool, "MCC %u %s, MNC %02u %s",
             mcc,
             val_to_str_ext_const(mcc,&E212_codes_ext,""),
             mnc,
@@ -3410,15 +3446,15 @@ dissect_e212_mcc_mnc_in_utf8_address(tvbuff_t *tvb, packet_info *pinfo _U_, prot
     guint16 mcc = 0, mnc = 0;
     gboolean    long_mnc = FALSE;
 
-    ws_strtou16(tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 3, ENC_UTF_8),
+    ws_strtou16(tvb_get_string_enc(pinfo->pool, tvb, offset, 3, ENC_UTF_8),
         NULL, &mcc);
-    ws_strtou16(tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 3, 2, ENC_UTF_8),
+    ws_strtou16(tvb_get_string_enc(pinfo->pool, tvb, offset + 3, 2, ENC_UTF_8),
         NULL, &mnc);
 
     /* Try to match the MCC and 2 digits MNC with an entry in our list of operators */
     if (!try_val_to_str_ext(mcc * 100 + mnc, &mcc_mnc_2digits_codes_ext)) {
         if (tvb_reported_length_remaining(tvb, offset + 3) > 2) {
-            ws_strtou16(tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 3, 3, ENC_UTF_8),
+            ws_strtou16(tvb_get_string_enc(pinfo->pool, tvb, offset + 3, 3, ENC_UTF_8),
                 NULL, &mnc);
             long_mnc = TRUE;
         }
@@ -3468,14 +3504,17 @@ dissect_e212_imsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int offse
 {
     proto_item *item;
     proto_tree *subtree;
-    const gchar *imsi_str;
+    const guint8 *imsi_str;
 
     /* Fetch the BCD encoded digits from tvb indicated half byte, formating the digits according to
      * a default digit set of 0-9 returning "?" for overdecadic digits a pointer to the wmem
      * allocated string will be returned.
      */
-    imsi_str = tvb_bcd_dig_to_wmem_packet_str( tvb, offset, length, NULL, skip_first);
-    item = proto_tree_add_string(tree, hf_E212_imsi, tvb, offset, length, imsi_str);
+    if (skip_first) {
+        item = proto_tree_add_item_ret_string(tree, hf_E212_imsi, tvb, offset, length, ENC_BCD_DIGITS_0_9 | ENC_BCD_SKIP_FIRST, pinfo->pool, &imsi_str);
+    } else {
+        item = proto_tree_add_item_ret_string(tree, hf_E212_imsi, tvb, offset, length, ENC_BCD_DIGITS_0_9, pinfo->pool, &imsi_str);
+    }
     if (!is_imsi_string_valid(imsi_str)) {
         expert_add_info(pinfo, item, &ei_E212_imsi_malformed);
     }
@@ -3500,7 +3539,7 @@ dissect_e212_utf8_imsi(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int 
     const gchar *imsi_str;
 
     /* Fetch the UTF8-encoded IMSI */
-    imsi_str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, length, ENC_UTF_8);
+    imsi_str = tvb_get_string_enc(pinfo->pool, tvb, offset, length, ENC_UTF_8);
     item = proto_tree_add_string(tree, hf_E212_imsi, tvb, offset, length, imsi_str);
     if (!is_imsi_string_valid(imsi_str)) {
         expert_add_info(pinfo, item, &ei_E212_imsi_malformed);
@@ -3580,6 +3619,21 @@ proto_register_e212(void)
         FT_UINT16, BASE_DEC|BASE_EXT_STRING, &E212_codes_ext, 0x0,
         "Mobile Country Code MCC", HFILL }
     },
+    { &hf_E212_mcc_5gstai,
+        { "Mobile Country Code (MCC)","e212.5gstai.mcc",
+        FT_UINT16, BASE_DEC|BASE_EXT_STRING, &E212_codes_ext, 0x0,
+        "Mobile Country Code MCC", HFILL }
+    },
+    { &hf_E212_mcc_gummei,
+        { "Mobile Country Code (MCC)","e212.gummei.mcc",
+        FT_UINT16, BASE_DEC|BASE_EXT_STRING, &E212_codes_ext, 0x0,
+        "Mobile Country Code MCC", HFILL }
+    },
+    { &hf_E212_mcc_guami,
+        { "Mobile Country Code (MCC)","e212.guami.mcc",
+        FT_UINT16, BASE_DEC|BASE_EXT_STRING, &E212_codes_ext, 0x0,
+        "Mobile Country Code MCC", HFILL }
+    },
     { &hf_E212_mnc,
         { "Mobile Network Code (MNC)","e212.mnc",
         FT_UINT16, BASE_DEC, NULL, 0x0,
@@ -3617,6 +3671,21 @@ proto_register_e212(void)
     },
     { &hf_E212_mnc_nrcgi,
         { "Mobile Network Code (MNC)","e212.nrcgi.mnc",
+        FT_UINT16, BASE_DEC, NULL, 0x0,
+        "Mobile network code", HFILL }
+    },
+    { &hf_E212_mnc_5gstai,
+        { "Mobile Network Code (MNC)","e212.5gstai.mnc",
+        FT_UINT16, BASE_DEC, NULL, 0x0,
+        "Mobile network code", HFILL }
+    },
+    { &hf_E212_mnc_gummei,
+        { "Mobile Network Code (MNC)","e212.gummei.mnc",
+        FT_UINT16, BASE_DEC, NULL, 0x0,
+        "Mobile network code", HFILL }
+    },
+    { &hf_E212_mnc_guami,
+        { "Mobile Network Code (MNC)","e212.guami.mnc",
         FT_UINT16, BASE_DEC, NULL, 0x0,
         "Mobile network code", HFILL }
     },

@@ -1,4 +1,4 @@
-/* voip_calls_info_model.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -61,8 +61,6 @@ private:
 
 class VoipCallsInfoSortedModel : public QSortFilterProxyModel
 {
-    Q_OBJECT
-
 public:
     VoipCallsInfoSortedModel(QObject *parent = 0);
 
@@ -71,16 +69,3 @@ protected:
 };
 
 #endif // VOIP_CALLS_INFO_MODEL_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

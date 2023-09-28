@@ -17,6 +17,7 @@
 #include <epan/sctpppids.h>
 #include <epan/asn1.h>
 #include <epan/prefs.h>
+#include <epan/proto_data.h>
 
 #include "packet-per.h"
 #include "packet-e212.h"
@@ -46,10 +47,13 @@ static int ett_hnbap = -1;
 static int ett_hnbap_imsi = -1;
 #include "packet-hnbap-ett.c"
 
+struct hnbap_private_data {
+  e212_number_type_t number_type;
+};
+
 /* Global variables */
 static guint32 ProcedureCode;
 static guint32 ProtocolIE_ID;
-static guint global_sctp_port = SCTP_PORT_HNBAP;
 
 /* Dissector tables */
 static dissector_table_t hnbap_ies_dissector_table;
@@ -66,6 +70,17 @@ static int dissect_InitiatingMessageValue(tvbuff_t *tvb, packet_info *pinfo, pro
 static int dissect_SuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *);
 static int dissect_UnsuccessfulOutcomeValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *);
 void proto_reg_handoff_hnbap(void);
+
+static struct hnbap_private_data*
+hnbap_get_private_data(packet_info *pinfo)
+{
+  struct hnbap_private_data *hnbap_data = (struct hnbap_private_data*)p_get_proto_data(pinfo->pool, pinfo, proto_hnbap, 0);
+  if (!hnbap_data) {
+    hnbap_data = wmem_new0(pinfo->pool, struct hnbap_private_data);
+    p_add_proto_data(pinfo->pool, pinfo, proto_hnbap, 0, hnbap_data);
+  }
+  return hnbap_data;
+}
 
 #include "packet-hnbap-fn.c"
 
@@ -131,7 +146,6 @@ dissect_hnbap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
 /*--- proto_register_hnbap -------------------------------------------*/
 void proto_register_hnbap(void) {
-module_t *hnbap_module;
 
   /* List of fields */
 
@@ -164,8 +178,7 @@ module_t *hnbap_module;
   hnbap_proc_sout_dissector_table = register_dissector_table("hnbap.proc.sout", "HNBAP-ELEMENTARY-PROCEDURE SuccessfulOutcome", proto_hnbap, FT_UINT32, BASE_DEC);
   hnbap_proc_uout_dissector_table = register_dissector_table("hnbap.proc.uout", "HNBAP-ELEMENTARY-PROCEDURE UnsuccessfulOutcome", proto_hnbap, FT_UINT32, BASE_DEC);
 
-  hnbap_module = prefs_register_protocol(proto_hnbap, proto_reg_handoff_hnbap);
-  prefs_register_uint_preference(hnbap_module, "port", "HNBAP SCTP Port", "Set the port for HNBAP messages (Default of 29169)", 10, &global_sctp_port);
+  /* hnbap_module = prefs_register_protocol(proto_hnbap, NULL); */
 }
 
 
@@ -173,18 +186,8 @@ module_t *hnbap_module;
 void
 proto_reg_handoff_hnbap(void)
 {
-        static gboolean initialized = FALSE;
-        static guint sctp_port;
-
-        if (!initialized) {
-                dissector_add_uint("sctp.ppi", HNBAP_PAYLOAD_PROTOCOL_ID, hnbap_handle);
-                initialized = TRUE;
+        dissector_add_uint("sctp.ppi", HNBAP_PAYLOAD_PROTOCOL_ID, hnbap_handle);
+        dissector_add_uint_with_preference("sctp.port", SCTP_PORT_HNBAP, hnbap_handle);
 #include "packet-hnbap-dis-tab.c"
 
-        } else {
-                dissector_delete_uint("sctp.port", sctp_port, hnbap_handle);
-        }
-        /* Set our port number for future use */
-        sctp_port = global_sctp_port;
-        dissector_add_uint("sctp.port", sctp_port, hnbap_handle);
 }

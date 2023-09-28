@@ -977,7 +977,7 @@ dissect_dsmcc_un_session_id(
     offset_start = offset;
 
     sub_sub_tree = proto_tree_add_subtree(sub_tree, tvb, offset, 10, ett_dsmcc_heading, NULL, "Session ID");
-    proto_item_set_text(sub_sub_tree, "Session ID: 0x%s", tvb_bytes_to_str(wmem_packet_scope(), tvb, offset, 10));
+    proto_item_set_text(sub_sub_tree, "Session ID: 0x%s", tvb_bytes_to_str(pinfo->pool, tvb, offset, 10));
     proto_tree_add_item(sub_sub_tree, hf_dsmcc_un_sess_session_id_device_id, tvb, offset, 6, ENC_NA);
     offset += 6;
     proto_tree_add_item(sub_sub_tree, hf_dsmcc_un_sess_session_id_session_number, tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -2312,7 +2312,7 @@ dissect_dsmcc_ts(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree_in, void *d
                         crc_len, 4, crc,
                         "CRC: 0x%08x [Failed Verification (Calculated: 0x%08x)]",
                         crc, calculated_crc );
-            PROTO_ITEM_SET_GENERATED(msg_error);
+            proto_item_set_generated(msg_error);
             expert_add_info( pinfo, msg_error, &ei_dsmcc_crc_invalid);
         }
     } else {
@@ -3116,7 +3116,7 @@ proto_register_dsmcc(void)
 
         { &hf_dsmcc_dii_private_data_length, {
             "Private Data Length", "mpeg_dsmcc.dii.private_data_length",
-            FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL
+            FT_UINT16, BASE_DEC, NULL, 0, NULL, HFILL
         } },
         /* table 7-6 downloadInfoIndication - end */
 
@@ -3303,7 +3303,14 @@ proto_reg_handoff_dsmcc(void)
     dissector_add_uint("mpeg_sect.tid", DSMCC_TID_UN_MSG, dsmcc_ts_handle);
     dissector_add_uint("mpeg_sect.tid", DSMCC_TID_DD_MSG, dsmcc_ts_handle);
     dissector_add_uint("mpeg_sect.tid", DSMCC_TID_DESC_LIST, dsmcc_ts_handle);
-    dissector_add_uint("mpeg_sect.tid", DSMCC_TID_PRIVATE, dsmcc_ts_handle);
+    /* TID 0x3E is used for both DSMCC_TID_PRIVATE and DVB_DATA_MPE_TID.
+     * MPE (ETSI EN 301 192) is conformant to the DSSMCC section format
+     * for private data, and is by far the most common implementation,
+     * so default register it to the table entry. If someone wants this
+     * generic DSM-CC dissector to handle it, they can use Decode As.
+     *
+     * dissector_add_uint("mpeg_sect.tid", DSMCC_TID_PRIVATE, dsmcc_ts_handle);
+     */
 
     dissector_add_uint_with_preference("tcp.port", DSMCC_TCP_PORT, dsmcc_tcp_handle);
     dissector_add_uint_with_preference("udp.port", DSMCC_UDP_PORT, dsmcc_udp_handle);

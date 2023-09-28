@@ -116,8 +116,10 @@ static dissector_handle_t ansi_map_handle=NULL;
 static int ansi_map_tap = -1;
 static int proto_ansi_map = -1;
 
+#if 0
 static int hf_ansi_map_op_code_fam = -1;
 static int hf_ansi_map_op_code = -1;
+#endif
 
 static int hf_ansi_map_reservedBitH = -1;
 static int hf_ansi_map_reservedBitHG = -1;
@@ -873,7 +875,7 @@ static int hf_ansi_map_interSystemSMSDeliveryPointToPointRes = -1;  /* InterSyst
 static int hf_ansi_map_qualificationRequest2Res = -1;  /* QualificationRequest2Res */
 
 /*--- End of included file: packet-ansi_map-hf.c ---*/
-#line 317 "./asn1/ansi_map/packet-ansi_map-template.c"
+#line 319 "./asn1/ansi_map/packet-ansi_map-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_ansi_map = -1;
@@ -1133,7 +1135,7 @@ static gint ett_ansi_map_InvokeData = -1;
 static gint ett_ansi_map_ReturnData = -1;
 
 /*--- End of included file: packet-ansi_map-ett.c ---*/
-#line 349 "./asn1/ansi_map/packet-ansi_map-template.c"
+#line 351 "./asn1/ansi_map/packet-ansi_map-template.c"
 
 static expert_field ei_ansi_map_nr_not_used = EI_INIT;
 static expert_field ei_ansi_map_unknown_invokeData_blob = EI_INIT;
@@ -1163,7 +1165,7 @@ static void dissect_ansi_map_win_trigger_list(tvbuff_t *tvb, packet_info *pinfo 
 
 
 /* Transaction table */
-static wmem_map_t *TransactionId_table=NULL;
+static wmem_multimap_t *TransactionId_table=NULL;
 
 /* Store Invoke information needed for the corresponding reply */
 static void
@@ -1175,8 +1177,8 @@ update_saved_invokedata(packet_info *pinfo, struct ansi_tcap_private_t *p_privat
     guint8 *dst_str;
     const char *buf = NULL;
 
-    src_str = address_to_str(wmem_packet_scope(), src);
-    dst_str = address_to_str(wmem_packet_scope(), dst);
+    src_str = address_to_str(pinfo->pool, src);
+    dst_str = address_to_str(pinfo->pool, dst);
 
     /* Data from the TCAP dissector */
     if ((!pinfo->fd->visited)&&(p_private_tcap->TransactionID_str)){
@@ -1184,30 +1186,27 @@ update_saved_invokedata(packet_info *pinfo, struct ansi_tcap_private_t *p_privat
         /* The hash string needs to contain src and dest to distiguish differnt flows */
         switch(ansi_map_response_matching_type){
             case ANSI_MAP_TID_ONLY:
-                buf = wmem_strdup(wmem_packet_scope(), p_private_tcap->TransactionID_str);
+                buf = wmem_strdup(pinfo->pool, p_private_tcap->TransactionID_str);
                 break;
             case ANSI_MAP_TID_AND_SOURCE:
-                buf = wmem_strdup_printf(wmem_packet_scope(), "%s%s",p_private_tcap->TransactionID_str,src_str);
+                buf = wmem_strdup_printf(pinfo->pool, "%s%s",p_private_tcap->TransactionID_str,src_str);
                 break;
             case ANSI_MAP_TID_SOURCE_AND_DEST:
             default:
-                buf = wmem_strdup_printf(wmem_packet_scope(), "%s%s%s",p_private_tcap->TransactionID_str,src_str,dst_str);
+                buf = wmem_strdup_printf(pinfo->pool, "%s%s%s",p_private_tcap->TransactionID_str,src_str,dst_str);
                 break;
         }
-        /* If the entry allready exists don't owervrite it */
-        ansi_map_saved_invokedata = (struct ansi_map_invokedata_t *)wmem_map_lookup(TransactionId_table,buf);
-        if(ansi_map_saved_invokedata)
-            return;
 
         ansi_map_saved_invokedata = wmem_new(wmem_file_scope(), struct ansi_map_invokedata_t);
         ansi_map_saved_invokedata->opcode = p_private_tcap->d.OperationCode_private;
         ansi_map_saved_invokedata->ServiceIndicator = ServiceIndicator;
 
-        wmem_map_insert(TransactionId_table,
+        wmem_multimap_insert32(TransactionId_table,
                             wmem_strdup(wmem_file_scope(), buf),
+                            pinfo->num,
                             ansi_map_saved_invokedata);
 
-        /*g_warning("Invoke Hash string %s pkt: %u",buf,pinfo->num);*/
+        /*ws_warning("Invoke Hash string %s pkt: %u",buf,pinfo->num);*/
     }
 }
 /* value strings */
@@ -1405,7 +1404,7 @@ dissect_ansi_map_min_type(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tre
 
     subtree = proto_item_add_subtree(actx->created_item, ett_mintype);
 
-    proto_tree_add_item_ret_display_string(subtree, hf_ansi_map_bcd_digits, tvb, offset, tvb_reported_length_remaining(tvb, offset), ENC_BCD_DIGITS_0_9, wmem_packet_scope(), &digit_str);
+    proto_tree_add_item_ret_display_string(subtree, hf_ansi_map_bcd_digits, tvb, offset, tvb_reported_length_remaining(tvb, offset), ENC_BCD_DIGITS_0_9, pinfo->pool, &digit_str);
     proto_item_append_text(actx->created_item, " - %s", digit_str);
 }
 
@@ -1449,7 +1448,7 @@ dissect_ansi_map_digits_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
             if(octet_len == 0)
                 return;
             offset++;
-            proto_tree_add_item_ret_display_string(subtree, hf_ansi_map_bcd_digits, tvb, offset, -1, ENC_KEYPAD_BC_TBCD, wmem_packet_scope(), &digit_str);
+            proto_tree_add_item_ret_display_string(subtree, hf_ansi_map_bcd_digits, tvb, offset, -1, ENC_KEYPAD_BC_TBCD, pinfo->pool, &digit_str);
             proto_item_append_text(actx->created_item, " - %s", digit_str);
             break;
         case 2:
@@ -1462,7 +1461,7 @@ dissect_ansi_map_digits_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
                 return;
             offset++;
             proto_tree_add_item_ret_string(subtree, hf_ansi_map_ia5_digits, tvb, offset, tvb_reported_length_remaining(tvb,offset),
-                                            ENC_ASCII|ENC_NA, wmem_packet_scope(), &digits);
+                                            ENC_ASCII|ENC_NA, pinfo->pool, &digits);
             proto_item_append_text(actx->created_item, " - %s", digits);
             }
             break;
@@ -1490,7 +1489,7 @@ dissect_ansi_map_digits_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
         switch ((octet&0xf)){
         case 1:
             /* BCD Coding */
-            proto_tree_add_item_ret_display_string(subtree, hf_ansi_map_bcd_digits, tvb, offset, -1, ENC_KEYPAD_BC_TBCD, wmem_packet_scope(), &digit_str);
+            proto_tree_add_item_ret_display_string(subtree, hf_ansi_map_bcd_digits, tvb, offset, -1, ENC_KEYPAD_BC_TBCD, pinfo->pool, &digit_str);
             proto_item_append_text(actx->created_item, " - %s", digit_str);
             break;
         case 2:
@@ -1498,7 +1497,7 @@ dissect_ansi_map_digits_type(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
             const guint8* digits;
             /* IA5 Coding */
             proto_tree_add_item_ret_string(subtree, hf_ansi_map_ia5_digits, tvb, offset, tvb_reported_length_remaining(tvb,offset),
-                                            ENC_ASCII|ENC_NA, wmem_packet_scope(), &digits);
+                                            ENC_ASCII|ENC_NA, pinfo->pool, &digits);
             proto_item_append_text(actx->created_item, " - %s", digits);
             }
             break;
@@ -15251,7 +15250,7 @@ dissect_ansi_map_QualificationRequest2Res(gboolean implicit_tag _U_, tvbuff_t *t
 
 
 /*--- End of included file: packet-ansi_map-fn.c ---*/
-#line 3606 "./asn1/ansi_map/packet-ansi_map-template.c"
+#line 3605 "./asn1/ansi_map/packet-ansi_map-template.c"
 
 /*
  * 6.5.2.dk N.S0013-0 v 1.0,X.S0004-550-E v1.0 2.301
@@ -15606,7 +15605,7 @@ static int dissect_invokeData(proto_tree *tree, tvbuff_t *tvb, int offset, asn1_
     case  93: /*Geo Position Directive*/
         break;
     case  94: /*Geo Position Request*/
-        offset = dissect_ansi_map_GeoPositionRequest(TRUE, tvb, offset, actx, tree, hf_ansi_map_interSystemPositionRequest);
+        offset = dissect_ansi_map_GeoPositionRequest(TRUE, tvb, offset, actx, tree, hf_ansi_map_geoPositionRequest);
         break;
     case  95: /*Inter System Position Request*/
         offset = dissect_ansi_map_InterSystemPositionRequest(TRUE, tvb, offset, actx, tree, hf_ansi_map_interSystemPositionRequest);
@@ -15892,7 +15891,7 @@ static int dissect_returnData(proto_tree *tree, tvbuff_t *tvb, int offset, asn1_
         offset = dissect_ansi_map_InterSystemPositionRequestRes(TRUE, tvb, offset, actx, tree, hf_ansi_map_interSystemPositionRequestRes);
         break;
     case  96: /*Inter System Position Request Forward*/
-        offset = dissect_ansi_map_InterSystemPositionRequestForwardRes(TRUE, tvb, offset, actx, tree, hf_ansi_map_interSystemPositionRequestRes);
+        offset = dissect_ansi_map_InterSystemPositionRequestForwardRes(TRUE, tvb, offset, actx, tree, hf_ansi_map_interSystemPositionRequestForwardRes);
         break;
     case  98: /*Roamer Database Verification Request*/
         offset = dissect_ansi_map_RoamerDatabaseVerificationRequestRes(TRUE, tvb, offset, actx, tree, hf_ansi_map_roamerDatabaseVerificationRequestRes);
@@ -15956,28 +15955,28 @@ find_saved_invokedata(asn1_ctx_t *actx, struct ansi_tcap_private_t *p_private_tc
     guint8 *dst_str;
     char *buf;
 
-    buf=(char *)wmem_alloc(wmem_packet_scope(), 1024);
+    buf=(char *)wmem_alloc(actx->pinfo->pool, 1024);
 
     /* Data from the TCAP dissector */
     /* The hash string needs to contain src and dest to distiguish differnt flows */
-    src_str = address_to_str(wmem_packet_scope(), src);
-    dst_str = address_to_str(wmem_packet_scope(), dst);
+    src_str = address_to_str(actx->pinfo->pool, src);
+    dst_str = address_to_str(actx->pinfo->pool, dst);
     /* Reverse order to invoke */
     switch(ansi_map_response_matching_type){
         case ANSI_MAP_TID_ONLY:
-            g_snprintf(buf,1024,"%s",p_private_tcap->TransactionID_str);
+            snprintf(buf,1024,"%s",p_private_tcap->TransactionID_str);
             break;
         case ANSI_MAP_TID_AND_SOURCE:
-            g_snprintf(buf,1024,"%s%s",p_private_tcap->TransactionID_str,dst_str);
+            snprintf(buf,1024,"%s%s",p_private_tcap->TransactionID_str,dst_str);
             break;
         case ANSI_MAP_TID_SOURCE_AND_DEST:
         default:
-            g_snprintf(buf,1024,"%s%s%s",p_private_tcap->TransactionID_str,dst_str,src_str);
+            snprintf(buf,1024,"%s%s%s",p_private_tcap->TransactionID_str,dst_str,src_str);
             break;
     }
 
-    /*g_warning("Find Hash string %s pkt: %u",buf,actx->pinfo->num);*/
-    ansi_map_saved_invokedata = (struct ansi_map_invokedata_t *)wmem_map_lookup(TransactionId_table, buf);
+    /*ws_warning("Find Hash string %s pkt: %u",buf,actx->pinfo->num);*/
+    ansi_map_saved_invokedata = (struct ansi_map_invokedata_t *)wmem_multimap_lookup32_le(TransactionId_table, buf, actx->pinfo->num);
     if(ansi_map_saved_invokedata){
         OperationCode = ansi_map_saved_invokedata->opcode & 0xff;
         ServiceIndicator = ansi_map_saved_invokedata->ServiceIndicator;
@@ -16086,11 +16085,21 @@ static stat_tap_table_item stat_fields[] = {{TABLE_ITEM_UINT, TAP_ALIGN_RIGHT, "
 
 static void ansi_map_stat_init(stat_tap_table_ui* new_stat)
 {
+    const char *table_name = "ANSI MAP Operation Statistics";
     int num_fields = sizeof(stat_fields)/sizeof(stat_tap_table_item);
-    stat_tap_table* table = stat_tap_init_table("ANSI MAP Operation Statistics", num_fields, 0, "ansi_map.op_code");
+    stat_tap_table *table;
     int i = 0;
     stat_tap_table_item_type items[sizeof(stat_fields)/sizeof(stat_tap_table_item)];
 
+    table = stat_tap_find_table(new_stat, table_name);
+    if (table) {
+        if (new_stat->stat_tap_reset_table_cb) {
+            new_stat->stat_tap_reset_table_cb(table);
+        }
+        return;
+    }
+
+    table = stat_tap_init_table(table_name, num_fields, 0, "ansi_map.op_code");
     stat_tap_add_table(new_stat, table);
 
     /* Add a fow for each value type */
@@ -16114,19 +16123,19 @@ static void ansi_map_stat_init(stat_tap_table_ui* new_stat)
 
 
 static tap_packet_status
-ansi_map_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *data)
+ansi_map_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *data, tap_flags_t flags _U_)
 {
     stat_data_t* stat_data = (stat_data_t*)tapdata;
     const ansi_map_tap_rec_t    *data_p = (const ansi_map_tap_rec_t *)data;
     stat_tap_table* table;
     stat_tap_table_item_type* item_data;
-    guint i = 0, count, total_bytes;
+    guint count, total_bytes;
 
     /* Only tracking field values we know */
     if (try_val_to_str(data_p->message_type, ansi_map_opr_code_strings) == NULL)
         return TAP_PACKET_DONT_REDRAW;
 
-    table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, i);
+    table = g_array_index(stat_data->stat_tap_data->tables, stat_tap_table*, 0);
 
     item_data = stat_tap_get_field_data(table, data_p->message_type, COUNT_COLUMN);
     item_data->value.uint_value++;
@@ -16197,10 +16206,12 @@ void proto_register_ansi_map(void) {
     /* List of fields */
     static hf_register_info hf[] = {
 
+#if 0
         { &hf_ansi_map_op_code_fam,
           { "Operation Code Family", "ansi_map.op_code_fam",
             FT_UINT8, BASE_DEC, NULL, 0,
             NULL, HFILL }},
+#endif
         { &hf_ansi_map_reservedBitH,
           { "Reserved", "ansi_map.reserved_bitH",
             FT_BOOLEAN, 8, NULL,0x80,
@@ -16225,10 +16236,12 @@ void proto_register_ansi_map(void) {
           { "Reserved", "ansi_map.reserved_bitED",
             FT_UINT8, BASE_DEC, NULL, 0x18,
             NULL, HFILL }},
+#if 0
         { &hf_ansi_map_op_code,
           { "Operation Code", "ansi_map.op_code",
             FT_UINT8, BASE_DEC|BASE_EXT_STRING, &ansi_map_opr_code_strings_ext, 0x0,
             NULL, HFILL }},
+#endif
         { &hf_ansi_map_type_of_digits,
           { "Type of Digits", "ansi_map.type_of_digits",
             FT_UINT8, BASE_DEC, VALS(ansi_map_type_of_digits_vals), 0x0,
@@ -16476,11 +16489,11 @@ void proto_register_ansi_map(void) {
 
         { &hf_ansi_map_mslocation_lat,
           { "Latitude in tenths of a second", "ansi_map.mslocation.lat",
-            FT_UINT8, BASE_DEC, NULL, 0,
+            FT_UINT24, BASE_DEC, NULL, 0,
             NULL, HFILL }},
         { &hf_ansi_map_mslocation_long,
           { "Longitude in tenths of a second", "ansi_map.mslocation.long",
-            FT_UINT8, BASE_DEC, NULL, 0,
+            FT_UINT24, BASE_DEC, NULL, 0,
             "Switch Number (SWNO)", HFILL }},
         { &hf_ansi_map_mslocation_res,
           { "Resolution in units of 1 foot", "ansi_map.mslocation.res",
@@ -18487,7 +18500,7 @@ void proto_register_ansi_map(void) {
         NULL, HFILL }},
     { &hf_ansi_map_generalizedTime,
       { "generalizedTime", "ansi_map.generalizedTime",
-        FT_STRING, BASE_NONE, NULL, 0,
+        FT_ABSOLUTE_TIME, ABSOLUTE_TIME_LOCAL, NULL, 0,
         NULL, HFILL }},
     { &hf_ansi_map_geographicPosition,
       { "geographicPosition", "ansi_map.geographicPosition",
@@ -19199,7 +19212,7 @@ void proto_register_ansi_map(void) {
         NULL, HFILL }},
 
 /*--- End of included file: packet-ansi_map-hfarr.c ---*/
-#line 5361 "./asn1/ansi_map/packet-ansi_map-template.c"
+#line 5374 "./asn1/ansi_map/packet-ansi_map-template.c"
     };
 
     /* List of subtrees */
@@ -19460,7 +19473,7 @@ void proto_register_ansi_map(void) {
     &ett_ansi_map_ReturnData,
 
 /*--- End of included file: packet-ansi_map-ettarr.c ---*/
-#line 5394 "./asn1/ansi_map/packet-ansi_map-template.c"
+#line 5407 "./asn1/ansi_map/packet-ansi_map-template.c"
     };
 
     static ei_register_info ei[] = {
@@ -19534,7 +19547,7 @@ void proto_register_ansi_map(void) {
                                   "Type of matching invoke/response, risk of mismatch if loose matching chosen",
                                   &ansi_map_response_matching_type, ansi_map_response_matching_type_values, FALSE);
 
-    TransactionId_table = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), wmem_str_hash, g_str_equal);
+    TransactionId_table = wmem_multimap_new_autoreset(wmem_epan_scope(), wmem_file_scope(), wmem_str_hash, g_str_equal);
     register_stat_tap_table_ui(&stat_table);
 }
 

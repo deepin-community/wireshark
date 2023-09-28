@@ -282,6 +282,7 @@ static const value_string rohc_opt_type_vals[] =
 
 static const value_string rohc_ip_version_vals[] =
 {
+    { 0,    "Unknown" },
     { 4,    "IPv4" },
     { 6,    "IPv6" },
     { 0, NULL },
@@ -1148,7 +1149,7 @@ dissect_rohc_feedback_data(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, 
     if(!rohc_cid_context){
         if (cid_context) {
             /* Reuse info coming from private data */
-            rohc_cid_context = wmem_new(wmem_packet_scope(), rohc_cid_context_t);
+            rohc_cid_context = wmem_new(pinfo->pool, rohc_cid_context_t);
             /*rohc_cid_context->d_mode;*/
             rohc_cid_context->rnd = p_rohc_info->rnd;
             rohc_cid_context->udp_checksum_present = p_rohc_info->udp_checksum_present;
@@ -1293,7 +1294,7 @@ dissect_rohc_feedback_data(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, 
 }
 
 
-const true_false_string rohc_cmp_lst_mask_size_vals = { "15-bit mask", "7-bit mask" };
+static const true_false_string rohc_cmp_lst_mask_size_vals = { "15-bit mask", "7-bit mask" };
 
 
 /* 5.8.6.  Compressed list formats */
@@ -1697,8 +1698,6 @@ dissect_rohc_ir_rtp_profile_dynamic(tvbuff_t *tvb, packet_info *pinfo, proto_tre
                 proto_tree_add_item(dynamic_ipv4_tree, hf_rohc_rtp_nbo, tvb, offset, 1, ENC_BIG_ENDIAN);
                 proto_tree_add_bits_item(dynamic_ipv4_tree, hf_rohc_spare_bits, tvb, (offset<<3)+3, 5, ENC_BIG_ENDIAN);
                 offset++;
-                /* Set proper length for subtree */
-                proto_item_set_len(root_ti, offset-tree_start_offset);
 
                 /*   +---+---+---+---+---+---+---+---+
                  *   / Generic extension header list /  variable length
@@ -1707,6 +1706,9 @@ dissect_rohc_ir_rtp_profile_dynamic(tvbuff_t *tvb, packet_info *pinfo, proto_tre
                  *   5.8.6.1, with all header items present in uncompressed form.
                  */
                 offset = dissect_compressed_list(0, pinfo, dynamic_ipv4_tree, tvb, offset);
+
+                /* Set proper length for subtree */
+                proto_item_set_len(root_ti, offset-tree_start_offset);
 
                 /* Add summary to ipv4 root item */
                 proto_item_append_text(root_ti, " (ToS=%u, TTL=%u, ID=%u, RND=%u, NBO=%u)",
@@ -2128,6 +2130,11 @@ dissect_rohc_ir_packet(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo,
     if(profile==ROHC_PROFILE_RTP){
         proto_tree_add_item(ir_tree, hf_rohc_d_bit, tvb, x_bit_offset, 1, ENC_BIG_ENDIAN);
     }
+
+    /* Profile.
+     *  In the IR packet, the profile identifier is abbreviated to the 8 least
+     * significant bits.  It selects the highest-number profile in the
+     * channel state parameter PROFILES that matches the 8 LSBs given. */
     proto_tree_add_item(ir_tree, hf_rohc_profile, tvb, offset, 1, ENC_BIG_ENDIAN);
     offset++;
 
@@ -2149,7 +2156,7 @@ dissect_rohc_ir_packet(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo,
             gboolean tmp_prev_rnd = rohc_cid_context->rnd;
             gboolean tmp_prev_udp_checksum_present = rohc_cid_context->udp_checksum_present;
 
-            /*g_warning("IR pkt found CID %u",cid);*/
+            /*ws_warning("IR pkt found CID %u",cid);*/
 
             rohc_cid_context = wmem_new(wmem_file_scope(), rohc_cid_context_t);
             rohc_cid_context->profile = profile;
@@ -2166,7 +2173,7 @@ dissect_rohc_ir_packet(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo,
         }else{
             rohc_cid_context = wmem_new(wmem_file_scope(), rohc_cid_context_t);
             rohc_cid_context->large_cid_present = p_rohc_info->large_cid_present;
-            /*rohc_cid_context->mode     mode;*/
+            rohc_cid_context->mode = 0;
             /*rohc_cid_context->d_mode;*/
             rohc_cid_context->rnd = FALSE;
             rohc_cid_context->udp_checksum_present = FALSE;
@@ -2176,7 +2183,7 @@ dissect_rohc_ir_packet(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo,
             rohc_cid_context->rohc_ip_version = p_rohc_info->rohc_ip_version;
             rohc_cid_context->mode = p_rohc_info->mode;
 
-            /*g_warning("IR pkt New CID %u",cid);*/
+            /*ws_warning("IR pkt New CID %u",cid);*/
 
             g_hash_table_insert(rohc_cid_hash, GUINT_TO_POINTER(key), rohc_cid_context);
             p_add_proto_data(wmem_file_scope(), pinfo, proto_rohc, 0, rohc_cid_context);
@@ -2270,7 +2277,7 @@ dissect_rohc_ir_dyn_packet(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo,
             gboolean tmp_prev_rnd = rohc_cid_context->rnd;
             gboolean tmp_prev_udp_checksum_present = rohc_cid_context->udp_checksum_present;
 
-            /*g_warning("IR pkt found CID %u",cid);*/
+            /*ws_warning("IR pkt found CID %u",cid);*/
 
             rohc_cid_context = wmem_new(wmem_file_scope(), rohc_cid_context_t);
             rohc_cid_context->profile = profile;
@@ -2286,9 +2293,8 @@ dissect_rohc_ir_dyn_packet(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo,
             p_add_proto_data(wmem_file_scope(), pinfo, proto_rohc, 0, rohc_cid_context);
         }else{
             rohc_cid_context = wmem_new(wmem_file_scope(), rohc_cid_context_t);
-            /*rohc_cid_context->rohc_ip_version;*/
+            rohc_cid_context->rohc_ip_version = 0;
             rohc_cid_context->large_cid_present = p_rohc_info->large_cid_present;
-            /*rohc_cid_context->mode     mode;*/
             /*rohc_cid_context->d_mode;*/
             rohc_cid_context->rnd = FALSE;
             rohc_cid_context->udp_checksum_present = FALSE;
@@ -2297,7 +2303,7 @@ dissect_rohc_ir_dyn_packet(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo,
             rohc_cid_context->ir_frame_number = pinfo->num;
             rohc_cid_context->mode = p_rohc_info->mode;
 
-            /*g_warning("IR pkt New CID %u",cid);*/
+            /*ws_warning("IR pkt New CID %u",cid);*/
 
             g_hash_table_insert(rohc_cid_hash, GUINT_TO_POINTER(key), rohc_cid_context);
             p_add_proto_data(wmem_file_scope(), pinfo, proto_rohc, 0, rohc_cid_context);
@@ -2544,10 +2550,10 @@ start_over:
     if (!pinfo->fd->visited){
         gint key = cid;
 
-        /*g_warning("Lookup CID %u",cid);*/
+        /*ws_warning("Lookup CID %u",cid);*/
         rohc_cid_context = (rohc_cid_context_t*)g_hash_table_lookup(rohc_cid_hash, GUINT_TO_POINTER(key));
         if(rohc_cid_context){
-            /*g_warning("Found CID %u",cid);*/
+            /*ws_warning("Found CID %u",cid);*/
         }else{
             rohc_cid_context = wmem_new(wmem_file_scope(), rohc_cid_context_t);
             /*rohc_cid_context->d_mode;*/
@@ -2559,7 +2565,7 @@ start_over:
             rohc_cid_context->large_cid_present = p_rohc_info->large_cid_present;
             rohc_cid_context->prev_ir_frame_number = -1;
             rohc_cid_context->ir_frame_number = -1;
-            /*g_warning("Store dummy data %u",cid);*/
+            /*ws_warning("Store dummy data %u",cid);*/
         }
         p_add_proto_data(wmem_file_scope(), pinfo, proto_rohc, 0, rohc_cid_context);
     } else {
@@ -2864,7 +2870,7 @@ proto_register_rohc(void)
               }
             },
             { &hf_rohc_ipv6_dst,
-              { "Destination Address","rohc.ipv6.src",
+              { "Destination Address","rohc.ipv6.dst",
                 FT_IPv6, BASE_NONE, NULL, 0,
                 NULL , HFILL
               }

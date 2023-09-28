@@ -1,4 +1,5 @@
-/* ringbuffer.h
+/** @file
+ *
  * Definitions for capture ringbuffer files
  *
  * Wireshark - Network traffic analyzer
@@ -23,7 +24,8 @@
 /* Maximum number for FAT filesystems */
 #define RINGBUFFER_WARN_NUM_FILES 65535
 
-int ringbuf_init(const char *capture_name, guint num_files, gboolean group_read_access);
+int ringbuf_init(const char *capture_name, guint num_files, gboolean group_read_access, gchar* compress_type,
+                 gboolean nametimenum);
 gboolean ringbuf_is_initialized(void);
 const gchar *ringbuf_current_filename(void);
 FILE *ringbuf_init_libpcap_fdopen(int *err);
@@ -35,16 +37,3 @@ void ringbuf_error_cleanup(void);
 gboolean ringbuf_set_print_name(gchar *name, int *err);
 
 #endif /* ringbuffer.h */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 2
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=2 tabstop=8 expandtab:
- * :indentSize=2:tabSize=8:noTabs=true:
- */

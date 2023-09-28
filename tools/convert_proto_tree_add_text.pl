@@ -76,7 +76,7 @@ my %FIELD_TYPE = ('FT_NONE' => "FT_NONE", 'FT_PROTOCOL' => "FT_PROTOCOL", 'FT_BO
 				   'FT_STRING' => "FT_STRING", 'FT_STRINGZ' => "FT_STRINGZ", 'FT_UINT_STRING' => "FT_UINT_STRING",
 				   'FT_ETHER' => "FT_ETHER", 'FT_BYTES' => "FT_BYTES", 'FT_UINT_BYTES' => "FT_UINT_BYTES",
 				   'FT_IPv4' => "FT_IPv4", 'FT_IPv6' => "FT_IPv6", 'FT_IPXNET' => "FT_IPXNET", 'FT_AX25' => "FT_AX25", 'FT_VINES' => "FT_VINES",
-				   'FT_FRAMENUM' => "FT_FRAMENUM", 'FT_PCRE' => "FT_PCRE", 'FT_GUID' => "FT_GUID", 'FT_OID' => "FT_OID", 'FT_REL_OID' => "FT_REL_OID", 'FT_EUI64' => "FT_EUI64");
+				   'FT_FRAMENUM' => "FT_FRAMENUM", 'FT_GUID' => "FT_GUID", 'FT_OID' => "FT_OID", 'FT_REL_OID' => "FT_REL_OID", 'FT_EUI64' => "FT_EUI64");
 
 my %EXPERT_SEVERITY = ('PI_COMMENT' => "PI_COMMENT",
 					   'PI_CHAT' => "PI_CHAT",
@@ -94,7 +94,10 @@ my %EXPERT_GROUPS = ('PI_CHECKSUM' => "PI_CHECKSUM",
 					   'PI_DEBUG' => "PI_DEBUG",
 					   'PI_PROTOCOL' => "PI_PROTOCOL",
 					   'PI_SECURITY' => "PI_SECURITY",
-					   'PI_COMMENTS_GROUP' => "PI_COMMENTS_GROUP");
+					   'PI_COMMENTS_GROUP' => "PI_COMMENTS_GROUP",
+   					   'PI_DECRYPTION' => "PI_DECRYPTION",
+   					   'PI_ASSUMPTION' => "PI_ASSUMPTION",						  
+					   'PI_DEPRECATED' => "PI_DEPRECATED");
 
 my @proto_tree_list;
 my @expert_list;

@@ -99,7 +99,7 @@ iax2_packet_analyse(tap_iax2_stat_t *statinfo,
         if (statinfo->jitter > statinfo->max_jitter) {
             statinfo->max_jitter = statinfo->jitter;
         }
-        statinfo->mean_jitter = (statinfo->mean_jitter*statinfo->total_nr + current_diff) / (statinfo->total_nr+1);
+        statinfo->mean_jitter = (statinfo->mean_jitter*statinfo->total_nr + current_jitter) / (statinfo->total_nr+1);
     }
     /* regular payload change? (CN ignored) */
     if (!(statinfo->flags & STAT_FLAG_FIRST)
@@ -123,16 +123,3 @@ iax2_packet_analyse(tap_iax2_stat_t *statinfo,
 
     return;
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

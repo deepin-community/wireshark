@@ -211,21 +211,21 @@ static const value_string route_policy_tlv_policy_class_typevals[] = {
 
 static int proto_bmp = -1;
 
-/* BMP Common Header filed */
+/* BMP Common Header field */
 static int hf_bmp_version = -1;
 static int hf_bmp_length = -1;
 static int hf_bmp_type = -1;
 
-/* BMP Unused Bytes filed */
+/* BMP Unused Bytes field */
 static int hf_bmp_unused = -1;
 
-/* BMP Initiation Header filed */
+/* BMP Initiation Header field */
 static int hf_init_types = -1;
 static int hf_init_type = -1;
 static int hf_init_length = -1;
 static int hf_init_info = -1;
 
-/* BMP Per Peer Header filed */
+/* BMP Per Peer Header field */
 static int hf_peer_header = -1;
 static int hf_peer_type = -1;
 static int hf_peer_flags = -1;
@@ -244,17 +244,17 @@ static int hf_peer_bgp_id = -1;
 static int hf_peer_timestamp_sec = -1;
 static int hf_peer_timestamp_msec = -1;
 
-/* BMP Peer Up Notification filed */
+/* BMP Peer Up Notification field */
 static int hf_peer_up_ipv4_address = -1;
 static int hf_peer_up_ipv6_address = -1;
 static int hf_peer_up_local_port = -1;
 static int hf_peer_up_remote_port = -1;
 
-/* BMP Peer Down Notification filed */
+/* BMP Peer Down Notification field */
 static int hf_peer_down_reason = -1;
 static int hf_peer_down_data = -1;
 
-/* BMP Stat Reports filed */
+/* BMP Stat Reports field */
 static int hf_stats_count = -1;
 static int hf_stat_type = -1;
 static int hf_stat_len = -1;
@@ -286,7 +286,7 @@ static int hf_stat_data_routes_post_per_adj_rib_out_afi = -1;
 static int hf_stat_data_routes_post_per_adj_rib_out_safi = -1;
 static int hf_stat_data_routes_post_per_adj_rib_out = -1;
 
-/* BMP Termination filed */
+/* BMP Termination field */
 static int hf_term_types = -1;
 static int hf_term_type = -1;
 static int hf_term_len = -1;
@@ -614,7 +614,7 @@ dissect_bmp_termination(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_,
     offset += 2;
 
     if (term_type == BMP_TERM_TYPE_STRING) {
-        proto_tree_add_item(subtree, hf_term_info, tvb, offset, term_len, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(subtree, hf_term_info, tvb, offset, term_len, ENC_ASCII);
     } else {
         proto_tree_add_item(subtree, hf_term_reason, tvb, offset, term_len, ENC_BIG_ENDIAN);
     }
@@ -684,7 +684,7 @@ dissect_bmp_peer_header(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, int
     offset += 1;
 
     item = proto_tree_add_item(subtree, hf_peer_distinguisher, tvb, offset, 8, ENC_NA);
-    proto_item_set_text(item, "Peer Distinguisher: %s", decode_bgp_rd(tvb, offset));
+    proto_item_set_text(item, "Peer Distinguisher: %s", decode_bgp_rd(pinfo->pool, tvb, offset));
     offset += 8;
 
     if (flags & BMP_PEER_FLAG_IPV6) {
@@ -772,7 +772,7 @@ dissect_bmp_init(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo _U_, int of
         proto_tree_add_item(subtree, hf_init_length, tvb, offset, 2, ENC_BIG_ENDIAN);
         offset += 2;
 
-        proto_tree_add_item(subtree, hf_init_info, tvb, offset, init_len, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(subtree, hf_init_info, tvb, offset, init_len, ENC_ASCII);
         offset += init_len;
     }
 }
@@ -860,7 +860,7 @@ dissect_bmp_route_policy_event(tvbuff_t *tvb, proto_tree *tree, packet_info *pin
         switch(type){
             case BMP_ROUTE_POLICY_TLV_VRF: {
                 proto_tree_add_item(tlv_tree, hf_route_policy_tlv_vrf_table_id, tvb, offset, 4, ENC_BIG_ENDIAN);
-                proto_tree_add_item(tlv_tree, hf_route_policy_tlv_vrf_table_name, tvb, offset+4, length-4, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(tlv_tree, hf_route_policy_tlv_vrf_table_name, tvb, offset+4, length-4, ENC_ASCII);
                 offset += length;
                 single_event_length -=length;
             }
@@ -926,11 +926,11 @@ dissect_bmp_route_policy_event(tvbuff_t *tvb, proto_tree *tree, packet_info *pin
                     proto_item_append_text(policy_tree, ": (t=%d,l=%d)", policy_name_length, policy_item_id_length);
                     proto_item_set_len(policy_tree, 2 + 2 + policy_name_length + policy_item_id_length );
 
-                    proto_tree_add_item_ret_string(policy_tree, hf_route_policy_tlv_policy_name, tvb, offset, policy_name_length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &policy_name);
+                    proto_tree_add_item_ret_string(policy_tree, hf_route_policy_tlv_policy_name, tvb, offset, policy_name_length, ENC_ASCII|ENC_NA, pinfo->pool, &policy_name);
                     proto_item_append_text(policy_tree, " name: %s", policy_name);
                     offset += policy_name_length;
 
-                    proto_tree_add_item_ret_string(policy_tree, hf_route_policy_tlv_policy_item_id, tvb, offset, policy_item_id_length, ENC_ASCII|ENC_NA, wmem_packet_scope(), &policy_id);
+                    proto_tree_add_item_ret_string(policy_tree, hf_route_policy_tlv_policy_item_id, tvb, offset, policy_item_id_length, ENC_ASCII|ENC_NA, pinfo->pool, &policy_id);
                     proto_item_append_text(policy_tree, " id: %s", policy_id);
                     offset += policy_item_id_length;
 
@@ -955,7 +955,7 @@ dissect_bmp_route_policy_event(tvbuff_t *tvb, proto_tree *tree, packet_info *pin
             }
             break;
             case BMP_ROUTE_POLICY_TLV_STRING: {
-                proto_tree_add_item(tlv_tree, hf_route_policy_tlv_string, tvb, offset, length, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(tlv_tree, hf_route_policy_tlv_string, tvb, offset, length, ENC_ASCII);
                 offset += length;
                 single_event_length -= length;
             }
@@ -1344,7 +1344,7 @@ proto_register_bmp(void)
             { "Number of routes in pre-policy Adj-RIBs-Out", "bmp.stats.data.routes_pre_adj_rib_out", FT_UINT64, BASE_DEC,
                 NULL, 0x0, NULL, HFILL }},
         { &hf_stat_data_routes_post_adj_rib_out,
-            { "Number of routes in post-policy Adj-RIBs-Out", "bmp.stats.data.routes_pre_adj_rib_out", FT_UINT64, BASE_DEC,
+            { "Number of routes in post-policy Adj-RIBs-Out", "bmp.stats.data.routes_post_adj_rib_out", FT_UINT64, BASE_DEC,
                 NULL, 0x0, NULL, HFILL }},
         { &hf_stat_data_routes_pre_per_adj_rib_out_afi,
             { "AFI", "bmp.stats.data.routes_pre_per_adj_rib_out.afi", FT_UINT16, BASE_DEC,

@@ -45,12 +45,12 @@ static const int column_number_hardware_error = 8;
 static const int column_number_occurrence = 9;
 
 static tap_packet_status
-bluetooth_hci_summary_tap_packet(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *edt, const void* data)
+bluetooth_hci_summary_tap_packet(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *edt, const void* data, tap_flags_t flags)
 {
     bluetooth_hci_summary_tapinfo_t *tapinfo = (bluetooth_hci_summary_tapinfo_t *) tapinfo_ptr;
 
     if (tapinfo->tap_packet)
-        tapinfo->tap_packet(tapinfo, pinfo, edt, data);
+        tapinfo->tap_packet(tapinfo, pinfo, edt, data, flags);
 
     return TAP_PACKET_REDRAW;
 }
@@ -151,10 +151,16 @@ void BluetoothHciSummaryDialog::captureFileClosing()
 {
     remove_tap_listener(&tapinfo_);
 
+    WiresharkDialog::captureFileClosing();
+}
+
+
+void BluetoothHciSummaryDialog::captureFileClosed()
+{
     ui->interfaceComboBox->setEnabled(FALSE);
     ui->adapterComboBox->setEnabled(FALSE);
 
-    WiresharkDialog::captureFileClosing();
+    WiresharkDialog::captureFileClosed();
 }
 
 
@@ -188,7 +194,7 @@ void BluetoothHciSummaryDialog::keyPressEvent(QKeyEvent *event)
 
 void BluetoothHciSummaryDialog::tableContextMenu(const QPoint &pos)
 {
-    context_menu_.exec(ui->tableTreeWidget->viewport()->mapToGlobal(pos));
+    context_menu_.popup(ui->tableTreeWidget->viewport()->mapToGlobal(pos));
 }
 
 void BluetoothHciSummaryDialog::tableItemExpanded(QTreeWidgetItem *)
@@ -332,7 +338,7 @@ void BluetoothHciSummaryDialog::tapReset(void *tapinfo_ptr)
     dialog->item_hardware_errors_->setText(column_number_occurrence, "0");
 }
 
-tap_packet_status BluetoothHciSummaryDialog::tapPacket(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *, const void *data)
+tap_packet_status BluetoothHciSummaryDialog::tapPacket(void *tapinfo_ptr, packet_info *pinfo, epan_dissect_t *, const void *data, tap_flags_t)
 {
     bluetooth_hci_summary_tapinfo_t  *tapinfo    = static_cast<bluetooth_hci_summary_tapinfo_t *>(tapinfo_ptr);
     BluetoothHciSummaryDialog        *dialog     = static_cast<BluetoothHciSummaryDialog *>(tapinfo->ui);
@@ -358,7 +364,7 @@ tap_packet_status BluetoothHciSummaryDialog::tapPacket(void *tapinfo_ptr, packet
         const char  *interface_name;
 
         interface_name = epan_get_interface_name(pinfo->epan, pinfo->rec->rec_header.packet_header.interface_id);
-        interface = wmem_strdup_printf(wmem_packet_scope(), "%u: %s", pinfo->rec->rec_header.packet_header.interface_id, interface_name);
+        interface = wmem_strdup_printf(pinfo->pool, "%u: %s", pinfo->rec->rec_header.packet_header.interface_id, interface_name);
 
         if (dialog->ui->interfaceComboBox->findText(interface) == -1)
             dialog->ui->interfaceComboBox->addItem(interface);
@@ -927,16 +933,3 @@ void BluetoothHciSummaryDialog::resultsFilterLineEditChanged(const QString &text
         }
     }
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -26,6 +26,8 @@
 /* ---- Structures for pnio_rtc1 ---- */
 extern int       proto_pn_dcp;
 extern int proto_pn_io_apdu_status;
+extern int proto_pn_io_time_aware_status;
+
 extern gboolean  pnio_ps_selection;  /* given by pnio preferences */
 
 /* Structure for general station information */
@@ -36,8 +38,10 @@ typedef struct tagStationInfo {
     guint16   u16Vendor_id;
     guint16   u16Device_id;
     /* frame structure */
-    guint16   ioDataObjectNr;
-    guint16   iocsNr;
+    guint16   ioDataObjectNr_in;
+    guint16   ioDataObjectNr_out;
+    guint16   iocsNr_in;
+    guint16   iocsNr_out;
     /* GSDfile station information */
     gboolean  gsdFound;
     gboolean  gsdPathLength;
@@ -70,6 +74,7 @@ typedef struct tagIocsObject {
 typedef struct tagIoDataObject {
     guint16     slotNr;
     guint16     subSlotNr;
+    guint32     api;
     guint32     moduleIdentNr;
     guint32     subModuleIdentNr;
     guint16     frameOffset;
@@ -111,6 +116,8 @@ extern wmem_list_t *aruuid_frame_setup_list;
 
 extern void init_pn(int proto);
 extern void init_pn_io_rtc1(int proto);
+extern void init_pn_rsi(int proto);
+extern void pn_rsi_reassemble_init(void);
 
 extern void init_pnio_rtc1_station(stationInfo *station_info);
 
@@ -143,8 +150,16 @@ extern int dissect_pn_undecoded(tvbuff_t *tvb, int offset, packet_info *pinfo,
 extern int dissect_pn_user_data(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
                     proto_tree *tree, guint32 length, const char *text);
 
+extern int dissect_pn_pa_profile_data(tvbuff_t *tvb, int offset, packet_info *pinfo _U_,
+                    proto_tree *tree, guint32 length, const char *text);
+
 extern int dissect_blocks(tvbuff_t *tvb, int offset,
                     packet_info *pinfo, proto_tree *tree, guint8 *drep);
+
+#define PDU_TYPE_REQ 0x05
+#define PDU_TYPE_RSP 0x06
+
+extern int dissect_rsi_blocks(tvbuff_t* tvb, int offset, packet_info* pinfo, proto_tree* tree, guint8* drep, guint32 u32FOpnumOffsetOpnum, int type);
 
 #define SUBST_DATA  1
 #define FRAG_DATA   2
@@ -166,6 +181,12 @@ extern int dissect_PNIO_status(tvbuff_t *tvb, int offset, packet_info *pinfo,
 extern int dissect_PNIO_C_SDU_RTC1(tvbuff_t* tvb, int offset, packet_info* pinfo,
                     proto_tree* tree, guint8* drep _U_, guint16 frameid);
 
+extern int dissect_PNIO_RSI(tvbuff_t *tvb, int offset, packet_info *pinfo,
+                    proto_tree *tree, guint8 *drep);
+
+extern int dissect_PDRsiInstances_block(tvbuff_t *tvb, int offset,
+                    packet_info *pinfo, proto_tree *tree, proto_item *item _U_, guint8 *drep, guint8 u8BlockVersionHigh, guint8 u8BlockVersionLow);
+
 extern void pn_append_info(packet_info *pinfo, proto_item *dcp_item, const char *text);
 
 extern void pn_init_append_aruuid_frame_setup_list(e_guid_t aruuid, guint32 setup);
@@ -180,4 +201,4 @@ extern gboolean dissect_CSF_SDU_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tr
 
 /* Read a string from an "xml" file, dropping xml comment blocks */
 #include <stdio.h>
-extern char *pn_fgets(char *str, int n, FILE *stream);
+extern char *pn_fgets(char *str, int n, FILE *stream, wmem_allocator_t *scope);

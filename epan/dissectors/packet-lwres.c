@@ -194,7 +194,7 @@ static void dissect_getnamebyaddr_request(tvbuff_t* tvb, proto_tree* lwres_tree)
     flags = tvb_get_ntohl(tvb, LWRES_LWPACKET_LENGTH);
     family = tvb_get_ntohl(tvb, LWRES_LWPACKET_LENGTH + 4);
     addrlen = tvb_get_ntohs(tvb, LWRES_LWPACKET_LENGTH + 8);
-    addrs = tvb_ip_to_str(tvb, LWRES_LWPACKET_LENGTH + 10);
+    addrs = tvb_ip_to_str(wmem_packet_scope(), tvb, LWRES_LWPACKET_LENGTH + 10);
     slen = (int)strlen(addrs);
 
     if (lwres_tree == NULL)
@@ -217,7 +217,7 @@ static void dissect_getnamebyaddr_request(tvbuff_t* tvb, proto_tree* lwres_tree)
 
 }
 
-static void dissect_getnamebyaddr_response(tvbuff_t* tvb, proto_tree* lwres_tree)
+static void dissect_getnamebyaddr_response(tvbuff_t* tvb, packet_info *pinfo, proto_tree* lwres_tree)
 {
     guint32 i, offset;
     guint16 naliases,realnamelen,aliaslen;
@@ -259,7 +259,7 @@ static void dissect_getnamebyaddr_response(tvbuff_t* tvb, proto_tree* lwres_tree
                         tvb,
                         LWRES_LWPACKET_LENGTH + 8,
                         realnamelen,
-                        ENC_ASCII|ENC_NA);
+                        ENC_ASCII);
 
     offset=LWRES_LWPACKET_LENGTH + 8 + realnamelen;
 
@@ -268,7 +268,7 @@ static void dissect_getnamebyaddr_response(tvbuff_t* tvb, proto_tree* lwres_tree
         for(i=0; i<naliases; i++)
         {
             aliaslen = tvb_get_ntohs(tvb, offset);
-            aliasname = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 2, aliaslen, ENC_ASCII);
+            aliasname = tvb_get_string_enc(pinfo->pool, tvb, offset + 2, aliaslen, ENC_ASCII);
 
             alias_tree = proto_tree_add_subtree_format(nba_resp_tree, tvb, offset, 2 + aliaslen,
                                 ett_adn_alias, NULL, "Alias %s",aliasname);
@@ -285,7 +285,7 @@ static void dissect_getnamebyaddr_response(tvbuff_t* tvb, proto_tree* lwres_tree
                                 tvb,
                                 offset + 2,
                                 aliaslen,
-                                ENC_ASCII|ENC_NA);
+                                ENC_ASCII);
 
             offset+=(2 + aliaslen + 1);
         }
@@ -334,12 +334,12 @@ static void dissect_getaddrsbyname_request(tvbuff_t* tvb, proto_tree* lwres_tree
                 tvb,
                 LWRES_LWPACKET_LENGTH+10,
                 namelen,
-                ENC_ASCII|ENC_NA);
+                ENC_ASCII);
 
 }
 
 
-static void dissect_getaddrsbyname_response(tvbuff_t* tvb, proto_tree* lwres_tree)
+static void dissect_getaddrsbyname_response(tvbuff_t* tvb, packet_info *pinfo, proto_tree* lwres_tree)
 {
     guint32 family ,i, offset;
     guint16 naliases, naddrs, realnamelen, length, aliaslen;
@@ -377,7 +377,7 @@ static void dissect_getaddrsbyname_response(tvbuff_t* tvb, proto_tree* lwres_tre
                 LWRES_LWPACKET_LENGTH + 8, 2, ENC_BIG_ENDIAN);
 
     proto_tree_add_item(adn_resp_tree, hf_adn_realname, tvb,
-                LWRES_LWPACKET_LENGTH + 10, realnamelen, ENC_ASCII|ENC_NA);
+                LWRES_LWPACKET_LENGTH + 10, realnamelen, ENC_ASCII);
 
     offset = LWRES_LWPACKET_LENGTH + 10 + realnamelen + 1;
 
@@ -386,7 +386,7 @@ static void dissect_getaddrsbyname_response(tvbuff_t* tvb, proto_tree* lwres_tre
         for(i=0; i<naliases; i++)
         {
             aliaslen = tvb_get_ntohs(tvb, offset);
-            aliasname = tvb_get_string_enc(wmem_packet_scope(), tvb, offset + 2, aliaslen, ENC_ASCII);
+            aliasname = tvb_get_string_enc(pinfo->pool, tvb, offset + 2, aliaslen, ENC_ASCII);
 
             alias_tree = proto_tree_add_subtree_format(adn_resp_tree, tvb, offset, 2 + aliaslen,
                                                         ett_adn_alias, NULL, "Alias %s",aliasname);
@@ -395,7 +395,7 @@ static void dissect_getaddrsbyname_response(tvbuff_t* tvb, proto_tree* lwres_tre
                         offset, 2, aliaslen);
 
             proto_tree_add_item(alias_tree, hf_adn_aliasname, tvb,
-                        offset + 2, aliaslen, ENC_ASCII|ENC_NA);
+                        offset + 2, aliaslen, ENC_ASCII);
 
             offset+=(2 + aliaslen + 1);
         }
@@ -407,7 +407,7 @@ static void dissect_getaddrsbyname_response(tvbuff_t* tvb, proto_tree* lwres_tre
         {
             family = tvb_get_ntohl(tvb, offset);
             length = tvb_get_ntohs(tvb, offset + 4);
-            addrs = tvb_ip_to_str(tvb, offset + 6);
+            addrs = tvb_ip_to_str(pinfo->pool, tvb, offset + 6);
             slen = (int)strlen(addrs);
 
             addr_tree = proto_tree_add_subtree_format(adn_resp_tree,tvb, offset, 4+2+4, ett_adn_addr, NULL, "Address %s", addrs);
@@ -447,7 +447,7 @@ static void dissect_a_records(tvbuff_t* tvb, proto_tree* tree,guint32 nrec,int o
 
         curr = offset + (int)((sizeof(guint32)+sizeof(guint16)) * i);
 
-        addrs = tvb_ip_to_str(tvb, curr+2);
+        addrs = tvb_ip_to_str(wmem_packet_scope(), tvb, curr+2);
 
         addr_tree = proto_tree_add_subtree_format(a_rec_tree, tvb, curr,
                             6, ett_a_rec_addr, NULL, "Address %s", addrs);
@@ -460,7 +460,7 @@ static void dissect_a_records(tvbuff_t* tvb, proto_tree* tree,guint32 nrec,int o
 
 }
 
-static void dissect_srv_records(tvbuff_t* tvb, proto_tree* tree,guint32 nrec,int offset)
+static void dissect_srv_records(tvbuff_t* tvb, packet_info *pinfo, proto_tree* tree,guint32 nrec,int offset)
 {
     guint32 i, curr;
     guint16 /*len, namelen,*/ priority, weight, port;
@@ -490,7 +490,7 @@ static void dissect_srv_records(tvbuff_t* tvb, proto_tree* tree,guint32 nrec,int
         rec_tree = proto_tree_add_subtree_format(srv_rec_tree, tvb, curr, 6,
                     ett_srv_rec_item, NULL,
                     "SRV record:pri=%d,w=%d,port=%d,dname=%s",
-                    priority, weight, port, format_text(wmem_packet_scope(), dname, dlen));
+                    priority, weight, port, format_text(pinfo->pool, dname, dlen));
 
         proto_tree_add_uint(rec_tree,
                         hf_srv_prio,
@@ -519,7 +519,7 @@ static void dissect_srv_records(tvbuff_t* tvb, proto_tree* tree,guint32 nrec,int
                             tvb,
                             curr + 8,
                             used_bytes,
-                            format_text(wmem_packet_scope(), dname, dlen));
+                            format_text(pinfo->pool, dname, dlen));
 
         curr+=(int)((sizeof(short)*4) + used_bytes);
 
@@ -527,7 +527,7 @@ static void dissect_srv_records(tvbuff_t* tvb, proto_tree* tree,guint32 nrec,int
 
 }
 
-static void dissect_mx_records(tvbuff_t* tvb, proto_tree* tree, guint32 nrec, int offset)
+static void dissect_mx_records(tvbuff_t* tvb, packet_info *pinfo, proto_tree* tree, guint32 nrec, int offset)
 {
 
     guint i, curr;
@@ -555,7 +555,7 @@ static void dissect_mx_records(tvbuff_t* tvb, proto_tree* tree, guint32 nrec, in
 
         rec_tree = proto_tree_add_subtree_format(mx_rec_tree, tvb, curr,6,ett_mx_rec_item,NULL,
                         "MX record: pri=%d,dname=%s", priority,
-                        format_text(wmem_packet_scope(), dname, dlen));
+                        format_text(pinfo->pool, dname, dlen));
 
 
         proto_tree_add_item(rec_tree,
@@ -570,7 +570,7 @@ static void dissect_mx_records(tvbuff_t* tvb, proto_tree* tree, guint32 nrec, in
                             tvb,
                             curr + 4,
                             used_bytes,
-                            format_text(wmem_packet_scope(), dname, dlen));
+                            format_text(pinfo->pool, dname, dlen));
 
         curr+=(int)((sizeof(short)*2) + used_bytes);
 
@@ -579,7 +579,7 @@ static void dissect_mx_records(tvbuff_t* tvb, proto_tree* tree, guint32 nrec, in
 
 }
 
-static void dissect_ns_records(tvbuff_t* tvb, proto_tree* tree, guint32 nrec, int offset)
+static void dissect_ns_records(tvbuff_t* tvb, packet_info *pinfo, proto_tree* tree, guint32 nrec, int offset)
 {
     guint i, curr;
     gint dlen;
@@ -603,14 +603,14 @@ static void dissect_ns_records(tvbuff_t* tvb, proto_tree* tree, guint32 nrec, in
         used_bytes = get_dns_name(tvb, curr + 2, 0, curr + 2, &dname, &dlen);
 
         rec_tree = proto_tree_add_subtree_format(ns_rec_tree, tvb, curr,4, ett_ns_rec_item, NULL, "NS record: dname=%s",
-                        format_text(wmem_packet_scope(), dname, dlen));
+                        format_text(pinfo->pool, dname, dlen));
 
         proto_tree_add_string(rec_tree,
                             hf_ns_dname,
                             tvb,
                             curr + 2,
                             used_bytes,
-                            format_text(wmem_packet_scope(), dname, dlen));
+                            format_text(pinfo->pool, dname, dlen));
         curr+=(int)(sizeof(short) + used_bytes);
 
     }
@@ -665,11 +665,11 @@ static void dissect_rdata_request(tvbuff_t* tvb, proto_tree* lwres_tree)
             tvb,
             LWRES_LWPACKET_LENGTH+10,
             namelen,
-                ENC_ASCII|ENC_NA);
+                ENC_ASCII);
 
 }
 
-static void dissect_rdata_response(tvbuff_t* tvb, proto_tree* lwres_tree)
+static void dissect_rdata_response(tvbuff_t* tvb, packet_info *pinfo, proto_tree* lwres_tree)
 {
     guint offset;
     guint rdtype, nrdatas, realnamelen;
@@ -741,7 +741,7 @@ static void dissect_rdata_response(tvbuff_t* tvb, proto_tree* lwres_tree)
                         tvb,
                         LWRES_LWPACKET_LENGTH+18,
                         realnamelen,
-                ENC_ASCII|ENC_NA);
+                ENC_ASCII);
 
     switch(rdtype)
     {
@@ -750,15 +750,15 @@ static void dissect_rdata_response(tvbuff_t* tvb, proto_tree* lwres_tree)
         break;
 
         case T_SRV:
-            dissect_srv_records(tvb,rdata_resp_tree,nrdatas, offset);
+            dissect_srv_records(tvb,pinfo,rdata_resp_tree,nrdatas, offset);
         break;
 
         case T_MX:
-            dissect_mx_records(tvb,rdata_resp_tree,nrdatas, offset);
+            dissect_mx_records(tvb,pinfo,rdata_resp_tree,nrdatas, offset);
         break;
 
         case T_NS:
-            dissect_ns_records(tvb,rdata_resp_tree,nrdatas, offset);
+            dissect_ns_records(tvb,pinfo,rdata_resp_tree,nrdatas, offset);
         break;
     }
 
@@ -784,28 +784,28 @@ static void dissect_noop(tvbuff_t* tvb, proto_tree* lwres_tree)
 
 }
 
-static void dissect_getaddrsbyname(tvbuff_t* tvb, proto_tree* lwres_tree, int type)
+static void dissect_getaddrsbyname(tvbuff_t* tvb, packet_info *pinfo, proto_tree* lwres_tree, int type)
 {
     if(type == 1)
         dissect_getaddrsbyname_request(tvb, lwres_tree);
     else
-        dissect_getaddrsbyname_response(tvb, lwres_tree);
+        dissect_getaddrsbyname_response(tvb, pinfo, lwres_tree);
 }
 
-static void dissect_getnamebyaddr(tvbuff_t* tvb, proto_tree* lwres_tree, int type)
+static void dissect_getnamebyaddr(tvbuff_t* tvb, packet_info *pinfo, proto_tree* lwres_tree, int type)
 {
     if(type == 1)
         dissect_getnamebyaddr_request(tvb, lwres_tree);
     else
-        dissect_getnamebyaddr_response(tvb, lwres_tree);
+        dissect_getnamebyaddr_response(tvb, pinfo, lwres_tree);
 }
 
-static void dissect_getrdatabyname(tvbuff_t* tvb, proto_tree* lwres_tree, int type)
+static void dissect_getrdatabyname(tvbuff_t* tvb, packet_info *pinfo _U_, proto_tree* lwres_tree, int type)
 {
     if(type == 1)
         dissect_rdata_request(tvb, lwres_tree);
     else
-        dissect_rdata_response(tvb, lwres_tree);
+        dissect_rdata_response(tvb, pinfo, lwres_tree);
 }
 
 static int
@@ -931,15 +931,15 @@ dissect_lwres(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
             break;
 
             case LWRES_OPCODE_GETADDRSBYNAME:
-                dissect_getaddrsbyname(tvb, lwres_tree, message_type);
+                dissect_getaddrsbyname(tvb, pinfo, lwres_tree, message_type);
             break;
 
             case LWRES_OPCODE_GETNAMEBYADDR:
-                dissect_getnamebyaddr(tvb, lwres_tree, message_type);
+                dissect_getnamebyaddr(tvb, pinfo, lwres_tree, message_type);
             break;
 
             case LWRES_OPCODE_GETRDATABYNAME:
-                dissect_getrdatabyname(tvb, lwres_tree, message_type);
+                dissect_getrdatabyname(tvb, pinfo, lwres_tree, message_type);
             break;
         }
     }
@@ -1043,11 +1043,11 @@ proto_register_lwres(void)
             "lwres srv weight", HFILL }},
 
         { &hf_srv_port,
-          { "Port" , "lwres.srv.port", FT_UINT16, BASE_DEC, NULL, 0x0,
+          { "Port", "lwres.srv.port", FT_UINT16, BASE_DEC, NULL, 0x0,
             "lwres srv port", HFILL }},
 
         { &hf_srv_dname,
-          { "DNAME" , "lwres.srv.dname", FT_STRING, BASE_NONE, NULL, 0x0,
+          { "DNAME", "lwres.srv.dname", FT_STRING, BASE_NONE, NULL, 0x0,
             NULL, HFILL }},
 
         { &hf_adn_flags,
@@ -1095,7 +1095,7 @@ proto_register_lwres(void)
             "lwres adn addr addr", HFILL }},
 
         { &hf_ns_dname,
-          { "Name" , "lwres.ns.dname", FT_STRING, BASE_NONE, NULL, 0x0,
+          { "Name", "lwres.ns.dname", FT_STRING, BASE_NONE, NULL, 0x0,
             NULL, HFILL }},
 
         /* Add more fields here */

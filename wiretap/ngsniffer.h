@@ -1,4 +1,4 @@
-/* ngsniffer.h
+/** @file
  *
  * Wiretap Library
  * Copyright (c) 1998 by Gilbert Ramirez <gram@alumni.rice.edu>
@@ -13,7 +13,5 @@
 #include "wtap.h"
 
 wtap_open_return_val ngsniffer_open(wtap *wth, int *err, gchar **err_info);
-gboolean ngsniffer_dump_open(wtap_dumper *wdh, int *err, gchar **err_info);
-int ngsniffer_dump_can_write_encap(int encap);
 
 #endif

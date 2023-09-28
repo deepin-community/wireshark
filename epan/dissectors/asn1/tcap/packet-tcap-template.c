@@ -76,7 +76,6 @@ static struct tcapsrt_info_t tcapsrt_global_info[MAX_TCAP_INSTANCE];
 static range_t *global_ssn_range;
 static range_t *ssn_range;
 
-gboolean gtcap_HandleSRT=FALSE;
 /* These two timeout (in second) are used when some message are lost,
    or when the same TCAP transcation identifier is reused */
 guint gtcap_RepetitionTimeout = 10;
@@ -105,7 +104,7 @@ static dissector_handle_t data_handle;
 static dissector_handle_t ansi_tcap_handle;
 
 static int dissect_tcap_param(asn1_ctx_t *actx, proto_tree *tree, tvbuff_t *tvb, int offset);
-static int dissect_tcap_ITU_ComponentPDU(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index _U_);
+static gboolean dissect_tcap_ITU_ComponentPDU(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index _U_);
 
 static dissector_table_t ansi_sub_dissectors = NULL;
 static dissector_table_t itu_sub_dissectors = NULL;
@@ -773,7 +772,7 @@ create_tcaphash_cont(struct tcaphash_cont_info_key_t *p_tcaphash_cont_key,
 
   if (p_tcaphash_contcall1) {
     /* Walk through list of transaction with identical keys */
-    /* go the the end to insert new record */
+    /* go to the end to insert new record */
     do {
       if (!p_tcaphash_contcall1->next_contcall) {
         p_tcaphash_contcall=append_tcaphash_contcall(p_tcaphash_contcall1,
@@ -802,7 +801,7 @@ create_tcaphash_end(struct tcaphash_end_info_key_t *p_tcaphash_end_key,
 
   if (p_tcaphash_endcall1) {
     /* Walk through list of transaction with identical keys */
-    /* go the the end to insert new record */
+    /* go to the end to insert new record */
     do {
       if (!p_tcaphash_endcall1->next_endcall) {
         p_tcaphash_endcall=append_tcaphash_endcall(p_tcaphash_endcall1,
@@ -839,7 +838,7 @@ tcaphash_begin_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   proto_tree *stat_tree=NULL;
 
 #ifdef DEBUG_TCAPSRT
-  dbg(51,"src %s srcTid %lx dst %s ", address_to_str(wmem_packet_scope(), &pinfo->src), p_tcapsrt_info->src_tid, address_to_str(wmem_packet_scope(), &pinfo->dst));
+  dbg(51,"src %s srcTid %lx dst %s ", address_to_str(pinfo->pool, &pinfo->src), p_tcapsrt_info->src_tid, address_to_str(pinfo->pool, &pinfo->dst));
 #endif
 
   /* prepare the key data */
@@ -850,7 +849,7 @@ tcaphash_begin_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     tcaphash_begin_key.pc_hash = mtp3_pc_hash((const mtp3_addr_pc_t *)pinfo->src.data);
   } else {
     /* Don't have MTP3 PCs (have SCCP GT ?) */
-    tcaphash_begin_key.pc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->src));
+    tcaphash_begin_key.pc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->src));
   }
   tcaphash_begin_key.hashKey=tcaphash_begin_calchash(&tcaphash_begin_key);
 
@@ -858,7 +857,7 @@ tcaphash_begin_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 #ifdef DEBUG_TCAPSRT
   dbg(10,"\n Hbegin #%u ", pinfo->num);
   dbg(11,"key %lx ",tcaphash_begin_key.hashKey);
-  dbg(51,"addr %s ", address_to_str(wmem_packet_scope(), &pinfo->src));
+  dbg(51,"addr %s ", address_to_str(pinfo->pool, &pinfo->src));
   dbg(51,"Tid %lx \n",tcaphash_begin_key.tid);
 #endif
 
@@ -1030,7 +1029,7 @@ tcaphash_cont_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   gboolean use_dst = FALSE;
 
 #ifdef DEBUG_TCAPSRT
-  dbg(51,"src %s srcTid %lx dst %s dstTid %lx ", address_to_str(wmem_packet_scope(), &pinfo->src), p_tcapsrt_info->src_tid, address_to_str(wmem_packet_scope(), &pinfo->dst), p_tcapsrt_info->dst_tid);
+  dbg(51,"src %s srcTid %lx dst %s dstTid %lx ", address_to_str(pinfo->pool, &pinfo->src), p_tcapsrt_info->src_tid, address_to_str(pinfo->pool, &pinfo->dst), p_tcapsrt_info->dst_tid);
   dbg(10,"\n Hcont #%u ", pinfo->num);
 #endif
 
@@ -1044,14 +1043,14 @@ tcaphash_cont_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     tcaphash_cont_key.dpc_hash = mtp3_pc_hash((const mtp3_addr_pc_t *)pinfo->dst.data);
   } else {
     /* Don't have MTP3 PCs (have SCCP GT ?) */
-    tcaphash_cont_key.opc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->src));
-    tcaphash_cont_key.dpc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->dst));
+    tcaphash_cont_key.opc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->src));
+    tcaphash_cont_key.dpc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->dst));
   }
   tcaphash_cont_key.hashKey=tcaphash_cont_calchash(&tcaphash_cont_key);
 
 #ifdef DEBUG_TCAPSRT
   dbg(11,"Ckey %lx ", tcaphash_cont_key.hashKey);
-  dbg(51,"addr %s %s ", address_to_str(wmem_packet_scope(), &pinfo->src), address_to_str(wmem_packet_scope(), &pinfo->dst));
+  dbg(51,"addr %s %s ", address_to_str(pinfo->pool, &pinfo->src), address_to_str(pinfo->pool, &pinfo->dst));
   dbg(51,"Tid %lx %lx \n",tcaphash_cont_key.src_tid, tcaphash_cont_key.dst_tid);
 #endif
   p_tcaphash_contcall = find_tcaphash_cont(&tcaphash_cont_key, pinfo);
@@ -1072,13 +1071,13 @@ tcaphash_cont_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       tcaphash_begin_key.pc_hash = mtp3_pc_hash((const mtp3_addr_pc_t *)pinfo->dst.data);
     } else {
       /* Don't have MTP3 PCs (have SCCP GT ?) */
-      tcaphash_begin_key.pc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->dst));
+      tcaphash_begin_key.pc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->dst));
     }
     tcaphash_begin_key.hashKey=tcaphash_begin_calchash(&tcaphash_begin_key);
 
 #ifdef DEBUG_TCAPSRT
     dbg(11,"Bkey %lx ", tcaphash_begin_key.hashKey);
-    dbg(51,"addr %s ", address_to_str(wmem_packet_scope(), &pinfo->dst));
+    dbg(51,"addr %s ", address_to_str(pinfo->pool, &pinfo->dst));
     dbg(51,"Tid %lx \n",tcaphash_begin_key.tid);
 #endif
     p_tcaphash_begincall = find_tcaphash_begin(&tcaphash_begin_key, pinfo, FALSE);
@@ -1097,12 +1096,12 @@ tcaphash_cont_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
           tcaphash_begin_key.pc_hash = mtp3_pc_hash((const mtp3_addr_pc_t *)pinfo->src.data);
         } else {
           /* Don't have MTP3 PCs (have SCCP GT ?) */
-          tcaphash_begin_key.pc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->src));
+          tcaphash_begin_key.pc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->src));
         }
         tcaphash_begin_key.hashKey=tcaphash_begin_calchash(&tcaphash_begin_key);
 #ifdef DEBUG_TCAPSRT
         dbg(11,"Bkey %lx ", tcaphash_begin_key.hashKey);
-        dbg(51,"addr %s ", address_to_str(wmem_packet_scope(), &pinfo->src));
+        dbg(51,"addr %s ", address_to_str(pinfo->pool, &pinfo->src));
         dbg(51,"Tid %lx \n",tcaphash_begin_key.tid);
 #endif
         p_tcaphash_begincall = find_tcaphash_begin(&tcaphash_begin_key, pinfo,FALSE);
@@ -1131,14 +1130,14 @@ tcaphash_cont_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         tcaphash_end_key.opc_hash = mtp3_pc_hash((const mtp3_addr_pc_t *)(use_dst ? pinfo->src.data : pinfo->dst.data));
     } else {
         /* Don't have MTP3 PCs (have SCCP GT ?) */
-        tcaphash_end_key.dpc_hash = g_str_hash(address_to_str(wmem_packet_scope(), use_dst ? &pinfo->dst : &pinfo->src));
-        tcaphash_end_key.opc_hash = g_str_hash(address_to_str(wmem_packet_scope(), use_dst ? &pinfo->src : &pinfo->dst));
+        tcaphash_end_key.dpc_hash = g_str_hash(address_to_str(pinfo->pool, use_dst ? &pinfo->dst : &pinfo->src));
+        tcaphash_end_key.opc_hash = g_str_hash(address_to_str(pinfo->pool, use_dst ? &pinfo->src : &pinfo->dst));
     }
       tcaphash_end_key.hashKey=tcaphash_end_calchash(&tcaphash_end_key);
 
 #ifdef DEBUG_TCAPSRT
       dbg(10,"New Ekey %lx ",tcaphash_end_key.hashKey);
-      dbg(51,"addr %s ", address_to_str(wmem_packet_scope(), use_dst ? &pinfo->dst : &pinfo->src));
+      dbg(51,"addr %s ", address_to_str(pinfo->pool, use_dst ? &pinfo->dst : &pinfo->src));
       dbg(51,"Tid %lx ",tcaphash_end_key.tid);
       dbg(11,"Frame reqlink #%u ", pinfo->num);
 #endif
@@ -1196,7 +1195,7 @@ tcaphash_end_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   proto_tree *stat_tree=NULL;
 
 #ifdef DEBUG_TCAPSRT
-  dbg(51,"src %s dst %s dstTid %lx ", address_to_str(wmem_packet_scope(), &pinfo->src), address_to_str(wmem_packet_scope(), &pinfo->dst), p_tcapsrt_info->dst_tid);
+  dbg(51,"src %s dst %s dstTid %lx ", address_to_str(pinfo->pool, &pinfo->src), address_to_str(pinfo->pool, &pinfo->dst), p_tcapsrt_info->dst_tid);
   dbg(10,"\n Hend #%u ", pinfo->num);
 #endif
   /* look only for matching request, if matching conversation is available. */
@@ -1208,14 +1207,14 @@ tcaphash_end_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     tcaphash_end_key.dpc_hash = mtp3_pc_hash((const mtp3_addr_pc_t *)pinfo->dst.data);
   } else {
     /* Don't have MTP3 PCs (have SCCP GT ?) */
-    tcaphash_end_key.opc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->src));
-    tcaphash_end_key.dpc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->dst));
+    tcaphash_end_key.opc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->src));
+    tcaphash_end_key.dpc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->dst));
 }
   tcaphash_end_key.hashKey=tcaphash_end_calchash(&tcaphash_end_key);
 
 #ifdef DEBUG_TCAPSRT
   dbg(11,"Ekey %lx ",tcaphash_end_key.hashKey);
-  dbg(11,"addr %s ", address_to_str(wmem_packet_scope(), &pinfo->dst));
+  dbg(11,"addr %s ", address_to_str(pinfo->pool, &pinfo->dst));
   dbg(51,"Tid %lx ",tcaphash_end_key.tid);
 #endif
   p_tcaphash_endcall = find_tcaphash_end(&tcaphash_end_key, pinfo,TRUE);
@@ -1231,13 +1230,13 @@ tcaphash_end_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       tcaphash_begin_key.pc_hash = mtp3_pc_hash((const mtp3_addr_pc_t *)pinfo->dst.data);
     } else {
       /* Don't have MTP3 PCs (have SCCP GT ?) */
-      tcaphash_begin_key.pc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->dst));
+      tcaphash_begin_key.pc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->dst));
     }
     tcaphash_begin_key.hashKey=tcaphash_begin_calchash(&tcaphash_begin_key);
 
 #ifdef DEBUG_TCAPSRT
     dbg(11,"Bkey %lx ", tcaphash_begin_key.hashKey);
-    dbg(51,"addr %s ", address_to_str(wmem_packet_scope(), &pinfo->dst));
+    dbg(51,"addr %s ", address_to_str(pinfo->pool, &pinfo->dst));
     dbg(51,"Tid %lx ",tcaphash_begin_key.tid);
 #endif
     p_tcaphash_begincall = find_tcaphash_begin(&tcaphash_begin_key, pinfo,FALSE);
@@ -1328,8 +1327,8 @@ tcaphash_ansi_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     tcaphash_ansi_key.dpc_hash = mtp3_pc_hash((const mtp3_addr_pc_t *)pinfo->dst.data);
   } else {
     /* Don't have MTP3 PCs (have SCCP GT ?) */
-    tcaphash_ansi_key.opc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->src));
-    tcaphash_ansi_key.dpc_hash = g_str_hash(address_to_str(wmem_packet_scope(), &pinfo->dst));
+    tcaphash_ansi_key.opc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->src));
+    tcaphash_ansi_key.dpc_hash = g_str_hash(address_to_str(pinfo->pool, &pinfo->dst));
   }
   tcaphash_ansi_key.hashKey=tcaphash_ansi_calchash(&tcaphash_ansi_key);
 
@@ -1337,7 +1336,7 @@ tcaphash_ansi_matching(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 #ifdef DEBUG_TCAPSRT
   dbg(10,"\n Hansi #%u ", pinfo->num);
   dbg(11,"key %lx ",tcaphash_ansi_key.hashKey);
-  dbg(51,"PC %s %s ",address_to_str(wmem_packet_scope(), &pinfo->src), address_to_str(wmem_packet_scope(), &pinfo->dst));
+  dbg(51,"PC %s %s ",address_to_str(pinfo->pool, &pinfo->src), address_to_str(pinfo->pool, &pinfo->dst));
   dbg(51,"Tid %lx ",tcaphash_ansi_key.tid);
 #endif
   p_tcaphash_ansicall = (struct tcaphash_ansicall_t *)
@@ -1876,14 +1875,14 @@ dissect_tcap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
   cur_oid = NULL;
   tcapext_oid = NULL;
 
-  p_tcap_private = wmem_new0(wmem_packet_scope(), struct tcap_private_t);
+  p_tcap_private = wmem_new0(pinfo->pool, struct tcap_private_t);
   asn1_ctx.value_ptr = p_tcap_private;
   gp_tcapsrt_info=tcapsrt_razinfo();
   tcap_subdissector_used=FALSE;
   gp_tcap_context=NULL;
   dissect_tcap_TCMessage(FALSE, tvb, 0, &asn1_ctx, tree, -1);
 
-  if (gtcap_HandleSRT && !tcap_subdissector_used ) {
+  if (!tcap_subdissector_used ) {
     p_tcap_context=tcapsrt_call_matching(tvb, pinfo, tcap_stat_tree, gp_tcapsrt_info);
     p_tcap_private->context=p_tcap_context;
 
@@ -1892,14 +1891,14 @@ dissect_tcap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, void* d
      */
     if ( p_tcap_context && cur_oid && !p_tcap_context->oid_present ) {
       /* Save the application context and the sub dissector */
-      g_strlcpy(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid));
+      (void) g_strlcpy(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid));
       p_tcap_context->oid_present=TRUE;
       if ( (subdissector_handle = dissector_get_string_handle(ber_oid_dissector_table, cur_oid)) ) {
         p_tcap_context->subdissector_handle=subdissector_handle;
         p_tcap_context->subdissector_present=TRUE;
       }
     }
-    if (gtcap_HandleSRT && p_tcap_context && p_tcap_context->callback) {
+    if (p_tcap_context && p_tcap_context->callback) {
       /* Callback fonction for the upper layer */
       (p_tcap_context->callback)(tvb, pinfo, tcap_stat_tree, p_tcap_context);
     }
@@ -2046,10 +2045,7 @@ proto_register_tcap(void)
                                   "SCCP (and SUA) SSNs to decode as TCAP",
                                   &global_ssn_range, MAX_SSN);
 
-  prefs_register_bool_preference(tcap_module, "srt",
-                                 "Service Response Time Analyse",
-                                 "Activate the analyse for Response Time",
-                                 &gtcap_HandleSRT);
+  prefs_register_obsolete_preference(tcap_module, "srt");
 
   prefs_register_bool_preference(tcap_module, "persistentsrt",
                                  "Persistent stats for SRT",
@@ -2106,8 +2102,11 @@ static void init_tcap(void)
   /* Reset the session counter */
   tcapsrt_global_SessionId=1;
 
-  /* Display of SRT only if Persistent Stat */
-  gtcap_DisplaySRT=gtcap_PersistentSRT || gtcap_HandleSRT&gtcap_StatSRT;
+  /* Display of SRT is enabled
+   * 1) For wireshark only if Persistent Stat is enabled
+   * 2) For tshark, if the CLI SRT tap is registered
+   */
+  gtcap_DisplaySRT=gtcap_PersistentSRT || gtcap_StatSRT;
 }
 
 static void cleanup_tcap(void)
@@ -2195,8 +2194,8 @@ dissect_tcap_param(asn1_ctx_t *actx, proto_tree *tree, tvbuff_t *tvb, int offset
 /*
  * Call ITU Subdissector to decode the Tcap Component
  */
-static int
-dissect_tcap_ITU_ComponentPDU(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index _U_)
+static gboolean
+dissect_tcap_ITU_ComponentPDU(gboolean implicit_tag _U_, tvbuff_t *tvb, int offset _U_, asn1_ctx_t *actx, proto_tree *tree, int hf_index _U_)
 {
   dissector_handle_t subdissector_handle=NULL;
   gboolean is_subdissector=FALSE;
@@ -2210,120 +2209,120 @@ dissect_tcap_ITU_ComponentPDU(gboolean implicit_tag _U_, tvbuff_t *tvb, int offs
   /*
    * Handle The TCAP Service Response Time
    */
-  if ( gtcap_HandleSRT ) {
-    if (!tcap_subdissector_used) {
-      p_tcap_context=tcapsrt_call_matching(tvb, actx->pinfo, tcap_stat_tree, gp_tcapsrt_info);
-      tcap_subdissector_used=TRUE;
-      gp_tcap_context=p_tcap_context;
-      p_tcap_private->context=p_tcap_context;
-    } else {
-      /* Take the last TCAP context */
-      p_tcap_context = gp_tcap_context;
-      p_tcap_private->context=p_tcap_context;
-    }
+  if (!tcap_subdissector_used) {
+    p_tcap_context=tcapsrt_call_matching(tvb, actx->pinfo, tcap_stat_tree, gp_tcapsrt_info);
+    tcap_subdissector_used=TRUE;
+    gp_tcap_context=p_tcap_context;
+    p_tcap_private->context=p_tcap_context;
+  } else {
+    /* Take the last TCAP context */
+    p_tcap_context = gp_tcap_context;
+    p_tcap_private->context=p_tcap_context;
   }
   if (p_tcap_context) {
-    if (cur_oid) {
-      if (p_tcap_context->oid_present) {
-        /* We have already an Application Context, check if we have
-           to fallback to a lower version */
-        if ( strncmp(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid))!=0) {
-          /* ACN, changed, Fallback to lower version
-           * and update the subdissector (purely formal)
-           */
-          g_strlcpy(p_tcap_context->oid,cur_oid, sizeof(p_tcap_context->oid));
-          if ( (subdissector_handle = dissector_get_string_handle(ber_oid_dissector_table, cur_oid)) ) {
-            p_tcap_context->subdissector_handle=subdissector_handle;
-            p_tcap_context->subdissector_present=TRUE;
-          }
-        }
+      if (cur_oid) {
+          if (p_tcap_context->oid_present) {
+              /* We have already an Application Context, check if we have
+                 to fallback to a lower version */
+              if (strncmp(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid)) != 0) {
+                  /* ACN, changed, Fallback to lower version
+                   * and update the subdissector (purely formal)
+                   */
+                  (void) g_strlcpy(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid));
+                  if ((subdissector_handle = dissector_get_string_handle(ber_oid_dissector_table, cur_oid))) {
+                      p_tcap_context->subdissector_handle = subdissector_handle;
+                      p_tcap_context->subdissector_present = TRUE;
+                  }
+              }
+          } else {
+              /* We do not have the OID in the TCAP context, so store it */
+              (void) g_strlcpy(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid));
+              p_tcap_context->oid_present = TRUE;
+              /* Try to find a subdissector according to OID */
+              if ((subdissector_handle
+                  = dissector_get_string_handle(ber_oid_dissector_table, cur_oid))) {
+                  p_tcap_context->subdissector_handle = subdissector_handle;
+                  p_tcap_context->subdissector_present = TRUE;
+              } else {
+                  /* Not found, so try to find a subdissector according to SSN */
+                  if ((subdissector_handle = get_itu_tcap_subdissector(actx->pinfo->match_uint))) {
+                      /* Found according to SSN */
+                      p_tcap_context->subdissector_handle = subdissector_handle;
+                      p_tcap_context->subdissector_present = TRUE;
+                  }
+              }
+          } /* context OID */
       } else {
-        /* We do not have the OID in the TCAP context, so store it */
-        g_strlcpy(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid));
-        p_tcap_context->oid_present=TRUE;
-        /* Try to find a subdissector according to OID */
-        if ( (subdissector_handle
-          = dissector_get_string_handle(ber_oid_dissector_table, cur_oid)) ) {
-          p_tcap_context->subdissector_handle=subdissector_handle;
-          p_tcap_context->subdissector_present=TRUE;
-        } else {
-          /* Not found, so try to find a subdissector according to SSN */
-          if ( (subdissector_handle = get_itu_tcap_subdissector(actx->pinfo->match_uint))) {
-            /* Found according to SSN */
-            p_tcap_context->subdissector_handle=subdissector_handle;
-            p_tcap_context->subdissector_present=TRUE;
+          /* Copy the OID from the TCAP context to the current oid */
+          if (p_tcap_context->oid_present) {
+              p_tcap_private->oid = (void*)p_tcap_context->oid;
+              p_tcap_private->acv = TRUE;
           }
-        }
-      } /* context OID */
-    } else {
-      /* Copy the OID from the TCAP context to the current oid */
-      if (p_tcap_context->oid_present) {
-        p_tcap_private->oid= (void*) p_tcap_context->oid;
-        p_tcap_private->acv=TRUE;
-      }
-    } /* no OID */
+      } /* no OID */
   } /* no TCAP context */
 
 
-  if ( p_tcap_context
-       && p_tcap_context->subdissector_present) {
-    /* Take the subdissector from the context */
-    subdissector_handle=p_tcap_context->subdissector_handle;
-    is_subdissector=TRUE;
+  if (p_tcap_context
+      && p_tcap_context->subdissector_present) {
+      /* Take the subdissector from the context */
+      subdissector_handle = p_tcap_context->subdissector_handle;
+      is_subdissector = TRUE;
   }
 
   /* Have SccpUsersTable protocol taking precedence over sccp.ssn table */
   if (!is_subdissector && requested_subdissector_handle) {
-    is_subdissector = TRUE;
-    subdissector_handle = requested_subdissector_handle;
+      is_subdissector = TRUE;
+      subdissector_handle = requested_subdissector_handle;
   }
 
   if (!is_subdissector) {
-    /*
-     * If we do not currently know the subdissector, we have to find it
-     * - first, according to the OID
-     * - then according to the SSN
-     * - and at least, take the default Data handler
-     */
-    if (ber_oid_dissector_table && cur_oid) {
-      /* Search if we can find the sub protocol according to the A.C.N */
-      if ( (subdissector_handle
-        = dissector_get_string_handle(ber_oid_dissector_table, cur_oid)) ) {
-        /* found */
-        is_subdissector=TRUE;
+      /*
+       * If we do not currently know the subdissector, we have to find it
+       * - first, according to the OID
+       * - then according to the SSN
+       * - and at least, take the default Data handler
+       */
+      if (ber_oid_dissector_table && cur_oid) {
+          /* Search if we can find the sub protocol according to the A.C.N */
+          if ((subdissector_handle
+              = dissector_get_string_handle(ber_oid_dissector_table, cur_oid))) {
+              /* found */
+              is_subdissector = TRUE;
+          } else {
+              /* Search if we can found the sub protocol according to the SSN table */
+              if ((subdissector_handle
+                  = get_itu_tcap_subdissector(actx->pinfo->match_uint))) {
+                  /* Found according to SSN */
+                  is_subdissector = TRUE;
+              } else {
+                  /* Nothing found, take the Data handler */
+                  subdissector_handle = data_handle;
+                  is_subdissector = TRUE;
+              } /* SSN */
+          } /* ACN */
       } else {
-        /* Search if we can found the sub protocol according to the SSN table */
-        if ( (subdissector_handle
-          = get_itu_tcap_subdissector(actx->pinfo->match_uint))) {
-          /* Found according to SSN */
-          is_subdissector=TRUE;
-        } else {
-          /* Nothing found, take the Data handler */
-          subdissector_handle = data_handle;
-          is_subdissector=TRUE;
-        } /* SSN */
-      } /* ACN */
-    } else {
-      /* There is no A.C.N for this transaction, so search in the SSN table */
-      if ( (subdissector_handle = get_itu_tcap_subdissector(actx->pinfo->match_uint))) {
-        /* Found according to SSN */
-        is_subdissector=TRUE;
-      } else {
-        subdissector_handle = data_handle;
-        is_subdissector=TRUE;
-      }
-    } /* OID */
+          /* There is no A.C.N for this transaction, so search in the SSN table */
+          if ((subdissector_handle = get_itu_tcap_subdissector(actx->pinfo->match_uint))) {
+              /* Found according to SSN */
+              is_subdissector = TRUE;
+          } else {
+              subdissector_handle = data_handle;
+              is_subdissector = TRUE;
+          }
+      } /* OID */
   } else {
-    /* We have it already */
+      /* We have it already */
   }
 
   /* Call the sub dissector if present, and not already called */
   if (is_subdissector) {
-    call_dissector_with_data(subdissector_handle, tvb, actx->pinfo, tree, actx->value_ptr);
-    col_set_fence(actx->pinfo->cinfo, COL_INFO);
+      gboolean is_active = call_dissector_only(subdissector_handle, tvb, actx->pinfo, tree, actx->value_ptr);
+      col_set_fence(actx->pinfo->cinfo, COL_INFO);
+      if(!is_active){
+          return FALSE;
+    }
   }
-
-  return offset;
+  return TRUE;
 }
 
 void

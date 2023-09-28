@@ -19,6 +19,7 @@
 #include <epan/tap.h>
 #include <epan/stat_tap_ui.h>
 #include <epan/expert.h>
+#include <wsutil/ws_assert.h>
 
 void register_tap_listener_expert_info(void);
 
@@ -72,7 +73,7 @@ expert_stat_reset(void *tapdata)
 /* Process stat struct for an expert frame */
 static tap_packet_status
 expert_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_,
-                   const void *pointer)
+                   const void *pointer, tap_flags_t flags _U_)
 {
     const expert_info_t *ei   = (const expert_info_t *)pointer;
     expert_tapdata_t    *data = (expert_tapdata_t *)tapdata;
@@ -98,7 +99,7 @@ expert_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U
             severity_level = error_level;
             break;
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             return TAP_PACKET_DONT_REDRAW;
     }
 
@@ -284,16 +285,3 @@ register_tap_listener_expert_info(void)
 {
     register_stat_tap_ui(&expert_stat_ui, NULL);
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

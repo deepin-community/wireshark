@@ -149,37 +149,41 @@ static const char* ipx_conv_get_filter_type(conv_item_t* conv, conv_filter_type_
 static ct_dissector_info_t ipx_ct_dissector_info = {&ipx_conv_get_filter_type};
 
 static tap_packet_status
-ipx_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
+ipx_conversation_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
 	conv_hash_t *hash = (conv_hash_t*) pct;
+    hash->flags = flags;
+
 	const ipxhdr_t *ipxh=(const ipxhdr_t *)vip;
 
-	add_conversation_table_data(hash, &ipxh->ipx_src, &ipxh->ipx_dst, 0, 0, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &ipx_ct_dissector_info, ENDPOINT_NONE);
+	add_conversation_table_data(hash, &ipxh->ipx_src, &ipxh->ipx_dst, 0, 0, 1, pinfo->fd->pkt_len, &pinfo->rel_ts, &pinfo->abs_ts, &ipx_ct_dissector_info, CONVERSATION_NONE);
 
 	return TAP_PACKET_REDRAW;
 }
 
-static const char* ipx_host_get_filter_type(hostlist_talker_t* host, conv_filter_type_e filter)
+static const char* ipx_endpoint_get_filter_type(endpoint_item_t* endpoint, conv_filter_type_e filter)
 {
-	if ((filter == CONV_FT_ANY_ADDRESS) && (host->myaddress.type == AT_IPX))
+	if ((filter == CONV_FT_ANY_ADDRESS) && (endpoint->myaddress.type == AT_IPX))
 		return "ipx.addr";
 
 	return CONV_FILTER_INVALID;
 }
 
-static hostlist_dissector_info_t ipx_host_dissector_info = {&ipx_host_get_filter_type};
+static et_dissector_info_t ipx_endpoint_dissector_info = {&ipx_endpoint_get_filter_type};
 
 static tap_packet_status
-ipx_hostlist_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
+ipx_endpoint_packet(void *pit, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags)
 {
 	conv_hash_t *hash = (conv_hash_t*) pit;
+    hash->flags = flags;
+
 	const ipxhdr_t *ipxh=(const ipxhdr_t *)vip;
 
 	/* Take two "add" passes per packet, adding for each direction, ensures that all
 	packets are counted properly (even if address is sending to itself)
-	XXX - this could probably be done more efficiently inside hostlist_table */
-	add_hostlist_table_data(hash, &ipxh->ipx_src, 0, TRUE, 1, pinfo->fd->pkt_len, &ipx_host_dissector_info, ENDPOINT_NONE);
-	add_hostlist_table_data(hash, &ipxh->ipx_dst, 0, FALSE, 1, pinfo->fd->pkt_len, &ipx_host_dissector_info, ENDPOINT_NONE);
+	XXX - this could probably be done more efficiently inside endpoint_table */
+	add_endpoint_table_data(hash, &ipxh->ipx_src, 0, TRUE, 1, pinfo->fd->pkt_len, &ipx_endpoint_dissector_info, ENDPOINT_NONE);
+	add_endpoint_table_data(hash, &ipxh->ipx_dst, 0, FALSE, 1, pinfo->fd->pkt_len, &ipx_endpoint_dissector_info, ENDPOINT_NONE);
 
 	return TAP_PACKET_REDRAW;
 }
@@ -324,12 +328,12 @@ dissect_ipx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 		ipx_tree = proto_item_add_subtree(ti, ett_ipx);
 	}
 
-	str=address_to_str(wmem_packet_scope(), &pinfo->net_src);
+	str=address_to_str(pinfo->pool, &pinfo->net_src);
 	hidden_item = proto_tree_add_string(ipx_tree, hf_ipx_src, tvb, 0, 0, str);
 	proto_item_set_hidden(hidden_item);
 	hidden_item = proto_tree_add_string(ipx_tree, hf_ipx_addr, tvb, 0, 0, str);
 	proto_item_set_hidden(hidden_item);
-	str=address_to_str(wmem_packet_scope(), &pinfo->net_dst);
+	str=address_to_str(pinfo->pool, &pinfo->net_dst);
 	hidden_item = proto_tree_add_string(ipx_tree, hf_ipx_dst, tvb, 0, 0, str);
 	proto_item_set_hidden(hidden_item);
 	hidden_item = proto_tree_add_string(ipx_tree, hf_ipx_addr, tvb, 0, 0, str);
@@ -669,7 +673,7 @@ dissect_spx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 	 * SPX session using that source port; can that happen?  If so,
 	 * we should probably use the direction, as well as the conversation,
 	 * as part of the hash key; if we do that, we can probably just
-	 * use ENDPOINT_IPX as the port type, and possibly get rid of ENDPOINT_NCP.
+	 * use CONVERSATION_IPX as the port type, and possibly get rid of CONVERSATION_NCP.
 	 *
 	 * According to
 	 *
@@ -694,7 +698,7 @@ dissect_spx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 		 */
 		if (!pinfo->fd->visited) {
 			conversation = find_conversation(pinfo->num, &pinfo->src,
-			    &pinfo->dst, ENDPOINT_NCP, pinfo->srcport,
+			    &pinfo->dst, CONVERSATION_NCP, pinfo->srcport,
 			    pinfo->srcport, 0);
 			if (conversation == NULL) {
 				/*
@@ -702,7 +706,7 @@ dissect_spx(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 				 * a new one.
 				 */
 				conversation = conversation_new(pinfo->num, &pinfo->src,
-				    &pinfo->dst, ENDPOINT_NCP, pinfo->srcport,
+				    &pinfo->dst, CONVERSATION_NCP, pinfo->srcport,
 				    pinfo->srcport, 0);
 			}
 
@@ -944,7 +948,7 @@ dissect_serialization(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void*
 	}
 
 	col_add_fstr(pinfo->cinfo, COL_INFO, "Serial number %s",
-		    tvb_bytes_to_str(wmem_packet_scope(), tvb, 0, 6));
+		    tvb_bytes_to_str(pinfo->pool, tvb, 0, 6));
 
 	proto_tree_add_item(ser_tree, hf_serial_number, tvb, 0, 6, ENC_NA);
 	return tvb_captured_length(tvb);
@@ -1247,7 +1251,7 @@ dissect_ipxsap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _
 				s_tree = proto_item_add_subtree(ti, ett_ipxsap_server);
 
 				proto_tree_add_item(s_tree, hf_sap_server_type, tvb, cursor, 2, ENC_BIG_ENDIAN);
-				proto_tree_add_item_ret_string(s_tree, hf_sap_server_name, tvb, cursor+2, 48, ENC_ASCII|ENC_NA, wmem_packet_scope(), &server_name);
+				proto_tree_add_item_ret_string(s_tree, hf_sap_server_name, tvb, cursor+2, 48, ENC_ASCII|ENC_NA, pinfo->pool, &server_name);
 				proto_item_append_text(ti, ": %s", server_name);
 				proto_tree_add_item(s_tree, hf_sap_server_network, tvb, cursor+50, 4, ENC_NA);
 				proto_tree_add_item(s_tree, hf_sap_server_node, tvb, cursor+54, 6, ENC_NA);
@@ -1580,7 +1584,7 @@ proto_register_ipx(void)
 	spx_hash = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), spx_hash_func, spx_equal);
 	ipx_tap=register_tap("ipx");
 
-	register_conversation_table(proto_ipx, TRUE, ipx_conversation_packet, ipx_hostlist_packet);
+	register_conversation_table(proto_ipx, TRUE, ipx_conversation_packet, ipx_endpoint_packet);
 
 	register_capture_dissector("ipx", capture_ipx, proto_ipx);
 }

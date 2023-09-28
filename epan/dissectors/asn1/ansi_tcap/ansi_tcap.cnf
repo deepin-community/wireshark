@@ -9,6 +9,15 @@ PackageType
 Priority
 #.END
 
+#.FIELD_RENAME
+Invoke/parameter                        invoke_parameter
+ReturnResult/parameter                  returnResult_parameter
+ReturnError/parameter                   returnError_parameter
+Reject/parameter                        reject_parameter
+Abort/causeInformation/userInformation  abort_userInformation
+ErrorCode/private                       ec_private
+#.FIELD_ATTR
+ErrorCode/private ABBREV=ec_private
 #--- OperationCode ---
 
 #.FN_PARS
@@ -168,9 +177,9 @@ if(next_tvb) {
 		 * in the 8 octets case.
 		 */
 		if (len > 4){
-			ansi_tcap_private.TransactionID_str = tvb_bytes_to_str(wmem_packet_scope(), next_tvb, 4,len-4);
+			ansi_tcap_private.TransactionID_str = tvb_bytes_to_str(actx->pinfo->pool, next_tvb, 4,len-4);
 		}else{
-			ansi_tcap_private.TransactionID_str = tvb_bytes_to_str(wmem_packet_scope(), next_tvb, 0,len);
+			ansi_tcap_private.TransactionID_str = tvb_bytes_to_str(actx->pinfo->pool, next_tvb, 0,len);
 		}
 	}
 	switch(len) {

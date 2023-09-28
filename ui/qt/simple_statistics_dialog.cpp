@@ -15,7 +15,7 @@
 
 #include <QTreeWidget>
 
-#include "wireshark_application.h"
+#include "main_application.h"
 
 // To do:
 // - Hide rows with zero counts.
@@ -32,7 +32,7 @@ simple_stat_init(const char *args, void*) {
         if (args_l.length() > 2) {
             filter = QStringList(args_l.mid(2)).join(",");
         }
-        wsApp->emitTapParameterSignal(simple_stat, filter, NULL);
+        mainApp->emitTapParameterSignal(simple_stat, filter, NULL);
     }
 }
 }
@@ -267,6 +267,8 @@ void SimpleStatisticsDialog::fillTree()
         return;
     }
 
+    statsTreeWidget()->setSortingEnabled(false);
+
     cap_file_.retapPackets();
 
     // We only have one table. Move its tree items up one level.
@@ -275,6 +277,9 @@ void SimpleStatisticsDialog::fillTree()
     }
 
     tapDraw(&stat_data);
+
+    statsTreeWidget()->sortItems(0, Qt::AscendingOrder);
+    statsTreeWidget()->setSortingEnabled(true);
 
     removeTapListeners();
 }
@@ -301,16 +306,3 @@ SimpleStatisticsDialog::~SimpleStatisticsDialog()
             free_stat_tables(stu_);
     }
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

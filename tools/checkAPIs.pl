@@ -76,6 +76,9 @@ my %APIs = (
                 # See https://gitlab.com/wireshark/wireshark/-/issues/6695#note_400659130
                 'g_fprintf',
                 'g_vfprintf',
+                # use native snprintf() and vsnprintf() instead of these:
+                'g_snprintf',
+                'g_vsnprintf',
                 ### non-ANSI C
                 # use memset, memcpy, memcmp instead of these:
                 'bzero',
@@ -116,6 +119,9 @@ my %APIs = (
                 'strtod',
                 'strcasecmp',
                 'strncasecmp',
+                # Deprecated in glib 2.68 in favor of g_memdup2
+                # We have our local implementation for older versions
+                'g_memdup',
                 'g_strcasecmp',
                 'g_strncasecmp',
                 'g_strup',
@@ -272,8 +278,8 @@ my %APIs = (
                 'qVariantFromValue'
                 ] },
 
-        # APIs that make the program exit. Dissectors shouldn't call these
-        'abort' => { 'count_errors' => 1, 'functions' => [
+        'dissectors-prohibited' => { 'count_errors' => 1, 'functions' => [
+                # APIs that make the program exit. Dissectors shouldn't call these.
                 'abort',
                 'assert',
                 'assert_perror',
@@ -282,8 +288,9 @@ my %APIs = (
                 'g_error',
                 ] },
 
-        # APIs that print to the terminal. Dissectors shouldn't call these
-        'termoutput' => { 'count_errors' => 0, 'functions' => [
+        'dissectors-restricted' => { 'count_errors' => 0, 'functions' => [
+                # APIs that print to the terminal. Dissectors shouldn't call these.
+                # FIXME: Explain what to use instead.
                 'printf',
                 'g_warning',
                 ] },
@@ -291,6 +298,13 @@ my %APIs = (
 );
 
 my @apiGroups = qw(prohibited deprecated soft-deprecated);
+
+# Defines array of pairs function/variable which are excluded
+# from prefs_register_*_preference checks
+my @excludePrefsCheck = (
+         [ qw(prefs_register_password_preference), '(const char **)arg->pref_valptr' ],
+         [ qw(prefs_register_string_preference), '(const char **)arg->pref_valptr' ],
+);
 
 
 # Given a ref to a hash containing "functions" and "functions_count" entries:
@@ -527,7 +541,7 @@ sub check_included_files($$)
                         if ( m#([<"]|/+)gcrypt\.h[>"]$# ) {
                                 print STDERR "Warning: ".$filename.
                                         " includes gcrypt.h directly. ".
-                                        "Include wsutil/wsgrypt.h instead.\n";
+                                        "Include wsutil/wsgcrypt.h instead.\n";
                                 last;
                         }
                 }
@@ -604,7 +618,7 @@ sub check_proto_tree_add_XXX($$)
 
                 #Check for accidental usage of ENC_ parameter
                 if ($args =~ /,\s*ENC_/xos) {
-                        if (!($func =~ /proto_tree_add_(time|item|bitmask|bits_item|bits_ret_val|item_ret_int|item_ret_uint|bytes_item|checksum)/xos)
+                        if (!($func =~ /proto_tree_add_(time|item|bitmask|[a-z0-9]+_bits_format_value|bits_item|bits_ret_val|item_ret_int|item_ret_uint|bytes_item|checksum)/xos)
                            ) {
                                 print STDERR "Error: ".$filename." uses $func with ENC_*.\n";
                                 $errorCount++;
@@ -704,17 +718,8 @@ sub check_hf_entries($$)
                                   &\s*([A-Z0-9_\[\]-]+)         # &hf
                                   \s*,\s*
         }xis;
-        if (${$fileContentsRef} =~ /^#define\s+NEW_PROTO_TREE_API/m) {
-                $hfRegex = qr{
-                                  \sheader_field_info\s+
-                                  ([A-Z0-9_]+)
-                                  \s+
-                                  [A-Z0-9_]*
-                                  \s*=\s*
-                }xis;
-        }
         @items = (${$fileContentsRef} =~ m{
-                                  $hfRegex                      # &hf or "new" hfi name
+                                  $hfRegex                      # &hf
                                   \{\s*
                                   ("[A-Z0-9 '\./\(\)_:-]+")     # name
                                   \s*,\s*
@@ -871,6 +876,7 @@ sub check_pref_var_dupes($$)
         my @dupes;
         my %count;
         while ($filecontents =~ /prefs_register_(\w+?)_preference/gs) {
+                my ($func) = "prefs_register_$1_preference";
                 my ($args) = extract_bracketed(substr($filecontents, $+[0]), '()');
                 $args = substr($args, 1, -1); # strip parens
 
@@ -878,7 +884,17 @@ sub check_pref_var_dupes($$)
                 next if exists $prefs_register_var_pos{$1} and not defined $pos;
                 $pos //= -1;
                 my $var = (split /\s*,\s*(?![^(]*\))/, $args)[$pos]; # only commas outside parens
-                push @dupes, $var if $count{$var}++ == 1;
+
+                my $ignore = 0;
+                for my $row (@excludePrefsCheck) {
+                        my ($rfunc, $rvar) = @$row;
+                        if (($rfunc eq $func) && ($rvar eq $var)) {
+                                $ignore = 1
+                        }
+                }
+                if (!$ignore) {
+                        push @dupes, $var if $count{$var}++ == 1;
+                }
         }
 
         if (@dupes) {
@@ -1175,14 +1191,9 @@ while ($_ = pop @filelist)
             $errorCount += check_hf_entries(\$fileContents, $filename);
         }
 
-        if ($fileContents =~ m{ __func__ }xo)
-        {
-                print STDERR "Error: Found __func__ (which is not portable, use G_STRFUNC) in " .$filename."\n";
-                $errorCount++;
-        }
         if ($fileContents =~ m{ %ll }xo)
         {
-                # use G_GINT64_MODIFIER instead of ll
+                # use PRI[dux...]N instead of ll
                 print STDERR "Error: Found %ll in " .$filename."\n";
                 $errorCount++;
         }

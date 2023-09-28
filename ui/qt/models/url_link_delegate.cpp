@@ -11,14 +11,13 @@
 #include <ui/qt/models/url_link_delegate.h>
 
 #include <QPainter>
-#include <QRegExp>
 
 #include <ui/qt/utils/color_utils.h>
 
 UrlLinkDelegate::UrlLinkDelegate(QObject *parent)
  : QStyledItemDelegate(parent),
    re_col_(-1),
-   url_re_(new QRegExp())
+   url_re_(new QRegularExpression())
 {}
 
 UrlLinkDelegate::~UrlLinkDelegate()
@@ -36,7 +35,7 @@ void UrlLinkDelegate::paint(QPainter *painter, const QStyleOptionViewItem &optio
     if (re_col_ >= 0 && url_re_) {
         QModelIndex re_idx = index.model()->index(index.row(), re_col_);
         QString col_text = index.model()->data(re_idx).toString();
-        if (url_re_->indexIn(col_text) < 0) {
+        if (!url_re_->match(col_text).hasMatch()) {
             QStyledItemDelegate::paint(painter, option, index);
             return;
         }
@@ -50,16 +49,3 @@ void UrlLinkDelegate::paint(QPainter *painter, const QStyleOptionViewItem &optio
 
     QStyledItemDelegate::paint(painter, opt, index);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

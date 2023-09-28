@@ -2664,8 +2664,8 @@ CSN_DESCR_END         (DTM_EGPRS_HighMultislotClass_t)
 
 static const
 CSN_DESCR_BEGIN       (DownlinkDualCarrierCapability_r7_t)
-  M_NEXT_EXIST        (DownlinkDualCarrierCapability_r7_t, MultislotCapabilityReductionForDL_DualCarrier, 1, &hf_content_multislot_capability_reduction_for_dl_dual_carrier),
-  M_UINT              (DownlinkDualCarrierCapability_r7_t, DL_DualCarrierForDTM,  3, &hf_content_dual_carrier_for_dtm),
+  M_UINT              (DownlinkDualCarrierCapability_r7_t, MultislotCapabilityReductionForDL_DualCarrier, 3, &hf_content_multislot_capability_reduction_for_dl_dual_carrier),
+  M_UINT              (DownlinkDualCarrierCapability_r7_t, DL_DualCarrierForDTM,  1, &hf_content_dual_carrier_for_dtm),
 CSN_DESCR_END         (DownlinkDualCarrierCapability_r7_t)
 
 static const
@@ -2750,7 +2750,7 @@ CSN_DESCR_BEGIN       (Content_t)
   /* additions in release 7 */
   M_UINT_OR_NULL      (Content_t,  DTM_Handover_Capability,  1, &hf_content_dtm_handover_capability),
   M_NEXT_EXIST_OR_NULL(Content_t, Exist_DownlinkDualCarrierCapability_r7, 1, &hf_content_multislot_capability_reduction_for_dl_dual_carrier_exist),
-  M_TYPE              (Content_t, DownlinkDualCarrierCapability_r7, DownlinkDualCarrierCapability_r7_t),
+  M_TYPE_OR_NULL      (Content_t, DownlinkDualCarrierCapability_r7, DownlinkDualCarrierCapability_r7_t),
 
   M_UINT_OR_NULL      (Content_t,  FlexibleTimeslotAssignment,  1, &hf_content_flexible_timeslot_assignment),
   M_UINT_OR_NULL      (Content_t,  GAN_PS_HandoverCapability,  1, &hf_content_gan_ps_handover_capability),
@@ -4496,10 +4496,12 @@ static CSN_CallBackStatus_t cb_parse_mi(proto_tree *tree, tvbuff_t *tvb,
 {
   guint8 mi_length = *((guint8 *) _mi_length);
 
-  /* de_mid() requires an octet-aligned buffer */
-  tvbuff_t *mi_tvb = tvb_new_octet_aligned(tvb, bit_offset, mi_length << 3);
-  add_new_data_source(pinfo, mi_tvb, "Mobile Identity");
-  de_mid(mi_tvb, tree, pinfo, 0, -1, NULL, 0);
+  if ((mi_length << 3) != 0) {
+    /* de_mid() requires an octet-aligned buffer */
+    tvbuff_t *mi_tvb = tvb_new_octet_aligned(tvb, bit_offset, mi_length << 3);
+    add_new_data_source(pinfo, mi_tvb, "Mobile Identity");
+    de_mid(mi_tvb, tree, pinfo, 0, -1, NULL, 0);
+  }
 
   return mi_length << 3;
 }
@@ -8390,7 +8392,7 @@ static const value_string gsm_rlcmac_val_plus_1_vals[] = {
 
 static const true_false_string gsm_rlcmac_psi1_measurement_order_value = {
   "MS shall send measurement reports for cell re-selection",
-  "MS performs cell re-selection in both packet idle and transfert mode and shall not send any measurement reports to the network"
+  "MS performs cell re-selection in both packet idle and transfer mode and shall not send any measurement reports to the network"
 };
 
 static const value_string gsm_rlcmac_nmo_vals[] = {
@@ -9012,6 +9014,7 @@ dissect_dl_gprs_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, RlcMa
   guint16      bit_length  = tvb_reported_length(tvb) * 8;
 
   guint8 payload_type = tvb_get_bits8(tvb, 0, 2);
+  guint8 s_p  = tvb_get_bits8(tvb, 4, 1);
   guint8 rbsn = tvb_get_bits8(tvb, 8, 1);
   guint8 fs   = tvb_get_bits8(tvb, 14, 1);
   guint8 ac   = tvb_get_bits8(tvb, 15, 1);
@@ -9098,6 +9101,8 @@ dissect_dl_gprs_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, RlcMa
     }
     data->u.MESSAGE_TYPE = tvb_get_bits8(tvb, message_type_offset, 6);
     col_append_sep_fstr(pinfo->cinfo, COL_INFO, " CTRL: ", "%s", val_to_str_ext(data->u.MESSAGE_TYPE, &dl_rlc_message_type_vals_ext, "Unknown Message Type"));
+    if (s_p)
+        col_append_str(pinfo->cinfo, COL_INFO, " [RRBP]");
     ti = proto_tree_add_protocol_format(tree, proto_gsm_rlcmac, tvb, bit_offset >> 3, -1,
                                         "GSM RLC/MAC: %s (%d) (Downlink)",
                                         val_to_str_ext(data->u.MESSAGE_TYPE, &dl_rlc_message_type_vals_ext, "Unknown Message Type"),
@@ -9200,7 +9205,8 @@ dissect_egprs_dl_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ", "MCS%d", rlc_mac->mcs);
     col_append_str_uint(pinfo->cinfo, COL_INFO, "TFI", data->u.DL_Data_Block_EGPRS_Header.TFI, " ");
     col_append_str_uint(pinfo->cinfo, COL_INFO, "BSN1", rlc_mac->u.egprs_dl_header_info.bsn1, " ");
-    col_append_str_uint(pinfo->cinfo, COL_INFO, "BSN2", rlc_mac->u.egprs_dl_header_info.bsn2, " ");
+    if (data->block_format == RLCMAC_HDR_TYPE_1)
+      col_append_str_uint(pinfo->cinfo, COL_INFO, "BSN2", rlc_mac->u.egprs_dl_header_info.bsn2, " ");
     col_append_str_uint(pinfo->cinfo, COL_INFO, "USF", data->u.DL_Data_Block_EGPRS_Header.USF, " ");
     if (data->u.DL_Data_Block_EGPRS_Header.ES_P)
         col_append_str(pinfo->cinfo, COL_INFO, " [RRBP]");
@@ -9575,7 +9581,8 @@ dissect_egprs_ul_header_block(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tre
     col_append_sep_fstr(pinfo->cinfo, COL_INFO, " ", "MCS%d", rlc_mac->mcs);
     col_append_str_uint(pinfo->cinfo, COL_INFO, "TFI", data->u.UL_Data_Block_EGPRS_Header.TFI, " ");
     col_append_str_uint(pinfo->cinfo, COL_INFO, "BSN1", rlc_mac->u.egprs_ul_header_info.bsn1, " ");
-    col_append_str_uint(pinfo->cinfo, COL_INFO, "BSN2", rlc_mac->u.egprs_ul_header_info.bsn2, " ");
+    if (data->block_format == RLCMAC_HDR_TYPE_1)
+      col_append_str_uint(pinfo->cinfo, COL_INFO, "BSN2", rlc_mac->u.egprs_ul_header_info.bsn2, " ");
     col_append_str_uint(pinfo->cinfo, COL_INFO, "CV", data->u.UL_Data_Block_EGPRS_Header.Countdown_Value, " ");
   }
 }
@@ -9734,7 +9741,7 @@ dissect_gsm_rlcmac_downlink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   RlcMacPrivateData_t *rlc_mac = (RlcMacPrivateData_t*)data;
 
   /* allocate a data structure and guess the coding scheme */
-  rlc_dl = wmem_new0(wmem_packet_scope(), RlcMacDownlink_t);
+  rlc_dl = wmem_new0(pinfo->pool, RlcMacDownlink_t);
 
   if ((rlc_mac != NULL) && (rlc_mac->magic == GSM_RLC_MAC_MAGIC_NUMBER))
   {
@@ -9815,7 +9822,7 @@ dissect_gsm_rlcmac_uplink(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
   RlcMacPrivateData_t *rlc_mac = (RlcMacPrivateData_t*)data;
 
   /* allocate a data structure and set the coding scheme */
-  rlc_ul = wmem_new0(wmem_packet_scope(), RlcMacUplink_t);
+  rlc_ul = wmem_new0(pinfo->pool, RlcMacUplink_t);
 
   if ((rlc_mac != NULL) && (rlc_mac->magic == GSM_RLC_MAC_MAGIC_NUMBER))
   {
@@ -10161,7 +10168,7 @@ proto_register_gsm_rlcmac(void)
      { &hf_tlli,
        { "TLLI",
          "gsm_rlcmac.tlli",
-         FT_UINT32, BASE_DEC, NULL, 0x0,
+         FT_UINT32, BASE_HEX, NULL, 0x0,
          NULL, HFILL
        }
      },
@@ -12240,7 +12247,7 @@ proto_register_gsm_rlcmac(void)
       }
     },
     { &hf_egprs_prr_additionsr7_16qam_hsr_mean_bep_exist,
-      { "Exist_16QAM_HSR_MEAN_BEP",        "gsm_rlcmac.ul.prr_esixt_16qam_hsr_mean_bep",
+      { "Exist_16QAM_HSR_MEAN_BEP",        "gsm_rlcmac.ul.prr_exist_16qam_hsr_mean_bep",
         FT_UINT8, BASE_DEC, NULL, 0x0,
         NULL, HFILL
       }
@@ -12312,7 +12319,7 @@ proto_register_gsm_rlcmac(void)
       }
     },
     { &hf_prr_additionsr6_additionsr7_exist,
-      { "Exist_AdditionsR7",        "gsm_rlcmac.ul.prr_exsit_r7",
+      { "Exist_AdditionsR7",        "gsm_rlcmac.ul.prr_exist_r7",
         FT_UINT8, BASE_DEC, NULL, 0x0,
         NULL, HFILL
       }
@@ -12330,7 +12337,7 @@ proto_register_gsm_rlcmac(void)
       }
     },
     { &hf_egprs_timeslotlinkquality_measurements_type2_exist,
-      { "Exist_EGPRS_TimeslotLinkQualityMeasurements_type2",        "gsm_rlcmac.ul.prr_exist_egprs_temeslotquality_meas_type2",
+      { "Exist_EGPRS_TimeslotLinkQualityMeasurements_type2",        "gsm_rlcmac.ul.prr_exist_egprs_timeslotquality_meas_type2",
         FT_UINT8, BASE_DEC, NULL, 0x0,
         NULL, HFILL
       }
@@ -15522,7 +15529,7 @@ proto_register_gsm_rlcmac(void)
       }
     },
     { &hf_packet_compact_cell_sel_gprs_penalty_time,
-      { "GPRS_PENALTY_TIME",        "gsm_rlcmac.dl.psi3_compact_cell_sel_gprs_panelty_time",
+      { "GPRS_PENALTY_TIME",        "gsm_rlcmac.dl.psi3_compact_cell_sel_gprs_penalty_time",
         FT_UINT8, BASE_DEC, NULL, 0x0,
         NULL, HFILL
       }
@@ -18227,7 +18234,7 @@ proto_register_gsm_rlcmac(void)
     },
 
     { &hf_packet_access_reject_reject_exist,
-      { "Reject[1] Exist", "gsm_rlcmac.acket_access_reject.reject_exist",
+      { "Reject[1] Exist", "gsm_rlcmac.packet_access_reject.reject_exist",
         FT_UINT8, BASE_DEC, NULL, 0x0,
         NULL, HFILL
       }

@@ -21,6 +21,7 @@
 
 #include <ui/qt/utils/qt_ui_utils.h>
 #include <wsutil/file_util.h>
+#include <wsutil/ws_assert.h>
 
 #include <QVector>
 
@@ -33,8 +34,8 @@ DecodeAsItem::DecodeAsItem()
  selectorUint_(0),
  selectorString_(""),
  selectorDCERPC_(NULL),
- default_proto_(DECODE_AS_NONE),
- current_proto_(DECODE_AS_NONE),
+ default_dissector_(DECODE_AS_NONE),
+ current_dissector_(DECODE_AS_NONE),
  dissector_handle_(NULL)
 {
 }
@@ -48,6 +49,13 @@ DecodeAsModel::DecodeAsModel(QObject *parent, capture_file *cf) :
     QAbstractTableModel(parent),
     cap_file_(cf)
 {
+}
+
+DecodeAsModel::~DecodeAsModel()
+{
+    foreach(DecodeAsItem* item, decode_as_items_)
+        delete item;
+    decode_as_items_.clear();
 }
 
 Qt::ItemFlags DecodeAsModel::flags(const QModelIndex &index) const
@@ -93,13 +101,13 @@ QVariant DecodeAsModel::data(const QModelIndex &index, int role) const
         case colTable:
             return tr("Match using this field");
         case colSelector:
-            return tr("Current\"Decode As\" behavior");
+            return tr("Change behavior when the field matches this value");
         case colType:
-            return QVariant();
+            return tr("Field value type (and base, if Integer)");
         case colDefault:
             return tr("Default \"Decode As\" behavior");
         case colProtocol:
-            return tr("Change behavior when the protocol field matches this value");
+            return tr("Current\"Decode As\" behavior");
         }
         return QVariant();
     case Qt::DisplayRole:
@@ -161,9 +169,9 @@ QVariant DecodeAsModel::data(const QModelIndex &index, int role) const
             break;
         }
         case colDefault:
-            return item->default_proto_;
+            return item->default_dissector_;
         case colProtocol:
-            return item->current_proto_;
+            return item->current_dissector_;
         }
         return QVariant();
 
@@ -192,7 +200,7 @@ QVariant DecodeAsModel::headerData(int section, Qt::Orientation orientation, int
     case colProtocol:
         return tr("Current");
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     return QVariant();
@@ -205,7 +213,7 @@ int DecodeAsModel::rowCount(const QModelIndex &parent) const
         return 0;
     }
 
-    return decode_as_items_.count();
+    return static_cast<int>(decode_as_items_.count());
 }
 
 int DecodeAsModel::columnCount(const QModelIndex &parent) const
@@ -254,7 +262,7 @@ bool DecodeAsModel::setData(const QModelIndex &cur_index, const QVariant &value,
         }
         break;
     case DecodeAsModel::colProtocol:
-        item->current_proto_ = value.toString();
+        item->current_dissector_ = value.toString();
         break;
     case DecodeAsModel::colSelector:
         {
@@ -303,7 +311,7 @@ bool DecodeAsModel::insertRows(int row, int count, const QModelIndex &/*parent*/
 
                     //reset the default and current protocols in case previous layer
                     //populated it and this layer doesn't have a handle for it
-                    item->default_proto_ =  item->current_proto_ = DECODE_AS_NONE;
+                    item->default_dissector_ =  item->current_dissector_ = DECODE_AS_NONE;
 
                     item->tableName_ = entry->table_name;
                     item->tableUIName_ = get_dissector_table_ui_name(entry->table_name);
@@ -351,10 +359,10 @@ bool DecodeAsModel::insertRows(int row, int count, const QModelIndex &/*parent*/
                     lastItemIsOk = itemOk;
 
                     if (dissector != NULL) {
-                        item->default_proto_ = dissector_handle_get_short_name(dissector);
+                        item->default_dissector_ = dissector_handle_get_description(dissector);
                         //When adding a new record, "default" should equal "current", so the user can
                         //explicitly change it
-                        item->current_proto_ = item->default_proto_;
+                        item->current_dissector_ = item->default_dissector_;
                     }
                 }
             }
@@ -400,6 +408,8 @@ void DecodeAsModel::clearAll()
         return;
 
     beginResetModel();
+    foreach(DecodeAsItem* item, decode_as_items_)
+        delete item;
     decode_as_items_.clear();
     endResetModel();
 }
@@ -418,8 +428,8 @@ bool DecodeAsModel::copyRow(int dst_row, int src_row)
     dst->selectorUint_ = src->selectorUint_;
     dst->selectorString_ = src->selectorString_;
     dst->selectorDCERPC_ = src->selectorDCERPC_;
-    dst->default_proto_ = src->default_proto_;
-    dst->current_proto_ = src->current_proto_;
+    dst->default_dissector_ = src->default_dissector_;
+    dst->current_dissector_ = src->current_dissector_;
     dst->dissector_handle_ = src->dissector_handle_;
 
     QVector<int> roles;
@@ -473,10 +483,10 @@ prefs_set_pref_e DecodeAsModel::readDecodeAsEntry(gchar *key, const gchar *value
         item->selectorUint_ = selector.toUInt(Q_NULLPTR, 0);
     }
 
-    item->default_proto_ = values[2];
+    item->default_dissector_ = values[2];
     item->dissector_handle_ = dissector_table_get_dissector_handle(dissector_table, values[3]);
     if (item->dissector_handle_) {
-        item->current_proto_ = values[3];
+        item->current_dissector_ = values[3];
     }
 
     model->decode_as_items_ << item;
@@ -539,7 +549,7 @@ QString DecodeAsModel::entryString(const gchar *table_name, gconstpointer value)
                 break;
 
             default:
-                g_assert_not_reached();
+                ws_assert_not_reached();
                 break;
             }
             entry_str = QString("%1").arg(int_to_qstring(num_val, width, 16));
@@ -569,7 +579,7 @@ QString DecodeAsModel::entryString(const gchar *table_name, gconstpointer value)
         return "0";
 
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
         break;
     }
     return entry_str;
@@ -578,12 +588,12 @@ QString DecodeAsModel::entryString(const gchar *table_name, gconstpointer value)
 void DecodeAsModel::fillTable()
 {
     decode_as_items_.clear();
-    emit beginResetModel();
+    beginResetModel();
 
     dissector_all_tables_foreach_changed(buildChangedList, this);
     decode_dcerpc_add_show_list(buildDceRpcChangedList, this);
 
-    emit endResetModel();
+    endResetModel();
 }
 
 void DecodeAsModel::setDissectorHandle(const QModelIndex &index, dissector_handle_t  dissector_handle)
@@ -600,7 +610,7 @@ void DecodeAsModel::buildChangedList(const gchar *table_name, ftenum_t, gpointer
         return;
 
     dissector_handle_t default_dh, current_dh;
-    QString default_proto_name(DECODE_AS_NONE), current_proto_name(DECODE_AS_NONE);
+    QString default_dissector(DECODE_AS_NONE), current_dissector(DECODE_AS_NONE);
     DecodeAsItem* item = new DecodeAsItem();
     ftenum_t selector_type = get_dissector_table_selector_type(table_name);
 
@@ -614,15 +624,15 @@ void DecodeAsModel::buildChangedList(const gchar *table_name, ftenum_t, gpointer
 
     default_dh = dtbl_entry_get_initial_handle((dtbl_entry_t *)value);
     if (default_dh) {
-        default_proto_name = dissector_handle_get_short_name(default_dh);
+        default_dissector = dissector_handle_get_description(default_dh);
     }
-    item->default_proto_ = default_proto_name;
+    item->default_dissector_ = default_dissector;
 
     current_dh = dtbl_entry_get_handle((dtbl_entry_t *)value);
     if (current_dh) {
-        current_proto_name = QString(dissector_handle_get_short_name(current_dh));
+        current_dissector = QString(dissector_handle_get_description(current_dh));
     }
-    item->current_proto_ = current_proto_name;
+    item->current_dissector_ = current_dissector;
     item->dissector_handle_ = current_dh;
 
     model->decode_as_items_ << item;
@@ -633,7 +643,7 @@ void DecodeAsModel::buildDceRpcChangedList(gpointer data, gpointer user_data)
     dissector_table_t sub_dissectors;
     guid_key guid_val;
     decode_dcerpc_bind_values_t *binding = (decode_dcerpc_bind_values_t *)data;
-    QString default_proto_name(DECODE_AS_NONE), current_proto_name(DECODE_AS_NONE);
+    QString default_dissector(DECODE_AS_NONE), current_dissector(DECODE_AS_NONE);
 
     DecodeAsModel *model = (DecodeAsModel*)user_data;
     if (model == NULL)
@@ -652,10 +662,10 @@ void DecodeAsModel::buildDceRpcChangedList(gpointer data, gpointer user_data)
     guid_val.guid = binding->uuid;
     item->dissector_handle_ = dissector_get_guid_handle(sub_dissectors, &guid_val);
     if (item->dissector_handle_) {
-        current_proto_name = QString(dissector_handle_get_short_name(item->dissector_handle_));
+        current_dissector = QString(dissector_handle_get_description(item->dissector_handle_));
     }
-    item->current_proto_ = current_proto_name;
-    item->default_proto_ = default_proto_name;
+    item->current_dissector_ = current_dissector;
+    item->default_dissector_ = default_dissector;
 
     model->decode_as_items_ << item;
 }
@@ -735,7 +745,7 @@ void DecodeAsModel::applyChanges()
     foreach(DecodeAsItem *item, decode_as_items_) {
         decode_as_t       *decode_as_entry;
 
-        if (item->current_proto_.isEmpty()) {
+        if (item->current_dissector_.isEmpty()) {
             continue;
         }
 
@@ -779,7 +789,7 @@ void DecodeAsModel::applyChanges()
                     continue;
                 }
 
-                if ((item->current_proto_ == DECODE_AS_NONE) || !item->dissector_handle_) {
+                if ((item->current_dissector_ == DECODE_AS_NONE) || !item->dissector_handle_) {
                     decode_as_entry->reset_value(decode_as_entry->table_name, selector_value);
                     sub_dissectors = find_dissector_table(decode_as_entry->table_name);
 
@@ -796,7 +806,7 @@ void DecodeAsModel::applyChanges()
                     }
                     break;
                 } else {
-                    decode_as_entry->change_value(decode_as_entry->table_name, selector_value, &item->dissector_handle_, item->current_proto_.toUtf8().constData());
+                    decode_as_entry->change_value(decode_as_entry->table_name, selector_value, &item->dissector_handle_, item->current_dissector_.toUtf8().constData());
                     sub_dissectors = find_dissector_table(decode_as_entry->table_name);
 
                     /* For now, only numeric dissector tables can use preferences */
@@ -815,15 +825,3 @@ void DecodeAsModel::applyChanges()
     }
     prefs_apply_all();
 }
-
-/* * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

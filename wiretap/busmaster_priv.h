@@ -1,4 +1,4 @@
-/* busmaster_priv.h
+/** @file
  *
  * Wiretap Library
  * Copyright (c) 1998 by Gilbert Ramirez <gram@alumni.rice.edu>
@@ -15,7 +15,6 @@
 #include <gmodule.h>
 #include <wiretap/wtap.h>
 #include <wiretap/socketcan.h>
-#include <wsutil/ws_printf.h>
 
 //#define BUSMASTER_DEBUG
 //#define BUSMASTER_PARSER_TRACE
@@ -36,7 +35,7 @@ typedef enum {
     PROTOCOL_CAN,
     PROTOCOL_LIN,
     PROTOCOL_J1939,
-} protocol_t;
+} protocol_type_t;
 
 typedef enum {
     DATA_MODE_UNKNOWN = 0,
@@ -101,7 +100,7 @@ typedef struct {
 typedef struct {
     gint64      file_start_offset;
     gint64      file_end_offset;
-    protocol_t  protocol;
+    protocol_type_t  protocol;
     data_mode_t data_mode;
     time_mode_t time_mode;
     msg_date_t  start_date;
@@ -128,7 +127,8 @@ run_busmaster_parser(busmaster_state_t *state,
                      int               *err, gchar **err_info);
 
 #ifdef BUSMASTER_DEBUG
-#define busmaster_debug_printf(...) ws_debug_printf(__VA_ARGS__)
+#include <stdio.h>
+#define busmaster_debug_printf(...) printf(__VA_ARGS__)
 #else
 #define busmaster_debug_printf(...) (void)0
 #endif

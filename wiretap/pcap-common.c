@@ -452,7 +452,7 @@ static const struct {
 	/* Linux vsock */
 	{ 271,		WTAP_ENCAP_VSOCK },
 
-	/* Nordic BLE Sniffer */
+	/* nRF Sniffer for Bluetooth LE */
 	{ 272,		WTAP_ENCAP_NORDIC_BLE },
 
 	/* DOCSIS31 XRA31 Sniffer */
@@ -481,6 +481,18 @@ static const struct {
 
 	/* USB 2.0/1.1/1.0 packets as transmitted over the cable */
 	{ 288,		WTAP_ENCAP_USB_2_0 },
+
+	/* Event Tracing for Windows records */
+	{ 290,		WTAP_ENCAP_ETW },
+
+	/* Serial NCP (Network Co-Processor) protocol for Zigbee stack ZBOSS */
+	{ 292,		WTAP_ENCAP_ZBNCP },
+
+	/* USB 2.0/1.1/1.0 packets captured on Low/Full/High speed link */
+	{ 293,		WTAP_ENCAP_USB_2_0_LOW_SPEED },
+	{ 294,		WTAP_ENCAP_USB_2_0_FULL_SPEED },
+	{ 295,		WTAP_ENCAP_USB_2_0_HIGH_SPEED },
+
 	/*
 	 * To repeat:
 	 *
@@ -762,6 +774,10 @@ wtap_max_snaplen_for_encap(int wtap_encap)
 		return WTAP_MAX_PACKET_SIZE_EBHSCR;
 
 	case WTAP_ENCAP_USBPCAP:
+	case WTAP_ENCAP_USB_LINUX:
+	case WTAP_ENCAP_USB_LINUX_MMAPPED:
+	case WTAP_ENCAP_USB_DARWIN:
+	case WTAP_ENCAP_USB_FREEBSD:
 		return WTAP_MAX_PACKET_SIZE_USBPCAP;
 
 	default:
@@ -800,7 +816,7 @@ pcap_read_nokiaatm_pseudoheader(FILE_T fh,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: Nokia IPSO ATM file has a %u-byte packet, too small to have even an ATM pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: Nokia IPSO ATM file has a %u-byte packet, too small to have even an ATM pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -847,7 +863,7 @@ pcap_read_sunatm_pseudoheader(FILE_T fh,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: SunATM file has a %u-byte packet, too small to have even an ATM pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: SunATM file has a %u-byte packet, too small to have even an ATM pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -991,7 +1007,7 @@ pcap_read_irda_pseudoheader(FILE_T fh, union wtap_pseudo_header *pseudo_header,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: IrDA file has a %u-byte packet, too small to have even an IrDA pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: IrDA file has a %u-byte packet, too small to have even an IrDA pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1048,7 +1064,7 @@ pcap_read_mtp2_pseudoheader(FILE_T fh, union wtap_pseudo_header *pseudo_header,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: MTP2 file has a %u-byte packet, too small to have even an MTP2 pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: MTP2 file has a %u-byte packet, too small to have even an MTP2 pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1108,7 +1124,7 @@ pcap_read_lapd_pseudoheader(FILE_T fh, union wtap_pseudo_header *pseudo_header,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: LAPD file has a %u-byte packet, too small to have even a LAPD pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: LAPD file has a %u-byte packet, too small to have even a LAPD pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1170,7 +1186,7 @@ pcap_read_sita_pseudoheader(FILE_T fh, union wtap_pseudo_header *pseudo_header,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: SITA file has a %u-byte packet, too small to have even a SITA pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: SITA file has a %u-byte packet, too small to have even a SITA pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1230,7 +1246,7 @@ pcap_read_bt_pseudoheader(FILE_T fh, union wtap_pseudo_header *pseudo_header,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: Bluetooth file has a %u-byte packet, too small to have even a pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: Bluetooth file has a %u-byte packet, too small to have even a pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1278,7 +1294,7 @@ pcap_read_bt_monitor_pseudoheader(FILE_T fh,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: Bluetooth monitor file has a %u-byte packet, too small to have even a pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: Bluetooth monitor file has a %u-byte packet, too small to have even a pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1322,7 +1338,7 @@ pcap_read_llcp_pseudoheader(FILE_T fh,
 
 	if (packet_size < LLCP_HEADER_LEN) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: NFC LLCP file has a %u-byte packet, too small to have even a pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: NFC LLCP file has a %u-byte packet, too small to have even a pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1369,7 +1385,7 @@ pcap_read_ppp_pseudoheader(FILE_T fh, union wtap_pseudo_header *pseudo_header,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: PPP file has a %u-byte packet, too small to have even a pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: PPP file has a %u-byte packet, too small to have even a pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1410,7 +1426,7 @@ pcap_read_erf_pseudoheader(FILE_T fh, wtap_rec *rec,
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to have even an ERF pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to have even an ERF pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1429,7 +1445,7 @@ pcap_read_erf_pseudoheader(FILE_T fh, wtap_rec *rec,
 	 * This allows an ultimate resolution of 1/(2^32) seconds, or approximately 233 picoseconds */
 	if (rec) {
 		guint64 ts = pseudo_header->erf.phdr.ts;
-		rec->ts.secs = (guint32) (ts >> 32);
+		rec->ts.secs = (time_t) (ts >> 32);
 		ts = ((ts & 0xffffffff) * 1000 * 1000 * 1000);
 		ts += (ts & 0x80000000) << 1; /* rounding */
 		rec->ts.nsecs = ((guint32) (ts >> 32));
@@ -1461,13 +1477,13 @@ pcap_read_erf_pseudoheader(FILE_T fh, wtap_rec *rec,
 		do {
 			if (phdr_len > INT_MAX - 8) {
 				*err = WTAP_ERR_BAD_FILE;
-				*err_info = g_strdup_printf("pcap/pcapng: ERF file has a packet larger than %d bytes",
+				*err_info = ws_strdup_printf("pcap/pcapng: ERF file has a packet larger than %d bytes",
 				    INT_MAX);
 				return -1;
 			}
 			if (packet_size < (guint)phdr_len + 8) {
 				*err = WTAP_ERR_BAD_FILE;
-				*err_info = g_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to include the extension headers",
+				*err_info = ws_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to include the extension headers",
 				    packet_size);
 				return -1;
 			}
@@ -1497,13 +1513,13 @@ pcap_read_erf_pseudoheader(FILE_T fh, wtap_rec *rec,
 		/* Extract the Multi Channel header to include it in the pseudo header part */
 		if (phdr_len > INT_MAX - (int)sizeof(erf_mc_header_t)) {
 			*err = WTAP_ERR_BAD_FILE;
-			*err_info = g_strdup_printf("pcap/pcapng: ERF file has a packet larger than %d bytes",
+			*err_info = ws_strdup_printf("pcap/pcapng: ERF file has a packet larger than %d bytes",
 			    INT_MAX);
 			return -1;
 		}
 		if (packet_size < (guint)(phdr_len + (int)sizeof(erf_mc_header_t))) {
 			*err = WTAP_ERR_BAD_FILE;
-			*err_info = g_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to include the Multi Channel header",
+			*err_info = ws_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to include the Multi Channel header",
 			    packet_size);
 			return -1;
 		}
@@ -1516,13 +1532,13 @@ pcap_read_erf_pseudoheader(FILE_T fh, wtap_rec *rec,
 		/* Extract the AAL2 header to include it in the pseudo header part */
 		if (phdr_len > INT_MAX - (int)sizeof(erf_aal2_header_t)) {
 			*err = WTAP_ERR_BAD_FILE;
-			*err_info = g_strdup_printf("pcap/pcapng: ERF file has a packet larger than %d bytes",
+			*err_info = ws_strdup_printf("pcap/pcapng: ERF file has a packet larger than %d bytes",
 			    INT_MAX);
 			return -1;
 		}
 		if (packet_size < (guint)(phdr_len + (int)sizeof(erf_aal2_header_t))) {
 			*err = WTAP_ERR_BAD_FILE;
-			*err_info = g_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to include the AAL2 header",
+			*err_info = ws_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to include the AAL2 header",
 			    packet_size);
 			return -1;
 		}
@@ -1538,13 +1554,13 @@ pcap_read_erf_pseudoheader(FILE_T fh, wtap_rec *rec,
 		/* Extract the Ethernet additional header to include it in the pseudo header part */
 		if (phdr_len > INT_MAX - (int)sizeof(erf_eth_header_t)) {
 			*err = WTAP_ERR_BAD_FILE;
-			*err_info = g_strdup_printf("pcap/pcapng: ERF file has a packet larger than %d bytes",
+			*err_info = ws_strdup_printf("pcap/pcapng: ERF file has a packet larger than %d bytes",
 			    INT_MAX);
 			return -1;
 		}
 		if (packet_size < (guint)(phdr_len + (int)sizeof(erf_eth_header_t))) {
 			*err = WTAP_ERR_BAD_FILE;
-			*err_info = g_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to include the Ethernet additional header",
+			*err_info = ws_strdup_printf("pcap/pcapng: ERF file has a %u-byte packet, too small to include the Ethernet additional header",
 			    packet_size);
 			return -1;
 		}
@@ -1674,7 +1690,7 @@ pcap_read_i2c_linux_pseudoheader(FILE_T fh, union wtap_pseudo_header *pseudo_hea
 		 * have a pseudo-header.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("pcap/pcapng: I2C file has a %u-byte packet, too small to have even a I2C pseudo-header",
+		*err_info = ws_strdup_printf("pcap/pcapng: I2C file has a %u-byte packet, too small to have even a I2C pseudo-header",
 		    packet_size);
 		return -1;
 	}
@@ -1842,6 +1858,24 @@ struct linux_usb_phdr {
 	guint32 ndesc;      /* actual number of isochronous descriptors */
 };
 
+/*
+ * event_type values
+ */
+#define URB_SUBMIT        'S'
+#define URB_COMPLETE      'C'
+#define URB_ERROR         'E'
+
+/*
+ * URB transfer_type values
+ */
+#define URB_ISOCHRONOUS   0x0
+#define URB_INTERRUPT     0x1
+#define URB_CONTROL       0x2
+#define URB_BULK          0x3
+#define URB_UNKNOWN       0xFF
+
+#define URB_TRANSFER_IN   0x80		/* to host */
+
 struct linux_usb_isodesc {
 	gint32 iso_status;
 	guint32 iso_off;
@@ -1907,10 +1941,13 @@ struct can_socketcan_hdr {
 };
 
 /*
- * The fake link-layer header of Linux cooked packets.
+ * CAN fake link-layer headers in Linux cooked packets.
  */
 #define LINUX_SLL_PROTOCOL_OFFSET	14	/* protocol */
 #define LINUX_SLL_LEN			16	/* length of the header */
+
+#define LINUX_SLL2_PROTOCOL_OFFSET	0	/* protocol */
+#define LINUX_SLL2_LEN			20	/* length of the header */
 
 /*
  * The protocols we have to check for.
@@ -1954,6 +1991,49 @@ pcap_byteswap_linux_sll_pseudoheader(wtap_rec *rec, guint8 *pd)
 	can_socketcan_phdr = (struct can_socketcan_hdr *)(void *)(pd + LINUX_SLL_LEN);
 
 	if (packet_size < LINUX_SLL_LEN + sizeof(can_socketcan_phdr->can_id)) {
+		/* Not enough data to have the full CAN ID */
+		return;
+	}
+
+	PBSWAP32((guint8 *)&can_socketcan_phdr->can_id);
+}
+
+static void
+pcap_byteswap_linux_sll2_pseudoheader(wtap_rec *rec, guint8 *pd)
+{
+	guint packet_size;
+	guint16 protocol;
+	struct can_socketcan_hdr *can_socketcan_phdr;
+
+	/*
+	 * Minimum of captured and actual length (just in case the
+	 * actual length < the captured length, which Should Never
+	 * Happen).
+	 */
+	packet_size = rec->rec_header.packet_header.caplen;
+	if (packet_size > rec->rec_header.packet_header.len)
+		packet_size = rec->rec_header.packet_header.len;
+
+	if (packet_size < LINUX_SLL2_LEN) {
+		/* Not enough data to have the protocol */
+		return;
+	}
+
+	protocol = pntoh16(&pd[LINUX_SLL2_PROTOCOL_OFFSET]);
+	if (protocol != LINUX_SLL_P_CAN && protocol != LINUX_SLL_P_CANFD) {
+		/* Not a CAN packet; nothing to fix */
+		return;
+	}
+
+	/*
+	 * Greasy hack, but we never directly dereference any of
+	 * the fields in *can_socketcan_phdr, we just get offsets
+	 * of and addresses of its members and byte-swap it with a
+	 * byte-at-a-time macro, so it's alignment-safe.
+	 */
+	can_socketcan_phdr = (struct can_socketcan_hdr *)(void *)(pd + LINUX_SLL2_LEN);
+
+	if (packet_size < LINUX_SLL2_LEN + sizeof(can_socketcan_phdr->can_id)) {
 		/* Not enough data to have the full CAN ID */
 		return;
 	}
@@ -2118,8 +2198,62 @@ pcap_byteswap_nflog_pseudoheader(wtap_rec *rec, guint8 *pd)
 	}
 }
 
+/*
+ * pflog headers, at least as they exist now.
+ */
+#define PFLOG_IFNAMSIZ		16
+#define PFLOG_RULESET_NAME_SIZE	16
+
+struct pfloghdr {
+	guint8		length;
+	guint8		af;
+	guint8		action;
+	guint8		reason;
+	char		ifname[PFLOG_IFNAMSIZ];
+	char		ruleset[PFLOG_RULESET_NAME_SIZE];
+	guint32		rulenr;
+	guint32		subrulenr;
+	guint32		uid;
+	gint32		pid;
+	guint32		rule_uid;
+	gint32		rule_pid;
+	guint8		dir;
+	/* More follows, depending on the header length */
+};
+
+static void
+pcap_byteswap_pflog_pseudoheader(wtap_rec *rec, guint8 *pd)
+{
+	guint packet_size;
+	struct pfloghdr *pflhdr;
+
+	/*
+	 * Minimum of captured and actual length (just in case the
+	 * actual length < the captured length, which Should Never
+	 * Happen).
+	 */
+	packet_size = rec->rec_header.packet_header.caplen;
+	if (packet_size > rec->rec_header.packet_header.len)
+		packet_size = rec->rec_header.packet_header.len;
+
+	if (packet_size < sizeof(struct pfloghdr)) {
+		/* Not enough data to have the UID and PID fields */
+		return;
+	}
+
+	pflhdr = (struct pfloghdr *)pd;
+	if (pflhdr->length < (guint) (offsetof(struct pfloghdr, rule_pid) + sizeof pflhdr->rule_pid)) {
+		/* Header doesn't include the UID and PID fields */
+		return;
+	}
+	PBSWAP32((guint8 *)&pflhdr->uid);
+	PBSWAP32((guint8 *)&pflhdr->pid);
+	PBSWAP32((guint8 *)&pflhdr->rule_uid);
+	PBSWAP32((guint8 *)&pflhdr->rule_pid);
+}
+
 int
-pcap_process_pseudo_header(FILE_T fh, int file_type, int wtap_encap,
+pcap_process_pseudo_header(FILE_T fh, gboolean is_nokia, int wtap_encap,
     guint packet_size, wtap_rec *rec, int *err, gchar **err_info)
 {
 	int phdr_len = 0;
@@ -2127,7 +2261,7 @@ pcap_process_pseudo_header(FILE_T fh, int file_type, int wtap_encap,
 	switch (wtap_encap) {
 
 	case WTAP_ENCAP_ATM_PDUS:
-		if (file_type == WTAP_FILE_TYPE_SUBTYPE_PCAP_NOKIA) {
+		if (is_nokia) {
 			/*
 			 * Nokia IPSO ATM.
 			 */
@@ -2149,7 +2283,7 @@ pcap_process_pseudo_header(FILE_T fh, int file_type, int wtap_encap,
 		break;
 
 	case WTAP_ENCAP_ETHERNET:
-		if (file_type == WTAP_FILE_TYPE_SUBTYPE_PCAP_NOKIA) {
+		if (is_nokia) {
 			/*
 			 * Nokia IPSO.  Pseudo header has already been read, but it's not considered
 			 * part of the packet size, so reread it to store the data for later (when saving)
@@ -2271,14 +2405,158 @@ pcap_process_pseudo_header(FILE_T fh, int file_type, int wtap_encap,
 	return phdr_len;
 }
 
+/*
+ * Compute, from the data provided by the Linux USB memory-mapped capture
+ * mechanism, the amount of packet data that would have been provided
+ * had the capture mechanism not chopped off any data at the end, if, in
+ * fact, it did so.
+ *
+ * Set the "unsliced length" field of the packet header to that value.
+ */
+static void
+fix_linux_usb_mmapped_length(wtap_rec *rec, const u_char *bp)
+{
+	const struct linux_usb_phdr *hdr;
+	u_int bytes_left;
+
+	/*
+	 * All callers of this routine must ensure that pkth->caplen is
+	 * >= sizeof (struct linux_usb_phdr).
+	 */
+	bytes_left = rec->rec_header.packet_header.caplen;
+	bytes_left -= sizeof (struct linux_usb_phdr);
+
+	hdr = (const struct linux_usb_phdr *) bp;
+	if (!hdr->data_flag && hdr->transfer_type == URB_ISOCHRONOUS &&
+	    hdr->event_type == URB_COMPLETE &&
+	    (hdr->endpoint_number & URB_TRANSFER_IN) &&
+	    rec->rec_header.packet_header.len == sizeof(struct linux_usb_phdr) +
+	                 (hdr->ndesc * sizeof (struct linux_usb_isodesc)) + hdr->urb_len) {
+		struct linux_usb_isodesc *descs;
+		u_int pre_truncation_data_len, pre_truncation_len;
+
+		descs = (struct linux_usb_isodesc *) (bp + sizeof(struct linux_usb_phdr));
+
+		/*
+		 * We have data (yes, data_flag is 0 if we *do* have data),
+		 * and this is a "this is complete" incoming isochronous
+		 * transfer event, and the length was calculated based
+		 * on the URB length.
+		 *
+		 * That's not correct, because the data isn't contiguous,
+		 * and the isochronous descriptos show how it's scattered.
+		 *
+		 * Find the end of the last chunk of data in the buffer
+		 * referred to by the isochronous descriptors; that indicates
+		 * how far into the buffer the data would have gone.
+		 *
+		 * Make sure we don't run past the end of the captured data
+		 * while processing the isochronous descriptors.
+		 */
+		pre_truncation_data_len = 0;
+		for (guint32 desc = 0;
+		    desc < hdr->ndesc && bytes_left >= sizeof (struct linux_usb_isodesc);
+		    desc++, bytes_left -= sizeof (struct linux_usb_isodesc)) {
+			u_int desc_end;
+
+			if (descs[desc].iso_len != 0) {
+				desc_end = descs[desc].iso_off + descs[desc].iso_len;
+				if (desc_end > pre_truncation_data_len)
+					pre_truncation_data_len = desc_end;
+			}
+		}
+
+		/*
+		 * Now calculate the total length based on that data
+		 * length.
+		 */
+		pre_truncation_len = sizeof(struct linux_usb_phdr) +
+		    (hdr->ndesc * sizeof (struct linux_usb_isodesc)) +
+		    pre_truncation_data_len;
+
+		/*
+		 * If that's greater than or equal to the captured length,
+		 * use that as the length.
+		 */
+		if (pre_truncation_len >= rec->rec_header.packet_header.caplen)
+			rec->rec_header.packet_header.len = pre_truncation_len;
+
+		/*
+		 * If the captured length is greater than the length,
+		 * use the captured length.
+		 *
+		 * For completion events for incoming isochronous transfers,
+		 * it's based on data_len, which is calculated the same way
+		 * we calculated pre_truncation_data_len above, except that
+		 * it has access to all the isochronous descriptors, not
+		 * just the ones that the kernel were able to provide us or,
+		 * for a capture file, that weren't sliced off by a snapshot
+		 * length.
+		 *
+		 * However, it might have been reduced by the USB capture
+		 * mechanism arbitrarily limiting the amount of data it
+		 * provides to userland, or by the libpcap capture code
+		 * limiting it to being no more than the snapshot, so
+		 * we don't want to just use it all the time; we only
+		 * do so to try to get a better estimate of the actual
+		 * length - and to make sure the on-the-network length
+		 * is always >= the captured length.
+		 */
+		if (rec->rec_header.packet_header.caplen > rec->rec_header.packet_header.len)
+			rec->rec_header.packet_header.len = rec->rec_header.packet_header.caplen;
+	}
+}
+
+static void
+pcap_fixup_len(wtap_rec *rec, const guint8 *pd)
+{
+	struct linux_usb_phdr *usb_phdr;
+
+	/*
+	 * Greasy hack, but we never directly dereference any of
+	 * the fields in *usb_phdr, we just get offsets of and
+	 * addresses of its members and byte-swap it with a
+	 * byte-at-a-time macro, so it's alignment-safe.
+	 */
+	usb_phdr = (struct linux_usb_phdr *)(void *)pd;
+
+	if (rec->rec_header.packet_header.caplen >=
+	    sizeof (struct linux_usb_phdr)) {
+		/*
+		 * In older versions of libpcap, in memory-mapped captures,
+		 * the "on-the-bus length" for completion events for
+		 * incoming isochronous transfers was miscalculated; it
+		 * needed to be calculated based on the* offsets and lengths
+		 * in the descriptors, not on the raw URB length, but it
+		 * wasn't.
+		 *
+		 * If this packet contains transferred data (yes, data_flag
+		 * is 0 if we *do* have data), and the total on-the-network
+		 * length is equal to the value calculated from the raw URB
+		 * length, then it might be one of those transfers.
+		 *
+		 * We only do this if we have the full USB pseudo-header.
+		 */
+		if (!usb_phdr->data_flag &&
+		    rec->rec_header.packet_header.len == sizeof (struct linux_usb_phdr) +
+		      (usb_phdr->ndesc * sizeof (struct linux_usb_isodesc)) + usb_phdr->urb_len) {
+			/*
+			 * It might need fixing; fix it if it's a completion
+			 * event for an incoming isochronous transfer.
+			 */
+			fix_linux_usb_mmapped_length(rec, pd);
+		}
+	}
+}
+
 void
-pcap_read_post_process(int file_type, int wtap_encap,
+pcap_read_post_process(gboolean is_nokia, int wtap_encap,
     wtap_rec *rec, guint8 *pd, gboolean bytes_swapped, int fcs_len)
 {
 	switch (wtap_encap) {
 
 	case WTAP_ENCAP_ATM_PDUS:
-		if (file_type == WTAP_FILE_TYPE_SUBTYPE_PCAP_NOKIA) {
+		if (is_nokia) {
 			/*
 			 * Nokia IPSO ATM.
 			 *
@@ -2308,6 +2586,11 @@ pcap_read_post_process(int file_type, int wtap_encap,
 			pcap_byteswap_linux_sll_pseudoheader(rec, pd);
 		break;
 
+	case WTAP_ENCAP_SLL2:
+		if (bytes_swapped)
+			pcap_byteswap_linux_sll2_pseudoheader(rec, pd);
+		break;
+
 	case WTAP_ENCAP_USB_LINUX:
 		if (bytes_swapped)
 			pcap_byteswap_linux_usb_pseudoheader(rec, pd, FALSE);
@@ -2316,6 +2599,11 @@ pcap_read_post_process(int file_type, int wtap_encap,
 	case WTAP_ENCAP_USB_LINUX_MMAPPED:
 		if (bytes_swapped)
 			pcap_byteswap_linux_usb_pseudoheader(rec, pd, TRUE);
+
+		/*
+		 * Fix up the on-the-network length if necessary.
+		 */
+		pcap_fixup_len(rec, pd);
 		break;
 
 	case WTAP_ENCAP_NETANALYZER:
@@ -2340,6 +2628,11 @@ pcap_read_post_process(int file_type, int wtap_encap,
 		 */
 		rec->rec_header.packet_header.len = rec->rec_header.packet_header.pseudo_header.erf.phdr.wlen;
 		rec->rec_header.packet_header.caplen = MIN(rec->rec_header.packet_header.len, rec->rec_header.packet_header.caplen);
+		break;
+
+	case WTAP_ENCAP_PFLOG:
+		if (bytes_swapped)
+			pcap_byteswap_pflog_pseudoheader(rec, pd);
 		break;
 
 	default:

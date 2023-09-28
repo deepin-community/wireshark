@@ -11,14 +11,12 @@
 
 #include "config.h"
 
-#include <stdio.h>
-
 #include <epan/packet.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
 #include <epan/to_str.h>
 #include <epan/conversation.h>
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 
 #include "packet-tcp.h"
 
@@ -420,7 +418,7 @@ dissect_jdwp_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
   }
 
   if (packet_type == 0) {
-    proto_tree_add_item(jdwp_tree, hf_jdwp_type, tvb, offset, 14, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(jdwp_tree, hf_jdwp_type, tvb, offset, 14, ENC_ASCII);
     return tvb_captured_length(tvb);
   }
 

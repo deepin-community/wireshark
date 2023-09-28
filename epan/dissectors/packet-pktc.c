@@ -213,7 +213,7 @@ dissect_pktc_app_specific_data(packet_info *pinfo, proto_tree *parent_tree, tvbu
             offset+=1;
 
             /* usmUserName */
-            proto_tree_add_item(tree, hf_pktc_usmUserName, tvb, offset, len, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_pktc_usmUserName, tvb, offset, len, ENC_ASCII);
             offset+=len;
 
             break;
@@ -314,7 +314,7 @@ dissect_pktc_wakeup(proto_tree *tree, tvbuff_t *tvb, int offset)
 
     /* Server Kerberos Principal Identifier */
     string_len=tvb_strsize(tvb, offset);
-    proto_tree_add_item(tree, hf_pktc_server_principal, tvb, offset, string_len, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_pktc_server_principal, tvb, offset, string_len, ENC_ASCII);
     offset+=string_len;
 
     return offset;
@@ -371,7 +371,7 @@ dissect_pktc_ap_reply(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int o
     proto_tree_add_uint_format(tree, hf_pktc_sec_param_lifetime, tvb, offset, 4,
                                tvb_get_ntohl(tvb, offset), "%s: %s",
                                proto_registrar_get_name(hf_pktc_sec_param_lifetime),
-                               signed_time_secs_to_str(wmem_packet_scope(), tvb_get_ntohl(tvb, offset)));
+                               signed_time_secs_to_str(pinfo->pool, tvb_get_ntohl(tvb, offset)));
     offset+=4;
 
     /* grace period */
@@ -417,12 +417,12 @@ dissect_pktc_rekey(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int offs
 
     /* Server Kerberos Principal Identifier */
     string_len=tvb_strsize(tvb, offset);
-    proto_tree_add_item(tree, hf_pktc_server_principal, tvb, offset, string_len, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(tree, hf_pktc_server_principal, tvb, offset, string_len, ENC_ASCII);
     offset+=string_len;
 
     /* Timestamp: YYMMDDhhmmssZ */
     /* They really came up with a two-digit year in late 1990s! =8o */
-    timestr=tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 13, ENC_ASCII);
+    timestr=tvb_get_string_enc(pinfo->pool, tvb, offset, 13, ENC_ASCII);
     proto_tree_add_string_format_value(tree, hf_pktc_timestamp, tvb, offset, 13, timestr,
                                 "%.2s-%.2s-%.2s %.2s:%.2s:%.2s",
                                  timestr, timestr+2, timestr+4, timestr+6, timestr+8, timestr+10);
@@ -513,7 +513,7 @@ dissect_pktc_mtafqdn_krbsafeuserdata(packet_info *pinfo, tvbuff_t *tvb, proto_tr
     case PKTC_MTAFQDN_REP:
         /* MTA FQDN */
         string_len = tvb_reported_length_remaining(tvb, offset) - 4;
-        proto_tree_add_item(tree, hf_pktc_mtafqdn_fqdn, tvb, offset, string_len, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(tree, hf_pktc_mtafqdn_fqdn, tvb, offset, string_len, ENC_ASCII);
         offset+=string_len;
 
         /* MTA IP address */
@@ -659,7 +659,7 @@ proto_register_pktc(void)
             "Server Kerberos Principal Identifier", "pktc.server_principal", FT_STRING, BASE_NONE,
             NULL, 0, NULL, HFILL }},
         { &hf_pktc_timestamp, {
-            "Timestamp", "pktc.timestamp", FT_STRING, STR_UNICODE,
+            "Timestamp", "pktc.timestamp", FT_STRING, BASE_NONE,
             NULL, 0, "Timestamp (UTC)", HFILL }},
         { &hf_pktc_app_spec_data, {
             "Application Specific Data", "pktc.asd", FT_NONE, BASE_NONE,

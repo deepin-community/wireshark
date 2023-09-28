@@ -15,7 +15,11 @@
  * with secure streams and easy firewall traversal, bringing the best
  * quality live video over the worst networks.
  *
- * http://www.srtalliance.org
+ * Internet draft:
+ * https://datatracker.ietf.org/doc/html/draft-sharabayko-srt-01
+ *
+ * Open-source implementation:
+ * https://github.com/Haivision/srt
  */
 
 #include <config.h>

@@ -13,15 +13,16 @@
 #include "software_update.h"
 #include "language.h"
 #include "../epan/prefs.h"
+#include "../wsutil/filesystem.h"
 
 /*
  * Version 0 of the update URI path has the following elements:
  * - The update path prefix (fixed, "update")
  * - The schema version (fixed, 0)
- * - The application name (fixed, "Wireshark")
+ * - The application name (variable, "Wireshark" or "Logray")
  * - The application version ("<major>.<minor>.<micro>")
  * - The operating system (variable, one of "Windows" or "macOS")
- * - The architecture name (variable, one of "x86", "x86-64")
+ * - The architecture name (variable, one of "x86", "x86-64", or "arm64")
  * - The locale (fixed, "en-US")
  * - The update channel (variable, one of "development" or "stable") + .xml
  *
@@ -34,7 +35,6 @@
 #ifdef HAVE_SOFTWARE_UPDATE
 #define SU_SCHEMA_PREFIX "update"
 #define SU_SCHEMA_VERSION 0
-#define SU_APPLICATION "Wireshark"
 #define SU_LOCALE "en-US"
 #endif /* HAVE_SOFTWARE_UPDATE */
 
@@ -57,13 +57,21 @@
 #define SU_ARCH "x86-64"
 #elif defined(__i386__) || defined(_M_IX86)
 #define SU_ARCH "x86"
+#elif defined(__arm64__)
+#define SU_ARCH "arm64"
 #else
-#error HAVE_SOFTWARE_UPDATE can only be defined for x86-64 or x86.
+#error HAVE_SOFTWARE_UPDATE can only be defined for x86-64 or x86 or arm64.
 #endif
 
 static char *get_appcast_update_url(software_update_channel_e chan) {
     GString *update_url_str = g_string_new("");;
     const char *chan_name;
+    const char *su_application = get_configuration_namespace();
+    const char *su_version = VERSION;
+
+    if (!is_packet_configuration_namespace()) {
+        su_version = LOG_VERSION;
+    }
 
     switch (chan) {
         case UPDATE_CHANNEL_DEVELOPMENT:
@@ -76,8 +84,8 @@ static char *get_appcast_update_url(software_update_channel_e chan) {
     g_string_printf(update_url_str, "https://www.wireshark.org/%s/%u/%s/%s/%s/%s/en-US/%s.xml",
                     SU_SCHEMA_PREFIX,
                     SU_SCHEMA_VERSION,
-                    SU_APPLICATION,
-                    VERSION,
+                    su_application,
+                    su_version,
                     SU_OSNAME,
                     SU_ARCH,
                     chan_name);
@@ -149,7 +157,6 @@ software_update_check(void) {
 /** Clean up software update checking.
  */
 void software_update_cleanup(void) {
-    sparkle_software_update_cleanup();
 }
 
 const char *software_update_info(void) {
@@ -181,16 +188,3 @@ const char *software_update_info(void) {
 }
 
 #endif /* defined(HAVE_SOFTWARE_UPDATE) && defined (_WIN32) */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

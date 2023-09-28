@@ -67,6 +67,10 @@ static gboolean daintree_sna_seek_read(wtap *wth, gint64 seek_off,
 static gboolean daintree_sna_read_packet(FILE_T fh, wtap_rec *rec,
 	Buffer *buf, int *err, gchar **err_info);
 
+static int daintree_sna_file_type_subtype = -1;
+
+void register_daintree_sna(void);
+
 /* Open a file and determine if it's a Daintree file */
 wtap_open_return_val daintree_sna_open(wtap *wth, int *err, gchar **err_info)
 {
@@ -99,7 +103,7 @@ wtap_open_return_val daintree_sna_open(wtap *wth, int *err, gchar **err_info)
 	wth->subtype_seek_read = daintree_sna_seek_read;
 
 	/* set up for file type */
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_DAINTREE_SNA;
+	wth->file_type_subtype = daintree_sna_file_type_subtype;
 	wth->file_encap = WTAP_ENCAP_IEEE802_15_4_NOFCS;
 	wth->file_tsprec = WTAP_TSPREC_USEC;
 	wth->snapshot_length = 0; /* not available in header */
@@ -141,7 +145,7 @@ daintree_sna_seek_read(wtap *wth, gint64 seek_off, wtap_rec *rec,
 	    err_info);
 }
 
-/* Read a header line, scan it, and fill in a struct wtap_pkthdr.
+/* Read a header line, scan it, and fill in a struct wtap_rec.
  * Then convert packet data from ASCII hex string to binary in place,
  * sanity-check its length against what we assume is the packet length field,
  * and copy it into a Buffer. */
@@ -167,9 +171,10 @@ daintree_sna_read_packet(FILE_T fh, wtap_rec *rec, Buffer *buf,
 	} while (readLine[0] == COMMENT_LINE);
 
 	rec->rec_type = REC_TYPE_PACKET;
+	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 	rec->presence_flags = WTAP_HAS_TS|WTAP_HAS_CAP_LEN;
 
-	if (sscanf(readLine, "%*s %18" G_GINT64_MODIFIER "u.%9d %9u %" READDATA_MAX_FIELD_SIZE "s",
+	if (sscanf(readLine, "%*s %18" SCNu64 ".%9d %9u %" READDATA_MAX_FIELD_SIZE "s",
 	    &seconds, &useconds, &rec->rec_header.packet_header.len, readData) != 4) {
 		*err = WTAP_ERR_BAD_FILE;
 		*err_info = g_strdup("daintree_sna: invalid read record");
@@ -179,7 +184,7 @@ daintree_sna_read_packet(FILE_T fh, wtap_rec *rec, Buffer *buf,
 	/* Daintree doesn't store the FCS, but pads end of packet with 0xffff, which we toss */
 	if (rec->rec_header.packet_header.len <= FCS_LENGTH) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("daintree_sna: packet length <= %u bytes, no frame data present",
+		*err_info = ws_strdup_printf("daintree_sna: packet length <= %u bytes, no frame data present",
 		    FCS_LENGTH);
 		return FALSE;
 	}
@@ -231,14 +236,14 @@ daintree_sna_read_packet(FILE_T fh, wtap_rec *rec, Buffer *buf,
 	/* Daintree doesn't store the FCS, but pads end of packet with 0xffff, which we toss */
 	if (bytes <= FCS_LENGTH) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("daintree_sna: Only %u bytes of packet data",
+		*err_info = ws_strdup_printf("daintree_sna: Only %u bytes of packet data",
 		    bytes);
 		return FALSE;
 	}
 	bytes -= FCS_LENGTH;
 	if (bytes > rec->rec_header.packet_header.len) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("daintree_sna: capture length (%u) > packet length (%u)",
+		*err_info = ws_strdup_printf("daintree_sna: capture length (%u) > packet length (%u)",
 		    bytes, rec->rec_header.packet_header.len);
 		return FALSE;
 	}
@@ -248,6 +253,31 @@ daintree_sna_read_packet(FILE_T fh, wtap_rec *rec, Buffer *buf,
 	ws_buffer_assure_space(buf, bytes);
 	memcpy(ws_buffer_start_ptr(buf), readData, bytes);
 	return TRUE;
+}
+
+static const struct supported_block_type daintree_sna_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info daintree_sna_info = {
+	"Daintree SNA", "dsna", "dcf", NULL,
+	FALSE, BLOCKS_SUPPORTED(daintree_sna_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_daintree_sna(void)
+{
+	daintree_sna_file_type_subtype = wtap_register_file_type_subtype(&daintree_sna_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("DAINTREE_SNA",
+	    daintree_sna_file_type_subtype);
 }
 
 /*

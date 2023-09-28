@@ -1,4 +1,4 @@
-/* column_list_model.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -32,7 +32,6 @@ private:
 
 class ColumnTypeDelegate : public QStyledItemDelegate
 {
-    Q_OBJECT
 public:
     ColumnTypeDelegate(QObject * parent = Q_NULLPTR);
 
@@ -59,7 +58,8 @@ public:
         COL_TITLE,
         COL_TYPE,
         COL_FIELDS,
-        COL_OCCURRENCE
+        COL_OCCURRENCE,
+        COL_RESOLVED
     };
 
     enum {
@@ -94,16 +94,3 @@ private:
 };
 
 #endif // COLUMN_LIST_MODELS_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

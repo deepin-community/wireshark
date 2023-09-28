@@ -936,9 +936,9 @@ static const value_string status_code[] = {
 static value_string_ext status_code_ext = VALUE_STRING_EXT_INIT(status_code);
 
 /* C1G2 tag inventory state aware singulation action */
-const true_false_string tfs_state_a_b = { "State B", "State A" };
-const true_false_string tfs_sl =        { "~SL",     "SL"      };
-const true_false_string tfs_all_no =    { "All",     "No"      };
+static const true_false_string tfs_state_a_b = { "State B", "State A" };
+static const true_false_string tfs_sl =        { "~SL",     "SL"      };
+static const true_false_string tfs_all_no =    { "All",     "No"      };
 
 /* Vendors */
 #define LLRP_VENDOR_IMPINJ 25882
@@ -2868,7 +2868,9 @@ dissect_llrp_packet(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* d
     guint       offset = 0;
 
     /* Check that there's enough data */
-    DISSECTOR_ASSERT(tvb_reported_length(tvb) >= LLRP_HEADER_LENGTH);
+    if (tvb_reported_length(tvb) < LLRP_HEADER_LENGTH) {
+        return 0;
+    }
 
     /* Make entries in Protocol column and Info column on summary display */
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "LLRP");
@@ -3138,7 +3140,7 @@ proto_register_llrp(void)
           NULL, HFILL }},
 
         { &hf_llrp_hop_table_id,
-        { "Hop table ID", "llrp.param.hop_table_id", FT_UINT8, BASE_DEC, NULL, 0,
+        { "Hop table ID", "llrp.param.hop_table_id", FT_UINT16, BASE_DEC, NULL, 0,
           NULL, HFILL }},
 
         { &hf_llrp_rfu,
@@ -3850,7 +3852,7 @@ proto_register_llrp(void)
           NULL, HFILL }},
 
         { &hf_llrp_gpi_debounce,
-        { "GPI debounce timer Msec", "llrp.param.gpi_debounce", FT_UINT16, BASE_DEC, NULL, 0,
+        { "GPI debounce timer Msec", "llrp.param.gpi_debounce", FT_UINT32, BASE_DEC, NULL, 0,
           NULL, HFILL }},
 
         { &hf_llrp_temperature,

@@ -1,4 +1,4 @@
-/* interface_toolbar.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -71,7 +71,7 @@ private slots:
 
     void closeLog();
 
-    void on_interfacesComboBox_currentIndexChanged(const QString &ifname);
+    void on_interfacesComboBox_currentTextChanged(const QString &ifname);
 
 private:
     void initializeControls(const iface_toolbar *toolbar);
@@ -96,16 +96,3 @@ private:
 };
 
 #endif // INTERFACE_TOOLBAR_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

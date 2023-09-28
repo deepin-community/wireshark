@@ -14,6 +14,7 @@
 
 #include <epan/column.h>
 #include <wsutil/filesystem.h>
+#include <wsutil/wslog.h>
 #include <epan/prefs.h>
 #include <epan/prefs-int.h>
 #include <epan/packet.h>
@@ -84,11 +85,11 @@ prefs_store_ext_helper(const char * module_name, const char *pref_name, const ch
     pref_t * pref = NULL;
     unsigned int pref_changed = 0;
 
-    if ( ! prefs_is_registered_protocol(module_name))
+    if ( !prefs_is_registered_protocol(module_name))
         return 0;
 
     module = prefs_find_module(module_name);
-    if ( ! module )
+    if ( !module )
         return 0;
 
     pref = prefs_find_preference(module, pref_name);
@@ -99,8 +100,13 @@ prefs_store_ext_helper(const char * module_name, const char *pref_name, const ch
     if (prefs_get_type(pref) == PREF_STRING )
     {
         pref_changed |= prefs_set_string_value(pref, pref_value, pref_stashed);
-        if ( ! pref_changed || prefs_get_string_value(pref, pref_stashed) != 0 )
+        if ( !pref_changed || prefs_get_string_value(pref, pref_stashed) != 0 )
             pref_changed |= prefs_set_string_value(pref, pref_value, pref_current);
+    } else if (prefs_get_type(pref) == PREF_PASSWORD )
+    {
+        pref_changed |= prefs_set_password_value(pref, pref_value, pref_stashed);
+        if ( !pref_changed || prefs_get_password_value(pref, pref_stashed) != 0 )
+            pref_changed |= prefs_set_password_value(pref, pref_value, pref_current);
     }
 
     return pref_changed;
@@ -127,11 +133,11 @@ prefs_store_ext_multiple(const char * module, GHashTable * pref_values)
     gboolean pref_changed = FALSE;
     GList * keys = NULL;
 
-    if ( ! prefs_is_registered_protocol(module))
+    if ( !prefs_is_registered_protocol(module))
         return pref_changed;
 
     keys = g_hash_table_get_keys(pref_values);
-    if ( ! keys )
+    if ( !keys )
         return pref_changed;
 
     for ( GList * key = keys; key != NULL; key = g_list_next(key) )
@@ -164,7 +170,7 @@ column_prefs_add_custom(gint fmt, const gchar *title, const gchar *custom_fields
     fmt_data *cfmt, *last_cfmt;
     gint colnr;
 
-    cfmt = (fmt_data *) g_malloc(sizeof(fmt_data));
+    cfmt = g_new(fmt_data, 1);
     /*
      * Because a single underscore is interpreted as a signal that the next character
      * is going to be marked as accelerator for this header (i.e. is going to be
@@ -213,13 +219,42 @@ column_prefs_has_custom(const gchar *custom_field)
             continue;
 
         cfmt = (fmt_data *) clp->data;
-        if (cfmt->fmt == COL_CUSTOM && strcmp(custom_field, cfmt->custom_fields) == 0) {
+        if (cfmt->fmt == COL_CUSTOM && cfmt->custom_occurrence == 0 && strcmp(custom_field, cfmt->custom_fields) == 0) {
             colnr = i;
             break;
         }
     }
 
     return colnr;
+}
+
+gboolean
+column_prefs_custom_resolve(const gchar* custom_field)
+{
+    gchar **fields;
+    header_field_info *hfi;
+    bool resolve = false;
+
+    fields = g_regex_split_simple(COL_CUSTOM_PRIME_REGEX, custom_field,
+                                  (GRegexCompileFlags) (G_REGEX_ANCHORED | G_REGEX_RAW),
+                                  G_REGEX_MATCH_ANCHORED);
+
+    for (guint i = 0; i < g_strv_length(fields); i++) {
+        if (fields[i] && *fields[i]) {
+            hfi = proto_registrar_get_byname(fields[i]);
+            if (hfi && ((hfi->type == FT_OID) || (hfi->type == FT_REL_OID) || (hfi->type == FT_BOOLEAN) ||
+                    ((hfi->strings != NULL) &&
+                     (IS_FT_INT(hfi->type) || IS_FT_UINT(hfi->type)))))
+                {
+                    resolve = TRUE;
+                    break;
+                }
+        }
+    }
+
+    g_strfreev(fields);
+
+    return resolve;
 }
 
 void
@@ -248,7 +283,7 @@ void save_migrated_uat(const char *uat_name, gboolean *old_pref)
     char *err = NULL;
 
     if (!uat_save(uat_get_table_by_name(uat_name), &err)) {
-        g_warning("Unable to save %s: %s", uat_name, err);
+        ws_warning("Unable to save %s: %s", uat_name, err);
         g_free(err);
         return;
     }
@@ -259,16 +294,3 @@ void save_migrated_uat(const char *uat_name, gboolean *old_pref)
         prefs_main_write();
     }
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

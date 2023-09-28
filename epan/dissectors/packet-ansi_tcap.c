@@ -48,11 +48,13 @@ static gint ansi_tcap_response_matching_type = ANSI_TCAP_TID_ONLY;
 /* Initialize the protocol and registered fields */
 static int proto_ansi_tcap = -1;
 
+#if 0
 static int hf_ansi_tcapsrt_SessionId = -1;
 static int hf_ansi_tcapsrt_Duplicate = -1;
 static int hf_ansi_tcapsrt_BeginSession = -1;
 static int hf_ansi_tcapsrt_EndSession = -1;
 static int hf_ansi_tcapsrt_SessionTime = -1;
+#endif
 static int hf_ansi_tcap_bit_h = -1;
 static int hf_ansi_tcap_op_family = -1;
 static int hf_ansi_tcap_op_specifier = -1;
@@ -63,7 +65,7 @@ static int hf_ansi_tcap_op_specifier = -1;
 static int hf_ansi_tcap_national = -1;            /* T_national */
 static int hf_ansi_tcap_private = -1;             /* T_private */
 static int hf_ansi_tcap_national_01 = -1;         /* INTEGER_M128_127 */
-static int hf_ansi_tcap_private_01 = -1;          /* ANSIMAPPrivateErrorcode */
+static int hf_ansi_tcap_ec_private = -1;          /* ANSIMAPPrivateErrorcode */
 static int hf_ansi_tcap_unidirectional = -1;      /* T_unidirectional */
 static int hf_ansi_tcap_queryWithPerm = -1;       /* T_queryWithPerm */
 static int hf_ansi_tcap_queryWithoutPerm = -1;    /* T_queryWithoutPerm */
@@ -77,12 +79,12 @@ static int hf_ansi_tcap_componentPortion = -1;    /* ComponentSequence */
 static int hf_ansi_tcap_dialogPortion = -1;       /* DialoguePortion */
 static int hf_ansi_tcap_causeInformation = -1;    /* T_causeInformation */
 static int hf_ansi_tcap_abortCause = -1;          /* P_Abort_cause */
-static int hf_ansi_tcap_userInformation = -1;     /* UserAbortInformation */
+static int hf_ansi_tcap_abort_userInformation = -1;  /* UserAbortInformation */
 static int hf_ansi_tcap_version = -1;             /* ProtocolVersion */
 static int hf_ansi_tcap_applicationContext = -1;  /* T_applicationContext */
 static int hf_ansi_tcap_integerApplicationId = -1;  /* IntegerApplicationContext */
 static int hf_ansi_tcap_objectApplicationId = -1;  /* ObjectIDApplicationContext */
-static int hf_ansi_tcap_userInformation_01 = -1;  /* UserInformation */
+static int hf_ansi_tcap_userInformation = -1;     /* UserInformation */
 static int hf_ansi_tcap_securityContext = -1;     /* T_securityContext */
 static int hf_ansi_tcap_integerSecurityId = -1;   /* INTEGER */
 static int hf_ansi_tcap_objectSecurityId = -1;    /* OBJECT_IDENTIFIER */
@@ -100,20 +102,20 @@ static int hf_ansi_tcap_invokeNotLast = -1;       /* Invoke */
 static int hf_ansi_tcap_returnResultNotLast = -1;  /* ReturnResult */
 static int hf_ansi_tcap_componentIDs = -1;        /* T_componentIDs */
 static int hf_ansi_tcap_operationCode = -1;       /* OperationCode */
-static int hf_ansi_tcap_parameter = -1;           /* T_parameter */
+static int hf_ansi_tcap_invoke_parameter = -1;    /* T_invoke_parameter */
 static int hf_ansi_tcap_componentID = -1;         /* T_componentID */
-static int hf_ansi_tcap_parameter_01 = -1;        /* T_parameter_01 */
+static int hf_ansi_tcap_returnResult_parameter = -1;  /* T_returnResult_parameter */
 static int hf_ansi_tcap_componentID_01 = -1;      /* T_componentID_01 */
 static int hf_ansi_tcap_errorCode = -1;           /* ErrorCode */
-static int hf_ansi_tcap_parameter_02 = -1;        /* T_parameter_02 */
+static int hf_ansi_tcap_returnError_parameter = -1;  /* T_returnError_parameter */
 static int hf_ansi_tcap_componentID_02 = -1;      /* OCTET_STRING_SIZE_0_1 */
 static int hf_ansi_tcap_rejectProblem = -1;       /* Problem */
-static int hf_ansi_tcap_parameter_03 = -1;        /* T_parameter_03 */
+static int hf_ansi_tcap_reject_parameter = -1;    /* T_reject_parameter */
 static int hf_ansi_tcap_paramSequence = -1;       /* T_paramSequence */
 static int hf_ansi_tcap_paramSet = -1;            /* T_paramSet */
 
 /*--- End of included file: packet-ansi_tcap-hf.c ---*/
-#line 53 "./asn1/ansi_tcap/packet-ansi_tcap-template.c"
+#line 55 "./asn1/ansi_tcap/packet-ansi_tcap-template.c"
 
 /* Initialize the subtree pointers */
 static gint ett_tcap = -1;
@@ -156,12 +158,12 @@ static gint ett_ansi_tcap_Invoke = -1;
 static gint ett_ansi_tcap_ReturnResult = -1;
 static gint ett_ansi_tcap_ReturnError = -1;
 static gint ett_ansi_tcap_Reject = -1;
-static gint ett_ansi_tcap_T_parameter_03 = -1;
+static gint ett_ansi_tcap_T_reject_parameter = -1;
 static gint ett_ansi_tcap_T_paramSequence = -1;
 static gint ett_ansi_tcap_T_paramSet = -1;
 
 /*--- End of included file: packet-ansi_tcap-ett.c ---*/
-#line 74 "./asn1/ansi_tcap/packet-ansi_tcap-template.c"
+#line 76 "./asn1/ansi_tcap/packet-ansi_tcap-template.c"
 
 #define MAX_SSN 254
 
@@ -223,7 +225,7 @@ struct ansi_tcap_invokedata_t {
     gint32 OperationCode_national;
 };
 
-static wmem_map_t *TransactionId_table=NULL;
+static wmem_multimap_t *TransactionId_table=NULL;
 
 /* Store Invoke information needed for the corresponding reply */
 static void
@@ -232,8 +234,8 @@ save_invoke_data(packet_info *pinfo, proto_tree *tree _U_, tvbuff_t *tvb _U_){
   gchar *src, *dst;
   char *buf;
 
-  src = address_to_str(wmem_packet_scope(), &(pinfo->src));
-  dst = address_to_str(wmem_packet_scope(), &(pinfo->dst));
+  src = address_to_str(pinfo->pool, &(pinfo->src));
+  dst = address_to_str(pinfo->pool, &(pinfo->dst));
 
   if ((!pinfo->fd->visited)&&(ansi_tcap_private.TransactionID_str)){
 
@@ -241,32 +243,28 @@ save_invoke_data(packet_info *pinfo, proto_tree *tree _U_, tvbuff_t *tvb _U_){
           /* The hash string needs to contain src and dest to distiguish differnt flows */
           switch(ansi_tcap_response_matching_type){
                         case ANSI_TCAP_TID_ONLY:
-                                buf = wmem_strdup(wmem_packet_scope(), ansi_tcap_private.TransactionID_str);
+                                buf = wmem_strdup(pinfo->pool, ansi_tcap_private.TransactionID_str);
                                 break;
                         case ANSI_TCAP_TID_AND_SOURCE:
-                                buf = wmem_strdup_printf(wmem_packet_scope(), "%s%s",ansi_tcap_private.TransactionID_str,src);
+                                buf = wmem_strdup_printf(pinfo->pool, "%s%s",ansi_tcap_private.TransactionID_str,src);
                                 break;
                         case ANSI_TCAP_TID_SOURCE_AND_DEST:
                         default:
-                                buf = wmem_strdup_printf(wmem_packet_scope(), "%s%s%s",ansi_tcap_private.TransactionID_str,src,dst);
+                                buf = wmem_strdup_printf(pinfo->pool, "%s%s%s",ansi_tcap_private.TransactionID_str,src,dst);
                                 break;
                 }
-
-          /* If the entry allready exists don't owervrite it */
-          ansi_tcap_saved_invokedata = (struct ansi_tcap_invokedata_t *)wmem_map_lookup(TransactionId_table,buf);
-          if(ansi_tcap_saved_invokedata)
-                  return;
 
           ansi_tcap_saved_invokedata = wmem_new(wmem_file_scope(), struct ansi_tcap_invokedata_t);
           ansi_tcap_saved_invokedata->OperationCode = ansi_tcap_private.d.OperationCode;
           ansi_tcap_saved_invokedata->OperationCode_national = ansi_tcap_private.d.OperationCode_national;
           ansi_tcap_saved_invokedata->OperationCode_private = ansi_tcap_private.d.OperationCode_private;
 
-          wmem_map_insert(TransactionId_table,
+          wmem_multimap_insert32(TransactionId_table,
                         wmem_strdup(wmem_file_scope(), buf),
+                        pinfo->num,
                         ansi_tcap_saved_invokedata);
           /*
-          g_warning("Tcap Invoke Hash string %s",buf);
+          ws_warning("Tcap Invoke Hash string %s",buf);
           */
   }
 }
@@ -281,27 +279,27 @@ find_saved_invokedata(packet_info *pinfo, proto_tree *tree _U_, tvbuff_t *tvb _U
     return FALSE;
   }
 
-  src = address_to_str(wmem_packet_scope(), &(pinfo->src));
-  dst = address_to_str(wmem_packet_scope(), &(pinfo->dst));
+  src = address_to_str(pinfo->pool, &(pinfo->src));
+  dst = address_to_str(pinfo->pool, &(pinfo->dst));
 
   /* The hash string needs to contain src and dest to distiguish differnt flows */
-  buf = (char *)wmem_alloc(wmem_packet_scope(), MAX_TID_STR_LEN);
+  buf = (char *)wmem_alloc(pinfo->pool, MAX_TID_STR_LEN);
   buf[0] = '\0';
   /* Reverse order to invoke */
   switch(ansi_tcap_response_matching_type){
         case ANSI_TCAP_TID_ONLY:
-                g_snprintf(buf,MAX_TID_STR_LEN,"%s",ansi_tcap_private.TransactionID_str);
+                snprintf(buf,MAX_TID_STR_LEN,"%s",ansi_tcap_private.TransactionID_str);
                 break;
         case ANSI_TCAP_TID_AND_SOURCE:
-                g_snprintf(buf,MAX_TID_STR_LEN,"%s%s",ansi_tcap_private.TransactionID_str,dst);
+                snprintf(buf,MAX_TID_STR_LEN,"%s%s",ansi_tcap_private.TransactionID_str,dst);
                 break;
         case ANSI_TCAP_TID_SOURCE_AND_DEST:
         default:
-                g_snprintf(buf,MAX_TID_STR_LEN,"%s%s%s",ansi_tcap_private.TransactionID_str,dst,src);
+                snprintf(buf,MAX_TID_STR_LEN,"%s%s%s",ansi_tcap_private.TransactionID_str,dst,src);
                 break;
   }
 
-  ansi_tcap_saved_invokedata = (struct ansi_tcap_invokedata_t *)wmem_map_lookup(TransactionId_table, buf);
+  ansi_tcap_saved_invokedata = (struct ansi_tcap_invokedata_t *)wmem_multimap_lookup32_le(TransactionId_table, buf, pinfo->num);
   if(ansi_tcap_saved_invokedata){
           ansi_tcap_private.d.OperationCode                      = ansi_tcap_saved_invokedata->OperationCode;
           ansi_tcap_private.d.OperationCode_national = ansi_tcap_saved_invokedata->OperationCode_national;
@@ -401,7 +399,7 @@ find_tcap_subdissector(tvbuff_t *tvb, asn1_ctx_t *actx, proto_tree *tree){
 
 static int
 dissect_ansi_tcap_T_national(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 22 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 31 "./asn1/ansi_tcap/ansi_tcap.cnf"
  proto_tree *subtree;
  proto_item *spcifier_item;
  int start_offset = offset;
@@ -501,7 +499,7 @@ dissect_ansi_tcap_OperationCode(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, in
                                  OperationCode_choice, hf_index, ett_ansi_tcap_OperationCode,
                                  &ansi_tcap_private.d.OperationCode);
 
-#line 18 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 27 "./asn1/ansi_tcap/ansi_tcap.cnf"
   ansi_tcap_private.d.OperationCode_item = actx->created_item;
 
   return offset;
@@ -552,7 +550,7 @@ static const value_string ansi_tcap_ErrorCode_vals[] = {
 
 static const ber_choice_t ErrorCode_choice[] = {
   {  19, &hf_ansi_tcap_national_01, BER_CLASS_PRI, 19, 0, dissect_ansi_tcap_INTEGER_M128_127 },
-  {  20, &hf_ansi_tcap_private_01, BER_CLASS_PRI, 20, BER_FLAGS_IMPLTAG, dissect_ansi_tcap_ANSIMAPPrivateErrorcode },
+  {  20, &hf_ansi_tcap_ec_private, BER_CLASS_PRI, 20, BER_FLAGS_IMPLTAG, dissect_ansi_tcap_ANSIMAPPrivateErrorcode },
   { 0, NULL, 0, 0, 0, NULL }
 };
 
@@ -569,7 +567,7 @@ dissect_ansi_tcap_ErrorCode(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int of
 
 static int
 dissect_ansi_tcap_TransactionID_U(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 154 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 163 "./asn1/ansi_tcap/ansi_tcap.cnf"
 
 tvbuff_t *next_tvb;
 guint8 len;
@@ -589,9 +587,9 @@ if(next_tvb) {
 		 * in the 8 octets case.
 		 */
 		if (len > 4){
-			ansi_tcap_private.TransactionID_str = tvb_bytes_to_str(wmem_packet_scope(), next_tvb, 4,len-4);
+			ansi_tcap_private.TransactionID_str = tvb_bytes_to_str(actx->pinfo->pool, next_tvb, 4,len-4);
 		}else{
-			ansi_tcap_private.TransactionID_str = tvb_bytes_to_str(wmem_packet_scope(), next_tvb, 0,len);
+			ansi_tcap_private.TransactionID_str = tvb_bytes_to_str(actx->pinfo->pool, next_tvb, 0,len);
 		}
 	}
 	switch(len) {
@@ -678,7 +676,7 @@ dissect_ansi_tcap_OBJECT_IDENTIFIER(gboolean implicit_tag _U_, tvbuff_t *tvb _U_
 
 static int
 dissect_ansi_tcap_ObjectIDApplicationContext(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 118 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 127 "./asn1/ansi_tcap/ansi_tcap.cnf"
 
  static const char * oid_str;
 
@@ -809,7 +807,7 @@ dissect_ansi_tcap_Confidentiality(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, 
 static const ber_sequence_t DialoguePortion_U_sequence[] = {
   { &hf_ansi_tcap_version   , BER_CLASS_PRI, 26, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_ProtocolVersion },
   { &hf_ansi_tcap_applicationContext, BER_CLASS_ANY/*choice*/, -1/*choice*/, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG|BER_FLAGS_NOTCHKTAG, dissect_ansi_tcap_T_applicationContext },
-  { &hf_ansi_tcap_userInformation_01, BER_CLASS_PRI, 29, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_UserInformation },
+  { &hf_ansi_tcap_userInformation, BER_CLASS_PRI, 29, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_UserInformation },
   { &hf_ansi_tcap_securityContext, BER_CLASS_ANY/*choice*/, -1/*choice*/, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG|BER_FLAGS_NOTCHKTAG, dissect_ansi_tcap_T_securityContext },
   { &hf_ansi_tcap_confidentiality, BER_CLASS_CON, 2, BER_FLAGS_OPTIONAL|BER_FLAGS_IMPLTAG, dissect_ansi_tcap_Confidentiality },
   { NULL, 0, 0, 0, NULL }
@@ -846,8 +844,8 @@ dissect_ansi_tcap_T_componentIDs(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, i
 
 
 static int
-dissect_ansi_tcap_T_parameter(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 87 "./asn1/ansi_tcap/ansi_tcap.cnf"
+dissect_ansi_tcap_T_invoke_parameter(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+#line 96 "./asn1/ansi_tcap/ansi_tcap.cnf"
 
   if(find_tcap_subdissector(tvb, actx, tree))
     offset = tvb_reported_length(tvb);
@@ -862,13 +860,13 @@ dissect_ansi_tcap_T_parameter(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int 
 static const ber_sequence_t Invoke_sequence[] = {
   { &hf_ansi_tcap_componentIDs, BER_CLASS_PRI, 15, BER_FLAGS_OPTIONAL|BER_FLAGS_IMPLTAG, dissect_ansi_tcap_T_componentIDs },
   { &hf_ansi_tcap_operationCode, BER_CLASS_ANY/*choice*/, -1/*choice*/, BER_FLAGS_NOOWNTAG|BER_FLAGS_NOTCHKTAG, dissect_ansi_tcap_OperationCode },
-  { &hf_ansi_tcap_parameter , BER_CLASS_ANY, 0, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_T_parameter },
+  { &hf_ansi_tcap_invoke_parameter, BER_CLASS_ANY, 0, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_T_invoke_parameter },
   { NULL, 0, 0, 0, NULL }
 };
 
 static int
 dissect_ansi_tcap_Invoke(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 93 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 102 "./asn1/ansi_tcap/ansi_tcap.cnf"
   ansi_tcap_private.d.pdu = 1;
 
 
@@ -892,8 +890,8 @@ dissect_ansi_tcap_T_componentID(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, in
 
 
 static int
-dissect_ansi_tcap_T_parameter_01(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 100 "./asn1/ansi_tcap/ansi_tcap.cnf"
+dissect_ansi_tcap_T_returnResult_parameter(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+#line 109 "./asn1/ansi_tcap/ansi_tcap.cnf"
   if(find_tcap_subdissector(tvb, actx, tree))
     offset = tvb_reported_length(tvb);
 
@@ -905,13 +903,13 @@ dissect_ansi_tcap_T_parameter_01(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, i
 
 static const ber_sequence_t ReturnResult_sequence[] = {
   { &hf_ansi_tcap_componentID, BER_CLASS_PRI, 15, BER_FLAGS_IMPLTAG, dissect_ansi_tcap_T_componentID },
-  { &hf_ansi_tcap_parameter_01, BER_CLASS_ANY, 0, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_T_parameter_01 },
+  { &hf_ansi_tcap_returnResult_parameter, BER_CLASS_ANY, 0, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_T_returnResult_parameter },
   { NULL, 0, 0, 0, NULL }
 };
 
 static int
 dissect_ansi_tcap_ReturnResult(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 104 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 113 "./asn1/ansi_tcap/ansi_tcap.cnf"
   ansi_tcap_private.d.pdu = 2;
 
 
@@ -936,8 +934,8 @@ dissect_ansi_tcap_T_componentID_01(gboolean implicit_tag _U_, tvbuff_t *tvb _U_,
 
 
 static int
-dissect_ansi_tcap_T_parameter_02(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 110 "./asn1/ansi_tcap/ansi_tcap.cnf"
+dissect_ansi_tcap_T_returnError_parameter(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+#line 119 "./asn1/ansi_tcap/ansi_tcap.cnf"
   if(find_tcap_subdissector(tvb, actx, tree))
     offset = tvb_reported_length(tvb);
 
@@ -950,13 +948,13 @@ dissect_ansi_tcap_T_parameter_02(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, i
 static const ber_sequence_t ReturnError_sequence[] = {
   { &hf_ansi_tcap_componentID_01, BER_CLASS_PRI, 15, BER_FLAGS_IMPLTAG, dissect_ansi_tcap_T_componentID_01 },
   { &hf_ansi_tcap_errorCode , BER_CLASS_ANY/*choice*/, -1/*choice*/, BER_FLAGS_NOOWNTAG|BER_FLAGS_NOTCHKTAG, dissect_ansi_tcap_ErrorCode },
-  { &hf_ansi_tcap_parameter_02, BER_CLASS_ANY, 0, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_T_parameter_02 },
+  { &hf_ansi_tcap_returnError_parameter, BER_CLASS_ANY, 0, BER_FLAGS_OPTIONAL|BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_T_returnError_parameter },
   { NULL, 0, 0, 0, NULL }
 };
 
 static int
 dissect_ansi_tcap_ReturnError(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 114 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 123 "./asn1/ansi_tcap/ansi_tcap.cnf"
   ansi_tcap_private.d.pdu = 3;
 
 
@@ -1039,22 +1037,22 @@ dissect_ansi_tcap_T_paramSet(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int o
 }
 
 
-static const value_string ansi_tcap_T_parameter_03_vals[] = {
+static const value_string ansi_tcap_T_reject_parameter_vals[] = {
   {  16, "paramSequence" },
   {  18, "paramSet" },
   { 0, NULL }
 };
 
-static const ber_choice_t T_parameter_03_choice[] = {
+static const ber_choice_t T_reject_parameter_choice[] = {
   {  16, &hf_ansi_tcap_paramSequence, BER_CLASS_PRI, 16, BER_FLAGS_IMPLTAG, dissect_ansi_tcap_T_paramSequence },
   {  18, &hf_ansi_tcap_paramSet  , BER_CLASS_PRI, 18, BER_FLAGS_IMPLTAG, dissect_ansi_tcap_T_paramSet },
   { 0, NULL, 0, 0, 0, NULL }
 };
 
 static int
-dissect_ansi_tcap_T_parameter_03(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+dissect_ansi_tcap_T_reject_parameter(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_ber_choice(actx, tree, tvb, offset,
-                                 T_parameter_03_choice, hf_index, ett_ansi_tcap_T_parameter_03,
+                                 T_reject_parameter_choice, hf_index, ett_ansi_tcap_T_reject_parameter,
                                  NULL);
 
   return offset;
@@ -1064,7 +1062,7 @@ dissect_ansi_tcap_T_parameter_03(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, i
 static const ber_sequence_t Reject_sequence[] = {
   { &hf_ansi_tcap_componentID_02, BER_CLASS_PRI, 15, BER_FLAGS_IMPLTAG, dissect_ansi_tcap_OCTET_STRING_SIZE_0_1 },
   { &hf_ansi_tcap_rejectProblem, BER_CLASS_PRI, 21, BER_FLAGS_IMPLTAG, dissect_ansi_tcap_Problem },
-  { &hf_ansi_tcap_parameter_03, BER_CLASS_ANY/*choice*/, -1/*choice*/, BER_FLAGS_NOOWNTAG|BER_FLAGS_NOTCHKTAG, dissect_ansi_tcap_T_parameter_03 },
+  { &hf_ansi_tcap_reject_parameter, BER_CLASS_ANY/*choice*/, -1/*choice*/, BER_FLAGS_NOOWNTAG|BER_FLAGS_NOTCHKTAG, dissect_ansi_tcap_T_reject_parameter },
   { NULL, 0, 0, 0, NULL }
 };
 
@@ -1149,7 +1147,7 @@ dissect_ansi_tcap_UniTransactionPDU(gboolean implicit_tag _U_, tvbuff_t *tvb _U_
 
 static int
 dissect_ansi_tcap_T_unidirectional(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 126 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 135 "./asn1/ansi_tcap/ansi_tcap.cnf"
 gp_tcapsrt_info->ope=TC_ANSI_ALL;
 col_set_str(actx->pinfo->cinfo, COL_INFO, "unidirectional ");
 
@@ -1179,7 +1177,7 @@ dissect_ansi_tcap_TransactionPDU(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, i
 
 static int
 dissect_ansi_tcap_T_queryWithPerm(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 130 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 139 "./asn1/ansi_tcap/ansi_tcap.cnf"
 gp_tcapsrt_info->ope=TC_ANSI_ALL;
 col_set_str(actx->pinfo->cinfo, COL_INFO, "queryWithPerm ");
 
@@ -1193,7 +1191,7 @@ col_set_str(actx->pinfo->cinfo, COL_INFO, "queryWithPerm ");
 
 static int
 dissect_ansi_tcap_T_queryWithoutPerm(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 134 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 143 "./asn1/ansi_tcap/ansi_tcap.cnf"
 gp_tcapsrt_info->ope=TC_ANSI_ALL;
 col_set_str(actx->pinfo->cinfo, COL_INFO, "queryWithoutPerm ");
 
@@ -1207,7 +1205,7 @@ col_set_str(actx->pinfo->cinfo, COL_INFO, "queryWithoutPerm ");
 
 static int
 dissect_ansi_tcap_T_response(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 138 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 147 "./asn1/ansi_tcap/ansi_tcap.cnf"
 gp_tcapsrt_info->ope=TC_ANSI_ALL;
 col_set_str(actx->pinfo->cinfo, COL_INFO, "response ");
 
@@ -1221,7 +1219,7 @@ col_set_str(actx->pinfo->cinfo, COL_INFO, "response ");
 
 static int
 dissect_ansi_tcap_T_conversationWithPerm(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 142 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 151 "./asn1/ansi_tcap/ansi_tcap.cnf"
 gp_tcapsrt_info->ope=TC_ANSI_ALL;
 col_set_str(actx->pinfo->cinfo, COL_INFO, "conversationWithPerm ");
 
@@ -1235,7 +1233,7 @@ col_set_str(actx->pinfo->cinfo, COL_INFO, "conversationWithPerm ");
 
 static int
 dissect_ansi_tcap_T_conversationWithoutPerm(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 146 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 155 "./asn1/ansi_tcap/ansi_tcap.cnf"
 gp_tcapsrt_info->ope=TC_ANSI_ALL;
 col_set_str(actx->pinfo->cinfo, COL_INFO, "conversationWithoutPerm ");
 
@@ -1298,7 +1296,7 @@ static const value_string ansi_tcap_T_causeInformation_vals[] = {
 
 static const ber_choice_t T_causeInformation_choice[] = {
   {  23, &hf_ansi_tcap_abortCause, BER_CLASS_PRI, 23, BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_P_Abort_cause },
-  {  24, &hf_ansi_tcap_userInformation, BER_CLASS_PRI, 24, BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_UserAbortInformation },
+  {  24, &hf_ansi_tcap_abort_userInformation, BER_CLASS_PRI, 24, BER_FLAGS_NOOWNTAG, dissect_ansi_tcap_UserAbortInformation },
   { 0, NULL, 0, 0, 0, NULL }
 };
 
@@ -1331,7 +1329,7 @@ dissect_ansi_tcap_Abort(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset
 
 static int
 dissect_ansi_tcap_T_abort(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-#line 150 "./asn1/ansi_tcap/ansi_tcap.cnf"
+#line 159 "./asn1/ansi_tcap/ansi_tcap.cnf"
 gp_tcapsrt_info->ope=TC_ANSI_ABORT;
 col_set_str(actx->pinfo->cinfo, COL_INFO, "Abort ");
 
@@ -1364,7 +1362,7 @@ dissect_ansi_tcap_PackageType(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int 
 
 
 /*--- End of included file: packet-ansi_tcap-fn.c ---*/
-#line 307 "./asn1/ansi_tcap/packet-ansi_tcap-template.c"
+#line 305 "./asn1/ansi_tcap/packet-ansi_tcap-template.c"
 
 
 
@@ -1416,7 +1414,7 @@ dissect_ansi_tcap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tree, vo
                  */
                 if ( p_tcap_context && cur_oid && !p_tcap_context->oid_present ) {
                         /* Save the application context and the sub dissector */
-                        g_strlcpy(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid));
+                        (void) g_strlcpy(p_tcap_context->oid, cur_oid, sizeof(p_tcap_context->oid));
                         if ( (subdissector_handle = dissector_get_string_handle(ber_oid_dissector_table, cur_oid)) ) {
                                 p_tcap_context->subdissector_handle=subdissector_handle;
                                 p_tcap_context->oid_present=TRUE;
@@ -1450,6 +1448,7 @@ proto_register_ansi_tcap(void)
 
 /* Setup list of header fields  See Section 1.6.1 for details*/
     static hf_register_info hf[] = {
+#if 0
         /* Tcap Service Response Time */
         { &hf_ansi_tcapsrt_SessionId,
           { "Session Id",
@@ -1481,6 +1480,7 @@ proto_register_ansi_tcap(void)
             FT_UINT32, BASE_DEC, NULL, 0x0,
             NULL, HFILL }
         },
+#endif
         { &hf_ansi_tcap_bit_h,
           { "Require Reply", "ansi_tcap.req_rep",
             FT_BOOLEAN, 16, NULL, 0x8000,
@@ -1513,8 +1513,8 @@ proto_register_ansi_tcap(void)
       { "national", "ansi_tcap.national",
         FT_INT32, BASE_DEC, NULL, 0,
         "INTEGER_M128_127", HFILL }},
-    { &hf_ansi_tcap_private_01,
-      { "private", "ansi_tcap.private",
+    { &hf_ansi_tcap_ec_private,
+      { "private", "ansi_tcap.ec_private",
         FT_UINT32, BASE_DEC, VALS(ansi_tcap_ANSIMAPPrivateErrorcode_vals), 0,
         "ANSIMAPPrivateErrorcode", HFILL }},
     { &hf_ansi_tcap_unidirectional,
@@ -1569,7 +1569,7 @@ proto_register_ansi_tcap(void)
       { "abortCause", "ansi_tcap.abortCause",
         FT_INT32, BASE_DEC, VALS(ansi_tcap_P_Abort_cause_U_vals), 0,
         "P_Abort_cause", HFILL }},
-    { &hf_ansi_tcap_userInformation,
+    { &hf_ansi_tcap_abort_userInformation,
       { "userInformation", "ansi_tcap.userInformation_element",
         FT_NONE, BASE_NONE, NULL, 0,
         "UserAbortInformation", HFILL }},
@@ -1589,7 +1589,7 @@ proto_register_ansi_tcap(void)
       { "objectApplicationId", "ansi_tcap.objectApplicationId",
         FT_OID, BASE_NONE, NULL, 0,
         "ObjectIDApplicationContext", HFILL }},
-    { &hf_ansi_tcap_userInformation_01,
+    { &hf_ansi_tcap_userInformation,
       { "userInformation", "ansi_tcap.userInformation",
         FT_UINT32, BASE_DEC, NULL, 0,
         NULL, HFILL }},
@@ -1661,18 +1661,18 @@ proto_register_ansi_tcap(void)
       { "operationCode", "ansi_tcap.operationCode",
         FT_UINT32, BASE_DEC, VALS(ansi_tcap_OperationCode_vals), 0,
         NULL, HFILL }},
-    { &hf_ansi_tcap_parameter,
+    { &hf_ansi_tcap_invoke_parameter,
       { "parameter", "ansi_tcap.parameter_element",
         FT_NONE, BASE_NONE, NULL, 0,
-        NULL, HFILL }},
+        "T_invoke_parameter", HFILL }},
     { &hf_ansi_tcap_componentID,
       { "componentID", "ansi_tcap.componentID",
         FT_BYTES, BASE_NONE, NULL, 0,
         NULL, HFILL }},
-    { &hf_ansi_tcap_parameter_01,
+    { &hf_ansi_tcap_returnResult_parameter,
       { "parameter", "ansi_tcap.parameter_element",
         FT_NONE, BASE_NONE, NULL, 0,
-        "T_parameter_01", HFILL }},
+        "T_returnResult_parameter", HFILL }},
     { &hf_ansi_tcap_componentID_01,
       { "componentID", "ansi_tcap.componentID",
         FT_BYTES, BASE_NONE, NULL, 0,
@@ -1681,10 +1681,10 @@ proto_register_ansi_tcap(void)
       { "errorCode", "ansi_tcap.errorCode",
         FT_UINT32, BASE_DEC, VALS(ansi_tcap_ErrorCode_vals), 0,
         NULL, HFILL }},
-    { &hf_ansi_tcap_parameter_02,
+    { &hf_ansi_tcap_returnError_parameter,
       { "parameter", "ansi_tcap.parameter_element",
         FT_NONE, BASE_NONE, NULL, 0,
-        "T_parameter_02", HFILL }},
+        "T_returnError_parameter", HFILL }},
     { &hf_ansi_tcap_componentID_02,
       { "componentID", "ansi_tcap.componentID",
         FT_BYTES, BASE_NONE, NULL, 0,
@@ -1693,10 +1693,10 @@ proto_register_ansi_tcap(void)
       { "rejectProblem", "ansi_tcap.rejectProblem",
         FT_INT32, BASE_DEC, VALS(ansi_tcap_Problem_vals), 0,
         "Problem", HFILL }},
-    { &hf_ansi_tcap_parameter_03,
+    { &hf_ansi_tcap_reject_parameter,
       { "parameter", "ansi_tcap.parameter",
-        FT_UINT32, BASE_DEC, VALS(ansi_tcap_T_parameter_03_vals), 0,
-        "T_parameter_03", HFILL }},
+        FT_UINT32, BASE_DEC, VALS(ansi_tcap_T_reject_parameter_vals), 0,
+        "T_reject_parameter", HFILL }},
     { &hf_ansi_tcap_paramSequence,
       { "paramSequence", "ansi_tcap.paramSequence_element",
         FT_NONE, BASE_NONE, NULL, 0,
@@ -1740,7 +1740,7 @@ proto_register_ansi_tcap(void)
     &ett_ansi_tcap_ReturnResult,
     &ett_ansi_tcap_ReturnError,
     &ett_ansi_tcap_Reject,
-    &ett_ansi_tcap_T_parameter_03,
+    &ett_ansi_tcap_T_reject_parameter,
     &ett_ansi_tcap_T_paramSequence,
     &ett_ansi_tcap_T_paramSet,
 
@@ -1780,5 +1780,5 @@ proto_register_ansi_tcap(void)
                                    "Type of matching invoke/response, risk of mismatch if loose matching chosen",
                                    &ansi_tcap_response_matching_type, ansi_tcap_response_matching_type_values, FALSE);
 
-    TransactionId_table = wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(), wmem_str_hash, g_str_equal);
+    TransactionId_table = wmem_multimap_new_autoreset(wmem_epan_scope(), wmem_file_scope(), wmem_str_hash, g_str_equal);
 }

@@ -18,12 +18,7 @@
 #include "help_url.h"
 #include "urls.h"
 #include "wsutil/filesystem.h"
-
-#ifdef HHC_DIR
-#include <windows.h>
-#include <htmlhelp.h>
-#include <wsutil/unicode-utils.h>
-#endif
+#include <wsutil/ws_assert.h>
 
 // To do:
 // - Automatically generate part or all of this, e.g. by parsing
@@ -36,40 +31,30 @@ gchar *
 user_guide_url(const gchar *page) {
     GString *url = g_string_new("");
 
+#if defined(_WIN32)
     /*
-     * Try to open local .chm file. This is not the most intuitive way to
-     * go about this but it fits in with the rest of the _url functions.
+     * The User's Guide is in a directory named "Wireshark User's Guide" in
+     * the program directory.
      */
-#ifdef HHC_DIR
-    HWND hw;
 
-    g_string_printf(url, "%s\\user-guide.chm::/wsug_chm/%s>Wireshark Help",
-        get_datafile_dir(), page);
-
-    hw = HtmlHelpW(NULL,
-        utf_8to16(url->str),
-        HH_DISPLAY_TOPIC, 0);
-
-    /* if the .chm file could be opened, stop here */
-    if(hw != NULL) {
-        g_string_free(url, TRUE /* free_segment */);
-        return NULL;
+    GString *ug_dir = g_string_new("");
+    g_string_printf(ug_dir, "%s\\Wireshark User's Guide", get_datafile_dir());
+    if (g_file_test(ug_dir->str, G_FILE_TEST_IS_DIR)) {
+        g_string_printf(url, "file:///%s/%s", ug_dir->str, page);
     }
-#endif /* HHC_DIR */
-
-#ifdef DOC_DIR
+    g_string_free(ug_dir, TRUE);
+#elif defined(DOC_DIR)
     if (g_file_test(DOC_DIR "/guides/wsug_html_chunked", G_FILE_TEST_IS_DIR)) {
         /* try to open the HTML page from wireshark.org instead */
         g_string_printf(url, "file://" DOC_DIR "/guides/wsug_html_chunked/%s", page);
-    } else {
-#endif /* ifdef DOC_DIR */
-       /* try to open the HTML page from wireshark.org instead */
-        g_string_printf(url, WS_DOCS_URL "/wsug_html_chunked/%s", page);
-#ifdef DOC_DIR
     }
-#endif /* ifdef DOC_DIR */
+#endif /* _WIN32 / DOC_DIR */
 
 
+    /* Fall back to wireshark.org. */
+    if (url->len == 0) {
+        g_string_printf(url, WS_DOCS_URL "wsug_html_chunked/%s", page);
+    }
     return g_string_free(url, FALSE);
 }
 
@@ -93,7 +78,7 @@ topic_action_url(topic_action_e action)
         url = g_strdup(WS_DOCS_URL);
         break;
     case(ONLINEPAGE_USERGUIDE):
-        url = g_strdup(WS_DOCS_URL "/wsug_html_chunked/");
+        url = g_strdup(WS_DOCS_URL "wsug_html_chunked/");
         break;
     case(ONLINEPAGE_FAQ):
         url = g_strdup(WS_FAQ_URL);
@@ -174,9 +159,6 @@ topic_action_url(topic_action_e action)
     case(HELP_CONFIG_PROFILES_DIALOG):
         url = user_guide_url("ChCustConfigProfilesSection.html");
         break;
-    case (HELP_MANUAL_ADDR_RESOLVE_DIALOG):
-        url = user_guide_url("ChManualAddressResolveSection.html");
-        break;
     case(HELP_PRINT_DIALOG):
         url = user_guide_url("ChIOPrintSection.html");
         break;
@@ -237,9 +219,6 @@ topic_action_url(topic_action_e action)
     case(HELP_STATS_IO_GRAPH_DIALOG):
         url = user_guide_url("ChStatIOGraphs.html");
         break;
-    case(HELP_STATS_COMPARE_FILES_DIALOG):
-        url = user_guide_url("ChStatCompareCaptureFiles.html");
-        break;
     case(HELP_STATS_LTE_MAC_TRAFFIC_DIALOG):
         url = user_guide_url("ChTelLTEMACTraffic.html");
         break;
@@ -250,16 +229,13 @@ topic_action_url(topic_action_e action)
         url = user_guide_url("ChStatTCPStreamGraphs.html");
         break;
     case(HELP_STATS_WLAN_TRAFFIC_DIALOG):
-        url = user_guide_url("ChStatWLANTraffic.html");
+        url = user_guide_url("ChWirelessWLANTraffic.html");
         break;
     case(HELP_FILESET_DIALOG):
         url = user_guide_url("ChIOFileSetSection.html");
         break;
     case(HELP_CAPTURE_INTERFACE_OPTIONS_DIALOG):
         url = user_guide_url("ChCustPreferencesSection.html#ChCustInterfaceOptionsSection");
-        break;
-    case(HELP_CAPTURE_INTERFACES_DETAILS_DIALOG):
-        url = user_guide_url("ChCapInterfaceDetailsSection.html");
         break;
     case(HELP_PREFERENCES_DIALOG):
         url = user_guide_url("ChCustPreferencesSection.html");
@@ -292,14 +268,14 @@ topic_action_url(topic_action_e action)
     case(HELP_TIME_SHIFT_DIALOG):
         url = user_guide_url("ChWorkShiftTimePacketSection.html");
         break;
-    case(HELP_FILTER_SAVE_DIALOG):
-        url = user_guide_url("ChWorkFilterSaveSection.html");
-        break;
     case(HELP_TELEPHONY_VOIP_CALLS_DIALOG):
         url = user_guide_url("ChTelVoipCalls.html");
         break;
-    case(HELP_RTP_ANALYSIS_DIALOG):
+    case(HELP_TELEPHONY_RTP_ANALYSIS_DIALOG):
         url = user_guide_url("ChTelRTPAnalysis.html");
+        break;
+    case(HELP_TELEPHONY_RTP_STREAMS_DIALOG):
+        url = user_guide_url("ChTelRTPStreams.html");
         break;
     case(HELP_NEW_PACKET_DIALOG):
         url = user_guide_url("ChapterWork.html#ChWorkPacketSepView");
@@ -310,25 +286,15 @@ topic_action_url(topic_action_e action)
     case(HELP_TELEPHONY_RTP_PLAYER_DIALOG):
         url = user_guide_url("ChTelRtpPlayer.html");
         break;
+    case(HELP_STAT_FLOW_GRAPH):
+        url = user_guide_url("ChStatFlowGraph.html");
+        break;
 
     case(TOPIC_ACTION_NONE):
     default:
-        g_assert_not_reached();
         url = g_strdup(WS_HOME_PAGE_URL);
+        ws_assert_not_reached();
     }
 
     return url;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -165,14 +165,14 @@ msrp_add_address( packet_info *pinfo,
      * Check if the ip address and port combination is not
      * already registered as a conversation.
      */
-    p_conv = find_conversation( pinfo->num, addr, &null_addr, ENDPOINT_TCP, port, 0,
+    p_conv = find_conversation( pinfo->num, addr, &null_addr, CONVERSATION_TCP, port, 0,
                                 NO_ADDR_B | NO_PORT_B);
 
     /*
      * If not, create a new conversation.
      */
     if (!p_conv) {
-        p_conv = conversation_new( pinfo->num, addr, &null_addr, ENDPOINT_TCP,
+        p_conv = conversation_new( pinfo->num, addr, &null_addr, CONVERSATION_TCP,
                                    (guint32)port, 0,
                                    NO_ADDR2 | NO_PORT2);
     }
@@ -198,7 +198,7 @@ msrp_add_address( packet_info *pinfo,
      * Update the conversation data.
      */
     p_conv_data->setup_method_set = TRUE;
-    g_strlcpy(p_conv_data->setup_method, setup_method, MAX_MSRP_SETUP_METHOD_SIZE);
+    (void) g_strlcpy(p_conv_data->setup_method, setup_method, MAX_MSRP_SETUP_METHOD_SIZE);
     p_conv_data->setup_frame_number = setup_frame_number;
 }
 
@@ -219,7 +219,7 @@ show_setup_info(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     {
         /* First time, get info from conversation */
         p_conv = find_conversation(pinfo->num, &pinfo->net_dst, &pinfo->net_src,
-                                   ENDPOINT_TCP,
+                                   CONVERSATION_TCP,
                                    pinfo->destport, pinfo->srcport, 0);
 
         if (p_conv)
@@ -526,20 +526,20 @@ dissect_msrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "MSRP");
     if (is_msrp_response){
         col_add_fstr(pinfo->cinfo, COL_INFO, "Response: %s ",
-                tvb_format_text(tvb, token_3_start, token_3_len));
+                tvb_format_text(pinfo->pool, tvb, token_3_start, token_3_len));
 
         if (token_4_len )
             col_append_fstr(pinfo->cinfo, COL_INFO, "%s ",
-                tvb_format_text(tvb, token_4_start, token_4_len));
+                tvb_format_text(pinfo->pool, tvb, token_4_start, token_4_len));
 
         col_append_fstr(pinfo->cinfo, COL_INFO, "Transaction ID: %s",
-                tvb_format_text(tvb, token_2_start, token_2_len));
+                tvb_format_text(pinfo->pool, tvb, token_2_start, token_2_len));
     }else{
         col_add_fstr(pinfo->cinfo, COL_INFO, "Request: %s ",
-                tvb_format_text(tvb, token_3_start, token_3_len));
+                tvb_format_text(pinfo->pool, tvb, token_3_start, token_3_len));
 
         col_append_fstr(pinfo->cinfo, COL_INFO, "Transaction ID: %s",
-                tvb_format_text(tvb, token_2_start, token_2_len));
+                tvb_format_text(pinfo->pool, tvb, token_2_start, token_2_len));
     }
 
     if (tree) {
@@ -550,20 +550,20 @@ dissect_msrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
             guint32 msrp_status_code = -1;
             gboolean msrp_status_code_valid;
             proto_item* pi;
-            th = proto_tree_add_item(msrp_tree,hf_msrp_response_line,tvb,0,linelen,ENC_UTF_8|ENC_NA);
+            th = proto_tree_add_item(msrp_tree,hf_msrp_response_line,tvb,0,linelen,ENC_UTF_8);
             reqresp_tree = proto_item_add_subtree(th, ett_msrp_reqresp);
-            proto_tree_add_item(reqresp_tree,hf_msrp_transactionID,tvb,token_2_start,token_2_len,ENC_UTF_8|ENC_NA);
+            proto_tree_add_item(reqresp_tree,hf_msrp_transactionID,tvb,token_2_start,token_2_len,ENC_UTF_8);
             msrp_status_code_valid = ws_strtou32(
-                tvb_get_string_enc(wmem_packet_scope(), tvb, token_3_start, token_3_len, ENC_UTF_8|ENC_NA),
+                tvb_get_string_enc(pinfo->pool, tvb, token_3_start, token_3_len, ENC_UTF_8|ENC_NA),
                 NULL, & msrp_status_code);
             pi = proto_tree_add_uint(reqresp_tree,hf_msrp_status_code,tvb,token_3_start,token_3_len,msrp_status_code);
             if (!msrp_status_code_valid)
                 expert_add_info(pinfo, pi, &ei_msrp_status_code_invalid);
         }else{
-            th = proto_tree_add_item(msrp_tree,hf_msrp_request_line,tvb,0,linelen,ENC_UTF_8|ENC_NA);
+            th = proto_tree_add_item(msrp_tree,hf_msrp_request_line,tvb,0,linelen,ENC_UTF_8);
             reqresp_tree = proto_item_add_subtree(th, ett_msrp_reqresp);
-            proto_tree_add_item(reqresp_tree,hf_msrp_transactionID,tvb,token_2_start,token_2_len,ENC_UTF_8|ENC_NA);
-            proto_tree_add_item(reqresp_tree,hf_msrp_method,tvb,token_3_start,token_3_len,ENC_UTF_8|ENC_NA);
+            proto_tree_add_item(reqresp_tree,hf_msrp_transactionID,tvb,token_2_start,token_2_len,ENC_UTF_8);
+            proto_tree_add_item(reqresp_tree,hf_msrp_method,tvb,token_3_start,token_3_len,ENC_UTF_8);
         }
 
         /* Conversation setup info */
@@ -597,7 +597,7 @@ dissect_msrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
                 /*
                  * Malformed header - no colon after the name.
                  */
-                hdr_str = tvb_format_text(tvb, offset, linelen);
+                hdr_str = tvb_format_text(pinfo->pool, tvb, offset, linelen);
                 proto_tree_add_string_format(msrp_hdr_tree, hf_msrp_hdr, tvb, offset,
                                     next_offset - offset, hdr_str, "%s", hdr_str);
             } else {
@@ -605,7 +605,7 @@ dissect_msrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
                 hf_index = msrp_is_known_msrp_header(tvb, offset, header_len);
 
                 if (hf_index == -1) {
-                    hdr_str = tvb_format_text(tvb, offset, linelen);
+                    hdr_str = tvb_format_text(pinfo->pool, tvb, offset, linelen);
                     proto_tree_add_string_format(msrp_hdr_tree, hf_msrp_hdr, tvb,
                                     offset, next_offset - offset, hdr_str, "%s", hdr_str);
                 } else {
@@ -621,7 +621,7 @@ dissect_msrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
                      * Fetch the value.
                      */
                     value_len = line_end_offset - value_offset;
-                    value = tvb_get_string_enc(wmem_packet_scope(), tvb, value_offset,
+                    value = tvb_get_string_enc(pinfo->pool, tvb, value_offset,
                                        value_len, ENC_UTF_8|ENC_NA);
 
                     /*
@@ -632,7 +632,7 @@ dissect_msrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
                                    hf_header_array[hf_index], tvb,
                                    offset, next_offset - offset,
                                    value, "%s",
-                                   tvb_format_text(tvb, offset, linelen));
+                                   tvb_format_text(pinfo->pool, tvb, offset, linelen));
 
                     switch ( hf_index ) {
 
@@ -650,11 +650,11 @@ dissect_msrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
                                     parameter_offset++;
                                 content_type_len = semi_colon_offset - value_offset;
                                 content_type_parameter_str_len = line_end_offset - parameter_offset;
-                                message_info.media_str = tvb_get_string_enc(wmem_packet_scope(), tvb,
+                                message_info.media_str = tvb_get_string_enc(pinfo->pool, tvb,
                                              parameter_offset, content_type_parameter_str_len, ENC_UTF_8|ENC_NA);
                             }
                             media_type_str_lower_case = ascii_strdown_inplace(
-                                                            (gchar *)tvb_get_string_enc(wmem_packet_scope(), tvb, value_offset, content_type_len, ENC_UTF_8|ENC_NA));
+                                                            (gchar *)tvb_get_string_enc(pinfo->pool, tvb, value_offset, content_type_len, ENC_UTF_8|ENC_NA));
                             break;
 
                         default:
@@ -675,7 +675,7 @@ dissect_msrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
             /* Create new tree & tvb for data */
             next_tvb = tvb_new_subset_remaining(tvb, next_offset);
             ti = proto_tree_add_item(msrp_tree, hf_msrp_data, tvb,
-                                     next_offset, -1, ENC_UTF_8|ENC_NA);
+                                     next_offset, -1, ENC_UTF_8);
             msrp_data_tree = proto_item_add_subtree(ti, ett_msrp_data);
 
             /* give the content type parameters to sub dissectors */
@@ -703,12 +703,12 @@ dissect_msrp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 
 
         /* End line */
-        ti = proto_tree_add_item(msrp_tree,hf_msrp_end_line,tvb,end_line_offset,end_line_len,ENC_UTF_8|ENC_NA);
+        ti = proto_tree_add_item(msrp_tree,hf_msrp_end_line,tvb,end_line_offset,end_line_len,ENC_UTF_8);
         msrp_end_tree = proto_item_add_subtree(ti, ett_msrp_end_line);
 
-        proto_tree_add_item(msrp_end_tree,hf_msrp_transactionID,tvb,end_line_offset + 7,token_2_len,ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(msrp_end_tree,hf_msrp_transactionID,tvb,end_line_offset + 7,token_2_len,ENC_UTF_8);
         /* continuation-flag */
-        proto_tree_add_item(msrp_end_tree,hf_msrp_cnt_flg,tvb,end_line_offset+end_line_len-1,1,ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(msrp_end_tree,hf_msrp_cnt_flg,tvb,end_line_offset+end_line_len-1,1,ENC_UTF_8);
 
         if (global_msrp_raw_text && tree) {
             raw_tree = proto_tree_add_subtree(tree, tvb, 0, -1, ett_msrp, NULL, "Message Session Relay Protocol(as raw text)");

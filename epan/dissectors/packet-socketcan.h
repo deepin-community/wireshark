@@ -10,12 +10,22 @@
 #ifndef __PACKET_SOCKETCAN_H__
 #define __PACKET_SOCKETCAN_H__
 
+#include <epan/tvbuff.h>
+#include <epan/packet_info.h>
+#include <epan/proto.h>
+
+/* Flags for CAN FD frames. */
+#define CANFD_BRS	0x01 /* Bit Rate Switch (second bitrate for payload data) */
+#define CANFD_ESI	0x02 /* Error State Indicator of the transmitting node */
+#define CANFD_FDF	0x04 /* FD flag - if set, this is an FD frame */
+
 /* Structure that gets passed between dissectors. */
 struct can_info
 {
 	guint32 id;
 	guint32 len;
 	gboolean fd;
+	guint16 bus_id;
 };
 
 typedef struct can_info can_info_t;
@@ -48,6 +58,9 @@ typedef struct can_info can_info_t;
 #define CAN_ERR_BUSERROR     0x00000080U /* bus error (may flood!) */
 #define CAN_ERR_RESTARTED    0x00000100U /* controller restarted */
 #define CAN_ERR_RESERVED     0x1FFFFE00U /* reserved bits */
+
+
+gboolean socketcan_call_subdissectors(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, struct can_info *can_info, const gboolean use_heuristics_first);
 
 #endif /* __PACKET_SOCKETCAN_H__ */
 

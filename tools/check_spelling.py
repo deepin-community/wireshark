@@ -13,7 +13,9 @@ import signal
 from collections import Counter
 
 # Looks for spelling errors among strings found in source or documentation files.
-# TODO: deal with contractions - pyspellcheck doesn't seem to handle apostrophies..
+# N.B. To run this script, you should install pyspellchecker (not spellchecker) using pip.
+
+# TODO: check structured doxygen comments?
 
 # For text colouring/highlighting.
 class bcolors:
@@ -76,7 +78,7 @@ class File:
 
             # Find protocol name and add to dict.
             # N.B. doesn't work when a variable is used instead of a literal for the protocol name...
-            matches =   re.finditer(r'proto_register_protocol\s*\([\n\r\s]*\"(.*)\",[\n\r\s]*\"(.*)\",[\n\r\s]*\"(.*)\"', contents)
+            matches = re.finditer(r'proto_register_protocol\s*\([\n\r\s]*\"(.*)\",[\n\r\s]*\"(.*)\",[\n\r\s]*\"(.*)\"', contents)
             for m in matches:
                 protocol = m.group(3)
                 # Add to dict.
@@ -100,6 +102,7 @@ class File:
                 return False
 
         # Try splitting into 2 words recognised at various points.
+        # Allow 3-letter words.
         length = len(word)
         for idx in range(3, length-3):
             word1 = word[0:idx]
@@ -108,19 +111,50 @@ class File:
             if not spell.unknown([word1, word2]):
                 return True
 
+        return self.checkMultiWordsRecursive(word)
+
+    # If word before 'id' is recognised, accept word.
+    def wordBeforeId(self, word):
+        if word.lower().endswith('id'):
+            if not spell.unknown([word[0:len(word)-2]]):
+                return True
+            else:
+                return False
+
+    def checkMultiWordsRecursive(self, word):
+        length = len(word)
+        #print('word=', word)
+        if length < 4:
+            return False
+
+        for idx in range(4, length+1):
+            w = word[0:idx]
+            if not spell.unknown([w]):
+                if idx == len(word):
+                    return True
+                else:
+                    if self.checkMultiWordsRecursive(word[idx:]):
+                        return True
+
+        return False
+
+    def numberPlusUnits(self, word):
+        m = re.search(r'^([0-9]+)([a-zA-Z]+)$', word)
+        if m:
+            if m.group(2).lower() in { "bit", "bits", "gb", "kbps", "gig", "mb", "th", "mhz", "v", "hz", "k",
+                                       "mbps", "m", "g", "ms", "nd", "nds", "rd", "kb", "kbit",
+                                       "khz", "km", "ms", "usec", "sec", "gbe", "ns", "ksps", "qam", "mm" }:
+                return True
         return False
 
 
-    # Check the spelling of all the words we have found fir tgus fuke,
+    # Check the spelling of all the words we have found
     def spellCheck(self):
 
         num_values = len(self.values)
-        this_value = 0
-        for v in self.values:
+        for value_index,v in enumerate(self.values):
             if should_exit:
                 exit(1)
-
-            this_value += 1
 
             # Ignore includes.
             if v.endswith('.h'):
@@ -164,7 +198,6 @@ class File:
             v = v.replace('%u', '')
             v = v.replace('%d', '')
             v = v.replace('%s', '')
-            v = v.replace('\\n', ' ')
 
             # Split into words.
             value_words = v.split()
@@ -182,34 +215,63 @@ class File:
                 word = word.replace('“', '')
                 word = word.replace('”', '')
 
-                if len(word) > 4 and spell.unknown([word]) and not self.checkMultiWords(word):
-                    print(self.file, this_value, '/', num_values, '"' + original + '"', bcolors.FAIL + word + bcolors.ENDC,
+                if self.numberPlusUnits(word):
+                    continue
+
+                if len(word) > 4 and spell.unknown([word]) and not self.checkMultiWords(word) and not self.wordBeforeId(word):
+                    print(self.file, value_index, '/', num_values, '"' + original + '"', bcolors.FAIL + word + bcolors.ENDC,
                          ' -> ', '?')
                     # TODO: this can be interesting, but takes too long!
                     # bcolors.OKGREEN + spell.correction(word) + bcolors.ENDC
                     global missing_words
                     missing_words.append(word)
 
+def removeWhitespaceControl(code_string):
+    code_string = code_string.replace('\\n', ' ')
+    code_string = code_string.replace('\\r', ' ')
+    code_string = code_string.replace('\\t', ' ')
+    return code_string
+
+# Remove any contractions from the given string.
+def removeContractions(code_string):
+    contractions = [ "wireshark’s", "don’t", "let’s", "isn’t", "won’t", "user’s", "hasn’t", "you’re", "o’clock", "you’ll",
+                     "you’d", "developer’s", "doesn’t", "what’s", "let’s", "haven’t", "can’t", "you’ve",
+                     "shouldn’t", "didn’t", "wouldn’t", "aren’t", "there’s", "packet’s", "couldn’t", "world’s",
+                     "needn’t", "graph’s", "table’s", "parent’s", "entity’s", "server’s", "node’s",
+                     "querier’s", "sender’s", "receiver’s", "computer’s", "frame’s", "vendor’s", "system’s",
+                     "we’ll", "asciidoctor’s", "protocol’s", "microsoft’s", "wasn’t" ]
+    for c in contractions:
+        code_string = code_string.replace(c, "")
+        code_string = code_string.replace(c.capitalize(), "")
+        code_string = code_string.replace(c.replace('’', "'"), "")
+        code_string = code_string.replace(c.capitalize().replace('’', "'"), "")
+    return code_string
+
 def removeComments(code_string):
     code_string = re.sub(re.compile(r"/\*.*?\*/",re.DOTALL ) ,"" ,code_string) # C-style comment
     # Remove this for now as can get tripped up if see htpps://www.... within a string!
-    #code_string = re.sub(re.compile(r"//.*?\n" ) ,"" ,code_string)             # C++-style comment
+    code_string = re.sub(re.compile(r"^\s*//.*?\n" ) ,"" ,code_string)             # C++-style comment
     return code_string
 
 def removeSingleQuotes(code_string):
+    code_string = code_string.replace('\\\\', " ")        # Separate at \\
     code_string = code_string.replace('\"\\\\\"', "")
     code_string = code_string.replace("\\\"", " ")
     code_string = code_string.replace("'\"'", "")
+    code_string = code_string.replace('…', ' ')
     return code_string
 
 def removeHexSpecifiers(code_string):
-    # TODO: replace with single regexp?
-    code_string = code_string.replace('0x%02X', "")
-    code_string = code_string.replace('0x%02x', "")
-    code_string = code_string.replace('0x%04X', "")
-    code_string = code_string.replace('0x%04x', "")
-    code_string = code_string.replace('0x%08X', "")
-    code_string = code_string.replace('0x%08x', "")
+    # Find all hex numbers
+
+    looking = True
+    while looking:
+        m = re.search(r'(0x[0-9a-fA-F]*)', code_string)
+        if m:
+            code_string = code_string.replace(m.group(0), "")
+        else:
+            looking = False
+
     return code_string
 
 
@@ -219,7 +281,8 @@ def findStrings(filename):
         contents = f.read()
 
         # Remove comments & embedded quotes so as not to trip up RE.
-        contents = removeComments(contents)
+        contents = removeContractions(contents)
+        contents = removeWhitespaceControl(contents)
         contents = removeSingleQuotes(contents)
         contents = removeHexSpecifiers(contents)
 
@@ -228,14 +291,14 @@ def findStrings(filename):
 
         # What we check depends upon file type.
         if file.code_file:
+            contents = removeComments(contents)
             # Code so only checking strings.
             matches =   re.finditer(r'\"([^\"]*)\"', contents)
             for m in matches:
                 file.add(m.group(1))
         else:
             # A documentation file, so examine all words.
-            words = contents.split()
-            for w in words:
+            for w in contents.split():
                 file.add(w)
 
         return file
@@ -243,13 +306,19 @@ def findStrings(filename):
 
 # Test for whether the given file was automatically generated.
 def isGeneratedFile(filename):
+    if not filename.endswith('.c'):
+        return False
+
+    # This file is generated, but notice is further in than want to check for all files
+    if filename.endswith('pci-ids.c'):
+        return True
+
     # Open file
     f_read = open(os.path.join(filename), 'r')
-    lines_tested = 0
-    for line in f_read:
+    for line_no,line in enumerate(f_read):
         # The comment to say that its generated is near the top, so give up once
         # get a few lines down.
-        if lines_tested > 10:
+        if line_no > 10:
             f_read.close()
             return False
         if (line.find('Generated automatically') != -1 or
@@ -257,11 +326,12 @@ def isGeneratedFile(filename):
             line.find('is autogenerated') != -1 or
             line.find('automatically generated by Pidl') != -1 or
             line.find('Created by: The Qt Meta Object Compiler') != -1 or
-            line.find('This file was generated') != -1):
+            line.find('This file was generated') != -1 or
+            line.find('This filter was automatically generated') != -1 or
+            line.find('This file is auto generated, do not edit!') != -1):
 
             f_read.close()
             return True
-        lines_tested = lines_tested + 1
 
     # OK, looks like a hand-written file!
     f_read.close()
@@ -270,26 +340,38 @@ def isGeneratedFile(filename):
 
 def isAppropriateFile(filename):
     file, extension = os.path.splitext(filename)
-    return extension in { '.adoc', '.c', '.cpp', '.pod'} or file.endswith('README')
+    if filename.find('CMake') != -1:
+        return False
+    return extension in { '.adoc', '.c', '.cpp', '.pod', '.nsi', '.txt'} or file.endswith('README')
 
 
-def findFilesInFolder(folder):
+def findFilesInFolder(folder, recursive=True):
     files_to_check = []
 
-    for root, subfolders, files in os.walk(folder):
-        for f in files:
-            if should_exit:
-                return
-
-            f = os.path.join(root, f)
+    if recursive:
+        for root, subfolders, files in os.walk(folder):
+            for f in files:
+                if should_exit:
+                    return
+                f = os.path.join(root, f)
+                if isAppropriateFile(f) and not isGeneratedFile(f):
+                    files_to_check.append(f)
+    else:
+        for f in sorted(os.listdir(folder)):
+            f = os.path.join(folder, f)
             if isAppropriateFile(f) and not isGeneratedFile(f):
                 files_to_check.append(f)
 
     return files_to_check
 
 
-# Check the given dissector file.
+# Check the given file.
 def checkFile(filename):
+    # Check file exists - e.g. may have been deleted in a recent commit.
+    if not os.path.exists(filename):
+        print(filename, 'does not exist!')
+        return
+
     file = findStrings(filename)
     file.spellCheck()
 
@@ -300,11 +382,13 @@ def checkFile(filename):
 
 # command-line args.  Controls which files should be checked.
 # If no args given, will just scan epan/dissectors folder.
-parser = argparse.ArgumentParser(description='Check calls in dissectors')
-parser.add_argument('--file', action='store', default='',
-                    help='specify individual dissector file to test')
+parser = argparse.ArgumentParser(description='Check spellings in specified files')
+parser.add_argument('--file', action='append',
+                    help='specify individual file to test')
 parser.add_argument('--folder', action='store', default='',
                     help='specify folder to test')
+parser.add_argument('--no-recurse', action='store_true', default='',
+                    help='do not recurse inside chosen folder')
 parser.add_argument('--commits', action='store',
                     help='last N commits to check')
 parser.add_argument('--open', action='store_true',
@@ -316,39 +400,38 @@ args = parser.parse_args()
 # Get files from wherever command-line args indicate.
 files = []
 if args.file:
-    # Add single specified file..
-    if not os.path.isfile(args.file):
-        print('Chosen file', args.file, 'does not exist.')
-        exit(1)
-    else:
-        files.append(args.file)
+    # Add specified file(s)
+    for f in args.file:
+        if not os.path.isfile(f):
+            print('Chosen file', f, 'does not exist.')
+            exit(1)
+        else:
+            files.append(f)
 elif args.commits:
     # Get files affected by specified number of commits.
     command = ['git', 'diff', '--name-only', 'HEAD~' + args.commits]
     files = [f.decode('utf-8')
              for f in subprocess.check_output(command).splitlines()]
-    # Will examine dissector files only
-    files = list(filter(lambda f : isAppropriateFile(f), files))
+    # Filter files
+    files = list(filter(lambda f : os.path.exists(f) and isAppropriateFile(f) and not isGeneratedFile(f), files))
 elif args.open:
     # Unstaged changes.
     command = ['git', 'diff', '--name-only']
     files = [f.decode('utf-8')
              for f in subprocess.check_output(command).splitlines()]
-    # Only interested in dissector files.
-    files = list(filter(lambda f : is_dissector_file(f), files))
+    # Filter files.
+    files = list(filter(lambda f : isAppropriateFile(f) and not isGeneratedFile(f), files))
     # Staged changes.
     command = ['git', 'diff', '--staged', '--name-only']
     files_staged = [f.decode('utf-8')
                     for f in subprocess.check_output(command).splitlines()]
-    # Only interested in dissector files.
-    files_staged = list(filter(lambda f : is_dissector_file(f), files_staged))
-    for f in files:
-        files.append(f)
+    # Filter files.
+    files_staged = list(filter(lambda f : isAppropriateFile(f) and not isGeneratedFile(f), files_staged))
     for f in files_staged:
         if not f in files:
             files.append(f)
 else:
-    # By default, scan dissectors
+    # By default, scan dissectors directory
     folder = os.path.join('epan', 'dissectors')
     # But overwrite with any folder entry.
     if args.folder:
@@ -359,7 +442,7 @@ else:
 
     # Find files from folder.
     print('Looking for files in', folder)
-    files = findFilesInFolder(folder)
+    files = findFilesInFolder(folder, not args.no_recurse)
 
 
 # If scanning a subset of files, list them here.
@@ -375,14 +458,15 @@ else:
 
 # Now check the chosen files.
 for f in files:
-    # Jump out if control-C has been pressed.
+    # Check this file.
+    checkFile(f)
+    # But get out if control-C has been pressed.
     if should_exit:
         exit(1)
-    checkFile(f)
 
 
 
-# Show the most commonly not-recognised words. TODO: depend upon a command-line option here?
+# Show the most commonly not-recognised words.
 print('')
 counter = Counter(missing_words).most_common(100)
 if len(counter) > 0:

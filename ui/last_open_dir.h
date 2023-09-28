@@ -1,4 +1,5 @@
-/* last_open_dir.h
+/** @file
+ *
  * Routines to fetch the last directory in which a file was opened;
  * its implementation is GUI-dependent, but the API isn't
  *
@@ -27,16 +28,3 @@ extern char *get_last_open_dir(void);
 #endif /* __cplusplus */
 
 #endif /* __UI_LAST_OPEN_DIR_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

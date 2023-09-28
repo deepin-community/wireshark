@@ -14,6 +14,7 @@
 
 #include <epan/packet.h>
 #include <epan/expert.h>
+#include <epan/strutil.h>
 #include <wsutil/pint.h>
 #include <wsutil/strtoi.h>
 
@@ -47,10 +48,10 @@ parse_string_field(proto_tree *tree, int hf, packet_info *pinfo, tvbuff_t *tvb, 
   if (*linelen < 0)
     return FALSE;
 
-  str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, *linelen, ENC_ASCII);
+  str = tvb_get_string_enc(pinfo->pool, tvb, offset, *linelen, ENC_ASCII);
   if (g_ascii_strncasecmp(str, hf_info->name, strlen(hf_info->name)) == 0)
   {
-      field_and_value = wmem_strsplit(wmem_packet_scope(), str, ":", 2);
+      field_and_value = wmem_strsplit(pinfo->pool, str, ":", 2);
       p = field_and_value[1];
       if (p) {
         while(g_ascii_isspace(*p))
@@ -87,7 +88,7 @@ dissect_lsd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
   ti = proto_tree_add_item(tree, proto_lsd, tvb, 0, -1, ENC_NA);
   lsd_tree = proto_item_add_subtree(ti, ett_lsd);
 
-  proto_tree_add_item(lsd_tree, hf_lsd_header, tvb, offset, linelen, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(lsd_tree, hf_lsd_header, tvb, offset, linelen, ENC_ASCII);
 
   offset = next_offset;
   if (!parse_string_field(lsd_tree, hf_lsd_host, pinfo, tvb, offset, &next_offset, &linelen))
@@ -97,10 +98,10 @@ dissect_lsd(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
   linelen = tvb_find_line_end(tvb, offset, -1, &next_offset, FALSE);
   if (linelen < 0)
       return offset+linelen;
-  str = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, linelen, ENC_ASCII);
+  str = tvb_get_string_enc(pinfo->pool, tvb, offset, linelen, ENC_ASCII);
   if (g_ascii_strncasecmp(str, "Port", strlen("Port")) == 0)
   {
-    field_and_value = wmem_strsplit(wmem_packet_scope(), str, ":", 2);
+    field_and_value = wmem_strsplit(pinfo->pool, str, ":", 2);
     valid = ws_strtou16(field_and_value[1], NULL, &port);
     ti = proto_tree_add_uint(lsd_tree, hf_lsd_port, tvb, offset, linelen, port);
     if (!valid)

@@ -11,6 +11,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN "randpktdump"
 
 #include "extcap-base.h"
 
@@ -20,6 +21,7 @@
 #include <wsutil/privileges.h>
 #include <wsutil/socket.h>
 #include <wsutil/please_report_bug.h>
+#include <wsutil/wslog.h>
 
 #include <cli_main.h>
 #include <ui/cmdarg_err.h>
@@ -41,16 +43,16 @@ enum {
 	OPT_TYPE
 };
 
-static struct option longopts[] = {
+static struct ws_option longopts[] = {
 	EXTCAP_BASE_OPTIONS,
-	{ "help",					no_argument,		NULL, OPT_HELP},
-	{ "version",				no_argument,		NULL, OPT_VERSION},
-	{ "maxbytes",				required_argument,	NULL, OPT_MAXBYTES},
-	{ "count",					required_argument,	NULL, OPT_COUNT},
-	{ "delay",					required_argument,	NULL, OPT_DELAY},
-	{ "random-type",			no_argument,		NULL, OPT_RANDOM_TYPE},
-	{ "all-random",				no_argument,		NULL, OPT_ALL_RANDOM},
-	{ "type",					required_argument,	NULL, OPT_TYPE},
+	{ "help",					ws_no_argument,		NULL, OPT_HELP},
+	{ "version",				ws_no_argument,		NULL, OPT_VERSION},
+	{ "maxbytes",				ws_required_argument,	NULL, OPT_MAXBYTES},
+	{ "count",					ws_required_argument,	NULL, OPT_COUNT},
+	{ "delay",					ws_required_argument,	NULL, OPT_DELAY},
+	{ "random-type",			ws_no_argument,		NULL, OPT_RANDOM_TYPE},
+	{ "all-random",				ws_no_argument,		NULL, OPT_ALL_RANDOM},
+	{ "type",					ws_required_argument,	NULL, OPT_TYPE},
     { 0, 0, 0, 0 }
 };
 
@@ -82,12 +84,12 @@ static int list_config(char *interface)
 	char** longname_list;
 
 	if (!interface) {
-		g_warning("No interface specified.");
+		ws_warning("No interface specified.");
 		return EXIT_FAILURE;
 	}
 
 	if (g_strcmp0(interface, RANDPKT_EXTCAP_INTERFACE)) {
-		g_warning("Interface must be %s", RANDPKT_EXTCAP_INTERFACE);
+		ws_warning("Interface must be %s", RANDPKT_EXTCAP_INTERFACE);
 		return EXIT_FAILURE;
 	}
 
@@ -125,9 +127,9 @@ static int list_config(char *interface)
 	return EXIT_SUCCESS;
 }
 
-static void failure_warning_message(const char *msg_format, va_list ap)
+static void randpktdump_cmdarg_err(const char *msg_format, va_list ap)
 {
-	g_logv(G_LOG_DOMAIN, G_LOG_LEVEL_WARNING, msg_format, ap);
+	ws_logv(LOG_DOMAIN_CAPCHILD, LOG_LEVEL_WARNING, msg_format, ap);
 }
 
 int main(int argc, char *argv[])
@@ -150,7 +152,10 @@ int main(int argc, char *argv[])
 	char* help_url;
 	char* help_header = NULL;
 
-	cmdarg_err_init(failure_warning_message, failure_warning_message);
+	cmdarg_err_init(randpktdump_cmdarg_err, randpktdump_cmdarg_err);
+
+	/* Initialize log handler early so we can have proper logging during startup. */
+	extcap_log_init("randpktdump");
 
 	/*
 	 * Get credential information for later use.
@@ -161,9 +166,9 @@ int main(int argc, char *argv[])
 	 * Attempt to get the pathname of the directory containing the
 	 * executable file.
 	 */
-	err_msg = init_progfile_dir(argv[0]);
+	err_msg = configuration_init(argv[0], NULL);
 	if (err_msg != NULL) {
-		g_warning("Can't get pathname of directory containing the captype program: %s.",
+		ws_warning("Can't get pathname of directory containing the extcap program: %s.",
 			err_msg);
 		g_free(err_msg);
 	}
@@ -174,7 +179,7 @@ int main(int argc, char *argv[])
 	g_free(help_url);
 	extcap_base_register_interface(extcap_conf, RANDPKT_EXTCAP_INTERFACE, "Random packet generator", 147, "Generator dependent DLT");
 
-	help_header = g_strdup_printf(
+	help_header = ws_strdup_printf(
 		" %s --extcap-interfaces\n"
 		" %s --extcap-interface=%s --extcap-dlts\n"
 		" %s --extcap-interface=%s --extcap-config\n"
@@ -198,7 +203,7 @@ int main(int argc, char *argv[])
 		goto end;
 	}
 
-	while ((result = getopt_long(argc, argv, ":", longopts, &option_idx)) != -1) {
+	while ((result = ws_getopt_long(argc, argv, ":", longopts, &option_idx)) != -1) {
 		switch (result) {
 		case OPT_VERSION:
 			extcap_version_print(extcap_conf);
@@ -211,23 +216,23 @@ int main(int argc, char *argv[])
 			goto end;
 
 		case OPT_MAXBYTES:
-			if (!ws_strtou16(optarg, NULL, &maxbytes)) {
-				g_warning("Invalid parameter maxbytes: %s (max value is %u)",
-					optarg, G_MAXUINT16);
+			if (!ws_strtou16(ws_optarg, NULL, &maxbytes)) {
+				ws_warning("Invalid parameter maxbytes: %s (max value is %u)",
+					ws_optarg, G_MAXUINT16);
 				goto end;
 			}
 			break;
 
 		case OPT_COUNT:
-			if (!ws_strtou64(optarg, NULL, &count)) {
-				g_warning("Invalid packet count: %s", optarg);
+			if (!ws_strtou64(ws_optarg, NULL, &count)) {
+				ws_warning("Invalid packet count: %s", ws_optarg);
 				goto end;
 			}
 			break;
 
 		case OPT_DELAY:
-			if (!ws_strtou64(optarg, NULL, &packet_delay_ms)) {
-				g_warning("Invalid packet delay: %s", optarg);
+			if (!ws_strtou64(ws_optarg, NULL, &packet_delay_ms)) {
+				ws_warning("Invalid packet delay: %s", ws_optarg);
 				goto end;
 			}
 			break;
@@ -242,19 +247,19 @@ int main(int argc, char *argv[])
 
 		case OPT_TYPE:
 			g_free(type);
-			type = g_strdup(optarg);
+			type = g_strdup(ws_optarg);
 			break;
 
 		case ':':
 			/* missing option argument */
-			g_warning("Option '%s' requires an argument", argv[optind - 1]);
+			ws_warning("Option '%s' requires an argument", argv[ws_optind - 1]);
 			break;
 
 		default:
 			/* Handle extcap specific options */
-			if (!extcap_base_parse_options(extcap_conf, result - EXTCAP_OPT_LIST_INTERFACES, optarg))
+			if (!extcap_base_parse_options(extcap_conf, result - EXTCAP_OPT_LIST_INTERFACES, ws_optarg))
 			{
-				g_warning("Invalid option: %s", argv[optind - 1]);
+				ws_warning("Invalid option: %s", argv[ws_optind - 1]);
 				goto end;
 			}
 		}
@@ -274,7 +279,7 @@ int main(int argc, char *argv[])
 
 	/* Some sanity checks */
 	if ((random_type) && (all_random)) {
-		g_warning("You can specify only one between: --random-type, --all-random");
+		ws_warning("You can specify only one between: --random-type, --all-random");
 		goto end;
 	}
 
@@ -286,16 +291,16 @@ int main(int argc, char *argv[])
 
 	err_msg = ws_init_sockets();
 	if (err_msg != NULL) {
-		g_warning("ERROR: %s", err_msg);
+		ws_warning("ERROR: %s", err_msg);
 		g_free(err_msg);
-		g_warning("%s", please_report_bug());
+		ws_warning("%s", please_report_bug());
 		goto end;
 	}
 
 	if (extcap_conf->capture) {
 
 		if (g_strcmp0(extcap_conf->interface, RANDPKT_EXTCAP_INTERFACE)) {
-			g_warning("ERROR: invalid interface");
+			ws_warning("ERROR: invalid interface");
 			goto end;
 		}
 
@@ -308,7 +313,7 @@ int main(int argc, char *argv[])
 			if (!example)
 				goto end;
 
-			g_debug("Generating packets: %s", example->abbrev);
+			ws_debug("Generating packets: %s", example->abbrev);
 
 			randpkt_example_init(example, extcap_conf->fifo, maxbytes);
 			randpkt_loop(example, count, packet_delay_ms);

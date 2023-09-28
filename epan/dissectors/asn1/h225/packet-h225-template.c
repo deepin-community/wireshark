@@ -99,8 +99,8 @@ static dissector_handle_t h4501_handle=NULL;
 static dissector_handle_t nsp_handle;
 static dissector_handle_t tp_handle;
 
-static next_tvb_list_t h245_list;
-static next_tvb_list_t tp_list;
+static next_tvb_list_t *h245_list;
+static next_tvb_list_t *tp_list;
 
 /* Initialize the protocol and registered fields */
 static int h225_tap = -1;
@@ -175,7 +175,7 @@ typedef enum _ras_category {
 #define NUM_RAS_STATS 7
 
 static tap_packet_status
-h225rassrt_packet(void *phs, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *phi)
+h225rassrt_packet(void *phs, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *phi, tap_flags_t flags _U_)
 {
   rtd_data_t* rtd_data = (rtd_data_t*)phs;
   rtd_stat_table* rs = &rtd_data->stat_table;
@@ -322,8 +322,8 @@ static void
 h225_frame_end(void)
 {
   /* next_tvb pointers are allocated in packet scope, clear it. */
-  next_tvb_init(&h245_list);
-  next_tvb_init(&tp_list);
+  h245_list = NULL;
+  tp_list = NULL;
 }
 
 static int
@@ -340,8 +340,8 @@ dissect_h225_H323UserInformation(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
   p_add_proto_data(pinfo->pool, pinfo, proto_h225, 0, h225_pi);
 
   register_frame_end_routine(pinfo, h225_frame_end);
-  next_tvb_init(&h245_list);
-  next_tvb_init(&tp_list);
+  h245_list = next_tvb_list_new(pinfo->pool);
+  tp_list = next_tvb_list_new(pinfo->pool);
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, PSNAME);
   col_clear(pinfo->cinfo, COL_INFO);
@@ -351,13 +351,13 @@ dissect_h225_H323UserInformation(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
 
   offset = dissect_H323_UserInformation_PDU(tvb, pinfo, tr, NULL);
 
-  if (h245_list.count){
+  if (h245_list->count){
     col_append_str(pinfo->cinfo, COL_PROTOCOL, "/");
     col_set_fence(pinfo->cinfo, COL_PROTOCOL);
   }
 
-  next_tvb_call(&h245_list, pinfo, tree, h245dg_handle, data_handle);
-  next_tvb_call(&tp_list, pinfo, tree, NULL, data_handle);
+  next_tvb_call(h245_list, pinfo, tree, h245dg_handle, data_handle);
+  next_tvb_call(tp_list, pinfo, tree, NULL, data_handle);
 
   tap_queue_packet(h225_tap, pinfo, h225_pi);
 
@@ -376,6 +376,8 @@ dissect_h225_h225_RasMessage(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
   p_add_proto_data(pinfo->pool, pinfo, proto_h225, 0, h225_pi);
 
   register_frame_end_routine(pinfo, h225_frame_end);
+  h245_list = next_tvb_list_new(pinfo->pool);
+  tp_list = next_tvb_list_new(pinfo->pool);
 
   col_set_str(pinfo->cinfo, COL_PROTOCOL, PSNAME);
 
@@ -385,6 +387,9 @@ dissect_h225_h225_RasMessage(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
   offset = dissect_RasMessage_PDU(tvb, pinfo, tr, NULL);
 
   ras_call_matching(tvb, pinfo, tr, h225_pi);
+
+  next_tvb_call(h245_list, pinfo, tree, h245dg_handle, data_handle);
+  next_tvb_call(tp_list, pinfo, tree, NULL, data_handle);
 
   tap_queue_packet(h225_tap, pinfo, h225_pi);
 
@@ -444,11 +449,22 @@ static guint other_idx;
 
 static void h225_stat_init(stat_tap_table_ui* new_stat)
 {
+  const char *table_name = "H.225 Messages and Message Reasons";
   int num_fields = sizeof(h225_stat_fields)/sizeof(stat_tap_table_item);
-  stat_tap_table* table = stat_tap_init_table("H.225 Messages and Message Reasons", num_fields, 0, NULL);
+  stat_tap_table *table;
   int row_idx = 0, msg_idx;
   stat_tap_table_item_type items[sizeof(h225_stat_fields)/sizeof(stat_tap_table_item)];
 
+  table = stat_tap_find_table(new_stat, table_name);
+  if (table) {
+    if (new_stat->stat_tap_reset_table_cb) {
+      new_stat->stat_tap_reset_table_cb(table);
+    }
+    return;
+  }
+
+  memset(items, 0x0, sizeof(items));
+  table = stat_tap_init_table(table_name, num_fields, 0, NULL);
   stat_tap_add_table(new_stat, table);
 
   items[MESSAGE_TYPE_COLUMN].type = TABLE_ITEM_STRING;
@@ -660,7 +676,7 @@ static void h225_stat_init(stat_tap_table_ui* new_stat)
 }
 
 static tap_packet_status
-h225_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *hpi_ptr)
+h225_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *hpi_ptr, tap_flags_t flags _U_)
 {
   stat_data_t* stat_data = (stat_data_t*)tapdata;
   const h225_packet_info *hpi = (const h225_packet_info *)hpi_ptr;

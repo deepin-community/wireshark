@@ -1,4 +1,4 @@
-/* lte_rlc_statistics_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -26,6 +26,7 @@ public:
     void     incFrameCount() { ++packet_count_; }
 
 protected:
+    void captureFileClosing();
 
 signals:
     void launchRLCGraph(bool channelKnown,
@@ -47,7 +48,7 @@ private:
 
     // Callbacks for register_tap_listener
     static void tapReset(void *ws_dlg_ptr);
-    static tap_packet_status tapPacket(void *ws_dlg_ptr, struct _packet_info *, struct epan_dissect *, const void *rlc_lte_tap_info_ptr);
+    static tap_packet_status tapPacket(void *ws_dlg_ptr, struct _packet_info *, struct epan_dissect *, const void *rlc_lte_tap_info_ptr, tap_flags_t flags);
     static void tapDraw(void *ws_dlg_ptr);
 
     void updateHeaderLabels();
@@ -60,8 +61,6 @@ private slots:
     virtual void fillTree();
     void updateItemSelectionChanged();
 
-    void captureFileClosing();
-
     void useRLCFramesFromMacCheckBoxToggled(bool state);
     void launchULGraphButtonClicked();
     void launchDLGraphButtonClicked();
@@ -69,16 +68,3 @@ private slots:
 };
 
 #endif // __LTE_RLC_STATISTICS_DIALOG_H__
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

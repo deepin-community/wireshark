@@ -10,6 +10,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN LOG_DOMAIN_EPAN
 
 #include <stdio.h>
 #include <string.h>
@@ -24,6 +25,7 @@
 #include "disabled_protos.h"
 #include <wsutil/file_util.h>
 #include <wsutil/report_message.h>
+#include <wsutil/wslog.h>
 
 #define ENABLED_PROTOCOLS_FILE_NAME     "enabled_protos"
 #define DISABLED_PROTOCOLS_FILE_NAME    "disabled_protos"
@@ -179,7 +181,7 @@ save_protos_list(char **pref_path_return, int *errno_return, const char* filenam
   /* Write to "XXX.new", and rename if that succeeds.
      That means we don't trash the file if we fail to write it out
      completely. */
-  ff_path_new = g_strdup_printf("%s.new", ff_path);
+  ff_path_new = ws_strdup_printf("%s.new", ff_path);
 
   if ((ff = ws_fopen(ff_path_new, "w")) == NULL) {
     *pref_path_return = ff_path;
@@ -320,7 +322,7 @@ read_protos_list_file(const char *ff_path, FILE *ff, GList **flp)
       if (c != EOF && c != '\n' && c != '#') {
         /* Non-white-space after the protocol name; warn about it,
            in case we come up with a reason to use it. */
-        g_warning("'%s' line %d has extra stuff after the protocol name.",
+        ws_warning("'%s' line %d has extra stuff after the protocol name.",
                   ff_path, line);
       }
     }
@@ -335,7 +337,7 @@ read_protos_list_file(const char *ff_path, FILE *ff, GList **flp)
         goto error;     /* I/O error */
       else {
         /* EOF, not error; no newline seen before EOF */
-        g_warning("'%s' line %d doesn't have a newline.", ff_path,
+        ws_warning("'%s' line %d doesn't have a newline.", ff_path,
                   line);
       }
       break;    /* nothing more to read */
@@ -355,7 +357,7 @@ read_protos_list_file(const char *ff_path, FILE *ff, GList **flp)
     prot_name[prot_name_index] = '\0';
 
     /* Add the new protocol to the list of disabled protocols */
-    prot         = (protocol_def *) g_malloc(sizeof(protocol_def));
+    prot         = g_new(protocol_def, 1);
     prot->name   = g_strdup(prot_name);
     *flp = g_list_append(*flp, prot);
   }
@@ -641,7 +643,7 @@ read_heur_dissector_list_file(const char *ff_path, FILE *ff, GList **flp)
       if (c != EOF && c != '\n' && c != '#') {
         /* Non-white-space after the protocol name; warn about it,
            in case we come up with a reason to use it. */
-        g_warning("'%s' line %d has extra stuff after the protocol name.",
+        ws_warning("'%s' line %d has extra stuff after the protocol name.",
                   ff_path, line);
       }
     }
@@ -656,7 +658,7 @@ read_heur_dissector_list_file(const char *ff_path, FILE *ff, GList **flp)
         goto error;     /* I/O error */
       else {
         /* EOF, not error; no newline seen before EOF */
-        g_warning("'%s' line %d doesn't have a newline.", ff_path,
+        ws_warning("'%s' line %d doesn't have a newline.", ff_path,
                   line);
       }
       break;    /* nothing more to read */
@@ -671,7 +673,7 @@ read_heur_dissector_list_file(const char *ff_path, FILE *ff, GList **flp)
     heuristic_name[name_index] = '\0';
 
     /* Add the new protocol to the list of protocols */
-    heur         = (heur_protocol_def *) g_malloc(sizeof(heur_protocol_def));
+    heur         = g_new(heur_protocol_def, 1);
     heur->name   = g_strdup(heuristic_name);
     heur->enabled = enabled;
     *flp = g_list_append(*flp, heur);
@@ -807,7 +809,7 @@ save_disabled_heur_dissector_list(char **pref_path_return, int *errno_return)
   /* Write to "XXX.new", and rename if that succeeds.
      That means we don't trash the file if we fail to write it out
      completely. */
-  ff_path_new = g_strdup_printf("%s.new", ff_path);
+  ff_path_new = ws_strdup_printf("%s.new", ff_path);
 
   if ((ff = ws_fopen(ff_path_new, "w")) == NULL) {
     *pref_path_return = ff_path;

@@ -135,7 +135,7 @@ static void udpcp_free_persistent_key(gpointer ptr _U_)
 {
 }
 
-reassembly_table_functions udpcp_reassembly_table_functions =
+static reassembly_table_functions udpcp_reassembly_table_functions =
 {
     g_direct_hash,
     g_direct_equal,
@@ -156,6 +156,8 @@ static gboolean global_udpcp_reassemble = TRUE;
 /* By default do try to decode payload as XML/SOAP */
 static gboolean global_udpcp_decode_payload_as_soap = TRUE;
 
+
+static dissector_handle_t xml_handle;
 
 /******************************/
 /* Main dissection function.  */
@@ -202,7 +204,7 @@ dissect_udpcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
     /***************************/
     /* Packet Transfer Options */
     proto_item *packet_transfer_options_ti =
-            proto_tree_add_string_format(udpcp_tree, hf_udpcp_packet_transfer_options, tvb, offset, 0,
+            proto_tree_add_string_format(udpcp_tree, hf_udpcp_packet_transfer_options, tvb, offset, 2,
                                          "", "Packet Transfer Options (");
     proto_tree *packet_transfer_options_tree =
             proto_item_add_subtree(packet_transfer_options_ti, ett_udpcp_packet_transfer_options);
@@ -309,7 +311,6 @@ dissect_udpcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
 
             if (global_udpcp_decode_payload_as_soap) {
                 /* Send to XML dissector */
-                dissector_handle_t xml_handle = find_dissector("xml");
                 tvbuff_t *next_tvb = tvb_new_subset_remaining(tvb, offset);
                 call_dissector_only(xml_handle, next_tvb, pinfo, tree, NULL);
             }
@@ -351,7 +352,6 @@ dissect_udpcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
 
                     if (global_udpcp_decode_payload_as_soap) {
                         /* Send to XML dissector */
-                        dissector_handle_t xml_handle = find_dissector("xml");
                         call_dissector_only(xml_handle, next_tvb, pinfo, tree, NULL);
                     }
                 }
@@ -527,6 +527,8 @@ proto_reg_handoff_udpcp(void)
 {
     dissector_add_uint_range_with_preference("udp.port", "", udpcp_handle);
     apply_udpcp_prefs();
+
+    xml_handle = find_dissector("xml");
 }
 
 /*

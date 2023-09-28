@@ -19,7 +19,6 @@
 #include "config.h"
 
 #include <string.h>
-#include <stdio.h>
 
 #include <epan/packet.h>
 #include <epan/stats_tree.h>
@@ -67,7 +66,7 @@ static const value_string amr_ft_names[] =
     {0, NULL}
 };
 
-static guint8 amr_ft_bytes[AMR_FT_MAX] = {12, 13, 15, 17, 19, 20, 26, 31, 6};
+static guint8 amr_ft_bytes[AMR_FT_MAX] = {12, 13, 15, 17, 19, 20, 26, 31, 5};
 
 #define OSMUX_AMR_HEADER_LEN 4
 
@@ -289,7 +288,7 @@ dissect_osmux(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
         guint8 i;
         guint32 size, temp;
 
-        osmuxh = wmem_new0(wmem_packet_scope(), struct osmux_hdr);
+        osmuxh = wmem_new0(pinfo->pool, struct osmux_hdr);
 
         ft_ctr = tvb_get_guint8(tvb, offset);
 
@@ -384,7 +383,7 @@ static void osmux_stats_tree_init(stats_tree *st)
 }
 
 static tap_packet_status osmux_stats_tree_packet(stats_tree *st,
-        packet_info *pinfo, epan_dissect_t *edt _U_, const void *p _U_)
+        packet_info *pinfo, epan_dissect_t *edt _U_, const void *p _U_, tap_flags_t flags _U_)
 {
     gchar* stream_name;
     gchar* ft_name;

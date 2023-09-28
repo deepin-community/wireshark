@@ -250,11 +250,11 @@ get_lnet_conv(packet_info *pinfo, guint64 match_bits) {
     lnet_conv_info_t *conv_info;
 
     // Ignore ports because this is kernel level and there can only be one Lustre instance per server
-    conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype),
+    conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype),
                                      0, 0, 0);
     if (conversation == NULL)
         conversation = conversation_new(pinfo->num, &pinfo->src,
-                                        &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype), 0, 0, 0);
+                                        &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), 0, 0, 0);
 
     conv_info = (lnet_conv_info_t *)conversation_get_proto_data(conversation, proto_lnet);
     if (!conv_info) {
@@ -1041,9 +1041,9 @@ proto_register_lnet(void)
     expert_module_t *expert_lnet;
     static ei_register_info ei[] = {
         { &ei_lnet_buflen,
-          { "lnet.bad_buflen", PI_ERROR, PI_MALFORMED, "Buffer length mis-match", EXPFILL } },
+          { "lnet.bad_buflen", PI_MALFORMED, PI_ERROR, "Buffer length mis-match", EXPFILL } },
         { &ei_lnet_type,
-          { "lnet.bad_type", PI_ERROR, PI_PROTOCOL, "LNET Type mis-match", EXPFILL } }
+          { "lnet.bad_type", PI_PROTOCOL, PI_ERROR, "LNET Type mis-match", EXPFILL } }
     };
 
     proto_lnet = proto_register_protocol("Lustre Network", "LNet", "lnet");

@@ -35,6 +35,10 @@ typedef struct {
 	time_t t0;
 } mpeg_t;
 
+static int mpeg_file_type_subtype = -1;
+
+void register_mpeg(void);
+
 static int
 mpeg_resync(FILE_T fh, int *err)
 {
@@ -159,7 +163,22 @@ mpeg_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
 				}
 			}
 		} else {
-			packet_size = mpeg_resync(fh, err);
+			if ((n & 0xffffff00) == 0x49443300) {
+				/* We have an ID3v2 header; read the size */
+				if (file_seek(fh, 6, SEEK_CUR, err) == -1)
+					return FALSE;
+				if (!wtap_read_bytes_or_eof(fh, &n, sizeof n, err, err_info))
+					return FALSE;
+				if (file_seek(fh, -(gint64)(6+sizeof(n)), SEEK_CUR, err) == -1)
+					return FALSE;
+				n = g_ntohl(n);
+
+				/* ID3v2 size does not include the 10-byte header */
+				packet_size = decode_synchsafe_int(n) + 10;
+			} else {
+				packet_size = mpeg_resync(fh, err);
+			}
+
 			if (packet_size == 0)
 				return FALSE;
 		}
@@ -169,6 +188,7 @@ mpeg_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
 		return FALSE;
 
 	rec->rec_type = REC_TYPE_PACKET;
+	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 
 	rec->presence_flags = 0; /* we may or may not have a time stamp */
 	if (!is_random) {
@@ -245,20 +265,47 @@ good_magic:
 	if (file_seek(wth->fh, 0, SEEK_SET, err) == -1)
 		return WTAP_OPEN_ERROR;
 
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_MPEG;
+	wth->file_type_subtype = mpeg_file_type_subtype;
 	wth->file_encap = WTAP_ENCAP_MPEG;
 	wth->file_tsprec = WTAP_TSPREC_NSEC;
 	wth->subtype_read = mpeg_read;
 	wth->subtype_seek_read = mpeg_seek_read;
 	wth->snapshot_length = 0;
 
-	mpeg = (mpeg_t *)g_malloc(sizeof(mpeg_t));
+	mpeg = g_new(mpeg_t, 1);
 	wth->priv = (void *)mpeg;
 	mpeg->now.secs = 0;
 	mpeg->now.nsecs = 0;
 	mpeg->t0 = mpeg->now.secs;
 
 	return WTAP_OPEN_MINE;
+}
+
+static const struct supported_block_type mpeg_blocks_supported[] = {
+	/*
+	 * This is a file format that we dissect, so we provide
+	 * only one "packet" with the file's contents, and don't
+	 * support any options.
+	 */
+	{ WTAP_BLOCK_PACKET, ONE_BLOCK_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info mpeg_info = {
+	"MPEG", "mpeg", "mpeg", "mpg;mp3",
+	FALSE, BLOCKS_SUPPORTED(mpeg_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_mpeg(void)
+{
+	mpeg_file_type_subtype = wtap_register_file_type_subtype(&mpeg_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("MPEG",
+	    mpeg_file_type_subtype);
 }
 
 /*

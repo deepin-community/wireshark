@@ -62,12 +62,15 @@ static const guint8 png_magic[]    = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\
 static const guint8 gif87a_magic[] = { 'G', 'I', 'F', '8', '7', 'a'};
 static const guint8 gif89a_magic[] = { 'G', 'I', 'F', '8', '9', 'a'};
 static const guint8 elf_magic[]    = { 0x7F, 'E', 'L', 'F'};
+static const guint8 tiff_le_magic[]    = { 'I', 'I', 42, 0 };
+static const guint8 tiff_be_magic[]    = { 'M', 'M', 0, 42 };
 static const guint8 btsnoop_magic[]    = { 'b', 't', 's', 'n', 'o', 'o', 'p', 0};
 static const guint8 pcap_magic[]           = { 0xA1, 0xB2, 0xC3, 0xD4 };
 static const guint8 pcap_swapped_magic[]   = { 0xD4, 0xC3, 0xB2, 0xA1 };
 static const guint8 pcap_nsec_magic[]           = { 0xA1, 0xB2, 0x3C, 0x4D };
 static const guint8 pcap_nsec_swapped_magic[]   = { 0x4D, 0x3C, 0xB2, 0xA1 };
 static const guint8 pcapng_premagic[]      = { 0x0A, 0x0D, 0x0D, 0x0A };
+static const guint8 blf_magic[]                 = { 'L', 'O', 'G', 'G' };
 
 /* File does not start with it */
 static const guint8 pcapng_xmagic[]         = { 0x1A, 0x2B, 0x3C, 0x4D };
@@ -80,15 +83,22 @@ static const mime_files_t magic_files[] = {
 	{ gif87a_magic, sizeof(gif87a_magic) },
 	{ gif89a_magic, sizeof(gif89a_magic) },
 	{ elf_magic, sizeof(elf_magic) },
+	{ tiff_le_magic, sizeof(tiff_le_magic) },
+	{ tiff_be_magic, sizeof(tiff_be_magic) },
 	{ btsnoop_magic, sizeof(btsnoop_magic) },
 	{ pcap_magic, sizeof(pcap_magic) },
 	{ pcap_swapped_magic, sizeof(pcap_swapped_magic) },
 	{ pcap_nsec_magic, sizeof(pcap_nsec_magic) },
 	{ pcap_nsec_swapped_magic, sizeof(pcap_nsec_swapped_magic) },
-	{ pcapng_premagic, sizeof(pcapng_premagic) }
+	{ pcapng_premagic, sizeof(pcapng_premagic) },
+	{ blf_magic, sizeof(blf_magic) }
 };
 
 #define	N_MAGIC_TYPES	(sizeof(magic_files) / sizeof(magic_files[0]))
+
+static int mime_file_type_subtype = -1;
+
+void register_mime(void);
 
 wtap_open_return_val
 mime_file_open(wtap *wth, int *err, gchar **err_info)
@@ -135,7 +145,7 @@ mime_file_open(wtap *wth, int *err, gchar **err_info)
 	if (file_seek(wth->fh, 0, SEEK_SET, err) == -1)
 		return WTAP_OPEN_ERROR;
 
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_MIME;
+	wth->file_type_subtype = mime_file_type_subtype;
 	wth->file_encap = WTAP_ENCAP_MIME;
 	wth->file_tsprec = WTAP_TSPREC_SEC;
 	wth->subtype_read = wtap_full_file_read;
@@ -143,6 +153,63 @@ mime_file_open(wtap *wth, int *err, gchar **err_info)
 	wth->snapshot_length = 0;
 
 	return WTAP_OPEN_MINE;
+}
+
+static const struct supported_block_type mime_blocks_supported[] = {
+	/*
+	 * This is a file format that we dissect, so we provide
+	 * only one "packet" with the file's contents, and don't
+	 * support any options.
+	 */
+	{ WTAP_BLOCK_PACKET, ONE_BLOCK_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info mime_info = {
+	"MIME File Format", "mime", NULL, NULL,
+	FALSE, BLOCKS_SUPPORTED(mime_blocks_supported),
+	NULL, NULL, NULL
+};
+
+/*
+ * XXX - registered solely for the benefit of Lua scripts that
+ * look for the file type "JPEG_JFIF"; it may be removed once
+ * we get rid of wtap_filetypes.
+ */
+static const struct supported_block_type jpeg_jfif_blocks_supported[] = {
+	/*
+	 * This is a file format that we dissect, so we provide
+	 * only one "packet" with the file's contents, and don't
+	 * support any options.
+	 */
+	{ WTAP_BLOCK_PACKET, ONE_BLOCK_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info jpeg_jfif_info = {
+	"JPEG/JFIF", "jpeg", "jpg", "jpeg;jfif",
+	FALSE, BLOCKS_SUPPORTED(jpeg_jfif_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_mime(void)
+{
+	int jpeg_jfif_file_type_subtype;
+
+	mime_file_type_subtype = wtap_register_file_type_subtype(&mime_info);
+
+	/*
+	 * Obsoleted by "mime", but we want it for the backwards-
+	 * compatibility table for Lua.
+	 */
+	jpeg_jfif_file_type_subtype = wtap_register_file_type_subtype(&jpeg_jfif_info);
+
+	/*
+	 * Register names for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("MIME",
+	    mime_file_type_subtype);
+	wtap_register_backwards_compatibility_lua_name("JPEG_JFIF",
+	    jpeg_jfif_file_type_subtype);
 }
 
 /*

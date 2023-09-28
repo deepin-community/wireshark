@@ -266,7 +266,6 @@
 
 #include "config.h"
 
-#include <stdio.h>
 #include <errno.h>
 #include <math.h>
 
@@ -282,7 +281,7 @@
 #include <wsutil/str_util.h>
 #include <wsutil/pint.h>
 #include <wsutil/report_message.h>
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
+#include <epan/ws_printf.h>
 
 #include "packet-giop.h"
 #include "packet-ziop.h"
@@ -869,7 +868,7 @@ static const value_string reply_status_types[] = {
   { 0, NULL }
 };
 
-const true_false_string tfs_matched_not_matched = { "Matched", "Not matched" };
+static const true_false_string tfs_matched_not_matched = { "Matched", "Not matched" };
 
 
 typedef enum LocateStatusType
@@ -1337,12 +1336,12 @@ void register_giop_user_module(giop_sub_dissector_t *sub, const gchar *name, con
   ws_debug_printf("giop:register_module: Module sub dissector name is %s \n", name);
 #endif
 
-  new_module_key = (struct giop_module_key *)wmem_alloc(wmem_epan_scope(), sizeof(struct giop_module_key));
+  new_module_key = wmem_new(wmem_epan_scope(), struct giop_module_key);
   new_module_key->module = module; /* save Module or interface name from IDL */
 
-  module_val = (struct giop_module_val *)wmem_alloc(wmem_epan_scope(), sizeof(struct giop_module_val));
+  module_val = wmem_new(wmem_epan_scope(), struct giop_module_val);
 
-  module_val->subh = (giop_sub_handle_t *)wmem_alloc(wmem_epan_scope(), sizeof (giop_sub_handle_t)); /* init subh  */
+  module_val->subh = wmem_new(wmem_epan_scope(), giop_sub_handle_t); /* init subh  */
 
   module_val->subh->sub_name = name;    /* save dissector name */
   module_val->subh->sub_fn = sub;       /* save subdissector*/
@@ -1615,7 +1614,7 @@ void register_giop_user(giop_sub_dissector_t *sub, const gchar *name, int sub_pr
 
   giop_sub_handle_t *subh;
 
-  subh = (giop_sub_handle_t *)wmem_alloc(wmem_epan_scope(), sizeof (giop_sub_handle_t));
+  subh = wmem_new(wmem_epan_scope(), giop_sub_handle_t);
 
   subh->sub_name = name;
   subh->sub_fn = sub;
@@ -3121,7 +3120,7 @@ void get_CDR_interface(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int 
 
 /* Copy a 4 octet sequence from the tvbuff
  * which represents a signed long value, and convert
- * it to an signed long vaule, taking into account byte order.
+ * it to an signed long value, taking into account byte order.
  * offset is first incremented so that it falls on a proper alignment
  * boundary for long values.
  * offset is then incremented by 4, to indicate the 4 octets which
@@ -3145,7 +3144,7 @@ gint32 get_CDR_long(tvbuff_t *tvb, int *offset, gboolean stream_is_big_endian, i
 
 /* Copy a 8 octet sequence from the tvbuff
  * which represents a signed long long value, and convert
- * it to an signed long long vaule, taking into account byte order.
+ * it to an signed long long value, taking into account byte order.
  * offset is first incremented so that it falls on a proper alignment
  * boundary for long long values.
  * offset is then incremented by 8, to indicate the 8 octets which
@@ -3490,7 +3489,7 @@ guint32 get_CDR_ulong(tvbuff_t *tvb, int *offset, gboolean stream_is_big_endian,
 
 /* Copy a 8 octet sequence from the tvbuff
  * which represents an unsigned long long value, and convert
- * it to an unsigned long long vaule, taking into account byte order.
+ * it to an unsigned long long value, taking into account byte order.
  * offset is first incremented so that it falls on a proper alignment
  * boundary for unsigned long long values.
  * offset is then incremented by 4, to indicate the 4 octets which
@@ -5807,7 +5806,7 @@ static void decode_IIOP_IOR_profile(tvbuff_t *tvb, packet_info *pinfo, proto_tre
   }
 
   /*
-   * Now see if if it's v1.1 or 1.2, as they can contain
+   * Now see if it's v1.1 or 1.2, as they can contain
    * extra sequence of IOP::TaggedComponents
    *
    */

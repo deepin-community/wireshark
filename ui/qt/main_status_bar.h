@@ -1,4 +1,4 @@
-/* main_status_bar.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -14,7 +14,7 @@
 
 #include "cfile.h"
 
-#include "capchild/capture_session.h"
+#include "capture/capture_session.h"
 
 #include <ui/qt/utils/field_information.h>
 #include <ui/qt/widgets/label_stack.h>
@@ -68,6 +68,7 @@ private:
     guint32 cs_count_;
 
     void showCaptureStatistics();
+    void setStatusbarForCaptureFile();
 
     void pushGenericStatus(StatusContext status, const QString &message, const QString &messagetip = QString());
     void popGenericStatus(StatusContext status);
@@ -96,20 +97,7 @@ private slots:
     void manageProfile();
     void showProfileMenu(const QPoint &global_pos, Qt::MouseButton button);
 
-    friend WiresharkApplication;
+    friend MainApplication;
 };
 
 #endif // MAIN_STATUS_BAR_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

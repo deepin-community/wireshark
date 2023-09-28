@@ -1,4 +1,4 @@
-/* service_response_time_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -72,16 +72,3 @@ private slots:
 gboolean register_service_response_tables(const void *key, void *value, void *userdata);
 
 #endif // __SERVICE_RESPONSE_TIME_DIALOG_H__
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

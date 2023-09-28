@@ -15,7 +15,7 @@
 #include <ui/qt/widgets/apply_line_edit.h>
 #include <ui/qt/utils/qt_ui_utils.h>
 #include <ui/qt/utils/variant_pointer.h>
-#include <ui/qt/wireshark_application.h>
+#include <ui/qt/main_application.h>
 
 #include <QLabel>
 #include <QLineEdit>
@@ -46,7 +46,7 @@ AdditionalToolBar * AdditionalToolBar::create(QWidget * parent, ext_toolbar_t * 
     AdditionalToolBar * result = new AdditionalToolBar(toolbar, parent);
     result->setMovable(false);
     result->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
-    result->layout()->setMargin(0);
+    result->layout()->setContentsMargins(0, 0, 0, 0);
     result->layout()->setSpacing(4);
 
     GList * walker = toolbar->children;
@@ -100,14 +100,14 @@ AdditionalToolbarWidgetAction::AdditionalToolbarWidgetAction(ext_toolbar_t * ite
 : QWidgetAction(parent),
   toolbar_item(item)
 {
-    connect(wsApp, &WiresharkApplication::captureActive, this, &AdditionalToolbarWidgetAction::captureActive);
+    connect(mainApp, &MainApplication::captureActive, this, &AdditionalToolbarWidgetAction::captureActive);
 }
 
 AdditionalToolbarWidgetAction::AdditionalToolbarWidgetAction(const AdditionalToolbarWidgetAction & copy_object)
 :  QWidgetAction(copy_object.parent()),
    toolbar_item(copy_object.toolbar_item)
 {
-    connect(wsApp, &WiresharkApplication::captureActive, this, &AdditionalToolbarWidgetAction::captureActive);
+    connect(mainApp, &MainApplication::captureActive, this, &AdditionalToolbarWidgetAction::captureActive);
 }
 
 
@@ -248,7 +248,7 @@ QWidget * AdditionalToolbarWidgetAction::createLabelFrame(ext_toolbar_t * item, 
     QWidget * frame = new QWidget(parent);
 
     QHBoxLayout * frameLayout = new QHBoxLayout(frame);
-    frameLayout->setMargin(0);
+    frameLayout->setContentsMargins(0, 0, 0, 0);
     frameLayout->setSpacing(0);
 
     QLabel * strLabel = new QLabel(item->name, frame);
@@ -572,16 +572,3 @@ void AdditionalToolbarWidgetAction::onSelectionInWidgetChanged(int idx)
         item->callback(item, value_entry, item->user_data);
     }
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

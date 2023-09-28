@@ -1538,7 +1538,7 @@ dissect_atm_cell(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
      * FF: parse the Header Error Check (HEC).
      */
     ti = proto_tree_add_item(atm_tree, hf_atm_header_error_check, tvb, 4, 1, ENC_BIG_ENDIAN);
-    err = get_header_err((const guint8*)tvb_memdup(wmem_packet_scope(), tvb, 0, 5));
+    err = get_header_err((const guint8*)tvb_memdup(pinfo->pool, tvb, 0, 5));
     if (err == NO_ERROR_DETECTED)
       proto_item_append_text(ti, " (correct)");
     else if (err == UNCORRECTIBLE_ERROR)
@@ -1746,7 +1746,7 @@ dissect_atm_pw_oam_cell(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 
 static void atm_prompt(packet_info *pinfo _U_, gchar* result)
 {
-  g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Decode AAL2 traffic as");
+  snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Decode AAL2 traffic as");
 }
 
 static gpointer atm_value(packet_info *pinfo)

@@ -104,7 +104,7 @@ static const netrom_tf_items netrom_type_items = {
 };
 
 
-const value_string op_code_vals_abbrev[] = {
+static const value_string op_code_vals_abbrev[] = {
 	{ NETROM_PROTOEXT	, "PROTOEXT"},
 	{ NETROM_CONNREQ	, "CONNREQ"},
 	{ NETROM_CONNACK	, "CONNACK"},
@@ -115,7 +115,7 @@ const value_string op_code_vals_abbrev[] = {
 	{ 0			, NULL}
 };
 
-const value_string op_code_vals_text[] = {
+static const value_string op_code_vals_text[] = {
 	{ NETROM_PROTOEXT	, "Protocol extension"},
 	{ NETROM_CONNREQ	, "Connect request"},
 	{ NETROM_CONNACK	, "Connect acknowledge"},
@@ -143,7 +143,7 @@ dissect_netrom_type(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *t
 	type    =  tvb_get_guint8( tvb, offset );
 	op_code = type &0x0f;
 
-	info_buffer = wmem_strdup_printf( wmem_packet_scope(), "%s%s%s%s (0x%02x)",
+	info_buffer = wmem_strdup_printf( pinfo->pool, "%s%s%s%s (0x%02x)",
 					val_to_str_const( op_code, op_code_vals_text, "Unknown" ),
 					( type & NETROM_MORE_FLAG  ) ? ", More"  : "",
 					( type & NETROM_NAK_FLAG   ) ? ", NAK"   : "",
@@ -223,8 +223,8 @@ dissect_netrom_proto(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 		ti = proto_tree_add_protocol_format( tree, proto_netrom, tvb, 0, NETROM_HEADER_SIZE,
 			"NET/ROM, Src: %s, Dst: %s",
-			address_to_str(wmem_packet_scope(), &pinfo->src),
-			address_to_str(wmem_packet_scope(), &pinfo->dst));
+			address_to_str(pinfo->pool, &pinfo->src),
+			address_to_str(pinfo->pool, &pinfo->dst));
 
 		netrom_tree = proto_item_add_subtree( ti, ett_netrom );
 
@@ -453,7 +453,7 @@ dissect_netrom_routing(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		netrom_tree = proto_item_add_subtree( ti, ett_netrom );
 
 		proto_tree_add_item_ret_string_and_length(netrom_tree, hf_netrom_mnemonic, tvb, 1, 6, ENC_ASCII|ENC_NA,
-													wmem_packet_scope(), &mnemonic, &mnemonic_len);
+													pinfo->pool, &mnemonic, &mnemonic_len);
 		proto_item_append_text(ti, ", routing table frame, Node: %.6s", mnemonic);
 	}
 

@@ -215,12 +215,12 @@ static int hf_lcsap_GNSS_Positioning_Data_Set_item = -1;  /* GNSS_Positioning_Me
 static int hf_lcsap_high_Accuracy_Geographical_Coordinates = -1;  /* High_Accuracy_Geographical_Coordinates */
 static int hf_lcsap_high_Accuracy_Uncertainty_Ellipse = -1;  /* High_Accuracy_Uncertainty_Ellipse */
 static int hf_lcsap_high_Accuracy_Altitude = -1;  /* High_Accuracy_Altitude */
-static int hf_lcsap_high_Accuracy_Uncertainty_Altitude = -1;  /* Uncertainty_Altitude */
+static int hf_lcsap_high_Accuracy_Uncertainty_Altitude = -1;  /* High_Accuracy_Uncertainty_Code */
 static int hf_lcsap_vertical_Confidence = -1;     /* Confidence */
 static int hf_lcsap_high_Accuracy_DegreesLatitude = -1;  /* High_Accuracy_DegreesLatitude */
 static int hf_lcsap_high_Accuracy_DegreesLongitude = -1;  /* High_Accuracy_DegreesLongitude */
-static int hf_lcsap_high_Accuracy_Uncertainty_SemiMajor = -1;  /* Uncertainty_Code */
-static int hf_lcsap_high_Accuracy_Uncertainty_SemiMinor = -1;  /* Uncertainty_Code */
+static int hf_lcsap_high_Accuracy_Uncertainty_SemiMajor = -1;  /* High_Accuracy_Uncertainty_Code */
+static int hf_lcsap_high_Accuracy_Uncertainty_SemiMinor = -1;  /* High_Accuracy_Uncertainty_Code */
 static int hf_lcsap_orientation_Major_Axis = -1;  /* INTEGER_0_179 */
 static int hf_lcsap_bearing = -1;                 /* INTEGER_0_359 */
 static int hf_lcsap_horizontal_Speed = -1;        /* INTEGER_0_2047 */
@@ -345,7 +345,6 @@ static guint32 ProcedureCode;
 static guint32 ProtocolIE_ID;
 static guint32 ProtocolExtensionID;
 static guint32 PayloadType = -1;
-static guint gbl_lcsapSctpPort=SCTP_PORT_LCSAP;
 
 /* Dissector handles */
 static dissector_handle_t lcsap_handle;
@@ -1453,6 +1452,16 @@ dissect_lcsap_High_Accuracy_Geographical_Coordinates(tvbuff_t *tvb _U_, int offs
 
 
 static int
+dissect_lcsap_High_Accuracy_Uncertainty_Code(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  offset = dissect_per_constrained_integer(tvb, offset, actx, tree, hf_index,
+                                                            0U, 255U, NULL, FALSE);
+
+  return offset;
+}
+
+
+
+static int
 dissect_lcsap_INTEGER_0_179(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
   offset = dissect_per_constrained_integer(tvb, offset, actx, tree, hf_index,
                                                             0U, 179U, NULL, FALSE);
@@ -1462,9 +1471,10 @@ dissect_lcsap_INTEGER_0_179(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx 
 
 
 static const per_sequence_t High_Accuracy_Uncertainty_Ellipse_sequence[] = {
-  { &hf_lcsap_high_Accuracy_Uncertainty_SemiMajor, ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_lcsap_Uncertainty_Code },
-  { &hf_lcsap_high_Accuracy_Uncertainty_SemiMinor, ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_lcsap_Uncertainty_Code },
-  { &hf_lcsap_orientation_Major_Axis, ASN1_NO_EXTENSIONS     , ASN1_NOT_OPTIONAL, dissect_lcsap_INTEGER_0_179 },
+  { &hf_lcsap_high_Accuracy_Uncertainty_SemiMajor, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_lcsap_High_Accuracy_Uncertainty_Code },
+  { &hf_lcsap_high_Accuracy_Uncertainty_SemiMinor, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_lcsap_High_Accuracy_Uncertainty_Code },
+  { &hf_lcsap_orientation_Major_Axis, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_lcsap_INTEGER_0_179 },
+  { &hf_lcsap_iE_Extensions , ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_lcsap_ProtocolExtensionContainer },
   { NULL, 0, 0, NULL }
 };
 
@@ -1509,7 +1519,7 @@ static const per_sequence_t High_Accuracy_Ellipsoid_Point_With_Altitude_And_Unce
   { &hf_lcsap_high_Accuracy_Altitude, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_lcsap_High_Accuracy_Altitude },
   { &hf_lcsap_high_Accuracy_Uncertainty_Ellipse, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_lcsap_High_Accuracy_Uncertainty_Ellipse },
   { &hf_lcsap_confidence    , ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_lcsap_Confidence },
-  { &hf_lcsap_high_Accuracy_Uncertainty_Altitude, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_lcsap_Uncertainty_Altitude },
+  { &hf_lcsap_high_Accuracy_Uncertainty_Altitude, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_lcsap_High_Accuracy_Uncertainty_Code },
   { &hf_lcsap_vertical_Confidence, ASN1_EXTENSION_ROOT    , ASN1_NOT_OPTIONAL, dissect_lcsap_Confidence },
   { &hf_lcsap_iE_Extensions , ASN1_EXTENSION_ROOT    , ASN1_OPTIONAL    , dissect_lcsap_ProtocolExtensionContainer },
   { NULL, 0, 0, NULL }
@@ -2820,7 +2830,7 @@ static int dissect_LCS_AP_PDU_PDU(tvbuff_t *tvb _U_, packet_info *pinfo _U_, pro
 
 
 /*--- End of included file: packet-lcsap-fn.c ---*/
-#line 185 "./asn1/lcsap/packet-lcsap-template.c"
+#line 184 "./asn1/lcsap/packet-lcsap-template.c"
 
 static int dissect_ProtocolIEFieldValue(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
@@ -2870,16 +2880,11 @@ dissect_lcsap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
 void
 proto_reg_handoff_lcsap(void)
 {
-  static gboolean Initialized=FALSE;
-  static guint SctpPort;
-
-  if (!Initialized) {
-    lpp_handle = find_dissector_add_dependency("lpp", proto_lcsap);
-    lppa_handle = find_dissector_add_dependency("lppa", proto_lcsap);
-    xml_handle = find_dissector_add_dependency("xml", proto_lcsap);
-    dissector_add_for_decode_as("sctp.port", lcsap_handle);   /* for "decode-as"  */
-    dissector_add_uint("sctp.ppi", LCS_AP_PAYLOAD_PROTOCOL_ID,   lcsap_handle);
-    Initialized=TRUE;
+  lpp_handle = find_dissector_add_dependency("lpp", proto_lcsap);
+  lppa_handle = find_dissector_add_dependency("lppa", proto_lcsap);
+  xml_handle = find_dissector_add_dependency("xml", proto_lcsap);
+  dissector_add_uint_with_preference("sctp.port", SCTP_PORT_LCSAP, lcsap_handle);
+  dissector_add_uint("sctp.ppi", LCS_AP_PAYLOAD_PROTOCOL_ID,   lcsap_handle);
 
 /*--- Included file: packet-lcsap-dis-tab.c ---*/
 #line 1 "./asn1/lcsap/packet-lcsap-dis-tab.c"
@@ -2932,17 +2937,8 @@ proto_reg_handoff_lcsap(void)
 
 
 /*--- End of included file: packet-lcsap-dis-tab.c ---*/
-#line 245 "./asn1/lcsap/packet-lcsap-template.c"
-  } else {
-    if (SctpPort != 0) {
-      dissector_delete_uint("sctp.port", SctpPort, lcsap_handle);
-    }
-  }
+#line 239 "./asn1/lcsap/packet-lcsap-template.c"
 
-  SctpPort=gbl_lcsapSctpPort;
-  if (SctpPort != 0) {
-    dissector_add_uint("sctp.port", SctpPort, lcsap_handle);
-  }
 }
 
 /*--- proto_register_lcsap -------------------------------------------*/
@@ -3367,7 +3363,7 @@ void proto_register_lcsap(void) {
     { &hf_lcsap_high_Accuracy_Uncertainty_Altitude,
       { "high-Accuracy-Uncertainty-Altitude", "lcsap.high_Accuracy_Uncertainty_Altitude",
         FT_UINT32, BASE_DEC, NULL, 0,
-        "Uncertainty_Altitude", HFILL }},
+        "High_Accuracy_Uncertainty_Code", HFILL }},
     { &hf_lcsap_vertical_Confidence,
       { "vertical-Confidence", "lcsap.vertical_Confidence",
         FT_UINT32, BASE_DEC, NULL, 0,
@@ -3383,11 +3379,11 @@ void proto_register_lcsap(void) {
     { &hf_lcsap_high_Accuracy_Uncertainty_SemiMajor,
       { "high-Accuracy-Uncertainty-SemiMajor", "lcsap.high_Accuracy_Uncertainty_SemiMajor",
         FT_UINT32, BASE_DEC, NULL, 0,
-        "Uncertainty_Code", HFILL }},
+        "High_Accuracy_Uncertainty_Code", HFILL }},
     { &hf_lcsap_high_Accuracy_Uncertainty_SemiMinor,
       { "high-Accuracy-Uncertainty-SemiMinor", "lcsap.high_Accuracy_Uncertainty_SemiMinor",
         FT_UINT32, BASE_DEC, NULL, 0,
-        "Uncertainty_Code", HFILL }},
+        "High_Accuracy_Uncertainty_Code", HFILL }},
     { &hf_lcsap_orientation_Major_Axis,
       { "orientation-Major-Axis", "lcsap.orientation_Major_Axis",
         FT_UINT32, BASE_DEC, NULL, 0,
@@ -3562,7 +3558,7 @@ void proto_register_lcsap(void) {
         "UnsuccessfulOutcome_value", HFILL }},
 
 /*--- End of included file: packet-lcsap-hfarr.c ---*/
-#line 290 "./asn1/lcsap/packet-lcsap-template.c"
+#line 275 "./asn1/lcsap/packet-lcsap-template.c"
   };
 
   /* List of subtrees */
@@ -3633,10 +3629,10 @@ void proto_register_lcsap(void) {
     &ett_lcsap_UnsuccessfulOutcome,
 
 /*--- End of included file: packet-lcsap-ettarr.c ---*/
-#line 299 "./asn1/lcsap/packet-lcsap-template.c"
+#line 284 "./asn1/lcsap/packet-lcsap-template.c"
  };
 
-  module_t *lcsap_module;
+  /* module_t *lcsap_module; */
   expert_module_t *expert_lcsap;
 
   static ei_register_info ei[] = {
@@ -3664,14 +3660,8 @@ void proto_register_lcsap(void) {
   lcsap_proc_sout_dissector_table = register_dissector_table("lcsap.proc.sout", "LCS-AP-ELEMENTARY-PROCEDURE SuccessfulOutcome", proto_lcsap, FT_UINT32, BASE_DEC);
   lcsap_proc_uout_dissector_table = register_dissector_table("lcsap.proc.uout", "LCS-AP-ELEMENTARY-PROCEDURE UnsuccessfulOutcome", proto_lcsap, FT_UINT32, BASE_DEC);
 
-  /* Register configuration options for ports */
-  lcsap_module = prefs_register_protocol(proto_lcsap, proto_reg_handoff_lcsap);
+  /* lcsap_module = prefs_register_protocol(proto_lcsap, NULL); */
 
-  prefs_register_uint_preference(lcsap_module, "sctp.port",
-                                 "LCSAP SCTP Port",
-                                 "Set the SCTP port for LCSAP messages",
-                                 10,
-                                 &gbl_lcsapSctpPort);
 }
 
 /*

@@ -10,9 +10,12 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+#include <stdio.h>
+#include <string.h>
 #include <glib.h>
 #include "nstime.h"
 #include "epochs.h"
+#include "time_util.h"
 
 /* this is #defined so that we can clearly see that we have the right number of
    zeros, rather than as a guard against the number of nanoseconds in a second
@@ -27,13 +30,9 @@ void nstime_set_zero(nstime_t *nstime)
 }
 
 /* is the given nstime_t currently zero? */
-gboolean nstime_is_zero(nstime_t *nstime)
+gboolean nstime_is_zero(const nstime_t *nstime)
 {
-    if(nstime->secs == 0 && nstime->nsecs == 0) {
-        return TRUE;
-    } else {
-        return FALSE;
-    }
+    return nstime->secs == 0 && nstime->nsecs == 0;
 }
 
 /* set the given nstime_t to (0,maxint) to mark it as "unset"
@@ -262,6 +261,313 @@ nsfiletime_to_nstime(nstime_t *nstime, guint64 nsfiletime)
     nsecs = (int)(nsfiletime % NS_PER_S);
 
     return common_filetime_to_nstime(nstime, ftsecs, nsecs);
+}
+
+/*
+ * function: iso8601_to_nstime
+ * parses a character string for a date and time given in
+ * ISO 8601 date-time format (eg: 2014-04-07T05:41:56.782+00:00)
+ * and converts to an nstime_t
+ * returns number of chars parsed on success, or 0 on failure
+ *
+ * NB. ISO 8601 is actually a lot more flexible than the above format,
+ * much to a developer's chagrin. The "basic format" is distinguished from
+ * the "extended format" by lacking the - and : separators. This function
+ * supports both the basic and extended format (as well as both simultaneously)
+ * with several common options and extensions. Time resolution is supported
+ * up to nanoseconds (9 fractional digits) or down to whole minutes (omitting
+ * the seconds component in the latter case). The T separator can be replaced
+ * by a space in either format (a common extension not in ISO 8601 but found
+ * in, e.g., RFC 3339) or omitted entirely in the basic format.
+ *
+ * Many standards that use ISO 8601 implement profiles with additional
+ * constraints, such as requiring that the seconds field be present, only
+ * allowing "." as the decimal separator, or limiting the number of fractional
+ * digits. Callers that wish to check constraints not yet enforced by a
+ * profile supported by the function must do so themselves.
+ *
+ * Future improvements could parse other ISO 8601 formats, such as
+ * YYYY-Www-D, YYYY-DDD, etc. For a relatively easy introduction to
+ * these formats, see wikipedia: https://en.wikipedia.org/wiki/ISO_8601
+ */
+guint8
+iso8601_to_nstime(nstime_t *nstime, const char *ptr, iso8601_fmt_e format)
+{
+    struct tm tm;
+    gint n_scanned = 0;
+    gint n_chars = 0;
+    guint frac = 0;
+    gint off_hr = 0;
+    gint off_min = 0;
+    guint8 ret_val = 0;
+    const char *start = ptr;
+    char sign = '\0';
+    gboolean has_separator = FALSE;
+    gboolean have_offset = FALSE;
+
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_isdst = -1;
+    nstime_set_unset(nstime);
+
+    /* Verify that we start with a four digit year and then look for the
+     * separator. */
+    for (n_scanned = 0; n_scanned < 4; n_scanned++) {
+        if (!g_ascii_isdigit(*ptr)) {
+            return 0;
+        }
+        tm.tm_year *= 10;
+        tm.tm_year += *ptr++ - '0';
+    }
+    if (*ptr == '-') {
+        switch (format) {
+            case ISO8601_DATETIME_BASIC:
+                return 0;
+
+            case ISO8601_DATETIME:
+            case ISO8601_DATETIME_AUTO:
+            default:
+                has_separator = TRUE;
+                ptr++;
+        };
+    } else if (g_ascii_isdigit(*ptr)) {
+        switch (format) {
+            case ISO8601_DATETIME:
+                return 0;
+
+            case ISO8601_DATETIME_BASIC:
+            case ISO8601_DATETIME_AUTO:
+            default:
+                has_separator = FALSE;
+        };
+    } else {
+        return 0;
+    }
+
+    tm.tm_year -= 1900; /* struct tm expects number of years since 1900 */
+
+    /* Note: sscanf is known to be inconsistent across platforms with respect
+       to whether a %n is counted as a return value or not (XXX: Is this
+       still true, despite the express comments of C99 §7.19.6.2 12?), so we
+       use '<'/'>='
+     */
+    /* XXX: sscanf allows an optional sign indicator before each integer
+     * converted (whether with %d or %u), so this will convert some bogus
+     * strings. Either checking afterwards or doing the whole thing by hand
+     * as with the year above is the only correct way. (strptime certainly
+     * can't handle the basic format.)
+     */
+    n_scanned = sscanf(ptr, has_separator ? "%2u-%2u%n" : "%2u%2u%n",
+            &tm.tm_mon,
+            &tm.tm_mday,
+            &n_chars);
+    if (n_scanned >= 2) {
+        /* Got year, month, and day */
+        tm.tm_mon--; /* struct tm expects 0-based month */
+        ptr += n_chars;
+    }
+    else {
+        return 0;
+    }
+
+    if (*ptr == 'T' || *ptr == ' ') {
+        /* The 'T' between date and time is optional if the meaning is
+           unambiguous. We also allow for ' ' here per RFC 3339 to support
+           formats such as editcap's -A/-B options. */
+        ptr++;
+    }
+    else if (has_separator) {
+        /* Allow no separator between date and time iff we have no
+           separator between units. (Some extended formats may negotiate
+           no separator here, so this could be changed.) */
+        return 0;
+    }
+
+    /* Now we're on to the time part. We'll require a minimum of hours and
+       minutes. */
+
+    n_scanned = sscanf(ptr, has_separator ? "%2u:%2u%n" : "%2u%2u%n",
+            &tm.tm_hour,
+            &tm.tm_min,
+            &n_chars);
+    if (n_scanned >= 2) {
+        ptr += n_chars;
+    }
+    else {
+        /* didn't get hours and minutes */
+        return 0;
+    }
+
+    /* Test for (whole) seconds */
+    if ((has_separator && *ptr == ':') ||
+            (!has_separator && g_ascii_isdigit(*ptr))) {
+        /* Looks like we should have them */
+        if (1 > sscanf(ptr, has_separator ? ":%2u%n" : "%2u%n",
+                &tm.tm_sec, &n_chars)) {
+            /* Couldn't get them */
+            return 0;
+        }
+        ptr += n_chars;
+
+        /* Now let's test for fractional seconds */
+        if (*ptr == '.' || *ptr == ',') {
+            /* Get fractional seconds */
+            ptr++;
+            if (1 <= sscanf(ptr, "%u%n", &frac, &n_chars)) {
+                /* normalize frac to nanoseconds */
+                if ((frac >= 1000000000) || (frac == 0)) {
+                    frac = 0;
+                } else {
+                    switch (n_chars) { /* including leading zeros */
+                        case 1: frac *= 100000000; break;
+                        case 2: frac *= 10000000; break;
+                        case 3: frac *= 1000000; break;
+                        case 4: frac *= 100000; break;
+                        case 5: frac *= 10000; break;
+                        case 6: frac *= 1000; break;
+                        case 7: frac *= 100; break;
+                        case 8: frac *= 10; break;
+                        default: break;
+                    }
+                }
+                ptr += n_chars;
+            }
+            /* If we didn't get frac, it's still its default of 0 */
+        }
+    }
+    else {
+        /* No seconds. ISO 8601 allows decimal fractions of a minute here,
+         * but that's pretty rare in practice. Could be added later if needed.
+         */
+        tm.tm_sec = 0;
+    }
+
+    /* Validate what we got so far. mktime() doesn't care about strange
+       values but we should at least start with something valid */
+    if (!tm_is_valid(&tm)) {
+        return 0;
+    }
+
+    /* Check for a time zone offset */
+    if (*ptr == '-' || *ptr == '+' || *ptr == 'Z') {
+        /* Just in case somewhere decides to observe a timezone of -00:30 or
+         * some such. */
+        sign = *ptr;
+        /* We have a UTC-relative offset */
+        if (*ptr == 'Z') {
+            off_hr = off_min = 0;
+            have_offset = TRUE;
+            ptr++;
+        }
+        else {
+            off_hr = off_min = 0;
+            n_scanned = sscanf(ptr, "%3d%n", &off_hr, &n_chars);
+            if (n_scanned >= 1) {
+                /* Definitely got hours */
+                have_offset = TRUE;
+                ptr += n_chars;
+                n_scanned = sscanf(ptr, *ptr == ':' ? ":%2d%n" : "%2d%n", &off_min, &n_chars);
+                if (n_scanned >= 1) {
+                    /* Got minutes too */
+                    ptr += n_chars;
+                }
+            }
+            else {
+                /* Didn't get a valid offset, treat as if there's none at all */
+                have_offset = FALSE;
+            }
+        }
+    }
+    if (have_offset) {
+        nstime->secs = mktime_utc(&tm);
+        if (sign == '+') {
+            nstime->secs -= (off_hr * 3600) + (off_min * 60);
+        } else if (sign == '-') {
+            /* -00:00 is illegal according to ISO 8601, but RFC 3339 allows
+             * it under a convention where -00:00 means "time in UTC is known,
+             * local timezone is unknown." This has the same value as an
+             * offset of Z or +00:00, but semantically implies that UTC is
+             * not the preferred time zone, which is immaterial to us.
+             */
+            /* Add the time, but reverse the sign of off_hr, which includes
+             * the negative sign.
+             */
+            nstime->secs += ((-off_hr) * 3600) + (off_min * 60);
+        }
+    }
+    else {
+        /* No UTC offset given; ISO 8601 says this means local time */
+        nstime->secs = mktime(&tm);
+    }
+    nstime->nsecs = frac;
+    ret_val = (guint)(ptr-start);
+    return ret_val;
+}
+
+/*
+ * function: unix_epoch_to_nstime
+ * parses a character string for a date and time given in
+ * a floating point number containing a Unix epoch date-time
+ * format (e.g. 1600000000.000 for Sun Sep 13 05:26:40 AM PDT 2020)
+ * and converts to an nstime_t
+ * returns number of chars parsed on success, or 0 on failure
+ *
+ * Reference: https://en.wikipedia.org/wiki/Unix_time
+ */
+guint8
+unix_epoch_to_nstime(nstime_t *nstime, const char *ptr)
+{
+    struct tm tm;
+    char *ptr_new;
+
+    gint n_chars = 0;
+    guint frac = 0;
+    guint8 ret_val = 0;
+    const char *start = ptr;
+
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_isdst = -1;
+    nstime_set_unset(nstime);
+
+    if (!(ptr_new = ws_strptime(ptr, "%s", &tm))) {
+        return 0;
+    }
+
+    /* No UTC offset given; ISO 8601 says this means local time */
+    nstime->secs = mktime(&tm);
+
+    /* Now let's test for fractional seconds */
+    if (*ptr_new == '.' || *ptr_new == ',') {
+        /* Get fractional seconds */
+        ptr_new++;
+        if (1 <= sscanf(ptr_new, "%u%n", &frac, &n_chars)) {
+            /* normalize frac to nanoseconds */
+            if ((frac >= 1000000000) || (frac == 0)) {
+                frac = 0;
+            } else {
+                switch (n_chars) { /* including leading zeros */
+                    case 1: frac *= 100000000; break;
+                    case 2: frac *= 10000000; break;
+                    case 3: frac *= 1000000; break;
+                    case 4: frac *= 100000; break;
+                    case 5: frac *= 10000; break;
+                    case 6: frac *= 1000; break;
+                    case 7: frac *= 100; break;
+                    case 8: frac *= 10; break;
+                    default: break;
+                }
+            }
+            ptr_new += n_chars;
+        }
+        /* If we didn't get frac, it's still its default of 0 */
+    }
+    else {
+        tm.tm_sec = 0;
+    }
+    nstime->nsecs = frac;
+
+    /* return pointer shift */
+    ret_val = (guint)(ptr_new-start);
+    return ret_val;
 }
 
 /*

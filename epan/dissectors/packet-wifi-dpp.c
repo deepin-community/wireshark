@@ -346,7 +346,7 @@ dissect_wifi_dpp_attributes(packet_info *pinfo _U_, proto_tree *tree,
       break;
 
     case DPP_CODE_IDENTIFIER:
-      proto_tree_add_item(specific_attr, hf_wifi_dpp_code_identifier, tvb, offset, attribute_len, ENC_UTF_8|ENC_NA);
+      proto_tree_add_item(specific_attr, hf_wifi_dpp_code_identifier, tvb, offset, attribute_len, ENC_UTF_8);
       break;
 
     case DPP_ENCRYPTED_KEY:
@@ -480,20 +480,6 @@ dissect_wifi_dpp_public_action(tvbuff_t *tvb, packet_info *pinfo,
     attributes_len = dissect_wifi_dpp_attributes(pinfo, attr_tree, tvb, offset);
     offset += attributes_len;
   }
-
-  return offset;
-}
-
-static int
-dissect_wifi_dpp_action(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void *data _U_)
-{
-  int offset = 0;
-  proto_tree_add_item(tree, hf_wifi_dpp_action_subtype, tvb, offset, 1, ENC_NA);
-  offset++;
-
-  proto_tree_add_item(tree, hf_wifi_dpp_action_dialog_token, tvb, offset, 1,
-                      ENC_NA);
-  offset++;
 
   return offset;
 }
@@ -816,7 +802,6 @@ proto_reg_handoff_wifi_dpp(void)
   static dissector_handle_t wifi_dpp_tcp_handle;
   static int current_port;
 
-  dissector_add_uint("wlan.action.wifi_alliance.subtype", WFA_SUBTYPE_DPP, create_dissector_handle(dissect_wifi_dpp_action, proto_wifi_dpp));
   dissector_add_uint("wlan.anqp.wifi_alliance.subtype", WFA_SUBTYPE_DPP, create_dissector_handle(dissect_wifi_dpp, proto_wifi_dpp));
   dissector_add_uint("wlan.ie.wifi_alliance.subtype", WFA_SUBTYPE_DPP, create_dissector_handle(dissect_wifi_dpp_ie, proto_wifi_dpp));
   dissector_add_uint("wlan.pa.wifi_alliance.subtype", WFA_SUBTYPE_DPP, create_dissector_handle(dissect_wifi_dpp_public_action, proto_wifi_dpp));

@@ -13,7 +13,6 @@
 #include "credentials_model.h"
 
 #include <file.h>
-#include <log.h>
 #include <ui/qt/utils/qt_ui_utils.h>
 
 CredentialsModel::CredentialsModel(QObject *parent)
@@ -23,7 +22,7 @@ CredentialsModel::CredentialsModel(QObject *parent)
 
 int CredentialsModel::rowCount(const QModelIndex &) const
 {
-    return credentials_.count();
+    return static_cast<int>(credentials_.count());
 }
 
 int CredentialsModel::columnCount(const QModelIndex &) const
@@ -99,7 +98,7 @@ QVariant CredentialsModel::data(const QModelIndex &index, int role) const
     return QVariant();
 }
 
-void CredentialsModel::addRecord(tap_credential_t* auth)
+void CredentialsModel::addRecord(const tap_credential_t* auth)
 {
     emit beginInsertRows(QModelIndex(), rowCount(), rowCount() + 1);
 
@@ -149,16 +148,3 @@ QVariant CredentialsModel::headerData(int section, Qt::Orientation orientation, 
 
     return QVariant();
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -27,17 +27,14 @@ set_source_files_properties(
 	COMPILE_FLAGS "${WERROR_COMMON_FLAGS}"
 )
 
-include_directories(
-	${CMAKE_SOURCE_DIR}/codecs
-	${CMAKE_CURRENT_SOURCE_DIR}
-)
-
 register_plugin_files(plugin.c
 	plugin_codec
 	${CODEC_SRC}
 )
 
-add_plugin_library(g722 codecs)
+add_wireshark_plugin_library(g722 codecs)
+
+target_include_directories(g722 PRIVATE ${CMAKE_SOURCE_DIR}/codecs)
 
 target_link_libraries(g722 wsutil ${SPANDSP_LIBRARIES})
 
@@ -50,7 +47,6 @@ CHECKAPI(
 	NAME
 	  g722
 	SWITCHES
-	  -g abort -g termoutput
 	SOURCES
 	  ${CODEC_SRC}
 	  ${CODEC_HEADERS}

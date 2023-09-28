@@ -1,4 +1,4 @@
-/* geometry_state_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -14,8 +14,6 @@
 
 class GeometryStateDialog : public QDialog
 {
-    Q_OBJECT
-
 public:
 
 // As discussed in change 7072, QDialogs have different minimize and "on
@@ -67,16 +65,3 @@ private:
 };
 
 #endif // GEOMETRY_STATE_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -351,7 +351,7 @@ static int dissect_nano_vote(tvbuff_t *tvb, proto_tree *nano_tree, int offset)
 
 // dissect a Nano protocol header, fills in the values
 // for nano_packet_type, nano_block_type
-static int dissect_nano_header(tvbuff_t *tvb, proto_tree *nano_tree, int offset, guint *nano_packet_type, guint64 *extensions)
+static int dissect_nano_header(tvbuff_t *tvb, packet_info *pinfo, proto_tree *nano_tree, int offset, guint *nano_packet_type, guint64 *extensions)
 {
     proto_tree *header_tree;
     char *nano_magic_number;
@@ -362,7 +362,7 @@ static int dissect_nano_header(tvbuff_t *tvb, proto_tree *nano_tree, int offset,
 
     header_tree = proto_tree_add_subtree(nano_tree, tvb, offset, NANO_HEADER_LENGTH, ett_nano_header, NULL, "Nano Protocol Header");
 
-    nano_magic_number = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, 2, ENC_ASCII);
+    nano_magic_number = tvb_get_string_enc(pinfo->pool, tvb, offset, 2, ENC_ASCII);
     proto_tree_add_string_format_value(header_tree, hf_nano_magic_number, tvb, 0,
             2, nano_magic_number, "%s (%s)", str_to_str(nano_magic_number, nano_magic_numbers, "Unknown"), nano_magic_number);
     offset += 2;
@@ -403,7 +403,7 @@ static int dissect_nano(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
     ti = proto_tree_add_item(tree, proto_nano, tvb, 0, -1, ENC_NA);
     nano_tree = proto_item_add_subtree(ti, ett_nano);
 
-    offset = dissect_nano_header(tvb, nano_tree, 0, &nano_packet_type, &extensions);
+    offset = dissect_nano_header(tvb, pinfo, nano_tree, 0, &nano_packet_type, &extensions);
 
     // call specific dissectors for specific packet types
     switch (nano_packet_type) {
@@ -562,7 +562,7 @@ static int dissect_nano_bulk_pull_blocks(tvbuff_t *tvb, proto_tree *nano_tree, i
 }
 
 // dissect a single nano bootstrap message (client)
-static int dissect_nano_tcp_client_message(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree _U_, void *data _U_)
+static int dissect_nano_tcp_client_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree _U_, void *data _U_)
 {
     int offset, nano_packet_type, nano_block_type;
     guint64 extensions;
@@ -598,7 +598,7 @@ static int dissect_nano_tcp_client_message(tvbuff_t *tvb, packet_info *pinfo _U_
     }
 
     // a bootstrap client command starts with a Nano header
-    offset = dissect_nano_header(tvb, tree, 0, &nano_packet_type, &extensions);
+    offset = dissect_nano_header(tvb, pinfo, tree, 0, &nano_packet_type, &extensions);
     session_state->client_packet_type = nano_packet_type;
 
     switch (nano_packet_type) {
@@ -735,7 +735,7 @@ static int dissect_nano_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     // try to find this conversation
     if ((conversation = find_conversation_pinfo(pinfo, 0)) == NULL) {
         // create new conversation
-        conversation = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype),
+        conversation = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype),
                 pinfo->srcport, pinfo->destport, 0);
     }
 
@@ -743,7 +743,7 @@ static int dissect_nano_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     session_state = (struct nano_session_state *)conversation_get_proto_data(conversation, proto_nano);
     if (!session_state) {
         // create new session state
-        session_state = (struct nano_session_state *)wmem_alloc0(wmem_file_scope(), sizeof(struct nano_session_state));
+        session_state = wmem_new0(wmem_file_scope(), struct nano_session_state);
         session_state->client_packet_type = NANO_PACKET_TYPE_INVALID;
         session_state->server_port = pinfo->match_uint;
         conversation_add_proto_data(conversation, proto_nano, session_state);
@@ -753,7 +753,7 @@ static int dissect_nano_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
     packet_session_state = (struct nano_session_state *)p_get_proto_data(wmem_file_scope(), pinfo, proto_nano, 0);
     if (!packet_session_state) {
         // this packet does not have a stored session state, get it from the conversation
-        packet_session_state = (struct nano_session_state *)wmem_alloc0(wmem_file_scope(), sizeof(struct nano_session_state));
+        packet_session_state = wmem_new0(wmem_file_scope(), struct nano_session_state);
         memcpy(packet_session_state, session_state, sizeof(struct nano_session_state));
         p_add_proto_data(wmem_file_scope(), pinfo, proto_nano, 0, packet_session_state);
     } else {
@@ -827,7 +827,7 @@ static gboolean dissect_nano_heur_tcp(tvbuff_t *tvb, packet_info *pinfo, proto_t
     session_state = (struct nano_session_state *)conversation_get_proto_data(conversation, proto_nano);
     if (!session_state) {
         // create new session state
-        session_state = (struct nano_session_state *)wmem_alloc0(wmem_file_scope(), sizeof(struct nano_session_state));
+        session_state = wmem_new0(wmem_file_scope(), struct nano_session_state);
         session_state->client_packet_type = NANO_PACKET_TYPE_INVALID;
         session_state->server_port = pinfo->destport;
         conversation_add_proto_data(conversation, proto_nano, session_state);
@@ -858,7 +858,7 @@ void proto_register_nano(void)
     static hf_register_info hf[] = {
         { &hf_nano_magic_number,
           { "Magic Number", "nano.magic_number",
-            FT_STRING, STR_ASCII, NULL, 0x00,
+            FT_STRING, BASE_NONE, NULL, 0x00,
             "Nano Protocol Magic Number", HFILL }
         },
         { &hf_nano_version_max,

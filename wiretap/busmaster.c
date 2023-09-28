@@ -12,8 +12,8 @@
 #include "config.h"
 #include <wtap-int.h>
 #include <file_wrappers.h>
-#include <epan/exported_pdu.h>
 #include <epan/dissectors/packet-socketcan.h>
+#include <wsutil/exported_pdu_tlvs.h>
 #include "busmaster.h"
 #include "busmaster_priv.h"
 #include <inttypes.h>
@@ -32,6 +32,18 @@ static gboolean
 busmaster_seek_read(wtap     *wth, gint64 seek_off,
                     wtap_rec *rec, Buffer *buf,
                     int      *err, gchar **err_info);
+
+static int busmaster_file_type_subtype = -1;
+
+void register_busmaster(void);
+
+/*
+ * See
+ *
+ *    http://rbei-etas.github.io/busmaster/
+ *
+ * for the BUSMASTER software.
+ */
 
 static gboolean
 busmaster_gen_packet(wtap_rec               *rec, Buffer *buf,
@@ -73,8 +85,8 @@ busmaster_gen_packet(wtap_rec               *rec, Buffer *buf,
 
     memset(buf_data, 0, packet_length);
 
-    buf_data[1] = EXP_PDU_TAG_PROTO_NAME;
-    buf_data[3] = proto_name_length;
+    phton16(buf_data + 0, EXP_PDU_TAG_DISSECTOR_NAME);
+    phton16(buf_data + 2, proto_name_length);
     memcpy(buf_data + 4, proto_name, strlen(proto_name));
 
     if (!priv_entry)
@@ -168,6 +180,7 @@ busmaster_gen_packet(wtap_rec               *rec, Buffer *buf,
     }
 
     rec->rec_type       = REC_TYPE_PACKET;
+    rec->block          = wtap_block_create(WTAP_BLOCK_PACKET);
     rec->presence_flags = has_ts ? WTAP_HAS_TS : 0;
     rec->ts.secs        = secs;
     rec->ts.nsecs       = nsecs;
@@ -252,7 +265,7 @@ busmaster_open(wtap *wth, int *err, char **err_info)
     wth->subtype_close     = busmaster_close;
     wth->subtype_read      = busmaster_read;
     wth->subtype_seek_read = busmaster_seek_read;
-    wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_UNKNOWN;
+    wth->file_type_subtype = busmaster_file_type_subtype;
     wth->file_encap        = WTAP_ENCAP_WIRESHARK_UPPER_PDU;
     wth->file_tsprec       = WTAP_TSPREC_USEC;
 
@@ -428,6 +441,24 @@ busmaster_seek_read(wtap   *wth, gint64 seek_off, wtap_rec *rec,
     }
 
     return busmaster_gen_packet(rec, buf, priv_entry, &state.msg, err, err_info);
+}
+
+static const struct supported_block_type busmaster_blocks_supported[] = {
+    /*
+     * We support packet blocks, with no comments or other options.
+     */
+    { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info busmaster_info = {
+    "BUSMASTER log file", "busmaster", "log", NULL,
+    FALSE, BLOCKS_SUPPORTED(busmaster_blocks_supported),
+    NULL, NULL, NULL
+};
+
+void register_busmaster(void)
+{
+    busmaster_file_type_subtype = wtap_register_file_type_subtype(&busmaster_info);
 }
 
 /*

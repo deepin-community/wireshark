@@ -17,21 +17,29 @@
 #include <wsutil/utf8_entities.h>
 
 #include <ui/qt/utils/color_utils.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 #include "ui/recent.h"
 
 #include <QActionGroup>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QScreen>
 #include <QScrollBar>
 #include <QStyle>
 #include <QStyleOption>
 #include <QTextLayout>
+#include <QWindow>
 
 // To do:
 // - Add recent settings and context menu items to show/hide the offset.
 // - Add a UTF-8 and possibly UTF-xx option to the ASCII display.
 // - Move more common metrics to DataPrinter.
+
+// Alternative implementations:
+// - Pre-draw all of our characters and paint our display using pixmap
+//   copying? That would make this behave like a terminal screen, which
+//   is what we ultimately want.
+// - Use QGraphicsView + QGraphicsScene + QGraphicsTextItem instead?
 
 Q_DECLARE_METATYPE(bytes_view_type)
 Q_DECLARE_METATYPE(bytes_encoding_type)
@@ -55,12 +63,16 @@ ByteViewText::ByteViewText(const QByteArray &data, packet_char_enc encoding, QWi
     show_ascii_(true),
     row_width_(recent.gui_bytes_view == BYTES_HEX ? 16 : 8),
     font_width_(0),
-    line_height_(0)
+    line_height_(0),
+    allow_hover_selection_(false)
 {
     layout_->setCacheEnabled(true);
 
     offset_normal_fg_ = ColorUtils::alphaBlend(palette().windowText(), palette().window(), 0.35);
     offset_field_fg_ = ColorUtils::alphaBlend(palette().windowText(), palette().window(), 0.65);
+
+    window()->winId(); // Required for screenChanged? https://phabricator.kde.org/D20171
+    connect(window()->windowHandle(), &QWindow::screenChanged, viewport(), [=](const QScreen *) { viewport()->update(); });
 
     createContextMenu();
 
@@ -79,6 +91,13 @@ ByteViewText::~ByteViewText()
 
 void ByteViewText::createContextMenu()
 {
+
+    action_allow_hover_selection_ = ctx_menu_.addAction(tr("Allow hover highlighting"));
+    action_allow_hover_selection_->setCheckable(true);
+    action_allow_hover_selection_->setChecked(true);
+    connect(action_allow_hover_selection_, &QAction::toggled, this, &ByteViewText::toggleHoverAllowed);
+    ctx_menu_.addSeparator();
+
     QActionGroup * copy_actions = DataPrinter::copyActions(this);
     ctx_menu_.addActions(copy_actions->actions());
     ctx_menu_.addSeparator();
@@ -116,8 +135,17 @@ void ByteViewText::createContextMenu()
     connect(encoding_actions, &QActionGroup::triggered, this, &ByteViewText::setCharacterEncoding);
 }
 
+void ByteViewText::toggleHoverAllowed(bool checked)
+{
+    allow_hover_selection_ = ! checked;
+    recent.gui_allow_hover_selection = checked;
+}
+
 void ByteViewText::updateContextMenu()
 {
+
+    action_allow_hover_selection_->setChecked(recent.gui_allow_hover_selection);
+
     switch (recent.gui_bytes_view) {
     case BYTES_HEX:
         action_bytes_hex_->setChecked(true);
@@ -182,15 +210,11 @@ void ByteViewText::setMonospaceFont(const QFont &mono_font)
 {
     QFont int_font(mono_font);
 
-    const QFontMetrics fm(int_font);
-    font_width_ = fm.boundingRect('M').width();
-
     setFont(int_font);
     viewport()->setFont(int_font);
     layout_->setFont(int_font);
 
-    // We should probably use ProtoTree::rowHeight.
-    line_height_ = fontMetrics().height();
+    updateLayoutMetrics();
 
     updateScrollbars();
     viewport()->update();
@@ -207,6 +231,8 @@ void ByteViewText::updateByteViewSettings()
 
 void ByteViewText::paintEvent(QPaintEvent *)
 {
+    updateLayoutMetrics();
+
     QPainter painter(viewport());
     painter.translate(-horizontalScrollBar()->value() * font_width_, 0);
 
@@ -232,14 +258,13 @@ void ByteViewText::paintEvent(QPaintEvent *)
 
     // Data rows
     int widget_height = height();
-    int leading = fontMetrics().leading();
     painter.save();
 
     x_pos_to_column_.clear();
-    while ((int) (row_y + line_height_) < widget_height && offset < (int) data_.count()) {
+    while ((int) (row_y + line_height_) < widget_height && offset < (int) data_.size()) {
         drawLine(&painter, offset, row_y);
         offset += row_width_;
-        row_y += line_height_ + leading;
+        row_y += line_height_;
     }
 
     painter.restore();
@@ -314,7 +339,8 @@ void ByteViewText::mousePressEvent (QMouseEvent *event) {
 
 void ByteViewText::mouseMoveEvent(QMouseEvent *event)
 {
-    if (marked_byte_offset_ >= 0) {
+    if (marked_byte_offset_ >= 0 || allow_hover_selection_ ||
+        (!allow_hover_selection_ && event->modifiers() & Qt::ControlModifier)) {
         return;
     }
 
@@ -334,12 +360,19 @@ void ByteViewText::leaveEvent(QEvent *event)
 
 void ByteViewText::contextMenuEvent(QContextMenuEvent *event)
 {
-    ctx_menu_.exec(event->globalPos());
+    ctx_menu_.popup(event->globalPos());
 }
 
 // Private
 
 const int ByteViewText::separator_interval_ = DataPrinter::separatorInterval();
+
+void ByteViewText::updateLayoutMetrics()
+{
+    font_width_  = stringWidth("M");
+    // We might want to match ProtoTree::rowHeight.
+    line_height_ = fontMetrics().lineSpacing();
+}
 
 int ByteViewText::stringWidth(const QString &line)
 {
@@ -360,11 +393,11 @@ void ByteViewText::drawLine(QPainter *painter, const int offset, const int row_y
 
     // Build our pixel to byte offset vector the first time through.
     bool build_x_pos = x_pos_to_column_.empty() ? true : false;
-    int tvb_len = data_.count();
+    int tvb_len = static_cast<int>(data_.size());
     int max_tvb_pos = qMin(offset + row_width_, tvb_len) - 1;
     QList<QTextLayout::FormatRange> fmt_list;
 
-    static const guchar hexchars[16] = {
+    static const char hexchars[16] = {
         '0', '1', '2', '3', '4', '5', '6', '7',
         '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
@@ -381,7 +414,7 @@ void ByteViewText::drawLine(QPainter *painter, const int offset, const int row_y
 
     // Hex
     if (show_hex_) {
-        int ascii_start = line.length() + DataPrinter::hexChars() + 3;
+        int ascii_start = static_cast<int>(line.length()) + DataPrinter::hexChars() + 3;
         // Extra hover space before and after each byte.
         int slop = font_width_ / 2;
 
@@ -437,7 +470,7 @@ void ByteViewText::drawLine(QPainter *painter, const int offset, const int row_y
         bool in_non_printable = false;
         int np_start = 0;
         int np_len = 0;
-        guchar c;
+        char c;
 
         for (int tvb_pos = offset; tvb_pos <= max_tvb_pos; tvb_pos++) {
             /* insert a space every separator_interval_ bytes */
@@ -494,17 +527,9 @@ void ByteViewText::drawLine(QPainter *painter, const int offset, const int row_y
     addFormatRange(fmt_list, 0, offsetChars(), offset_mode);
 
     layout_->clearLayout();
-#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
     layout_->clearFormats();
-#else
-    layout_->clearAdditionalFormats();
-#endif
     layout_->setText(line);
-#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
     layout_->setFormats(fmt_list.toVector());
-#else
-    layout_->setAdditionalFormats(fmt_list);
-#endif
     layout_->beginLayout();
     QTextLine tl = layout_->createLine();
     tl.setLineWidth(totalPixels());
@@ -595,7 +620,7 @@ void ByteViewText::scrollToByte(int byte)
 int ByteViewText::offsetChars(bool include_pad)
 {
     int padding = include_pad ? 2 : 0;
-    if (! isEmpty() && data_.count() > 0xffff) {
+    if (! isEmpty() && data_.size() > 0xffff) {
         return 8 + padding;
     }
     return 4 + padding;
@@ -658,7 +683,7 @@ void ByteViewText::copyBytes(bool)
 // math easier. Should we do smooth scrolling?
 void ByteViewText::updateScrollbars()
 {
-    const int length = data_.count();
+    const int length = static_cast<int>(data_.size());
     if (length > 0) {
         int all_lines_height = length / row_width_ + ((length % row_width_) ? 1 : 0) - viewport()->height() / line_height_;
 
@@ -678,7 +703,7 @@ int ByteViewText::byteOffsetAtPixel(QPoint pos)
     }
 
     byte += col;
-    if (byte > data_.count()) {
+    if (byte > data_.size()) {
         return -1;
     }
     return byte;
@@ -705,16 +730,3 @@ void ByteViewText::setCharacterEncoding(QAction *action)
 
     emit byteViewSettingsChanged();
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

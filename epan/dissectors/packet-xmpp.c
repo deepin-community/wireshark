@@ -17,6 +17,7 @@
 #include <epan/conversation.h>
 #include <epan/prefs.h>
 #include <epan/proto_data.h>
+#include <epan/exceptions.h>
 
 #include "packet-xmpp.h"
 #include "packet-xmpp-core.h"
@@ -56,7 +57,7 @@ gint hf_xmpp_query_identity = -1;
 gint hf_xmpp_query_identity_category = -1;
 gint hf_xmpp_query_identity_type = -1;
 gint hf_xmpp_query_identity_name = -1;
-gint hf_xmpp_query_identity_lang = -1;
+static gint hf_xmpp_query_identity_lang = -1;
 
 gint hf_xmpp_query_feature = -1;
 
@@ -208,8 +209,8 @@ gint hf_xmpp_conf_info_sid = -1;
 gint hf_xmpp_unknown = -1;
 gint hf_xmpp_unknown_attr = -1;
 
-gint hf_xmpp_out = -1;
-gint hf_xmpp_in = -1;
+static gint hf_xmpp_out = -1;
+static gint hf_xmpp_in = -1;
 gint hf_xmpp_response_in = -1;
 gint hf_xmpp_response_to = -1;
 gint hf_xmpp_jingle_session = -1;
@@ -221,18 +222,18 @@ gint hf_xmpp_hashes = -1;
 gint hf_xmpp_jitsi_inputevt = -1;
 gint hf_xmpp_jitsi_inputevt_rmt_ctrl = -1;
 
-gint ett_xmpp = -1;
+static gint ett_xmpp = -1;
 gint ett_xmpp_iq = -1;
 gint ett_xmpp_query = -1;
 gint ett_xmpp_query_item = -1;
 gint ett_xmpp_query_identity = -1;
-gint ett_xmpp_query_feature = -1;
+static gint ett_xmpp_query_feature = -1;
 
 gint ett_xmpp_query_streamhost = -1;
 gint ett_xmpp_query_streamhost_used = -1;
 gint ett_xmpp_query_udpsuccess = -1;
 
-gint ett_xmpp_iq_error = -1;
+static gint ett_xmpp_iq_error = -1;
 gint ett_xmpp_iq_bind = -1;
 gint ett_xmpp_iq_session = -1;
 gint ett_xmpp_vcard = -1;
@@ -292,9 +293,9 @@ gint ett_xmpp_presence_status = -1;
 gint ett_xmpp_presence_caps = -1;
 
 gint ett_xmpp_auth = -1;
-gint ett_xmpp_challenge = -1;
-gint ett_xmpp_response = -1;
-gint ett_xmpp_success = -1;
+static gint ett_xmpp_challenge = -1;
+static gint ett_xmpp_response = -1;
+static gint ett_xmpp_success = -1;
 gint ett_xmpp_failure = -1;
 gint ett_xmpp_stream = -1;
 gint ett_xmpp_features = -1;
@@ -348,8 +349,8 @@ static expert_field ei_xmpp_xml_disabled = EI_INIT;
 static expert_field ei_xmpp_packet_unknown = EI_INIT;
 expert_field ei_xmpp_starttls_missing = EI_INIT;
 expert_field ei_xmpp_response = EI_INIT;
-expert_field ei_xmpp_challenge = EI_INIT;
-expert_field ei_xmpp_success = EI_INIT;
+static expert_field ei_xmpp_challenge = EI_INIT;
+static expert_field ei_xmpp_success = EI_INIT;
 expert_field ei_xmpp_proceed_already_in_frame = EI_INIT;
 expert_field ei_xmpp_starttls_already_in_frame = EI_INIT;
 expert_field ei_xmpp_packet_without_response = EI_INIT;
@@ -361,6 +362,14 @@ expert_field ei_xmpp_required_attribute = EI_INIT;
 static dissector_handle_t xmpp_handle;
 
 static dissector_handle_t xml_handle;
+
+static void
+cleanup_xmpp(void *user_data) {
+
+    xmpp_element_t *root = (xmpp_element_t*)user_data;
+
+    xmpp_element_t_tree_free(root);
+}
 
 static int
 dissect_xmpp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_) {
@@ -470,8 +479,9 @@ dissect_xmpp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
 
     while(xml_frame)
     {
-        packet = xmpp_xml_frame_to_element_t(xml_frame, NULL, tvb);
+        packet = xmpp_xml_frame_to_element_t(pinfo->pool, xml_frame, NULL, tvb);
         DISSECTOR_ASSERT(packet);
+        CLEANUP_PUSH(cleanup_xmpp, packet);
 
         if (strcmp(packet->name, "iq") == 0) {
             xmpp_iq_reqresp_track(pinfo, packet, xmpp_info);
@@ -537,7 +547,7 @@ dissect_xmpp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
                 col_append_fstr(pinfo->cinfo, COL_INFO, "< %s ", from->value);
         }
 
-        xmpp_element_t_tree_free(packet);
+        CLEANUP_CALL_AND_POP;
         xml_frame = xml_frame->next_sibling;
     }
     return tvb_captured_length(tvb);

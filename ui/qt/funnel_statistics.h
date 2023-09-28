@@ -1,4 +1,4 @@
-/* funnel_statistics.cpp
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -13,11 +13,9 @@
 #include <QObject>
 
 #include "capture_file.h"
-#include "funnel_text_dialog.h"
 #include <ui/qt/filter_action.h>
 
 struct _funnel_ops_t;
-struct _funnel_progress_window_t;
 struct progdlg;
 
 class FunnelStatistics : public QObject
@@ -31,6 +29,7 @@ public:
     const char *displayFilter();
     void emitSetDisplayFilter(const QString filter);
     void reloadPackets();
+    void redissectPackets();
     void reloadLuaPlugins();
     void emitApplyDisplayFilter();
     void emitOpenCaptureFile(QString cf_path, QString filter);
@@ -59,16 +58,3 @@ extern "C" {
 } // extern "C"
 
 #endif // FUNNELSTATISTICS_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

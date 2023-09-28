@@ -1,4 +1,4 @@
-/* byte_view_text.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -77,6 +77,7 @@ private:
     QTextLayout *layout_;
     const QByteArray data_;
 
+    void updateLayoutMetrics();
     int stringWidth(const QString &line);
     void drawLine(QPainter *painter, const int offset, const int row_y);
     bool addFormatRange(QList<QTextLayout::FormatRange> &fmt_list, int start, int length, HighlightMode mode);
@@ -124,10 +125,13 @@ private:
     int line_height_;           // Font line spacing
     QList<QRect> hover_outlines_; // Hovered byte outlines.
 
+    bool allow_hover_selection_;
+
     // Data selection
     QVector<int> x_pos_to_column_;
 
     // Context menu actions
+    QAction *action_allow_hover_selection_;
     QAction *action_bytes_hex_;
     QAction *action_bytes_bits_;
     QAction *action_bytes_enc_from_packet_;
@@ -138,20 +142,8 @@ private slots:
     void copyBytes(bool);
     void setHexDisplayFormat(QAction *action);
     void setCharacterEncoding(QAction *action);
+    void toggleHoverAllowed(bool);
 
 };
 
 #endif // BYTE_VIEW_TEXT_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

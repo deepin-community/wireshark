@@ -1,4 +1,4 @@
-/* packet_list_utils.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -36,21 +36,28 @@ gboolean right_justify_column (gint col, capture_file *cf);
  */
 gboolean resolve_column (gint col, capture_file *cf);
 
+/**
+ * @brief The following methods have to be implemented by any class that
+ * whishes to represent a packet list.
+ */
+
+/** Write all packet list geometry values to the recent file.
+ *
+ *  @param rf recent file handle from caller
+ */
+extern void packet_list_recent_write_all(FILE *rf);
+
+extern void packet_list_clear(void);
+extern void packet_list_freeze(void);
+extern void packet_list_recreate_visible_rows(void);
+extern void packet_list_thaw(void);
+extern guint packet_list_append(column_info *cinfo, frame_data *fdata);
+extern void packet_list_queue_draw(void);
+extern gboolean packet_list_select_row_from_data(frame_data *fdata_needle);
+extern gboolean packet_list_multi_select_active(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
 #endif /* __PACKET_LIST_UTILS_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

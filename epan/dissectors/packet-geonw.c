@@ -62,13 +62,12 @@
 #include <epan/address_types.h>
 #include <epan/addr_resolv.h>
 #include <epan/to_str.h>
-#include <epan/to_str-int.h>
+#include <epan/to_str.h>
 #include <epan/conversation.h>
 #include <epan/tap.h>
 #include <epan/etypes.h>
 
 #include <wsutil/utf8_entities.h>
-#include <wsutil/ws_printf.h>
 
 #include "packet-e164.h"
 #include "packet-ieee1609dot2.h"
@@ -147,6 +146,8 @@ void proto_register_geonw(void);
 #define LS_REPLY_LEN      48
 
 #define TST_MAX 0xffffffff
+
+#define SEC_TVB_KEY 0
 
 /*
  * Variables
@@ -324,7 +325,7 @@ dissect_btpa(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     proto_item *hidden_item;
     struct btpaheader *btpah;
 
-    btpah = wmem_new0(wmem_packet_scope(), struct btpaheader);
+    btpah = wmem_new0(pinfo->pool, struct btpaheader);
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "BTPA");
     /* Clear out stuff in the info column */
@@ -390,7 +391,7 @@ dissect_btpb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
     guint32 dst_info;
     struct btpbheader *btpbh;
 
-    btpbh = wmem_new0(wmem_packet_scope(), struct btpbheader);
+    btpbh = wmem_new0(pinfo->pool, struct btpbheader);
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "BTPB");
     /* Clear out stuff in the info column */
@@ -404,9 +405,7 @@ dissect_btpb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_
 
     pinfo->destport = dst_port;
 
-    char buf_dst[32];
-    ws_snprintf(buf_dst, 32, "%"G_GUINT16_FORMAT, dst_port);
-    col_append_lstr(pinfo->cinfo, COL_INFO, " " UTF8_RIGHTWARDS_ARROW " ", buf_dst, COL_ADD_LSTR_TERMINATOR);
+    col_append_fstr(pinfo->cinfo, COL_INFO, " " UTF8_RIGHTWARDS_ARROW " %u", dst_port);
 
     btpbh->btp_pdst = dst_port;
     btpbh->btp_idst = dst_info;
@@ -448,9 +447,9 @@ typedef struct _geonw_conv_info_t {
     wmem_tree_t  *matched_pdus;
 } geonw_conv_info_t;
 
-const gchar * get_geonw_name(const guint8 *addr);
-const gchar* geonw_name_resolution_str(const address* addr);
-int geonw_name_resolution_len(void);
+static const gchar * get_geonw_name(const guint8 *addr);
+static const gchar* geonw_name_resolution_str(const address* addr);
+static int geonw_name_resolution_len(void);
 
 static geonw_transaction_t *transaction_start(packet_info * pinfo, proto_tree * tree);
 static geonw_transaction_t *transaction_end(packet_info * pinfo, proto_tree * tree);
@@ -607,7 +606,7 @@ geonw_addr_resolve(hashgeonw_t *tp) {
     set_address(&eth_addr, AT_ETHER, 6, &(addr[2]));
     ether_to_str(&eth_addr, rname, 18);
     // We could use ether_name_resolution_str:
-    //     g_strlcpy(rname, ether_name_resolution_str(&eth_addr), MAXNAMELEN-l1-4);
+    //     (void) g_strlcpy(rname, ether_name_resolution_str(&eth_addr), MAXNAMELEN-l1-4);
 
     tp->status = 1;
 
@@ -693,10 +692,10 @@ static geonw_transaction_t *transaction_start(packet_info * pinfo, proto_tree * 
     proto_item *it;
 
     /* Handle the conversation tracking */
-    conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype), HT_LS, HT_LS, 0);
+    conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), HT_LS, HT_LS, 0);
     if (conversation == NULL) {
         /* No, this is a new conversation. */
-        conversation = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype), HT_LS, HT_LS, 0);
+        conversation = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), HT_LS, HT_LS, 0);
     }
     geonw_info = (geonw_conv_info_t *)conversation_get_proto_data(conversation, proto_geonw);
     if (geonw_info == NULL) {
@@ -764,7 +763,7 @@ static geonw_transaction_t *transaction_end(packet_info * pinfo, proto_tree * tr
     nstime_t ns;
     double resp_time;
 
-    conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype), HT_LS, HT_LS, 0);
+    conversation = find_conversation(pinfo->num, &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), HT_LS, HT_LS, 0);
     if (conversation == NULL) {
         return NULL;
     }
@@ -1215,7 +1214,7 @@ dissect_sec_var_len(tvbuff_t *tvb, gint *offset, packet_info *pinfo, proto_tree 
     ti = proto_tree_add_item(tree, hf_sgeonw_var_len, tvb, start, (*offset) - start, ENC_NA); // Length cannot be determined now
     subtree = proto_item_add_subtree(ti, ett_sgeonw_var_len);
     proto_tree_add_bits_item(subtree, hf_sgeonw_var_len_det, tvb, start << 3, (*offset) - start, ENC_NA);
-    proto_tree_add_uint_bits_format_value(subtree, hf_sgeonw_var_len_val, tvb, (start << 3) + (*offset) - start, (((*offset) - start) << 3) - ((*offset) - start),var_len,"%u",var_len);
+    proto_tree_add_uint_bits_format_value(subtree, hf_sgeonw_var_len_val, tvb, (start << 3) + (*offset) - start, (((*offset) - start) << 3) - ((*offset) - start),var_len,ENC_BIG_ENDIAN,"%u",var_len);
     // EI Error if !mask (more than 32 bits)
     if (!mask)
         expert_add_info(pinfo, ti, &ei_sgeonw_len_unsupported);
@@ -1250,11 +1249,11 @@ dissect_sec_intx(tvbuff_t *tvb, gint *offset, packet_info *pinfo, proto_tree *tr
     proto_tree_add_bits_item(subtree, hf_sgeonw_var_len_det, tvb, start << 3, (*offset) - start, ENC_NA);
     if ((hf != hf_sgeonw_app_id) || ((*offset) - start) > 4) {
         proto_tree_add_uint64_bits_format_value(subtree, hf, tvb, (start << 3) + (*offset) - start,
-            (((*offset) - start) << 3) - ((*offset) - start), tmp_val, "%" G_GUINT64_FORMAT, tmp_val);
+            (((*offset) - start) << 3) - ((*offset) - start), tmp_val, ENC_BIG_ENDIAN, "%" PRIu64, tmp_val);
     }
     else {
         proto_tree_add_uint_bits_format_value(subtree, hf, tvb, (start << 3) + (*offset) - start,
-            (((*offset) - start) << 3) - ((*offset) - start), (guint32)tmp_val, "%s(%u)", val64_to_str_const(tmp_val, ieee1609dot2_Psid_vals, "Unknown") , (guint32)tmp_val);
+            (((*offset) - start) << 3) - ((*offset) - start), (guint32)tmp_val, ENC_BIG_ENDIAN, "%s(%u)", val64_to_str_const(tmp_val, ieee1609dot2_Psid_vals, "Unknown") , (guint32)tmp_val);
     }
     // ETSI TS 103 097 V1.2.1: The encoding of the length shall use at most 7 bits set to 1.
     if (!mask)
@@ -1913,7 +1912,7 @@ dissect_sec_payload(tvbuff_t *tvb, gint *offset, packet_info *pinfo, proto_tree 
                 param_len = dissect_sec_var_len(tvb, offset, pinfo, field_tree);
                 if (param_len) {
                     tvbuff_t *next_tvb = tvb_new_subset_length(tvb, *offset, param_len);
-                    p_add_proto_data(wmem_file_scope(), pinfo, proto_geonw, 0, next_tvb);
+                    p_add_proto_data(pinfo->pool, pinfo, proto_geonw, SEC_TVB_KEY, next_tvb);
                 }
                 *offset += param_len;
                 break;
@@ -2116,7 +2115,7 @@ static int
 dissect_sgeonw(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree _U_, void *data _U_)
 {
     // Just store the tvbuff for later, as it is embedded inside a secured geonetworking packet
-    p_add_proto_data(wmem_file_scope(), pinfo, proto_geonw, 0, tvb);
+    p_add_proto_data(pinfo->pool, pinfo, proto_geonw, SEC_TVB_KEY, tvb);
 
     return tvb_reported_length(tvb);
 }
@@ -2142,7 +2141,7 @@ dissect_geonw(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
     struct geonwheader *geonwh;
     gint32 latlon;
 
-    geonwh = wmem_new0(wmem_packet_scope(), struct geonwheader);
+    geonwh = wmem_new0(pinfo->pool, struct geonwheader);
 
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "GEONW");
     /* Clear out stuff in the info column */
@@ -2229,7 +2228,7 @@ dissect_geonw(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
 
     if (bh_next_header == BH_NH_SECURED_PKT) {
         dissect_secured_message(tvb, offset, pinfo, geonw_tree, NULL);
-        tvbuff_t *next_tvb = (tvbuff_t*)p_get_proto_data(wmem_file_scope(), pinfo, proto_geonw, 0);
+        tvbuff_t *next_tvb = (tvbuff_t*)p_get_proto_data(pinfo->pool, pinfo, proto_geonw, SEC_TVB_KEY);
         if (next_tvb) {
             tvb = next_tvb;
             bh_next_header = BH_NH_COMMON_HDR;
@@ -2262,7 +2261,6 @@ dissect_geonw(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U
                 default:
                     hdr_len = -1;
             }
-            p_add_proto_data(wmem_file_scope(), pinfo, proto_geonw, 0, NULL);
         }
     }
 
@@ -2750,7 +2748,7 @@ btpa_src_prompt(packet_info *pinfo _U_, gchar* result)
 {
     guint32 port = GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, hf_btpa_srcport, pinfo->curr_layer_num));
 
-    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "source (%u%s)", port, UTF8_RIGHTWARDS_ARROW);
+    snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "source (%u%s)", port, UTF8_RIGHTWARDS_ARROW);
 }
 
 static gpointer
@@ -2764,7 +2762,7 @@ btpa_dst_prompt(packet_info *pinfo, gchar *result)
 {
     guint32 port = GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, hf_btpa_dstport, pinfo->curr_layer_num));
 
-    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "destination (%s%u)", UTF8_RIGHTWARDS_ARROW, port);
+    snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "destination (%s%u)", UTF8_RIGHTWARDS_ARROW, port);
 }
 
 static gpointer
@@ -2778,7 +2776,7 @@ btpa_both_prompt(packet_info *pinfo, gchar *result)
 {
     guint32 srcport = GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, hf_btpa_srcport, pinfo->curr_layer_num)),
             destport = GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, hf_btpa_dstport, pinfo->curr_layer_num));
-    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "both (%u%s%u)", srcport, UTF8_LEFT_RIGHT_ARROW, destport);
+    snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "both (%u%s%u)", srcport, UTF8_LEFT_RIGHT_ARROW, destport);
 }
 
 static void
@@ -2786,7 +2784,7 @@ btpb_dst_prompt(packet_info *pinfo, gchar *result)
 {
     guint32 port = GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, hf_btpb_dstport, pinfo->curr_layer_num));
 
-    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "destination (%s%u)", UTF8_RIGHTWARDS_ARROW, port);
+    snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "destination (%s%u)", UTF8_RIGHTWARDS_ARROW, port);
 }
 
 static gpointer
@@ -2917,33 +2915,35 @@ proto_reg_handoff_btpb(void)
 static void
 display_latitude( gchar *result, gint32 hexver )
 {
-    g_snprintf( result, ITEM_LABEL_LENGTH, "%ud%u'%.2f\"%c",
+    snprintf( result, ITEM_LABEL_LENGTH, "%ud%u'%.2f\"%c (%d)",
             abs(hexver)/10000000,
             abs(hexver%10000000)*6/1000000,
             abs(hexver*6%1000000)*6./100000.,
-            hexver>=0?'N':'S');
+            hexver>=0?'N':'S',
+            hexver);
 }
 
 static void
 display_longitude( gchar *result, gint32 hexver )
 {
-    g_snprintf( result, ITEM_LABEL_LENGTH, "%ud%u'%.2f\"%c",
+    snprintf( result, ITEM_LABEL_LENGTH, "%ud%u'%.2f\"%c (%d)",
             abs(hexver)/10000000,
             abs(hexver%10000000)*6/1000000,
             abs(hexver*6%1000000)*6./100000.,
-            hexver>=0?'E':'W');
+            hexver>=0?'E':'W',
+            hexver);
 }
 
 static void
 display_speed( gchar *result, gint32 hexver )
 {
-    g_snprintf( result, ITEM_LABEL_LENGTH, "%.2f m/s", abs(hexver)/100.);
+    snprintf( result, ITEM_LABEL_LENGTH, "%.2f m/s", hexver/100.);
 }
 
 static void
 display_heading( gchar *result, guint32 hexver )
 {
-    g_snprintf( result, ITEM_LABEL_LENGTH, "%.1f degrees", hexver/10.);
+    snprintf( result, ITEM_LABEL_LENGTH, "%.1f degrees", hexver/10.);
 }
 
 static void
@@ -2955,15 +2955,16 @@ display_elevation( gchar *result, gint32 hexver )
     //  also represented by 0xF001.
     //  0xF000: an unknown elevation
     if (hexver == -4096)
-        g_snprintf( result, ITEM_LABEL_LENGTH, "Unknown (%4x)", hexver);
+        snprintf( result, ITEM_LABEL_LENGTH, "Unknown (%4x)", hexver);
     else
-        g_snprintf( result, ITEM_LABEL_LENGTH, "%.1fm", hexver/10.);
+        snprintf( result, ITEM_LABEL_LENGTH, "%.1fm", hexver/10.);
 }
 
 void
 proto_register_geonw(void)
 {
     static const value_string bh_next_header_names[] = {
+        { 0, "ANY" },
         { 1, "Common Header" },
         { 2, "Secured Packet" },
         { 0, NULL}
@@ -2978,6 +2979,7 @@ proto_register_geonw(void)
     };
 
     static const value_string ch_next_header_names[] = {
+        { 0, "ANY" },
         { CH_NH_BTP_A, "BTP-A Transport protocol" },
         { CH_NH_BTP_B, "BTP-B Transport protocol" },
         { CH_NH_IPV6, "IPv6 header" },
@@ -3178,7 +3180,7 @@ proto_register_geonw(void)
 
         { &hf_geonw_so_pv_speed,
           { "Speed", "geonw.src_pos.speed",
-            FT_INT16, BASE_CUSTOM, CF_FUNC(display_speed), 0x00,
+            FT_INT16, BASE_CUSTOM, CF_FUNC(display_speed), 0x7FFF,
             NULL, HFILL }},
 
         { &hf_geonw_so_pv_heading,
@@ -3650,7 +3652,10 @@ proto_reg_handoff_geonw(void)
     dissector_add_uint("ieee1609dot2.psid", psid_road_and_lane_topology_service, sgeonw_handle_);
     dissector_add_uint("ieee1609dot2.psid", psid_infrastructure_to_vehicle_information_service, sgeonw_handle_);
     dissector_add_uint("ieee1609dot2.psid", psid_traffic_light_control_requests_service, sgeonw_handle_);
+    dissector_add_uint("ieee1609dot2.psid", psid_geonetworking_management_communications, sgeonw_handle_);
     dissector_add_uint("ieee1609dot2.psid", psid_traffic_light_control_status_service, sgeonw_handle_);
+    dissector_add_uint("ieee1609dot2.psid", psid_collective_perception_service, sgeonw_handle_);
+
 }
 
 /*

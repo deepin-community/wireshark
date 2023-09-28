@@ -1522,7 +1522,7 @@ dissect_btavdtp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
         channels_info->control_remote_cid = l2cap_data->remote_cid;
         channels_info->media_local_cid = BTL2CAP_UNKNOWN_CID;
         channels_info->media_remote_cid = BTL2CAP_UNKNOWN_CID;
-        channels_info->disconnect_in_frame = max_disconnect_in_frame;
+        channels_info->disconnect_in_frame = bluetooth_max_disconnect_in_frame;
         channels_info->l2cap_disconnect_in_frame   = l2cap_data->disconnect_in_frame;
         channels_info->hci_disconnect_in_frame     = l2cap_data->hci_disconnect_in_frame;
         channels_info->adapter_disconnect_in_frame = l2cap_data->adapter_disconnect_in_frame;
@@ -2349,7 +2349,7 @@ proto_register_btavdtp(void)
         },
         { &hf_btavdtp_content_protection_type,
             { "Type",                           "btavdtp.content_protection_type",
-            FT_UINT16, BASE_HEX, VALS(content_protection_type_vals), 0x0000,
+            FT_UINT16, BASE_HEX, VALS(content_protection_type_vals), 0x0,
             NULL, HFILL }
         },
         { &hf_btavdtp_media_codec_media_type,
@@ -3594,7 +3594,7 @@ proto_register_bta2dp(void)
         },
         { &hf_bta2dp_content_protection,
             { "Content Protection",              "bta2dp.content_protection",
-            FT_UINT16, BASE_HEX, VALS(content_protection_type_vals), 0x0000,
+            FT_UINT16, BASE_HEX, VALS(content_protection_type_vals), 0x0,
             NULL, HFILL }
         },
         { &hf_bta2dp_stream_start_in_frame,
@@ -3827,7 +3827,7 @@ proto_register_btvdp(void)
         },
         { &hf_btvdp_content_protection,
             { "Content Protection",              "btvdp.content_protection",
-            FT_UINT16, BASE_HEX, VALS(content_protection_type_vals), 0x0000,
+            FT_UINT16, BASE_HEX, VALS(content_protection_type_vals), 0x0,
             NULL, HFILL }
         },
         { &hf_btvdp_stream_start_in_frame,

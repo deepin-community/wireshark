@@ -58,6 +58,7 @@
 #include <epan/expert.h>
 #include <epan/crc16-tvb.h> /* For CRC verification */
 #include <epan/proto_data.h>
+#include "packet-tls.h"
 
 void proto_register_modbus(void);
 void proto_reg_handoff_mbtcp(void);
@@ -163,6 +164,7 @@ static expert_field ei_mbtcp_cannot_classify = EI_INIT;
 
 static dissector_handle_t modbus_handle;
 static dissector_handle_t mbtcp_handle;
+static dissector_handle_t mbtls_handle;
 static dissector_handle_t mbudp_handle;
 static dissector_handle_t mbrtu_handle;
 
@@ -172,13 +174,14 @@ static dissector_table_t   modbus_dissector_table;
 
 /* Globals for Modbus/TCP Preferences */
 static gboolean mbtcp_desegment = TRUE;
-static guint global_mbus_tcp_port = PORT_MBTCP; /* Port 502, by default */
-static guint global_mbus_udp_port = PORT_MBTCP; /* Port 502, by default */
+static range_t *global_mbus_tcp_ports = NULL; /* Port 502, by default */
+static range_t *global_mbus_udp_ports = NULL; /* Port 502, by default */
+static range_t *global_mbus_tls_ports = NULL; /* Port 802, by default */
 
 /* Globals for Modbus RTU over TCP Preferences */
 static gboolean mbrtu_desegment = TRUE;
-static guint global_mbus_tcp_rtu_port = PORT_MBRTU; /* 0, by default        */
-static guint global_mbus_udp_rtu_port = PORT_MBRTU; /* 0, by default        */
+static range_t *global_mbus_tcp_rtu_ports = PORT_MBRTU; /* 0, by default     */
+static range_t *global_mbus_udp_rtu_ports = PORT_MBRTU; /* 0, by default     */
 static gboolean mbrtu_crc = FALSE;
 
 /* Globals for Modbus Preferences */
@@ -195,7 +198,7 @@ typedef struct {
 } modbus_pkt_info_t;
 
 static int
-classify_mbtcp_packet(packet_info *pinfo, guint port)
+classify_mbtcp_packet(packet_info *pinfo, range_t *ports)
 {
     /* see if nature of packets can be derived from src/dst ports */
     /* if so, return as found */
@@ -204,9 +207,9 @@ classify_mbtcp_packet(packet_info *pinfo, guint port)
     /* the Modbus/TCP transaction ID for each pair of messages would allow for detection based on a new seq. number. */
     /* Otherwise, we can stick with this method; a configurable port option has been added to allow for usage of     */
     /* user ports either than the default of 502.                                                                    */
-    if (( pinfo->srcport == port ) && ( pinfo->destport != port ))
+    if ( (value_is_in_range(ports, pinfo->srcport)) && (!value_is_in_range(ports, pinfo->destport)) )
         return RESPONSE_PACKET;
-    if (( pinfo->srcport != port ) && ( pinfo->destport == port ))
+    if ( (!value_is_in_range(ports, pinfo->srcport)) && (value_is_in_range(ports, pinfo->destport)) )
         return QUERY_PACKET;
 
     /* else, cannot classify */
@@ -214,7 +217,7 @@ classify_mbtcp_packet(packet_info *pinfo, guint port)
 }
 
 static int
-classify_mbrtu_packet(packet_info *pinfo, tvbuff_t *tvb, guint port)
+classify_mbrtu_packet(packet_info *pinfo, tvbuff_t *tvb, range_t *ports)
 {
     guint8 func, len;
 
@@ -223,11 +226,10 @@ classify_mbrtu_packet(packet_info *pinfo, tvbuff_t *tvb, guint port)
 
     /* see if nature of packets can be derived from src/dst ports */
     /* if so, return as found */
-    if (( pinfo->srcport == port ) && ( pinfo->destport != port ))
+    if ( (value_is_in_range(ports, pinfo->srcport)) && (!value_is_in_range(ports, pinfo->destport)) )
         return RESPONSE_PACKET;
-    if (( pinfo->srcport != port ) && ( pinfo->destport == port ))
+    if ( (!value_is_in_range(ports, pinfo->srcport)) && (value_is_in_range(ports, pinfo->destport)) )
         return QUERY_PACKET;
-
 
     /* We may not have an Ethernet header or unique ports. */
     /* Dig into these a little deeper to try to guess the message type */
@@ -407,7 +409,7 @@ static const enum_val_t mbus_register_format[] = {
 
 /* Code to dissect Modbus/TCP packets */
 static int
-dissect_mbtcp_pdu_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int proto, guint port)
+dissect_mbtcp_pdu_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int proto, range_t *ports)
 {
 /* Set up structures needed to add the protocol subtree and manage it */
     proto_item    *mi;
@@ -431,7 +433,7 @@ dissect_mbtcp_pdu_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, in
     offset = 0;
 
     /* "Request" or "Response" */
-    modbus_data.packet_type = classify_mbtcp_packet(pinfo, port);
+    modbus_data.packet_type = classify_mbtcp_packet(pinfo, ports);
     /* Save the transaction and unit id to find the request to a response */
     modbus_data.mbtcp_transid = transaction_id;
     modbus_data.unit_id = unit_id;
@@ -535,12 +537,22 @@ dissect_mbtcp_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* dat
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "Modbus/TCP");
     col_clear(pinfo->cinfo, COL_INFO);
 
-    return dissect_mbtcp_pdu_common(tvb, pinfo, tree, proto_mbtcp, global_mbus_tcp_port);
+    return dissect_mbtcp_pdu_common(tvb, pinfo, tree, proto_mbtcp, global_mbus_tcp_ports);
+}
+
+static int
+dissect_mbtls_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
+{
+    /* Make entries in Protocol column on summary display */
+    col_set_str(pinfo->cinfo, COL_PROTOCOL, "Modbus/TCP Security");
+    col_clear(pinfo->cinfo, COL_INFO);
+
+    return dissect_mbtcp_pdu_common(tvb, pinfo, tree, proto_mbtcp, global_mbus_tls_ports);
 }
 
 /* Code to dissect Modbus RTU */
 static int
-dissect_mbrtu_pdu_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint port)
+dissect_mbrtu_pdu_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, range_t *ports)
 {
 /* Set up structures needed to add the protocol subtree and manage it */
     proto_item    *mi;
@@ -566,7 +578,7 @@ dissect_mbrtu_pdu_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gu
     offset = 0;
 
     /* "Request" or "Response" */
-    modbus_data.packet_type = classify_mbrtu_packet(pinfo, tvb, port);
+    modbus_data.packet_type = classify_mbrtu_packet(pinfo, tvb, ports);
     /* Transaction ID is available only in Modbus TCP */
     modbus_data.mbtcp_transid = 0;
     modbus_data.unit_id = unit_id;
@@ -676,7 +688,7 @@ dissect_mbrtu_pdu_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, gu
 static int
 dissect_mbrtu_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
-    return dissect_mbrtu_pdu_common(tvb, pinfo, tree, global_mbus_tcp_rtu_port);
+    return dissect_mbrtu_pdu_common(tvb, pinfo, tree, global_mbus_tcp_rtu_ports);
 }
 
 /* Return length of Modbus/TCP message */
@@ -713,7 +725,7 @@ get_mbrtu_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
              the rest can be added as pcap examples are made available */
 
     /* Determine "Query" or "Response" */
-    packet_type = classify_mbrtu_packet(pinfo, tvb, global_mbus_tcp_rtu_port);
+    packet_type = classify_mbrtu_packet(pinfo, tvb, global_mbus_tcp_rtu_ports);
 
     switch ( packet_type ) {
         case QUERY_PACKET :
@@ -768,7 +780,7 @@ get_mbrtu_pdu_len(packet_info *pinfo _U_, tvbuff_t *tvb,
 
 /* Code to dissect Modbus/TCP messages */
 static int
-dissect_mbtcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+dissect_mbtcp_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data, dissector_t dissect_pdu)
 {
 
     /* Make sure there's at least enough data to determine it's a Modbus TCP packet */
@@ -787,9 +799,21 @@ dissect_mbtcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 
     /* build up protocol tree and iterate over multiple packets */
     tcp_dissect_pdus(tvb, pinfo, tree, mbtcp_desegment, 6,
-                     get_mbtcp_pdu_len, dissect_mbtcp_pdu, data);
+                     get_mbtcp_pdu_len, dissect_pdu, data);
 
     return tvb_captured_length(tvb);
+}
+
+static int
+dissect_mbtcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+{
+    return dissect_mbtcp_common(tvb, pinfo, tree, data, dissect_mbtcp_pdu);
+}
+
+static int
+dissect_mbtls(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
+{
+    return dissect_mbtcp_common(tvb, pinfo, tree, data, dissect_mbtls_pdu);
 }
 
 static int
@@ -814,7 +838,7 @@ dissect_mbudp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U
     col_set_str(pinfo->cinfo, COL_PROTOCOL, "Modbus/UDP");
     col_clear(pinfo->cinfo, COL_INFO);
 
-    return dissect_mbtcp_pdu_common(tvb, pinfo, tree, proto_mbudp, global_mbus_udp_port);
+    return dissect_mbtcp_pdu_common(tvb, pinfo, tree, proto_mbudp, global_mbus_udp_ports);
 }
 
 /* Code to dissect Modbus RTU over TCP messages */
@@ -848,7 +872,7 @@ dissect_mbrtu_udp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *dat
     if (tvb_reported_length(tvb) < 5)
         return 0;
 
-    return dissect_mbrtu_pdu_common(tvb, pinfo, tree, global_mbus_udp_rtu_port);
+    return dissect_mbrtu_pdu_common(tvb, pinfo, tree, global_mbus_udp_rtu_ports);
 }
 
 
@@ -1039,6 +1063,10 @@ dissect_modbus_request(tvbuff_t *tvb, packet_info *pinfo, proto_tree *modbus_tre
     guint16       reg_base=0, diagnostic_code;
     guint32       group_byte_cnt, group_word_cnt;
 
+    if (!pkt_info) {
+        return 0;
+    }
+
     switch (function_code) {
 
         case READ_COILS:
@@ -1217,11 +1245,17 @@ dissect_modbus_response(tvbuff_t *tvb, packet_info *pinfo, proto_tree *modbus_tr
     proto_item    *mei;
     gint          byte_cnt, group_offset, event_index, object_index, object_len, num_objects, ii;
     guint8        object_type, mei_code, event_code;
-    guint16       diagnostic_code, num_reg = pkt_info->num_reg;
+    guint16       diagnostic_code, num_reg;
     guint32       group_byte_cnt, group_word_cnt;
 
     nstime_t      response_time;
     proto_item    *request_frame_item, *response_time_item;
+
+    if (!pkt_info) {
+        return 0;
+    }
+
+    num_reg = pkt_info->num_reg;
 
     if (pkt_info->request_found == TRUE) {
         request_frame_item = proto_tree_add_uint(modbus_tree, hf_modbus_request_frame, tvb, 0, 0, pkt_info->req_frame_num);
@@ -1495,7 +1529,7 @@ dissect_modbus_response(tvbuff_t *tvb, packet_info *pinfo, proto_tree *modbus_tr
 
                         if (object_type < 7)
                         {
-                            proto_tree_add_item(device_objects_item_tree, hf_modbus_object_str_value, tvb, payload_start+6+object_index, object_len, ENC_ASCII|ENC_NA);
+                            proto_tree_add_item(device_objects_item_tree, hf_modbus_object_str_value, tvb, payload_start+6+object_index, object_len, ENC_ASCII);
                         }
                         else
                         {
@@ -1675,16 +1709,17 @@ static void
 apply_mbtcp_prefs(void)
 {
     /* Modbus/RTU uses the port preference to determine request/response */
-    global_mbus_tcp_port = prefs_get_uint_value("mbtcp", "tcp.port");
-    global_mbus_udp_port = prefs_get_uint_value("mbudp", "udp.port");
+    global_mbus_tcp_ports = prefs_get_range_value("mbtcp", "tcp.port");
+    global_mbus_udp_ports = prefs_get_range_value("mbudp", "udp.port");
+    global_mbus_tls_ports = prefs_get_range_value("mbtcp", "tls.port");
 }
 
 static void
 apply_mbrtu_prefs(void)
 {
     /* Modbus/RTU uses the port preference to determine request/response */
-    global_mbus_tcp_rtu_port = prefs_get_uint_value("mbrtu", "tcp.port");
-    global_mbus_udp_rtu_port = prefs_get_uint_value("mbrtu", "udp.port");
+    global_mbus_tcp_rtu_ports = prefs_get_range_value("mbrtu", "tcp.port");
+    global_mbus_udp_rtu_ports = prefs_get_range_value("mbrtu", "udp.port");
 }
 
 /* Register the protocol with Wireshark */
@@ -2130,6 +2165,7 @@ proto_register_modbus(void)
     /* Registering protocol to be called by another dissector */
     modbus_handle = register_dissector("modbus", dissect_modbus, proto_modbus);
     mbtcp_handle = register_dissector("mbtcp", dissect_mbtcp, proto_mbtcp);
+    mbtls_handle = register_dissector("mbtls", dissect_mbtls, proto_mbtcp);
     mbrtu_handle = register_dissector("mbrtu", dissect_mbrtu, proto_mbrtu);
     mbudp_handle = register_dissector("mbudp", dissect_mbudp, proto_mbudp);
 
@@ -2199,10 +2235,12 @@ proto_reg_handoff_mbtcp(void)
 {
     dissector_add_uint_with_preference("tcp.port", PORT_MBTCP, mbtcp_handle);
     dissector_add_uint_with_preference("udp.port", PORT_MBTCP, mbudp_handle);
+    dissector_add_uint_with_preference("tls.port", PORT_MBTLS, mbtls_handle);
     apply_mbtcp_prefs();
 
     dissector_add_uint("mbtcp.prot_id", MODBUS_PROTOCOL_ID, modbus_handle);
 
+    ssl_dissector_add(PORT_MBTLS, mbtls_handle);
 }
 
 void

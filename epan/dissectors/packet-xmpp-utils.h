@@ -15,7 +15,7 @@
 #include "ws_symbol_export.h"
 #include "tvbuff.h"
 #include "dissectors/packet-xml.h"
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 
 #define xmpp_elem_cdata(elem) \
 elem->data?elem->data->value:""
@@ -144,8 +144,6 @@ extern void xmpp_gtalk_session_track(packet_info *pinfo, xmpp_element_t *packet,
  */
 extern void xmpp_unknown(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, xmpp_element_t *element);
 
-extern void xmpp_unknown_attrs(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, xmpp_element_t *element, gboolean displ_short_list);
-
 /** Displays CDATA from element in tree. You can use your own header field hf or
  * pass -1. If you pass -1 then CDATA will be display as text:
  * ELEMENT_NAME: CDATA
@@ -160,7 +158,7 @@ extern void xmpp_simple_cdata_elem(proto_tree *tree, tvbuff_t *tvb, packet_info 
 
 /** Converts xml_frame_t struct to xmpp_element_t. Should be call with parent==NULL.
  */
-extern xmpp_element_t* xmpp_xml_frame_to_element_t(xml_frame_t *xml_frame, xmpp_element_t *parent, tvbuff_t *tvb);
+extern xmpp_element_t* xmpp_xml_frame_to_element_t(wmem_allocator_t *pool, xml_frame_t *xml_frame, xmpp_element_t *parent, tvbuff_t *tvb);
 
 /** Frees all GLib structs in xmpp_element_t struct. Should be call only for root element.
  * It works recursively.
@@ -168,19 +166,10 @@ extern xmpp_element_t* xmpp_xml_frame_to_element_t(xml_frame_t *xml_frame, xmpp_
 extern void xmpp_element_t_tree_free(xmpp_element_t *root);
 
 /** Allocs ephemeral memory for xmpp_array_t struct.*/
-extern xmpp_array_t* xmpp_ep_init_array_t(const gchar** array, gint len);
+extern xmpp_array_t* xmpp_ep_init_array_t(wmem_allocator_t *pool, const gchar** array, gint len);
 
 /*Allocs ephemeral memory for xmpp_attr_t struct*/
-extern xmpp_attr_t* xmpp_ep_init_attr_t(const gchar *value, gint offset, gint length);
-
-/*Allocs ephemeral memory for upcased string*/
-extern gchar* xmpp_ep_string_upcase(const gchar* string);
-
-/*Compares 2 xmpp_element_t struct by names. Returns value is similar to the returned by strcmp*/
-extern gint xmpp_element_t_cmp(gconstpointer a, gconstpointer b);
-
-/*Searches child element in parent element by name. GList element is returned.*/
-extern GList* xmpp_find_element_by_name(xmpp_element_t *packet,const gchar *name);
+extern xmpp_attr_t* xmpp_ep_init_attr_t(wmem_allocator_t *pool, const gchar *value, gint offset, gint length);
 
 /** steal_*
  * Functions searches and marks as read found elements.
@@ -194,11 +183,8 @@ extern xmpp_element_t* xmpp_steal_element_by_name_and_attr(xmpp_element_t *packe
 /*Returns first child in element*/
 extern xmpp_element_t* xmpp_get_first_element(xmpp_element_t *packet);
 
-/*Converts element to string. Returns memory allocated as ephemeral.*/
-extern gchar* xmpp_element_to_string(tvbuff_t *tvb, xmpp_element_t *element);
-
-/*Converts attribute to string. Returns memory allocated as ephemeral.*/
-extern gchar* xmpp_attr_to_string(tvbuff_t *tvb, xmpp_attr_t *attr);
+/*Converts element to string. Returns memory allocated from the given pool.*/
+extern gchar* xmpp_element_to_string(wmem_allocator_t *pool, tvbuff_t *tvb, xmpp_element_t *element);
 
 /* Returns attribute by name and set as read. If attrib is set as read, it may be found
  * one more time, but it is invisible for function xmpp_unknown_attrib*/
@@ -210,11 +196,11 @@ extern void xmpp_proto_tree_hide_first_child(proto_tree *tree);
 /*Function shows first element in tree.*/
 extern void xmpp_proto_tree_show_first_child(proto_tree *tree);
 
-/*Function returns item as text. Memory is allocated as ephemeral.*/
-extern gchar* proto_item_get_text(proto_item *item);
+/*Function returns item as text. Memory is allocated from the given pool.*/
+extern gchar* proto_item_get_text(wmem_allocator_t *pool, proto_item *item);
 
 /*Function returns struct that contains 3 strings. It is used to build xmpp_attr_info struct.*/
-extern gpointer xmpp_name_attr_struct(const gchar *name, const gchar *attr_name, const gchar *attr_value);
+extern gpointer xmpp_name_attr_struct(wmem_allocator_t *pool, const gchar *name, const gchar *attr_name, const gchar *attr_value);
 
 /** Function displays attributes from element in way described in attrs.
  * Elements that doesn't exist in attrs are displayed as text.
@@ -256,14 +242,10 @@ extern void xmpp_val_enum_list(packet_info *pinfo, proto_item *item, const gchar
  * next it create attribute using transform_func and inserts it to parent attributes hash table
  * using attr_name as key.
  */
-extern void xmpp_change_elem_to_attrib(const gchar *elem_name, const gchar *attr_name, xmpp_element_t *parent, xmpp_attr_t* (*transform_func)(xmpp_element_t *element));
+extern void xmpp_change_elem_to_attrib(wmem_allocator_t *pool, const gchar *elem_name, const gchar *attr_name, xmpp_element_t *parent, xmpp_attr_t* (*transform_func)(wmem_allocator_t *pool, xmpp_element_t *element));
 
 /** transform_func that creates attribute with element's cdata as value
  */
-extern xmpp_attr_t* xmpp_transform_func_cdata(xmpp_element_t *elem);
-
-/*Copys keys and values from one hash table to another.
- Hash tables must be initialized.*/
-extern void xmpp_copy_hash_table(GHashTable *src, GHashTable *dst);
+extern xmpp_attr_t* xmpp_transform_func_cdata(wmem_allocator_t *pool, xmpp_element_t *elem);
 
 #endif /* XMPP_UTILS_H */

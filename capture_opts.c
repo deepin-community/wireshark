@@ -13,6 +13,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #ifdef HAVE_LIBPCAP
 
 #include <string.h>
@@ -26,11 +30,13 @@
 
 #include <ui/clopts_common.h>
 #include <ui/cmdarg_err.h>
+#include <ui/exit_codes.h>
 #include <wsutil/file_util.h>
 #include <wsutil/ws_pipe.h>
+#include <wsutil/ws_assert.h>
 
-#include "caputils/capture_ifinfo.h"
-#include "caputils/capture-pcap-util.h"
+#include "capture/capture_ifinfo.h"
+#include "capture/capture-pcap-util.h"
 
 #include "ui/filter_files.h"
 
@@ -45,6 +51,7 @@ capture_opts_init(capture_options *capture_opts)
     capture_opts->num_selected                    = 0;
     capture_opts->default_options.name            = NULL;
     capture_opts->default_options.descr           = NULL;
+    capture_opts->default_options.ifname          = NULL;
     capture_opts->default_options.hardware        = NULL;
     capture_opts->default_options.display_name    = NULL;
     capture_opts->default_options.cfilter         = NULL;
@@ -56,8 +63,11 @@ capture_opts_init(capture_options *capture_opts)
     capture_opts->default_options.extcap          = NULL;
     capture_opts->default_options.extcap_fifo     = NULL;
     capture_opts->default_options.extcap_args     = NULL;
-    capture_opts->default_options.extcap_pipedata = NULL;
     capture_opts->default_options.extcap_pid      = WS_INVALID_PID;
+    capture_opts->default_options.extcap_pipedata = NULL;
+    capture_opts->default_options.extcap_stderr   = NULL;
+    capture_opts->default_options.extcap_stdout_watch = 0;
+    capture_opts->default_options.extcap_stderr_watch = 0;
 #ifdef _WIN32
     capture_opts->default_options.extcap_pipe_h   = INVALID_HANDLE_VALUE;
     capture_opts->default_options.extcap_control_in_h  = INVALID_HANDLE_VALUE;
@@ -98,6 +108,7 @@ capture_opts_init(capture_options *capture_opts)
     capture_opts->has_file_duration               = FALSE;
     capture_opts->file_duration                   = 60.0;             /* 1 min */
     capture_opts->has_file_interval               = FALSE;
+    capture_opts->has_nametimenum                 = FALSE;
     capture_opts->file_interval                   = 60;               /* 1 min */
     capture_opts->has_file_packets                = FALSE;
     capture_opts->file_packets                    = 0;
@@ -108,16 +119,23 @@ capture_opts_init(capture_options *capture_opts)
     capture_opts->autostop_files                  = 1;
     capture_opts->has_autostop_packets            = FALSE;
     capture_opts->autostop_packets                = 0;
+    capture_opts->has_autostop_written_packets    = FALSE;
+    capture_opts->autostop_written_packets        = 0;
     capture_opts->has_autostop_filesize           = FALSE;
     capture_opts->autostop_filesize               = 1000;             /* 1 MB */
     capture_opts->has_autostop_duration           = FALSE;
     capture_opts->autostop_duration               = 60.0;             /* 1 min */
-    capture_opts->capture_comment                 = NULL;
 
     capture_opts->output_to_pipe                  = FALSE;
     capture_opts->capture_child                   = FALSE;
+    capture_opts->stop_after_extcaps              = FALSE;
+    capture_opts->wait_for_extcap_cbs             = FALSE;
     capture_opts->print_file_names                = FALSE;
     capture_opts->print_name_to                   = NULL;
+    capture_opts->temp_dir                        = NULL;
+    capture_opts->compress_type                   = NULL;
+    capture_opts->closed_msg                      = NULL;
+    capture_opts->extcap_terminate_id             = 0;
 }
 
 void
@@ -143,119 +161,132 @@ capture_opts_cleanup(capture_options *capture_opts)
         capture_opts->all_ifaces = NULL;
     }
     g_free(capture_opts->save_file);
+    g_free(capture_opts->temp_dir);
+
+    if (capture_opts->closed_msg) {
+        g_free(capture_opts->closed_msg);
+        capture_opts->closed_msg = NULL;
+    }
+    if (capture_opts->extcap_terminate_id > 0) {
+        g_source_remove(capture_opts->extcap_terminate_id);
+        capture_opts->extcap_terminate_id = 0;
+    }
 }
 
 /* log content of capture_opts */
 void
-capture_opts_log(const char *log_domain, GLogLevelFlags log_level, capture_options *capture_opts) {
+capture_opts_log(const char *log_domain, enum ws_log_level log_level, capture_options *capture_opts) {
     guint i;
 
-    g_log(log_domain, log_level, "CAPTURE OPTIONS     :");
+    ws_log(log_domain, log_level, "CAPTURE OPTIONS     :");
 
     for (i = 0; i < capture_opts->ifaces->len; i++) {
         interface_options *interface_opts;
 
         interface_opts = &g_array_index(capture_opts->ifaces, interface_options, i);
-        g_log(log_domain, log_level, "Interface name[%02d]  : %s", i, interface_opts->name ? interface_opts->name : "(unspecified)");
-        g_log(log_domain, log_level, "Interface description[%02d] : %s", i, interface_opts->descr ? interface_opts->descr : "(unspecified)");
-        g_log(log_domain, log_level, "Interface vendor description[%02d] : %s", i, interface_opts->hardware ? interface_opts->hardware : "(unspecified)");
-        g_log(log_domain, log_level, "Display name[%02d]: %s", i, interface_opts->display_name ? interface_opts->display_name : "(unspecified)");
-        g_log(log_domain, log_level, "Capture filter[%02d]  : %s", i, interface_opts->cfilter ? interface_opts->cfilter : "(unspecified)");
-        g_log(log_domain, log_level, "Snap length[%02d] (%u) : %d", i, interface_opts->has_snaplen, interface_opts->snaplen);
-        g_log(log_domain, log_level, "Link Type[%02d]       : %d", i, interface_opts->linktype);
-        g_log(log_domain, log_level, "Promiscuous Mode[%02d]: %s", i, interface_opts->promisc_mode?"TRUE":"FALSE");
-        g_log(log_domain, log_level, "Extcap[%02d]          : %s", i, interface_opts->extcap ? interface_opts->extcap : "(unspecified)");
-        g_log(log_domain, log_level, "Extcap FIFO[%02d]     : %s", i, interface_opts->extcap_fifo ? interface_opts->extcap_fifo : "(unspecified)");
-        g_log(log_domain, log_level, "Extcap PID[%02d]      : %d", i, interface_opts->extcap_pid);
+        ws_log(log_domain, log_level, "Interface name[%02d]  : %s", i, interface_opts->name ? interface_opts->name : "(unspecified)");
+        ws_log(log_domain, log_level, "Interface description[%02d] : %s", i, interface_opts->descr ? interface_opts->descr : "(unspecified)");
+        ws_log(log_domain, log_level, "Interface vendor description[%02d] : %s", i, interface_opts->hardware ? interface_opts->hardware : "(unspecified)");
+        ws_log(log_domain, log_level, "Display name[%02d]: %s", i, interface_opts->display_name ? interface_opts->display_name : "(unspecified)");
+        ws_log(log_domain, log_level, "Capture filter[%02d]  : %s", i, interface_opts->cfilter ? interface_opts->cfilter : "(unspecified)");
+        ws_log(log_domain, log_level, "Snap length[%02d] (%u) : %d", i, interface_opts->has_snaplen, interface_opts->snaplen);
+        ws_log(log_domain, log_level, "Link Type[%02d]       : %d", i, interface_opts->linktype);
+        ws_log(log_domain, log_level, "Promiscuous Mode[%02d]: %s", i, interface_opts->promisc_mode?"TRUE":"FALSE");
+        ws_log(log_domain, log_level, "Extcap[%02d]          : %s", i, interface_opts->extcap ? interface_opts->extcap : "(unspecified)");
+        ws_log(log_domain, log_level, "Extcap FIFO[%02d]     : %s", i, interface_opts->extcap_fifo ? interface_opts->extcap_fifo : "(unspecified)");
+        ws_log(log_domain, log_level, "Extcap PID[%02d]      : %d", i, interface_opts->extcap_pid);
 #ifdef CAN_SET_CAPTURE_BUFFER_SIZE
-        g_log(log_domain, log_level, "Buffer size[%02d]     : %d (MB)", i, interface_opts->buffer_size);
+        ws_log(log_domain, log_level, "Buffer size[%02d]     : %d (MB)", i, interface_opts->buffer_size);
 #endif
-        g_log(log_domain, log_level, "Monitor Mode[%02d]    : %s", i, interface_opts->monitor_mode?"TRUE":"FALSE");
+        ws_log(log_domain, log_level, "Monitor Mode[%02d]    : %s", i, interface_opts->monitor_mode?"TRUE":"FALSE");
 #ifdef HAVE_PCAP_REMOTE
-        g_log(log_domain, log_level, "Capture source[%02d]  : %s", i,
+        ws_log(log_domain, log_level, "Capture source[%02d]  : %s", i,
             interface_opts->src_type == CAPTURE_IFLOCAL ? "Local interface" :
             interface_opts->src_type == CAPTURE_IFREMOTE ? "Remote interface" :
             "Unknown");
         if (interface_opts->src_type == CAPTURE_IFREMOTE) {
-            g_log(log_domain, log_level, "Remote host[%02d]     : %s", i, interface_opts->remote_host ? interface_opts->remote_host : "(unspecified)");
-            g_log(log_domain, log_level, "Remote port[%02d]     : %s", i, interface_opts->remote_port ? interface_opts->remote_port : "(unspecified)");
+            ws_log(log_domain, log_level, "Remote host[%02d]     : %s", i, interface_opts->remote_host ? interface_opts->remote_host : "(unspecified)");
+            ws_log(log_domain, log_level, "Remote port[%02d]     : %s", i, interface_opts->remote_port ? interface_opts->remote_port : "(unspecified)");
         }
-        g_log(log_domain, log_level, "Authentication[%02d]  : %s", i,
+        ws_log(log_domain, log_level, "Authentication[%02d]  : %s", i,
             interface_opts->auth_type == CAPTURE_AUTH_NULL ? "Null" :
             interface_opts->auth_type == CAPTURE_AUTH_PWD ? "By username/password" :
             "Unknown");
         if (interface_opts->auth_type == CAPTURE_AUTH_PWD) {
-            g_log(log_domain, log_level, "Auth username[%02d]   : %s", i, interface_opts->auth_username ? interface_opts->auth_username : "(unspecified)");
-            g_log(log_domain, log_level, "Auth password[%02d]   : <hidden>", i);
+            ws_log(log_domain, log_level, "Auth username[%02d]   : %s", i, interface_opts->auth_username ? interface_opts->auth_username : "(unspecified)");
+            ws_log(log_domain, log_level, "Auth password[%02d]   : <hidden>", i);
         }
-        g_log(log_domain, log_level, "UDP data tfer[%02d]   : %u", i, interface_opts->datatx_udp);
-        g_log(log_domain, log_level, "No cap. RPCAP[%02d]   : %u", i, interface_opts->nocap_rpcap);
-        g_log(log_domain, log_level, "No cap. local[%02d]   : %u", i, interface_opts->nocap_local);
+        ws_log(log_domain, log_level, "UDP data tfer[%02d]   : %u", i, interface_opts->datatx_udp);
+        ws_log(log_domain, log_level, "No cap. RPCAP[%02d]   : %u", i, interface_opts->nocap_rpcap);
+        ws_log(log_domain, log_level, "No cap. local[%02d]   : %u", i, interface_opts->nocap_local);
 #endif
 #ifdef HAVE_PCAP_SETSAMPLING
-        g_log(log_domain, log_level, "Sampling meth.[%02d]  : %d", i, interface_opts->sampling_method);
-        g_log(log_domain, log_level, "Sampling param.[%02d] : %d", i, interface_opts->sampling_param);
+        ws_log(log_domain, log_level, "Sampling meth.[%02d]  : %d", i, interface_opts->sampling_method);
+        ws_log(log_domain, log_level, "Sampling param.[%02d] : %d", i, interface_opts->sampling_param);
 #endif
-        g_log(log_domain, log_level, "Timestamp type [%02d] : %s", i, interface_opts->timestamp_type);
+        ws_log(log_domain, log_level, "Timestamp type [%02d] : %s", i, interface_opts->timestamp_type);
     }
-    g_log(log_domain, log_level, "Interface name[df]  : %s", capture_opts->default_options.name ? capture_opts->default_options.name : "(unspecified)");
-    g_log(log_domain, log_level, "Interface Descr[df] : %s", capture_opts->default_options.descr ? capture_opts->default_options.descr : "(unspecified)");
-    g_log(log_domain, log_level, "Interface Hardware Descr[df] : %s", capture_opts->default_options.hardware ? capture_opts->default_options.hardware : "(unspecified)");
-    g_log(log_domain, log_level, "Interface display name[df] : %s", capture_opts->default_options.display_name ? capture_opts->default_options.display_name : "(unspecified)");
-    g_log(log_domain, log_level, "Capture filter[df]  : %s", capture_opts->default_options.cfilter ? capture_opts->default_options.cfilter : "(unspecified)");
-    g_log(log_domain, log_level, "Snap length[df] (%u) : %d", capture_opts->default_options.has_snaplen, capture_opts->default_options.snaplen);
-    g_log(log_domain, log_level, "Link Type[df]       : %d", capture_opts->default_options.linktype);
-    g_log(log_domain, log_level, "Promiscuous Mode[df]: %s", capture_opts->default_options.promisc_mode?"TRUE":"FALSE");
-    g_log(log_domain, log_level, "Extcap[df]          : %s", capture_opts->default_options.extcap ? capture_opts->default_options.extcap : "(unspecified)");
-    g_log(log_domain, log_level, "Extcap FIFO[df]     : %s", capture_opts->default_options.extcap_fifo ? capture_opts->default_options.extcap_fifo : "(unspecified)");
+    ws_log(log_domain, log_level, "Interface name[df]  : %s", capture_opts->default_options.name ? capture_opts->default_options.name : "(unspecified)");
+    ws_log(log_domain, log_level, "Interface Descr[df] : %s", capture_opts->default_options.descr ? capture_opts->default_options.descr : "(unspecified)");
+    ws_log(log_domain, log_level, "Interface Hardware Descr[df] : %s", capture_opts->default_options.hardware ? capture_opts->default_options.hardware : "(unspecified)");
+    ws_log(log_domain, log_level, "Interface display name[df] : %s", capture_opts->default_options.display_name ? capture_opts->default_options.display_name : "(unspecified)");
+    ws_log(log_domain, log_level, "Capture filter[df]  : %s", capture_opts->default_options.cfilter ? capture_opts->default_options.cfilter : "(unspecified)");
+    ws_log(log_domain, log_level, "Snap length[df] (%u) : %d", capture_opts->default_options.has_snaplen, capture_opts->default_options.snaplen);
+    ws_log(log_domain, log_level, "Link Type[df]       : %d", capture_opts->default_options.linktype);
+    ws_log(log_domain, log_level, "Promiscuous Mode[df]: %s", capture_opts->default_options.promisc_mode?"TRUE":"FALSE");
+    ws_log(log_domain, log_level, "Extcap[df]          : %s", capture_opts->default_options.extcap ? capture_opts->default_options.extcap : "(unspecified)");
+    ws_log(log_domain, log_level, "Extcap FIFO[df]     : %s", capture_opts->default_options.extcap_fifo ? capture_opts->default_options.extcap_fifo : "(unspecified)");
 #ifdef CAN_SET_CAPTURE_BUFFER_SIZE
-    g_log(log_domain, log_level, "Buffer size[df]     : %d (MB)", capture_opts->default_options.buffer_size);
+    ws_log(log_domain, log_level, "Buffer size[df]     : %d (MB)", capture_opts->default_options.buffer_size);
 #endif
-    g_log(log_domain, log_level, "Monitor Mode[df]    : %s", capture_opts->default_options.monitor_mode?"TRUE":"FALSE");
+    ws_log(log_domain, log_level, "Monitor Mode[df]    : %s", capture_opts->default_options.monitor_mode?"TRUE":"FALSE");
 #ifdef HAVE_PCAP_REMOTE
-    g_log(log_domain, log_level, "Capture source[df]  : %s",
+    ws_log(log_domain, log_level, "Capture source[df]  : %s",
         capture_opts->default_options.src_type == CAPTURE_IFLOCAL ? "Local interface" :
         capture_opts->default_options.src_type == CAPTURE_IFREMOTE ? "Remote interface" :
         "Unknown");
     if (capture_opts->default_options.src_type == CAPTURE_IFREMOTE) {
-        g_log(log_domain, log_level, "Remote host[df]     : %s", capture_opts->default_options.remote_host ? capture_opts->default_options.remote_host : "(unspecified)");
-        g_log(log_domain, log_level, "Remote port[df]     : %s", capture_opts->default_options.remote_port ? capture_opts->default_options.remote_port : "(unspecified)");
+        ws_log(log_domain, log_level, "Remote host[df]     : %s", capture_opts->default_options.remote_host ? capture_opts->default_options.remote_host : "(unspecified)");
+        ws_log(log_domain, log_level, "Remote port[df]     : %s", capture_opts->default_options.remote_port ? capture_opts->default_options.remote_port : "(unspecified)");
     }
-    g_log(log_domain, log_level, "Authentication[df]  : %s",
+    ws_log(log_domain, log_level, "Authentication[df]  : %s",
         capture_opts->default_options.auth_type == CAPTURE_AUTH_NULL ? "Null" :
         capture_opts->default_options.auth_type == CAPTURE_AUTH_PWD ? "By username/password" :
         "Unknown");
     if (capture_opts->default_options.auth_type == CAPTURE_AUTH_PWD) {
-        g_log(log_domain, log_level, "Auth username[df]   : %s", capture_opts->default_options.auth_username ? capture_opts->default_options.auth_username : "(unspecified)");
-        g_log(log_domain, log_level, "Auth password[df]   : <hidden>");
+        ws_log(log_domain, log_level, "Auth username[df]   : %s", capture_opts->default_options.auth_username ? capture_opts->default_options.auth_username : "(unspecified)");
+        ws_log(log_domain, log_level, "Auth password[df]   : <hidden>");
     }
-    g_log(log_domain, log_level, "UDP data tfer[df]   : %u", capture_opts->default_options.datatx_udp);
-    g_log(log_domain, log_level, "No cap. RPCAP[df]   : %u", capture_opts->default_options.nocap_rpcap);
-    g_log(log_domain, log_level, "No cap. local[df]   : %u", capture_opts->default_options.nocap_local);
+    ws_log(log_domain, log_level, "UDP data tfer[df]   : %u", capture_opts->default_options.datatx_udp);
+    ws_log(log_domain, log_level, "No cap. RPCAP[df]   : %u", capture_opts->default_options.nocap_rpcap);
+    ws_log(log_domain, log_level, "No cap. local[df]   : %u", capture_opts->default_options.nocap_local);
 #endif
 #ifdef HAVE_PCAP_SETSAMPLING
-    g_log(log_domain, log_level, "Sampling meth. [df] : %d", capture_opts->default_options.sampling_method);
-    g_log(log_domain, log_level, "Sampling param.[df] : %d", capture_opts->default_options.sampling_param);
+    ws_log(log_domain, log_level, "Sampling meth. [df] : %d", capture_opts->default_options.sampling_method);
+    ws_log(log_domain, log_level, "Sampling param.[df] : %d", capture_opts->default_options.sampling_param);
 #endif
-    g_log(log_domain, log_level, "Timestamp type [df] : %s", capture_opts->default_options.timestamp_type ? capture_opts->default_options.timestamp_type : "(unspecified)");
-    g_log(log_domain, log_level, "SavingToFile        : %u", capture_opts->saving_to_file);
-    g_log(log_domain, log_level, "SaveFile            : %s", (capture_opts->save_file) ? capture_opts->save_file : "");
-    g_log(log_domain, log_level, "GroupReadAccess     : %u", capture_opts->group_read_access);
-    g_log(log_domain, log_level, "Fileformat          : %s", (capture_opts->use_pcapng) ? "PCAPNG" : "PCAP");
-    g_log(log_domain, log_level, "RealTimeMode        : %u", capture_opts->real_time_mode);
-    g_log(log_domain, log_level, "ShowInfo            : %u", capture_opts->show_info);
+    ws_log(log_domain, log_level, "Timestamp type [df] : %s", capture_opts->default_options.timestamp_type ? capture_opts->default_options.timestamp_type : "(unspecified)");
+    ws_log(log_domain, log_level, "SavingToFile        : %u", capture_opts->saving_to_file);
+    ws_log(log_domain, log_level, "SaveFile            : %s", (capture_opts->save_file) ? capture_opts->save_file : "");
+    ws_log(log_domain, log_level, "GroupReadAccess     : %u", capture_opts->group_read_access);
+    ws_log(log_domain, log_level, "Fileformat          : %s", (capture_opts->use_pcapng) ? "PCAPNG" : "PCAP");
+    ws_log(log_domain, log_level, "RealTimeMode        : %u", capture_opts->real_time_mode);
+    ws_log(log_domain, log_level, "ShowInfo            : %u", capture_opts->show_info);
 
-    g_log(log_domain, log_level, "MultiFilesOn        : %u", capture_opts->multi_files_on);
-    g_log(log_domain, log_level, "FileDuration    (%u) : %.3f", capture_opts->has_file_duration, capture_opts->file_duration);
-    g_log(log_domain, log_level, "FileInterval    (%u) : %u", capture_opts->has_file_interval, capture_opts->file_interval);
-    g_log(log_domain, log_level, "FilePackets     (%u) : %u", capture_opts->has_file_packets, capture_opts->file_packets);
-    g_log(log_domain, log_level, "RingNumFiles    (%u) : %u", capture_opts->has_ring_num_files, capture_opts->ring_num_files);
-    g_log(log_domain, log_level, "RingPrintFiles  (%u) : %s", capture_opts->print_file_names, (capture_opts->print_file_names ? capture_opts->print_name_to : ""));
+    ws_log(log_domain, log_level, "MultiFilesOn        : %u", capture_opts->multi_files_on);
+    ws_log(log_domain, log_level, "FileDuration    (%u) : %.3f", capture_opts->has_file_duration, capture_opts->file_duration);
+    ws_log(log_domain, log_level, "FileInterval    (%u) : %u", capture_opts->has_file_interval, capture_opts->file_interval);
+    ws_log(log_domain, log_level, "FilePackets     (%u) : %u", capture_opts->has_file_packets, capture_opts->file_packets);
+    ws_log(log_domain, log_level, "FileNameType        : %s", (capture_opts->has_nametimenum) ? "prefix_time_num.suffix"  : "prefix_num_time.suffix");
+    ws_log(log_domain, log_level, "RingNumFiles    (%u) : %u", capture_opts->has_ring_num_files, capture_opts->ring_num_files);
+    ws_log(log_domain, log_level, "RingPrintFiles  (%u) : %s", capture_opts->print_file_names, (capture_opts->print_file_names ? capture_opts->print_name_to : ""));
 
-    g_log(log_domain, log_level, "AutostopFiles   (%u) : %u", capture_opts->has_autostop_files, capture_opts->autostop_files);
-    g_log(log_domain, log_level, "AutostopPackets (%u) : %u", capture_opts->has_autostop_packets, capture_opts->autostop_packets);
-    g_log(log_domain, log_level, "AutostopFilesize(%u) : %u (KB)", capture_opts->has_autostop_filesize, capture_opts->autostop_filesize);
-    g_log(log_domain, log_level, "AutostopDuration(%u) : %.3f", capture_opts->has_autostop_duration, capture_opts->autostop_duration);
+    ws_log(log_domain, log_level, "AutostopFiles   (%u) : %u", capture_opts->has_autostop_files, capture_opts->autostop_files);
+    ws_log(log_domain, log_level, "AutostopPackets (%u) : %u", capture_opts->has_autostop_packets, capture_opts->autostop_packets);
+    ws_log(log_domain, log_level, "AutostopWrittenPackets (%u) : %u", capture_opts->has_autostop_written_packets, capture_opts->autostop_written_packets);
+    ws_log(log_domain, log_level, "AutostopFilesize(%u) : %u (KB)", capture_opts->has_autostop_filesize, capture_opts->autostop_filesize);
+    ws_log(log_domain, log_level, "AutostopDuration(%u) : %.3f", capture_opts->has_autostop_duration, capture_opts->autostop_duration);
+    ws_log(log_domain, log_level, "Temporary Directory  : %s", capture_opts->temp_dir && capture_opts->temp_dir[0] ? capture_opts->temp_dir : g_get_tmp_dir());
 }
 
 /*
@@ -303,8 +334,8 @@ set_autostop_criterion(capture_options *capture_opts, const char *autostoparg)
         capture_opts->has_autostop_files = TRUE;
         capture_opts->autostop_files = get_positive_int(p,"autostop files");
     } else if (strcmp(autostoparg,"packets") == 0) {
-        capture_opts->has_autostop_packets = TRUE;
-        capture_opts->autostop_packets = get_positive_int(p,"packet count");
+        capture_opts->has_autostop_written_packets = TRUE;
+        capture_opts->autostop_written_packets = get_positive_int(p,"packet write count");
     } else {
         return FALSE;
     }
@@ -411,6 +442,9 @@ get_ring_arguments(capture_options *capture_opts, const char *arg)
     } else if (strcmp(arg,"interval") == 0) {
         capture_opts->has_file_interval = TRUE;
         capture_opts->file_interval = get_positive_int(p, "ring buffer interval");
+    } else if (strcmp(arg,"nametimenum") == 0) {
+        int val = get_positive_int(p, "file name: time before num");
+        capture_opts->has_nametimenum = (val > 1);
     } else if (strcmp(arg,"packets") == 0) {
         capture_opts->has_file_packets = TRUE;
         capture_opts->file_packets = get_positive_int(p, "ring buffer packet count");
@@ -536,7 +570,7 @@ capture_opts_generate_display_name(const char *friendly_name,
      * On UN*X, however, users are more used to interface names,
      * and may find it helpful to see them.
      */
-    return g_strdup_printf("%s: %s", friendly_name, name);
+    return ws_strdup_printf("%s: %s", friendly_name, name);
 }
 #endif
 
@@ -562,6 +596,7 @@ fill_in_interface_opts_from_ifinfo(interface_options *interface_opts,
         interface_opts->descr = NULL;
         interface_opts->display_name = g_strdup(if_info->name);
     }
+    interface_opts->ifname = NULL;
     interface_opts->if_type = if_info->type;
     interface_opts->extcap = g_strdup(if_info->extcap);
 }
@@ -615,6 +650,28 @@ fill_in_interface_opts_from_ifinfo_by_name(interface_options *interface_opts,
                 matched = TRUE;
                 break;
             }
+
+#ifdef _WIN32
+            /*
+             * On Windows, we store interface names in preferences as:
+             *  friendlyname (name)
+             * Do we have a case-insensitive match for that?
+             */
+            if (if_info->friendly_name != NULL) {
+                GString* combined_name = g_string_new(if_info->friendly_name);
+                g_string_append_printf(combined_name, " (%s)", if_info->name);
+                if (g_ascii_strcasecmp(combined_name->str, name) == 0) {
+                    /*
+                     * Yes.
+                     */
+                    matched = TRUE;
+                }
+                g_string_free(combined_name, TRUE);
+                if (matched == TRUE) {
+                    break;
+                }
+            }
+#endif
         }
 
         if (!matched) {
@@ -739,6 +796,7 @@ capture_opts_add_iface_opt(capture_options *capture_opts, const char *optarg_str
             interface_opts.descr = NULL;
             interface_opts.hardware = NULL;
             interface_opts.display_name = g_strdup(optarg_str_p);
+            interface_opts.ifname = NULL;
             interface_opts.if_type = capture_opts->default_options.if_type;
             interface_opts.extcap = g_strdup(capture_opts->default_options.extcap);
         }
@@ -753,6 +811,9 @@ capture_opts_add_iface_opt(capture_options *capture_opts, const char *optarg_str
     interface_opts.extcap_args = NULL;
     interface_opts.extcap_pid = WS_INVALID_PID;
     interface_opts.extcap_pipedata = NULL;
+    interface_opts.extcap_stderr = NULL;
+    interface_opts.extcap_stdout_watch = 0;
+    interface_opts.extcap_stderr_watch = 0;
 #ifdef _WIN32
     interface_opts.extcap_pipe_h = INVALID_HANDLE_VALUE;
     interface_opts.extcap_control_in_h = INVALID_HANDLE_VALUE;
@@ -788,18 +849,12 @@ capture_opts_add_iface_opt(capture_options *capture_opts, const char *optarg_str
 
 
 int
-capture_opts_add_opt(capture_options *capture_opts, int opt, const char *optarg_str_p, gboolean *start_capture)
+capture_opts_add_opt(capture_options *capture_opts, int opt, const char *optarg_str_p)
 {
     int status, snaplen;
+    ws_statb64 fstat;
 
     switch(opt) {
-    case LONGOPT_NUM_CAP_COMMENT:  /* capture comment */
-        if (capture_opts->capture_comment) {
-            cmdarg_err("--capture-comment can be set only once per file");
-            return 1;
-        }
-        capture_opts->capture_comment = g_strdup(optarg_str_p);
-        break;
     case 'a':        /* autostop criteria */
         if (set_autostop_criterion(capture_opts, optarg_str_p) == FALSE) {
             cmdarg_err("Invalid or unknown -a flag \"%s\"", optarg_str_p);
@@ -877,9 +932,6 @@ capture_opts_add_opt(capture_options *capture_opts, int opt, const char *optarg_
         }
         break;
 #endif
-    case 'k':        /* Start capture immediately */
-        *start_capture = TRUE;
-        break;
     /*case 'l':*/    /* Automatic scrolling in live capture mode */
 #ifdef HAVE_PCAP_SETSAMPLING
     case 'm':
@@ -978,25 +1030,82 @@ capture_opts_add_opt(capture_options *capture_opts, int opt, const char *optarg_
             }
         }
         break;
+    case LONGOPT_COMPRESS_TYPE:  /* compress type */
+        if (capture_opts->compress_type) {
+            cmdarg_err("--compress-type can be set only once");
+            return 1;
+        }
+        if (strcmp(optarg_str_p, "none") == 0) {
+            ;
+        } else if (strcmp(optarg_str_p, "gzip") == 0) {
+#ifdef HAVE_ZLIB
+            ;
+#else
+            cmdarg_err("'gzip' compression is not supported");
+            return 1;
+#endif
+        } else {
+#ifdef HAVE_ZLIB
+            cmdarg_err("parameter of --compress-type can be 'none' or 'gzip'");
+#else
+            cmdarg_err("parameter of --compress-type can only be 'none'");
+#endif
+            return 1;
+        }
+        capture_opts->compress_type = g_strdup(optarg_str_p);
+        break;
+    case LONGOPT_CAPTURE_TMPDIR:  /* capture temporary directory */
+        if (capture_opts->temp_dir) {
+            cmdarg_err("--temp-dir can be set only once");
+            return 1;
+        }
+        if (ws_stat64(optarg_str_p, &fstat) < 0) {
+            cmdarg_err("Can't set temporary directory %s: %s",
+                    optarg_str_p, g_strerror(errno));
+            return 1;
+        }
+        if (!S_ISDIR(fstat.st_mode)) {
+            cmdarg_err("Can't set temporary directory %s: not a directory",
+                    optarg_str_p);
+            return 1;
+        }
+#ifdef S_IRWXU
+        if ((fstat.st_mode & S_IRWXU) != S_IRWXU) {
+            cmdarg_err("Can't set temporary directory %s: not a writable directory",
+                    optarg_str_p);
+            return 1;
+        }
+#endif /* S_IRWXU */
+        capture_opts->temp_dir = g_strdup(optarg_str_p);
+        break;
     default:
         /* the caller is responsible to send us only the right opt's */
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     return 0;
 }
 
-void
-capture_opts_print_if_capabilities(if_capabilities_t *caps, char *name, int queries)
+int
+capture_opts_print_if_capabilities(if_capabilities_t *caps,
+                                   interface_options *interface_opts,
+                                   int queries)
 {
     GList *lt_entry, *ts_entry;
 
     if (queries & CAPS_QUERY_LINK_TYPES) {
+        if (caps->data_link_types == NULL) {
+            cmdarg_err("The capture device \"%s\" has no data link types.",
+                       interface_opts->name);
+            return IFACE_HAS_NO_LINK_TYPES;
+        }
         if (caps->can_set_rfmon)
             printf("Data link types of interface %s when %sin monitor mode (use option -y to set):\n",
-                   name, (queries & CAPS_MONITOR_MODE) ? "" : "not ");
+                   interface_opts->name,
+                   (interface_opts->monitor_mode) ? "" : "not ");
         else
-            printf("Data link types of interface %s (use option -y to set):\n", name);
+            printf("Data link types of interface %s (use option -y to set):\n",
+                   interface_opts->name);
         for (lt_entry = caps->data_link_types; lt_entry != NULL;
              lt_entry = g_list_next(lt_entry)) {
             data_link_info_t *data_link_info = (data_link_info_t *)lt_entry->data;
@@ -1010,6 +1119,11 @@ capture_opts_print_if_capabilities(if_capabilities_t *caps, char *name, int quer
     }
 
     if (queries & CAPS_QUERY_TIMESTAMP_TYPES) {
+        if (caps->timestamp_types == NULL) {
+            cmdarg_err("The capture device \"%s\" has no timestamp types.",
+                       interface_opts->name);
+            return IFACE_HAS_NO_TIMESTAMP_TYPES;
+        }
         printf("Timestamp types of the interface (use option --time-stamp-type to set):\n");
         for (ts_entry = caps->timestamp_types; ts_entry != NULL;
              ts_entry = g_list_next(ts_entry)) {
@@ -1022,6 +1136,7 @@ capture_opts_print_if_capabilities(if_capabilities_t *caps, char *name, int quer
             printf("\n");
         }
     }
+    return EXIT_SUCCESS;
 }
 
 /* Print an ASCII-formatted list of interfaces. */
@@ -1190,6 +1305,7 @@ capture_opts_del_iface(capture_options *capture_opts, guint if_index)
     g_free(interface_opts->descr);
     g_free(interface_opts->hardware);
     g_free(interface_opts->display_name);
+    g_free(interface_opts->ifname);
     g_free(interface_opts->cfilter);
     g_free(interface_opts->timestamp_type);
     g_free(interface_opts->extcap);
@@ -1197,8 +1313,10 @@ capture_opts_del_iface(capture_options *capture_opts, guint if_index)
     if (interface_opts->extcap_args)
         g_hash_table_unref(interface_opts->extcap_args);
     if (interface_opts->extcap_pid != WS_INVALID_PID)
-        ws_pipe_close((ws_pipe_t *) interface_opts->extcap_pipedata);
+        ws_warning("Extcap still running during interface delete");
     g_free(interface_opts->extcap_pipedata);
+    if (interface_opts->extcap_stderr)
+        g_string_free(interface_opts->extcap_stderr, TRUE);
     g_free(interface_opts->extcap_control_in);
     g_free(interface_opts->extcap_control_out);
 #ifdef HAVE_PCAP_REMOTE
@@ -1232,9 +1350,10 @@ collect_ifaces(capture_options *capture_opts)
     /* Now fill the list up again. */
     for (i = 0; i < capture_opts->all_ifaces->len; i++) {
         device = &g_array_index(capture_opts->all_ifaces, interface_t, i);
-        if (!device->hidden && device->selected) {
+        if (device->selected) {
             interface_opts.name = g_strdup(device->name);
             interface_opts.descr = g_strdup(device->friendly_name);
+            interface_opts.ifname = NULL;
             interface_opts.hardware = g_strdup(device->vendor_description);
             interface_opts.display_name = g_strdup(device->display_name);
             interface_opts.linktype = device->active_dlt;
@@ -1252,6 +1371,7 @@ collect_ifaces(capture_options *capture_opts)
             if (interface_opts.extcap_args)
                 g_hash_table_ref(interface_opts.extcap_args);
             interface_opts.extcap_pipedata = NULL;
+            interface_opts.extcap_stderr = NULL;
 #ifdef _WIN32
             interface_opts.extcap_pipe_h = INVALID_HANDLE_VALUE;
             interface_opts.extcap_control_in_h = INVALID_HANDLE_VALUE;

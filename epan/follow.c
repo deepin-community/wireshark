@@ -134,6 +134,7 @@ follow_reset_stream(follow_info_t* info)
     info->server_ip.len = 0;
     info->fragments[0] = info->fragments[1] = NULL;
     info->seq[0] = info->seq[1] = 0;
+    info->substream_id = SUBSTREAM_UNUSED;
 }
 
 void
@@ -177,7 +178,7 @@ follow_info_free(follow_info_t* follow_info)
 
 tap_packet_status
 follow_tvb_tap_listener(void *tapdata, packet_info *pinfo,
-                      epan_dissect_t *edt _U_, const void *data)
+                      epan_dissect_t *edt _U_, const void *data, tap_flags_t flags _U_)
 {
     follow_record_t *follow_record;
     follow_info_t *follow_info = (follow_info_t *)tapdata;
@@ -190,6 +191,7 @@ follow_tvb_tap_listener(void *tapdata, packet_info *pinfo,
                                               tvb_get_ptr(next_tvb, 0, -1),
                                               tvb_captured_length(next_tvb));
     follow_record->packet_num = pinfo->fd->num;
+    follow_record->abs_ts = pinfo->fd->abs_ts;
 
     if (follow_info->client_port == 0) {
         follow_info->client_port = pinfo->srcport;

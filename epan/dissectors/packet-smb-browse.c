@@ -553,11 +553,11 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		proto_tree_add_uint_format_value(tree, hf_periodicity, tvb, offset, 4,
 		    periodicity,
 		    "%s",
-		    signed_time_msecs_to_str(wmem_packet_scope(), periodicity));
+		    signed_time_msecs_to_str(pinfo->pool, periodicity));
 		offset += 4;
 
 		/* server name */
-		host_name = tvb_get_stringzpad(wmem_packet_scope(), tvb, offset, HOST_NAME_LEN, ENC_CP437|ENC_NA);
+		host_name = tvb_get_stringzpad(pinfo->pool, tvb, offset, HOST_NAME_LEN, ENC_CP437|ENC_NA);
 		col_append_fstr(pinfo->cinfo, COL_INFO, " %s", host_name);
 		proto_tree_add_string_format(tree, hf_server_name,
 			tvb, offset, HOST_NAME_LEN,
@@ -629,7 +629,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		offset += 1;
 
 		/* name of computer to which to send reply */
-		computer_name = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &namelen, ENC_ASCII);
+		computer_name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &namelen, ENC_ASCII);
 		proto_tree_add_string(tree, hf_response_computer_name,
 			tvb, offset, namelen, computer_name);
 		col_append_fstr(pinfo->cinfo, COL_INFO, " %s", computer_name);
@@ -650,7 +650,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		proto_tree_add_uint_format_value(tree, hf_server_uptime,
 		    tvb, offset, 4, uptime,
 		    "%s",
-		    signed_time_msecs_to_str(wmem_packet_scope(), uptime));
+		    signed_time_msecs_to_str(pinfo->pool, uptime));
 		offset += 4;
 
 		/* next 4 bytes must be zero */
@@ -659,7 +659,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		/* server name */
 		namelen = tvb_strsize(tvb, offset);
 		proto_tree_add_item(tree, hf_server_name,
-			tvb, offset, namelen, ENC_ASCII|ENC_NA);
+			tvb, offset, namelen, ENC_ASCII);
 		break;
 
 	case BROWSE_BACKUP_LIST_REQUEST:
@@ -686,7 +686,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		for (i = 0; i < server_count; i++) {
 			namelen = tvb_strsize(tvb, offset);
 			proto_tree_add_item(tree, hf_backup_server,
-				tvb, offset, namelen, ENC_ASCII|ENC_NA);
+				tvb, offset, namelen, ENC_ASCII);
 			offset += namelen;
 		}
 		break;
@@ -695,7 +695,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		/* master browser server name */
 		namelen = tvb_strsize(tvb, offset);
 		proto_tree_add_item(tree, hf_mb_server_name,
-			tvb, offset, namelen, ENC_ASCII|ENC_NA);
+			tvb, offset, namelen, ENC_ASCII);
 		break;
 
 	case BROWSE_RESETBROWSERSTATE_ANNOUNCEMENT: {
@@ -714,7 +714,7 @@ dissect_mailslot_browse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		/* name of browser to promote */
 		namelen = tvb_strsize(tvb, offset);
 		proto_tree_add_item(tree, hf_browser_to_promote,
-			tvb, offset, namelen, ENC_ASCII|ENC_NA);
+			tvb, offset, namelen, ENC_ASCII);
 		break;
 	}
 	return tvb_captured_length(tvb);
@@ -797,15 +797,15 @@ dissect_mailslot_lanman(tvbuff_t *tvb, packet_info *pinfo, proto_tree *parent_tr
 		proto_tree_add_uint_format_value(tree, hf_periodicity, tvb, offset, 2,
 		    periodicity,
 		    "%s",
-		    signed_time_msecs_to_str(wmem_packet_scope(), periodicity));
+		    signed_time_msecs_to_str(pinfo->pool, periodicity));
 		offset += 2;
 
 		/* server name */
-		host_name = tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &namelen, ENC_CP437|ENC_NA);
+		host_name = tvb_get_stringz_enc(pinfo->pool, tvb, offset, &namelen, ENC_CP437|ENC_NA);
 		col_append_fstr(pinfo->cinfo, COL_INFO, " %s", host_name);
 
 		proto_tree_add_item(tree, hf_server_name,
-			tvb, offset, namelen, ENC_ASCII|ENC_NA);
+			tvb, offset, namelen, ENC_ASCII);
 		offset += namelen;
 
 		/* master browser server name or server comment */

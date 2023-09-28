@@ -1,3 +1,227 @@
+wireshark (4.0.8-1) unstable; urgency=medium
+
+  * New upstream version
+    - security fixes:
+      - CBOR dissector crash (CVE-2023-4512)
+      - BT SDP dissector infinite loop (CVE-2023-4511)
+      - BT SDP dissector memory leak (CVE-2023-4513)
+      - CP2179 dissector crash
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 24 Aug 2023 15:44:26 +0200
+
+wireshark (4.0.7-1) unstable; urgency=medium
+
+  * New upstream version
+    - security fixes:
+      - Kafka dissector crash (CVE-2023-3648)
+      - iSCSI dissector crash (CVE-2023-3649)
+  * Drop wireshark-gtk transitional package (Closes: #1038267)
+  * Ignore test failure on hppa, like on many other exotic architectures
+    (Closes: #1025875)
+
+ -- Balint Reczey <balint@balintreczey.hu>  Fri, 14 Jul 2023 23:03:18 +0200
+
+wireshark (4.0.6-1) unstable; urgency=medium
+
+  * Upload to unstable
+
+ -- Balint Reczey <balint@balintreczey.hu>  Wed, 14 Jun 2023 12:39:46 +0200
+
+wireshark (4.0.6-1~exp1) experimental; urgency=medium
+
+  * New upstream version 4.0.6
+    - security fixes:
+      - Candump log file parser crash (CVE-2023-2855)
+      - BLF file parser crash (CVE-2023-2857)
+      - GDSDB dissector infinite loop
+      - NetScaler file parser crash (CVE-2023-2858)
+      - VMS TCPIPtrace file parser crash (CVE-2023-2856)
+      - BLF file parser crash (CVE-2023-2854)
+      - RTPS dissector crash (CVE-2023-0666)
+      - IEEE C37.118 Synchrophasor dissector crash (CVE-2023-0668)
+      - XRA dissector infinite loop
+  * Fix mismatched Lintian overrides
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 25 May 2023 23:49:45 +0200
+
+wireshark (4.0.5-1~exp1) experimental; urgency=medium
+
+  [ Balint Reczey ]
+  * New upstream version 4.0.4
+    - security fixes:
+      -  ISO 15765 and ISO 10681 dissector crash (CVE-2023-1161)
+         (Closes: #1033756)
+  * Drop 0001-tests-Get-tests-working-with-Python-3.11-except-with.patch
+    integrated to the new upstream release.
+  * New upstream version 4.0.5
+    - security fixes (Closes: #1034721):
+      - RPCoRDMA dissector crash (CVE-2023-1992)
+      - LISP dissector large loop (CVE-2023-1993)
+      - GQUIC dissector crash (CVE-2023-1994)
+
+  [ Remus-Gabriel Chelu ]
+  * Adding Romanian debconf templates translation (Closes: #1033792)
+
+ -- Balint Reczey <balint@balintreczey.hu>  Sat, 22 Apr 2023 20:29:22 +0200
+
+wireshark (4.0.3-1) unstable; urgency=medium
+
+  * New upstream version
+    - security fixes:
+      - EAP dissector crash
+      - NFS dissector memory leak
+      - Dissection engine crash
+      - GNW dissector crash
+      - iSCSI dissector crash
+      - Multiple dissector excessive loops
+      - TIPC dissector crash
+  * debian/patches: Cherry-pick upstream patch to fix tests with Python 3.11
+
+ -- Balint Reczey <balint@balintreczey.hu>  Fri, 20 Jan 2023 11:25:23 +0100
+
+wireshark (4.0.2-1) unstable; urgency=medium
+
+  * New upstream version
+    - security fixes:
+      - Multiple dissector infinite loops
+      - Kafka dissector memory exhaustion
+
+ -- Balint Reczey <balint@balintreczey.hu>  Fri, 09 Dec 2022 14:53:35 +0100
+
+wireshark (4.0.1-1) unstable; urgency=medium
+
+  * New upstream version
+  * wireshark-common: Ship wifidump(1) man page
+
+ -- Balint Reczey <balint@balintreczey.hu>  Fri, 28 Oct 2022 20:37:12 +0200
+
+wireshark (4.0.0-1) unstable; urgency=medium
+
+  * Upload to unstable
+
+ -- Balint Reczey <balint@balintreczey.hu>  Sun, 09 Oct 2022 14:39:44 +0200
+
+wireshark (4.0.0-1~exp0) experimental; urgency=medium
+
+  * New upstream version
+  * Refresh patches
+  * Update shipped headers
+  * Fix mismatched Lintian overrides
+  * debian/control: Make libwsutil-dev break/replace libwireshark-dev (<< 4.0.0)
+    Libwsutil now ships header files previously present in libwireshark-dev.
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 06 Oct 2022 12:47:31 +0200
+
+wireshark (3.6.8-1) unstable; urgency=medium
+
+  * New upstream version
+    - security fixes:
+     - F5 Ethernet Trailer dissector infinite loop
+  * Update symbols
+  * debian/copyright: Drop unused ISC copyright paragraph
+
+ -- Balint Reczey <balint@balintreczey.hu>  Fri, 09 Sep 2022 10:53:46 +0200
+
+wireshark (3.6.7-1) unstable; urgency=medium
+
+  * New upstream version
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 28 Jul 2022 20:18:52 +0200
+
+wireshark (3.6.6-1) unstable; urgency=medium
+
+  * New upstream version
+  * Update Lintian overrides to conform to the new format
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 30 Jun 2022 21:48:06 +0200
+
+wireshark (3.6.5-1) unstable; urgency=medium
+
+  * New upstream version
+  * debian/control: Set Rules-Requires-Root: no
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 05 May 2022 21:13:31 +0200
+
+wireshark (3.6.3-1) unstable; urgency=medium
+
+  * New upstream version
+  * Update symbols
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 24 Mar 2022 20:44:04 +0100
+
+wireshark (3.6.2-2) unstable; urgency=medium
+
+  * debian/rules: Ignore tests again on s390x, they are still failing.
+    Thanks to Matthias Klose
+
+ -- Balint Reczey <balint@balintreczey.hu>  Fri, 04 Mar 2022 17:13:20 +0100
+
+wireshark (3.6.2-1) unstable; urgency=medium
+
+  [ Balint Reczey ]
+  * New upstream version
+    - security fixes:
+      - RTMPT dissector infinite loop (CVE-2021-4185)
+      - BitTorrent DHT dissector infinite loop (CVE-2021-4184)
+      - pcapng file parser crash (CVE-2021-4183)
+      - RFC 7468 file parser infinite loop (CVE-2021-4182)
+      - Sysdig Event dissector crash (CVE-2021-4181)
+      - Kafka dissector infinite loop
+      - RTMPT dissector infinite loop
+      - Large loops in multiple dissectors
+      - PVFS dissector crash
+      - CSN.1 dissector crash
+      - CMS dissector crash
+  * debian/rules: Don't ignore test results on riscv64, they are passing now
+  * debian/watch: Update URL to find releses
+  * Update symbols
+
+ -- Balint Reczey <balint@balintreczey.hu>  Sat, 12 Feb 2022 00:34:42 +0100
+
+wireshark (3.6.0-1) unstable; urgency=medium
+
+  [ Jenkins ]
+  * Use canonical URL in Vcs-Browser, Vcs-Git.
+    Changes-By: lintian-brush
+    Fixes: lintian: vcs-field-not-canonical
+    See-also: https://lintian.debian.org/tags/vcs-field-not-canonical.html
+  * Update renamed lintian tag names in lintian overrides.
+    Changes-By: lintian-brush
+    Fixes: lintian: renamed-tag
+    See-also: https://lintian.debian.org/tags/renamed-tag.html
+
+  [ Balint Reczey ]
+  * debian/control: Don't build-depend on libpcre3-dev.
+    It is obsolete as a package and Wireshark also already relies on GLib's
+    regular expression implementation. (Closes: #999929)
+  * New major upstream release:
+     - https://www.wireshark.org/docs/relnotes/wireshark-3.6.0.html
+  * Update symbols files
+  * debian/rules: Run dh_dwz with debhelper (>= 12.6) only
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 25 Nov 2021 16:16:55 +0100
+
+wireshark (3.6.0~rc1-0exp1) experimental; urgency=medium
+
+  * debian/changelog: Break too long line
+  * debian/rules: Merge identical override_dh_auto_configure-{arch|indep}
+    targets
+  * debian/rules: Pass -a and -i in *-arch and *-indep overrides respectively
+  * debian/wireshark-common.post{inst,rm}: Use "command -v" instead of "which"
+    (Closes: #996144)
+  * New upstream release candidate
+  * Refresh patches
+  * Update files to install
+  * Install files from debian/tmp instead of from source dir.
+    This silences dh_missing.
+  * debian/libwsutil-dev.install: Ship ws_log_defs.h
+  * Sort .install and .manpages files
+  * debian/control: Tidy up using "cme fix"
+  * debian/control: Don't (build-)depend on libtool and bison
+  * debian/rules: Update version string override
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 14 Oct 2021 22:00:47 +0200
+
 wireshark (3.4.9-1) unstable; urgency=medium
 
   [ Debian Janitor ]
@@ -20,7 +244,8 @@ wireshark (3.4.9-1) unstable; urgency=medium
     - Pass build idl2deb man page in arch:any build, too
   * Bump standards version, no changes were needed
   * Drop obsoleted override for not applied patch
-  * Override false positive missing-build-dependency-for-dh-addon Lintian warning
+  * Override false positive missing-build-dependency-for-dh-addon Lintian
+    warning
 
  -- Balint Reczey <balint@balintreczey.hu>  Sat, 09 Oct 2021 00:03:22 +0200
 

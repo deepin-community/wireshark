@@ -157,6 +157,10 @@ static gboolean visual_dump_finish(wtap_dumper *wdh, int *err,
     gchar **err_info);
 static void visual_dump_free(wtap_dumper *wdh);
 
+static int visual_file_type_subtype = -1;
+
+void register_visual(void);
+
 
 /* Open a file for reading */
 wtap_open_return_val visual_open(wtap *wth, int *err, gchar **err_info)
@@ -189,7 +193,7 @@ wtap_open_return_val visual_open(wtap *wth, int *err, gchar **err_info)
     if (vfile_hdr.file_version != 1)
     {
         *err = WTAP_ERR_UNSUPPORTED;
-        *err_info = g_strdup_printf("visual: file version %u unsupported", vfile_hdr.file_version);
+        *err_info = ws_strdup_printf("visual: file version %u unsupported", vfile_hdr.file_version);
         return WTAP_OPEN_ERROR;
     }
 
@@ -230,13 +234,13 @@ wtap_open_return_val visual_open(wtap *wth, int *err, gchar **err_info)
 
     default:
         *err = WTAP_ERR_UNSUPPORTED;
-        *err_info = g_strdup_printf("visual: network type %u unknown or unsupported",
+        *err_info = ws_strdup_printf("visual: network type %u unknown or unsupported",
                                      vfile_hdr.media_type);
         return WTAP_OPEN_ERROR;
     }
 
     /* Fill in the wiretap struct with data from the file header */
-    wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_VISUAL_NETWORKS;
+    wth->file_type_subtype = visual_file_type_subtype;
     wth->file_encap = encap;
     wth->snapshot_length = pletoh16(&vfile_hdr.max_length);
 
@@ -246,7 +250,7 @@ wtap_open_return_val visual_open(wtap *wth, int *err, gchar **err_info)
     wth->file_tsprec = WTAP_TSPREC_MSEC;
 
     /* Add Visual-specific information to the wiretap struct for later use. */
-    visual = (struct visual_read_info *)g_malloc(sizeof(struct visual_read_info));
+    visual = g_new(struct visual_read_info, 1);
     wth->priv = (void *)visual;
     visual->num_pkts = pletoh32(&vfile_hdr.num_pkts);
     visual->start_time = pletoh32(&vfile_hdr.start_time);
@@ -327,6 +331,7 @@ visual_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
     packet_size = pletoh16(&vpkt_hdr.incl_len);
 
     rec->rec_type = REC_TYPE_PACKET;
+    rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
     rec->presence_flags = WTAP_HAS_TS|WTAP_HAS_CAP_LEN;
 
     /* Set the packet time and length. */
@@ -364,7 +369,7 @@ visual_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
         if (rec->rec_header.packet_header.len < 4)
         {
             *err = WTAP_ERR_BAD_FILE;
-            *err_info = g_strdup_printf("visual: Ethernet packet has %u-byte original packet, less than the FCS length",
+            *err_info = ws_strdup_printf("visual: Ethernet packet has %u-byte original packet, less than the FCS length",
                         rec->rec_header.packet_header.len);
             return FALSE;
         }
@@ -380,7 +385,7 @@ visual_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
         if (rec->rec_header.packet_header.len < 2)
         {
             *err = WTAP_ERR_BAD_FILE;
-            *err_info = g_strdup_printf("visual: Cisco HDLC packet has %u-byte original packet, less than the FCS length",
+            *err_info = ws_strdup_printf("visual: Cisco HDLC packet has %u-byte original packet, less than the FCS length",
                         rec->rec_header.packet_header.len);
             return FALSE;
         }
@@ -401,7 +406,7 @@ visual_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
         if (rec->rec_header.packet_header.len < 2)
         {
             *err = WTAP_ERR_BAD_FILE;
-            *err_info = g_strdup_printf("visual: Frame Relay packet has %u-byte original packet, less than the FCS length",
+            *err_info = ws_strdup_printf("visual: Frame Relay packet has %u-byte original packet, less than the FCS length",
                         rec->rec_header.packet_header.len);
             return FALSE;
         }
@@ -416,7 +421,7 @@ visual_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
         if (rec->rec_header.packet_header.len < 2)
         {
             *err = WTAP_ERR_BAD_FILE;
-            *err_info = g_strdup_printf("visual: Frame Relay packet has %u-byte original packet, less than the FCS length",
+            *err_info = ws_strdup_printf("visual: Frame Relay packet has %u-byte original packet, less than the FCS length",
                         rec->rec_header.packet_header.len);
             return FALSE;
         }
@@ -512,7 +517,7 @@ visual_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
         /* Probably a corrupt capture file; don't blow up trying
           to allocate space for an immensely-large packet. */
         *err = WTAP_ERR_BAD_FILE;
-        *err_info = g_strdup_printf("visual: File has %u-byte packet, bigger than maximum of %u",
+        *err_info = ws_strdup_printf("visual: File has %u-byte packet, bigger than maximum of %u",
             packet_size, WTAP_MAX_PACKET_SIZE_STANDARD);
         return FALSE;
     }
@@ -576,7 +581,7 @@ visual_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
 /* Check for media types that may be written in Visual file format.
    Returns 0 if the specified encapsulation type is supported,
    an error indication otherwise. */
-int visual_dump_can_write_encap(int encap)
+static int visual_dump_can_write_encap(int encap)
 {
     /* Per-packet encapsulations aren't supported. */
     if (encap == WTAP_ENCAP_PER_PACKET)
@@ -602,7 +607,7 @@ int visual_dump_can_write_encap(int encap)
 /* Open a file for writing.
    Returns TRUE on success, FALSE on failure; sets "*err" to an
    error code on failure */
-gboolean visual_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
+static gboolean visual_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
 {
     struct visual_write_info *visual;
 
@@ -612,7 +617,7 @@ gboolean visual_dump_open(wtap_dumper *wdh, int *err, gchar **err_info _U_)
 
     /* Create a struct to hold file information for the duration
        of the write */
-    visual = (struct visual_write_info *)g_malloc(sizeof(struct visual_write_info));
+    visual = g_new(struct visual_write_info, 1);
     wdh->priv = (void *)visual;
     visual->index_table_index = 0;
     visual->index_table_size = 1024;
@@ -804,7 +809,7 @@ static gboolean visual_dump_finish(wtap_dumper *wdh, int *err,
     vfile_hdr.max_length = GUINT16_TO_LE(65535);
     vfile_hdr.file_flags = GUINT16_TO_LE(1);  /* indexes are present */
     vfile_hdr.file_version = GUINT16_TO_LE(1);
-    g_strlcpy(vfile_hdr.description, "Wireshark file", 64);
+    (void) g_strlcpy(vfile_hdr.description, "Wireshark file", 64);
 
     /* Translate the encapsulation type */
     switch (wdh->encap)
@@ -855,6 +860,31 @@ static void visual_dump_free(wtap_dumper *wdh)
         /* Free the index table memory. */
         g_free(visual->index_table);
     }
+}
+
+static const struct supported_block_type visual_blocks_supported[] = {
+    /*
+     * We support packet blocks, with no comments or other options.
+     */
+    { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info visual_info = {
+    "Visual Networks traffic capture", "visual", NULL, NULL,
+    TRUE, BLOCKS_SUPPORTED(visual_blocks_supported),
+    visual_dump_can_write_encap, visual_dump_open, NULL
+};
+
+void register_visual(void)
+{
+    visual_file_type_subtype = wtap_register_file_type_subtype(&visual_info);
+
+    /*
+     * Register name for backwards compatibility with the
+     * wtap_filetypes table in Lua.
+     */
+    wtap_register_backwards_compatibility_lua_name("VISUAL_NETWORKS",
+                                                   visual_file_type_subtype);
 }
 
 /*

@@ -1,4 +1,5 @@
-/* exceptions.h
+/** @file
+ *
  * Wireshark's exceptions.
  *
  * Wireshark - Network traffic analyzer
@@ -12,6 +13,7 @@
 #define __EXCEPTIONS_H__
 
 #include "except.h"
+#include <wsutil/ws_assert.h>
 
 /* Wireshark has only one exception group, to make these macros simple */
 #define XCEPT_GROUP_WIRESHARK 1
@@ -48,8 +50,12 @@
 #define ReportedBoundsError	3
 
 /**
-    Index is beyond the fragment length but not the reported length.
-    This means that the packet wasn't reassembled.
+    Index is beyond the contained length, and possibly the reported length,
+    of the tvbuff, but we believe it is an unreassembled fragment, either
+    because the "this is an unreassembled fragment" flag or pinfo->fragmented
+    is set.  This means that the packet wasn't reassembled, but could possibly
+    be correctly dissected if reassembly preferences were changed.  It is
+    therefore not reported as a "Malformed packet".
 **/
 #define FragmentBoundsError	4
 
@@ -398,7 +404,7 @@
 #define RETHROW                                     \
     {                                               \
         /* check we're in a catch block */          \
-        g_assert(except_state == EXCEPT_CAUGHT);    \
+        ws_assert(except_state == EXCEPT_CAUGHT);    \
 	/* we can't use except_rethrow here, as that pops a catch block \
 	 * off the stack, and we don't want to do that, because we want to \
 	 * excecute the FINALLY {} block first.     \

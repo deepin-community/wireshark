@@ -17,7 +17,7 @@ if [ -z "$TEST_TYPE" ] ; then
 fi
 
 DATE=/bin/date
-BASE_NAME=$TEST_TYPE-`$DATE +%Y-%m-%d`-$$
+BASE_NAME=$TEST_TYPE-$($DATE +%Y-%m-%d)-$$
 
 # Directory containing binaries.  Default: cmake run directory.
 if [ -z "$WIRESHARK_BIN_DIR" ]; then
@@ -28,7 +28,7 @@ fi
 # (had problems with this on cygwin, tried TMP_DIR=./ which worked)
 TMP_DIR=/tmp
 if [ "$OSTYPE" == "cygwin" ] ; then
-        TMP_DIR=`cygpath --windows "$TMP_DIR"`
+        TMP_DIR=$(cygpath --windows "$TMP_DIR")
 fi
 TMP_FILE=$BASE_NAME.pcap
 ERR_FILE=$BASE_NAME.err
@@ -41,7 +41,7 @@ MAX_PASSES=0
 MAX_CPU_TIME=600
 # Stop the child process if it's using more than y * 1024 bytes
 MAX_VMEM=1000000
-# Stop the child process if its stack is larger than than z * 1024 bytes
+# Stop the child process if its stack is larger than z * 1024 bytes
 # Windows XP:    2033
 # Windows 7:     2034
 # Mac OS X 10.6: 8192
@@ -50,6 +50,8 @@ MAX_VMEM=1000000
 MAX_STACK=2033
 # Insert z times an error into the capture file (0.02 seems to be a good value to find errors)
 ERR_PROB=0.02
+# Maximum number of packets to fuzz
+MAX_FUZZ_PACKETS=50000
 
 # Call *after* any changes to WIRESHARK_BIN_DIR (e.g., via command-line options)
 function ws_bind_exec_paths() {
@@ -131,28 +133,41 @@ function ws_exit_error() {
     echo
 
     # Fill in build information
-    echo -e "Input file: $CF\n" > $TMP_DIR/${ERR_FILE}.header
-    echo -e "Build host information:" >> $TMP_DIR/${ERR_FILE}.header
-    uname -a >> $TMP_DIR/${ERR_FILE}.header
-    lsb_release -a >> $TMP_DIR/${ERR_FILE}.header 2> /dev/null
+    {
+        if [ -n "$CI_COMMIT_BRANCH" ] ; then
+            printf "Branch: %s\\n" "$CI_COMMIT_BRANCH"
+        else
+            printf "Branch: %s\\n" "$(git rev-parse --abbrev-ref HEAD)"
+        fi
 
-    if [ -n "$BUILDBOT_BUILDERNAME" ] ; then
-        echo -e "\nBuildbot information:" >> $TMP_DIR/${ERR_FILE}.header
-        env | grep "^BUILDBOT_" >> $TMP_DIR/${ERR_FILE}.header
-    fi
+        printf "Input file: %s\\n" "$CF"
 
-    echo -e "\nReturn value: " $RETVAL >> $TMP_DIR/${ERR_FILE}.header
-    echo -e "\nDissector bug: " $DISSECTOR_BUG >> $TMP_DIR/${ERR_FILE}.header
-    echo -e "\nValgrind error count: " $VG_ERR_CNT >> $TMP_DIR/${ERR_FILE}.header
+        if [ -n "$CI_JOB_NAME" ] ; then
+            printf "CI job name: %s, ID: %s\\n" "$CI_JOB_NAME" "$CI_JOB_ID"
+            printf "CI job URL: %s\\n" "$CI_JOB_URL"
+        fi
 
-    echo -e "\n" >> $TMP_DIR/${ERR_FILE}.header
+        printf "Return value: %s\\n" "$RETVAL"
+        printf "Dissector bug: %s\\n" "$DISSECTOR_BUG"
+        if [ "$VALGRIND" -eq 1 ] ; then
+            printf "Valgrind error count: %s\\n" "$VG_ERR_CNT"
+        fi
 
-    if [ -d ${GIT_DIR:-.git} ] ; then
-        echo -e "\nGit commit" >> $TMP_DIR/${ERR_FILE}.header
-        git log -1 >> $TMP_DIR/${ERR_FILE}.header
-    fi
+        printf "Date and time: %s\\n" "$( date --utc )"
 
-    echo -e "\n" >> $TMP_DIR/${ERR_FILE}.header
+        SINCE_HOURS=48
+        if [ -d "${GIT_DIR:-.git}" ] ; then
+                printf "\\nCommits in the last %s hours:\\n" $SINCE_HOURS
+                git --no-pager log --oneline --no-decorate --since=${SINCE_HOURS}hours
+                printf "\\n"
+        fi
+
+        printf "Build host information:\\n"
+        uname -srvm
+        lsb_release -a 2> /dev/null
+        printf "\\n"
+
+    } > "$TMP_DIR/${ERR_FILE}.header"
 
     # Trim the stderr output if needed
     ERR_SIZE=$(du -sk $TMP_DIR/$ERR_FILE | awk '{ print $1 }')

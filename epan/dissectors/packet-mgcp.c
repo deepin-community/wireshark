@@ -30,6 +30,7 @@
 #include <epan/prefs.h>
 #include <epan/conversation.h>
 #include <epan/tap.h>
+#include <epan/strutil.h>
 #include <epan/rtd_table.h>
 #include <epan/expert.h>
 #include "packet-mgcp.h"
@@ -322,7 +323,7 @@ static const value_string mgcp_message_type[] = {
 };
 
 static tap_packet_status
-mgcpstat_packet(void *pms, packet_info *pinfo, epan_dissect_t *edt _U_, const void *pmi)
+mgcpstat_packet(void *pms, packet_info *pinfo, epan_dissect_t *edt _U_, const void *pmi, tap_flags_t flags _U_)
 {
 	rtd_data_t* rtd_data = (rtd_data_t*)pms;
 	rtd_stat_table* ms = &rtd_data->stat_table;
@@ -530,7 +531,7 @@ static int dissect_mgcp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
 	sectionlen = tvb_find_line_end(tvb, tvb_sectionbegin, -1,
 			&tvb_sectionend, FALSE);
 	col_prepend_fstr(pinfo->cinfo, COL_INFO, "%s",
-			tvb_format_text(tvb, tvb_sectionbegin, sectionlen));
+			tvb_format_text(pinfo->pool, tvb, tvb_sectionbegin, sectionlen));
 
 	return tvb_len;
 }
@@ -853,18 +854,18 @@ static gint tvb_parse_param(tvbuff_t* tvb, gint offset, gint len, int** hf, mgcp
 				/* XRM/MCR */
 				else
 				if (len > (tvb_current_offset - offset) &&
-				   (tempchar = (guint8)g_ascii_toupper(tvb_get_guint8(tvb,tvb_current_offset))) == 'R')
+				   ((guint8)g_ascii_toupper(tvb_get_guint8(tvb,tvb_current_offset))) == 'R')
 				{
 					/* Move past 'R' */
 					tvb_current_offset += 3;
 					if (len > (tvb_current_offset - offset) &&
-						(tempchar = (guint8)g_ascii_toupper(tvb_get_guint8(tvb,tvb_current_offset))) == 'R')
+						((guint8)g_ascii_toupper(tvb_get_guint8(tvb,tvb_current_offset))) == 'R')
 					{
 						*hf = &hf_mgcp_param_remotevoicemetrics;
 					}
 					else
 					if (len > (tvb_current_offset - offset) &&
-					   (tempchar = (guint8)g_ascii_toupper(tvb_get_guint8(tvb,tvb_current_offset))) == 'L')
+					   ((guint8)g_ascii_toupper(tvb_get_guint8(tvb,tvb_current_offset))) == 'L')
 					{
 						*hf = &hf_mgcp_param_localvoicemetrics;
 					}
@@ -1164,15 +1165,15 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					return;
 				}
 
-				code = tvb_format_text(tvb, tvb_previous_offset, tokenlen);
-				g_strlcpy(mi->code, code, 5);
+				code = tvb_format_text(pinfo->pool, tvb, tvb_previous_offset, tokenlen);
+				(void) g_strlcpy(mi->code, code, 5);
 				if (is_mgcp_verb(tvb, tvb_previous_offset, tvb_current_len, &verb_description))
 				{
 					mgcp_type = MGCP_REQUEST;
 					if (verb_description != NULL)
 					{
 						/* Can show verb along with code if known */
-						g_snprintf(code_with_verb, 64, "%s (%s)", code, verb_description);
+						snprintf(code_with_verb, 64, "%s (%s)", code, verb_description);
 					}
 
 					proto_tree_add_string_format(tree, hf_mgcp_req_verb, tvb,
@@ -1198,7 +1199,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 			}
 			if (tokennum == 1)
 			{
-				transid = tvb_format_text(tvb, tvb_previous_offset, tokenlen);
+				transid = tvb_format_text(pinfo->pool, tvb, tvb_previous_offset, tokenlen);
 				/* XXX - what if this isn't a valid text string? */
 				mi->transid = (guint32)strtoul(transid, NULL, 10);
 				proto_tree_add_string(tree, hf_mgcp_transid, tvb,
@@ -1208,7 +1209,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 			{
 				if (mgcp_type == MGCP_REQUEST)
 				{
-					endpointId = tvb_format_text(tvb, tvb_previous_offset, tokenlen);
+					endpointId = tvb_format_text(pinfo->pool, tvb, tvb_previous_offset, tokenlen);
 					mi->endpointId = wmem_strdup(wmem_packet_scope(), endpointId);
 					proto_tree_add_string(tree, hf_mgcp_req_endpoint, tvb,
 					                      tvb_previous_offset, tokenlen, endpointId);
@@ -1227,7 +1228,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					}
 					proto_tree_add_string(tree, hf_mgcp_rsp_rspstring, tvb,
 					                      tvb_previous_offset, tokenlen,
-					                      tvb_format_text(tvb, tvb_previous_offset,
+					                      tvb_format_text(pinfo->pool, tvb, tvb_previous_offset,
 					                      tokenlen));
 					break;
 				}
@@ -1246,7 +1247,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 				}
 				proto_tree_add_string(tree, hf_mgcp_version, tvb,
 				                      tvb_previous_offset, tokenlen,
-				                      tvb_format_text(tvb, tvb_previous_offset,
+				                      tvb_format_text(pinfo->pool, tvb, tvb_previous_offset,
 				                      tokenlen));
 				break;
 			}
@@ -1292,7 +1293,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					 * if you do that.
 					 */
 					conversation = find_conversation(pinfo->num, &null_address,
-					                                 &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype), pinfo->srcport,
+					                                 &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype), pinfo->srcport,
 					                                 pinfo->destport, 0);
 				}
 				if (conversation != NULL)
@@ -1311,7 +1312,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 							mi->request_available = TRUE;
 							mgcp_call->responded = TRUE;
 							mi->req_num = mgcp_call->req_num;
-							g_strlcpy(mi->code, mgcp_call->code, 5);
+							(void) g_strlcpy(mi->code, mgcp_call->code, 5);
 							item = proto_tree_add_uint_format(tree, hf_mgcp_req_frame,
 							                                  tvb, 0, 0, mgcp_call->req_num,
 							                                  "This is a response to a request in frame %u",
@@ -1393,7 +1394,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					 * if you do that.
 					 */
 					conversation = find_conversation(pinfo->num, &pinfo->src,
-					                                 &null_address, conversation_pt_to_endpoint_type(pinfo->ptype), pinfo->srcport,
+					                                 &null_address, conversation_pt_to_conversation_type(pinfo->ptype), pinfo->srcport,
 					                                 pinfo->destport, 0);
 				}
 				if (conversation == NULL)
@@ -1402,13 +1403,13 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					if (pinfo->ptype == PT_TCP)
 					{
 						conversation = conversation_new(pinfo->num, &pinfo->src,
-						                                &pinfo->dst, ENDPOINT_TCP, pinfo->srcport,
+						                                &pinfo->dst, CONVERSATION_TCP, pinfo->srcport,
 						                                pinfo->destport, 0);
 					}
 					else
 					{
 						conversation = conversation_new(pinfo->num, &pinfo->src,
-						                                &null_address, conversation_pt_to_endpoint_type(pinfo->ptype), pinfo->srcport,
+						                                &null_address, conversation_pt_to_conversation_type(pinfo->ptype), pinfo->srcport,
 						                                pinfo->destport, 0);
 					}
 				}
@@ -1459,7 +1460,7 @@ static void dissect_mgcp_firstline(tvbuff_t *tvb, packet_info *pinfo, proto_tree
 					mgcp_call->transid   = mi->transid;
 					mgcp_call->responded = FALSE;
 					mgcp_call->req_time=pinfo->abs_ts;
-					g_strlcpy(mgcp_call->code, mi->code, 5);
+					(void) g_strlcpy(mgcp_call->code, mi->code, 5);
 
 					/* Store it */
 					wmem_map_insert(mgcp_calls, new_mgcp_call_key, mgcp_call);
@@ -1558,7 +1559,7 @@ static void dissect_mgcp_params(tvbuff_t *tvb, proto_tree *tree, mgcp_info_t* mi
 					tokenlen = tvb_find_line_end(tvb, tvb_tokenbegin, -1, &tvb_lineend, FALSE);
 					proto_tree_add_string(mgcp_param_tree, *my_param, tvb,
 							tvb_linebegin, linelen,
-							tvb_format_text(tvb, tvb_tokenbegin, tokenlen));
+							tvb_format_text(wmem_packet_scope(), tvb, tvb_tokenbegin, tokenlen));
 				}
 		}
 
@@ -1583,7 +1584,7 @@ dissect_mgcp_connectionparams(proto_tree *parent_tree, tvbuff_t *tvb, gint offse
 	gchar **tokens;
 	guint i;
 
-	item = proto_tree_add_item(parent_tree, hf_mgcp_param_connectionparam, tvb, offset, param_type_len+param_val_len, ENC_ASCII|ENC_NA);
+	item = proto_tree_add_item(parent_tree, hf_mgcp_param_connectionparam, tvb, offset, param_type_len+param_val_len, ENC_ASCII);
 	tree = proto_item_add_subtree(item, ett_mgcp_param_connectionparam);
 
 	/* The P: line */
@@ -1690,7 +1691,7 @@ dissect_mgcp_localconnectionoptions(proto_tree *parent_tree, tvbuff_t *tvb, gint
 	gchar **tokens;
 	guint i;
 
-	item = proto_tree_add_item(parent_tree, hf_mgcp_param_localconnoptions, tvb, offset, param_type_len+param_val_len, ENC_ASCII|ENC_NA);
+	item = proto_tree_add_item(parent_tree, hf_mgcp_param_localconnoptions, tvb, offset, param_type_len+param_val_len, ENC_ASCII);
 	tree = proto_item_add_subtree(item, ett_mgcp_param_localconnectionoptions);
 
 	/* The L: line */
@@ -1852,7 +1853,7 @@ dissect_mgcp_localvoicemetrics(proto_tree *parent_tree, tvbuff_t *tvb, gint offs
 
 	if (parent_tree)
 	{
-	item = proto_tree_add_item(parent_tree, hf_mgcp_param_localvoicemetrics, tvb, offset, param_type_len+param_val_len, ENC_ASCII|ENC_NA);
+	item = proto_tree_add_item(parent_tree, hf_mgcp_param_localvoicemetrics, tvb, offset, param_type_len+param_val_len, ENC_ASCII);
 		tree = proto_item_add_subtree(item, ett_mgcp_param_localvoicemetrics);
 	}
 
@@ -2003,7 +2004,7 @@ dissect_mgcp_remotevoicemetrics(proto_tree *parent_tree, tvbuff_t *tvb, gint off
 
 	if (parent_tree)
 	{
-	item = proto_tree_add_item(parent_tree, hf_mgcp_param_remotevoicemetrics, tvb, offset, param_type_len+param_val_len, ENC_ASCII|ENC_NA);
+	item = proto_tree_add_item(parent_tree, hf_mgcp_param_remotevoicemetrics, tvb, offset, param_type_len+param_val_len, ENC_ASCII);
 		tree = proto_item_add_subtree(item, ett_mgcp_param_remotevoicemetrics);
 	}
 

@@ -1,4 +1,4 @@
-/* capture_filter_syntax_worker.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -20,31 +20,12 @@ class CaptureFilterSyntaxWorker : public QObject
 
 public:
     CaptureFilterSyntaxWorker(QObject *parent = 0) : QObject(parent) {}
-    void checkFilter(const QString &filter);
 
 public slots:
-    void start();
-
-private:
-    QMutex data_mtx_;
-    QWaitCondition data_cond_;
-    QString filter_text_;
+    void checkFilter(const QString filter);
 
 signals:
     void syntaxResult(QString filter, int state, QString err_msg);
 };
 
 #endif // CAPTURE_FILTER_SYNTAX_WORKER_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

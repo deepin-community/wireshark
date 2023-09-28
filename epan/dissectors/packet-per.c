@@ -61,6 +61,7 @@ static int hf_per_internal_range = -1;
 static int hf_per_internal_num_bits = -1;
 static int hf_per_internal_min = -1;
 static int hf_per_internal_value = -1;
+static int hf_per_encoding_boiler_plate = -1;
 
 static gint ett_per_open_type = -1;
 static gint ett_per_containing = -1;
@@ -80,7 +81,7 @@ static expert_field ei_per_undecoded = EI_INIT;
 static expert_field ei_per_field_not_integer = EI_INIT;
 static expert_field ei_per_external_type = EI_INIT;
 static expert_field ei_per_open_type = EI_INIT;
-static expert_field ei_per_dissect_per_constrained_sequence_of = EI_INIT;
+static expert_field ei_per_open_type_len = EI_INIT;
 
 static dissector_table_t per_oid_dissector_table = NULL;
 
@@ -109,6 +110,15 @@ static const true_false_string tfs_small_number_bit = {
 	"The number is large, >63"
 };
 
+void
+add_per_encoded_label(tvbuff_t* tvb, packet_info* pinfo _U_, proto_tree* tree)
+{
+	proto_item* ti;
+
+	ti = proto_tree_add_item(tree, hf_per_encoding_boiler_plate, tvb, 0, -1, ENC_NA);
+	proto_item_set_generated(ti);
+
+}
 
 #define BYTE_ALIGN_OFFSET(offset) if(offset&0x07){offset=(offset&0xfffffff8)+8;}
 
@@ -126,9 +136,9 @@ static void per_check_value(guint32 value, guint32 min_len, guint32 max_len, asn
 static void per_check_value64(guint64 value, guint64 min_len, guint64 max_len, asn1_ctx_t *actx, proto_item *item, gboolean is_signed)
 {
 	if ((is_signed == FALSE) && (value > max_len)) {
-		expert_add_info_format(actx->pinfo, item, &ei_per_size_constraint_value, "Size constraint: value too big: %" G_GINT64_MODIFIER "u (%" G_GINT64_MODIFIER "u .. %" G_GINT64_MODIFIER "u)", value, min_len, max_len);
+		expert_add_info_format(actx->pinfo, item, &ei_per_size_constraint_value, "Size constraint: value too big: %" PRIu64 " (%" PRIu64 " .. %" PRIu64 ")", value, min_len, max_len);
 	} else if ((is_signed == TRUE) && ((gint64)value > (gint64)max_len)) {
-		expert_add_info_format(actx->pinfo, item, &ei_per_size_constraint_value, "Size constraint: value too big: %" G_GINT64_MODIFIER "d (%" G_GINT64_MODIFIER "d .. %" G_GINT64_MODIFIER "d)", (gint64)value, (gint64)min_len, (gint64)max_len);
+		expert_add_info_format(actx->pinfo, item, &ei_per_size_constraint_value, "Size constraint: value too big: %" PRId64 " (%" PRId64 " .. %" PRId64 ")", (gint64)value, (gint64)min_len, (gint64)max_len);
 	}
 }
 
@@ -155,11 +165,12 @@ void dissect_per_not_decoded_yet(proto_tree* tree, packet_info* pinfo, tvbuff_t 
 static guint32
 dissect_per_open_type_internal(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx, proto_tree *tree, int hf_index, void* type_cb, asn1_cb_variant variant)
 {
-	guint32 type_length, start_offset, end_offset, fragmented_length = 0, pdu_length, pdu_offset;
+	int type_length, start_offset, end_offset, fragmented_length = 0, pdu_length, pdu_offset;
 	tvbuff_t *val_tvb = NULL, *pdu_tvb = NULL;
 	header_field_info *hfi;
 	proto_tree *subtree = tree;
 	gboolean is_fragmented;
+	int captured_pdu_length;
 
 	hfi = (hf_index == -1) ? NULL : proto_registrar_get_nth(hf_index);
 
@@ -196,9 +207,19 @@ dissect_per_open_type_internal(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx, 
 		if (fragmented_length) {
 			val_tvb = pdu_tvb;
 		} else {
-			if (!pdu_length)
+			if (!pdu_length) {
 				return end_offset;
-			val_tvb = tvb_new_octet_aligned(pdu_tvb, pdu_offset, pdu_length * 8);
+			}
+			/* Check if we have a tvb that holds the whole PDU */
+			captured_pdu_length = tvb_captured_length(pdu_tvb) - (pdu_offset>>3);
+			if(captured_pdu_length < pdu_length){
+				val_tvb = tvb_new_octet_aligned(pdu_tvb, pdu_offset, captured_pdu_length * 8);
+				actx->created_item = proto_tree_add_expert_format(tree, actx->pinfo, &ei_per_open_type_len, tvb, pdu_offset >> 3,
+					captured_pdu_length,"Open type length(%i) > available data(%i)", pdu_length, captured_pdu_length);
+				pdu_length = captured_pdu_length;
+			} else {
+				val_tvb = tvb_new_octet_aligned(pdu_tvb, pdu_offset, pdu_length * 8);
+			}
 			/* Add new data source if the offet was unaligned */
 			if ((pdu_offset & 7) != 0) {
 				add_new_data_source(actx->pinfo, val_tvb, "Unaligned OCTET STRING");
@@ -308,7 +329,7 @@ dissect_per_length_determinant(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx _
 		str=(char *)wmem_alloc(wmem_packet_scope(), str_length+1);
 		str_index = 0;
 
-		str_length = g_snprintf(str, str_length+1, " ");
+		str_length = snprintf(str, str_length+1, " ");
 		for(bit=0;bit<((int)(offset&0x07));bit++){
 			if(bit&&(!(bit%4))){
 				if (str_index < str_length) str[str_index++] = ' ';
@@ -544,12 +565,16 @@ dissect_per_null(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx _U_, proto_tree
 }
 
 /* 19 this function dissects a sequence of */
+// Arbitrary. Allow a sequence of NULLs, but not too many since we might add
+// a hierarchy of tree items per NULL
+#define PER_SEQUENCE_OF_MAX_NULLS 10
 static guint32
 dissect_per_sequence_of_helper(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx, proto_tree *tree, per_type_fn func, int hf_index, guint32 length)
 {
 	guint32 i;
 
 DEBUG_ENTRY("dissect_per_sequence_of_helper");
+	guint32 old_offset = offset;
 	for(i=0;i<length;i++){
 		guint32 lold_offset=offset;
 		proto_item *litem;
@@ -559,6 +584,9 @@ DEBUG_ENTRY("dissect_per_sequence_of_helper");
 
 		offset=(*func)(tvb, offset, actx, ltree, hf_index);
 		proto_item_set_len(litem, (offset>>3)!=(lold_offset>>3)?(offset>>3)-(lold_offset>>3):1);
+		if (i >= PER_SEQUENCE_OF_MAX_NULLS-1 && offset <= old_offset) {
+			dissect_per_not_decoded_yet(tree, actx->pinfo, tvb, "too many nulls in sequence");
+		}
 	}
 
 	return offset;
@@ -656,6 +684,7 @@ DEBUG_ENTRY("dissect_per_restricted_character_string");
 			bits_per_char=8;
 		}
 	}
+
 	/* 27.4	If the type is extensible for PER encodings (see 9.3.16),
 	 * then a bit-field consisting of a single bit shall be added to the field-list.
 	 * The single bit shall be set to zero if the value is within the range of the extension root,
@@ -687,6 +716,7 @@ DEBUG_ENTRY("dissect_per_restricted_character_string");
 
 	/* xx.x */
 	length=max_len;
+	old_offset = offset;
 	if (max_len == NO_BOUND) {
 		offset = dissect_per_length_determinant(tvb, offset, actx, tree, hf_per_octet_string_length, &length, NULL);
 		/* the unconstrained strings are always byte aligned (27.6.3)*/
@@ -702,7 +732,9 @@ DEBUG_ENTRY("dissect_per_restricted_character_string");
 		/* there is no string at all, so don't do any byte alignment */
 		/* byte_aligned=FALSE; */
 		/* Advance offset to next 'element' */
-		offset = offset + 1;	}
+		if (offset == old_offset)
+			offset = offset + 1;
+	}
 
 	if((byte_aligned)&&(actx->aligned)){
 		BYTE_ALIGN_OFFSET(offset);
@@ -737,7 +769,7 @@ DEBUG_ENTRY("dissect_per_restricted_character_string");
 		}
 	}
 	buf[char_pos]=0;
-	proto_tree_add_string(tree, hf_index, tvb, (old_offset>>3), (offset>>3)-(old_offset>>3), (char*)buf);
+	proto_tree_add_string(tree, hf_index, tvb, (old_offset>>3), ((offset+7)>>3)-(old_offset>>3), (char*)buf);
 	if (value_tvb) {
 		*value_tvb = tvb_new_child_real_data(tvb, buf, length, length);
 	}
@@ -745,7 +777,7 @@ DEBUG_ENTRY("dissect_per_restricted_character_string");
 }
 
 static const char*
-sort_alphabet(char *sorted_alphabet, const char *alphabet, int alphabet_length)
+sort_alphabet(char *sorted_alphabet, const char *alphabet, int alphabet_length, guint16 *lb, guint16 *ub)
 {
 	int i, j;
 	guchar c, c_max, c_min;
@@ -753,7 +785,10 @@ sort_alphabet(char *sorted_alphabet, const char *alphabet, int alphabet_length)
 
 	/*
 	 * XXX - presumably all members of alphabet will be in the
-	 * range 0 to 127.
+	 * range 0 to 127. asn2wrs.py doesn't properly handle the
+	 * Quadruple or CharacterStringList types needed for other
+	 * characters, nor representing characters outside ASCII
+	 * in the "cstring" notation (possibly in UTF-8?)
 	 */
 	if (!alphabet_length) return sorted_alphabet;
 	memset(tmp_buf, 0, 256);
@@ -767,6 +802,8 @@ sort_alphabet(char *sorted_alphabet, const char *alphabet, int alphabet_length)
 	for (i=c_min,j=0; i<=c_max; i++) {
 		if (tmp_buf[i]) sorted_alphabet[j++] = i;
 	}
+	*lb = (guint16)c_min;
+	*ub = (guint16)c_max;
 	return sorted_alphabet;
 }
 
@@ -775,14 +812,24 @@ dissect_per_restricted_character_string(tvbuff_t *tvb, guint32 offset, asn1_ctx_
 {
 	const char *alphabet_ptr;
 	char sorted_alphabet[128];
+	guint16 lb = 0;
+	guint16 ub = 65535;
 
+	/* XXX: We don't handle permitted-alphabet characters outside the
+	 * ASCII range if used in BMPString (UCS2) or UniversalString (UCS4)
+	 */
 	if (alphabet_length > 127) {
 		alphabet_ptr = alphabet;
 	} else {
-		alphabet_ptr = sort_alphabet(sorted_alphabet, alphabet, alphabet_length);
+		alphabet_ptr = sort_alphabet(sorted_alphabet, alphabet, alphabet_length, &lb, &ub);
 	}
-	/* Not a known-multiplier character string: enforce lb and ub to max values */
-	return dissect_per_restricted_character_string_sorted(tvb, offset, actx, tree, hf_index, min_len, max_len, has_extension, 0, 65535, alphabet_ptr, alphabet_length, value_tvb);
+
+	/* This is for a restricted character string type with a permitted-
+	 * alphabet constraint type. Such constraints are only PER-visible for
+	 * the known-multiplier character string types.
+	 */
+
+	return dissect_per_restricted_character_string_sorted(tvb, offset, actx, tree, hf_index, min_len, max_len, has_extension, lb, ub, alphabet_ptr, alphabet_length, value_tvb);
 }
 
 guint32
@@ -986,6 +1033,9 @@ dissect_per_any_oid(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx, proto_tree 
 	DEBUG_ENTRY("dissect_per_any_oid");
 
 	offset = dissect_per_length_determinant(tvb, offset, actx, tree, hf_per_object_identifier_length, &length, NULL);
+	if(length == 0){
+		dissect_per_not_decoded_yet(tree, actx->pinfo, tvb, "unexpected length");
+	}
 	if (actx->aligned) BYTE_ALIGN_OFFSET(offset);
 	val_tvb = tvb_new_octet_aligned(tvb, offset, length * 8);
 	/* Add new data source if the offet was unaligned */
@@ -1118,6 +1168,10 @@ dissect_per_integer(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx, proto_tree 
 	if(length>4){
 		dissect_per_not_decoded_yet(tree, actx->pinfo, tvb, "too long integer(per_integer)");
 		length=4;
+	}
+
+	if(length == 0){
+		dissect_per_not_decoded_yet(tree, actx->pinfo, tvb, "unexpected length");
 	}
 
 	if (actx->aligned) BYTE_ALIGN_OFFSET(offset);
@@ -1320,10 +1374,10 @@ DEBUG_ENTRY("dissect_per_constrained_integer");
 
 		val_start = (offset)>>3;
 		val_length = length;
-		val = (guint32)tvb_get_bits64(tvb,offset,num_bits, ENC_BIG_ENDIAN);
+		val = (guint32)tvb_get_bits64(tvb,offset,num_bits,ENC_BIG_ENDIAN);
 
 		if (display_internal_per_fields){
-			str = decode_bits_in_field((offset&0x07),num_bits,val);
+			str = decode_bits_in_field(actx->pinfo->pool, (offset&0x07),num_bits,val,ENC_BIG_ENDIAN);
 			proto_tree_add_uint(tree, hf_per_internal_min, tvb, val_start,val_length, min);
 			proto_tree_add_uint64(tree, hf_per_internal_range, tvb, val_start, val_length, range);
 			proto_tree_add_uint(tree, hf_per_internal_num_bits, tvb, val_start, val_length, num_bits);
@@ -1528,7 +1582,7 @@ DEBUG_ENTRY("dissect_per_constrained_integer_64b");
 		if (display_internal_per_fields) {
 			proto_tree_add_uint64(tree, hf_per_internal_range, tvb, val_start, val_length, range);
 			proto_tree_add_uint(tree, hf_per_internal_num_bits, tvb, val_start,val_length, num_bits);
-			proto_tree_add_uint64_format_value(tree, hf_per_internal_value, tvb, val_start, val_length, val, "%s decimal value: %" G_GINT64_MODIFIER "u", str, val);
+			proto_tree_add_uint64_format_value(tree, hf_per_internal_value, tvb, val_start, val_length, val, "%s decimal value: %" PRIu64, str, val);
 		}
 	} else if(range==256){
 		/* 10.5.7.2 */
@@ -1568,7 +1622,7 @@ DEBUG_ENTRY("dissect_per_constrained_integer_64b");
 		num_bytes++;  /* lower bound for length determinant is 1 */
 		if (display_internal_per_fields){
 			int_item = proto_tree_add_bits_item(tree, hf_per_const_int_len, tvb, offset,n_bits, ENC_BIG_ENDIAN);
-			proto_item_append_text(int_item,"+1=%u bytes, Range = (%" G_GINT64_MODIFIER "u)",num_bytes, range);
+			proto_item_append_text(int_item,"+1=%u bytes, Range = (%" PRIu64 ")",num_bytes, range);
 		}
 		offset = offset+n_bits;
 		/* byte aligned */
@@ -1650,6 +1704,9 @@ dissect_per_real(tvbuff_t *tvb, guint32 offset, asn1_ctx_t *actx, proto_tree *tr
 	double val = 0;
 
 	offset = dissect_per_length_determinant(tvb, offset, actx, tree, hf_per_real_length, &val_length, NULL);
+	if(val_length == 0){
+		dissect_per_not_decoded_yet(tree, actx->pinfo, tvb, "unexpected length");
+	}
 	if (actx->aligned) BYTE_ALIGN_OFFSET(offset);
 	val_tvb = tvb_new_octet_aligned(tvb, offset, val_length * 8);
 	/* Add new data source if the offet was unaligned */
@@ -2122,8 +2179,8 @@ static tvbuff_t *dissect_per_bit_string_display(tvbuff_t *tvb, guint32 offset, a
 			}else {
 				value = tvb_get_bits64(out_tvb, 0, length, ENC_BIG_ENDIAN);
 			}
-			proto_item_append_text(actx->created_item, ", %s decimal value %" G_GINT64_MODIFIER "u",
-				decode_bits_in_field(0, length, value), value);
+			proto_item_append_text(actx->created_item, ", %s decimal value %" PRIu64,
+				decode_bits_in_field(actx->pinfo->pool, 0, length, value, ENC_BIG_ENDIAN), value);
 			if (named_bits) {
 				const guint32 named_bits_bytelen = (num_named_bits + 7) / 8;
 				proto_tree *subtree = proto_item_add_subtree(actx->created_item, ett_per_named_bits);
@@ -2674,21 +2731,24 @@ call_per_oid_callback(const char *oid, tvbuff_t *tvb, packet_info *pinfo, proto_
 {
 	guint32 type_length, end_offset, start_offset;
 	tvbuff_t *val_tvb = NULL;
-	int len = 0;
 
 	start_offset = offset;
 	offset = dissect_per_length_determinant(tvb, offset, actx, tree, hf_per_open_type_length, &type_length, NULL);
+	if(type_length == 0){
+		dissect_per_not_decoded_yet(tree, actx->pinfo, tvb, "unexpected length");
+	}
 	if (actx->aligned) BYTE_ALIGN_OFFSET(offset);
 	end_offset = offset + type_length;
 
 
-	val_tvb = tvb_new_octet_aligned(tvb, offset, type_length);
+	/* length in bits */
+	val_tvb = tvb_new_octet_aligned(tvb, offset, type_length * 8);
 	if ((offset & 7) != 0) {
 		add_new_data_source(actx->pinfo, val_tvb, "Unaligned OCTET STRING");
 	}
 
 	if (oid == NULL ||
-		((len = dissector_try_string(per_oid_dissector_table, oid, val_tvb, pinfo, tree, actx)) == 0))
+		(dissector_try_string(per_oid_dissector_table, oid, val_tvb, pinfo, tree, actx)) == 0)
 	{
 		proto_tree_add_expert(tree, pinfo, &ei_per_oid_not_implemented, val_tvb, 0, -1);
 		dissect_per_open_type(tvb, start_offset, actx, tree, hf_index, NULL);
@@ -2820,6 +2880,11 @@ proto_register_per(void)
 		  { "Bits", "per.internal.value",
 		    FT_UINT64, BASE_DEC, NULL, 0,
 		    NULL, HFILL }},
+		{ &hf_per_encoding_boiler_plate,
+		  { "PER encoded protocol, to see PER internal fields set protocol PER preferences", "per.encoding_boiler_plate",
+		    FT_NONE, BASE_NONE, NULL, 0x0,
+		    NULL, HFILL } },
+
 	};
 
 	static gint *ett[] = {
@@ -2853,8 +2918,8 @@ proto_register_per(void)
 		  { "per.external_type.unknown", PI_PROTOCOL, PI_WARN, "Unknown EXTERNAL Type", EXPFILL }},
 		{ &ei_per_open_type,
 		  { "per.open_type.unknown", PI_PROTOCOL, PI_WARN, "Unknown Open Type", EXPFILL }},
-		{ &ei_per_dissect_per_constrained_sequence_of,
-		  { "per.dissect_per_constrained_sequence_of", PI_UNDECODED, PI_WARN, "dissect_per_constrained_sequence_of with extension is not handled", EXPFILL }},
+		{ &ei_per_open_type_len,
+		  { "per.open_type.len", PI_PROTOCOL, PI_ERROR, "Open Type length > available data(tvb)", EXPFILL }}
 	};
 
 	module_t *per_module;

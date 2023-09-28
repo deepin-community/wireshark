@@ -1,4 +1,4 @@
-/* uat_frame.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -47,6 +47,7 @@ private:
     bool trySetErrorHintFromField(const QModelIndex &index);
     void addRecord(bool copy_from_current = false);
     void applyChanges();
+    void resizeColumns();
 
 private slots:
     void copyFromProfile(QString filename);

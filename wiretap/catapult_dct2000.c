@@ -20,7 +20,7 @@
 
 #define MAX_FIRST_LINE_LENGTH      150
 #define MAX_TIMESTAMP_LINE_LENGTH  50
-#define MAX_LINE_LENGTH            65536
+#define MAX_LINE_LENGTH            131072
 #define MAX_SECONDS_CHARS          16
 #define MAX_TIMESTAMP_LEN          (MAX_SECONDS_CHARS+5)
 #define MAX_SUBSECOND_DECIMALS     4
@@ -146,6 +146,9 @@ static guint packet_offset_hash_func(gconstpointer v);
 static gboolean get_file_time_stamp(gchar *linebuff, time_t *secs, guint32 *usecs);
 static gboolean free_line_prefix_info(gpointer key, gpointer value, gpointer user_data);
 
+static int dct2000_file_type_subtype = -1;
+
+void register_dct2000(void);
 
 
 /********************************************/
@@ -201,7 +204,7 @@ catapult_dct2000_open(wtap *wth, int *err, gchar **err_info)
     file_externals = g_new0(dct2000_file_externals_t, 1);
 
     /* Copy this first line into buffer so could write out later */
-    g_strlcpy(file_externals->firstline, linebuff, firstline_length+1);
+    (void) g_strlcpy(file_externals->firstline, linebuff, firstline_length+1);
     file_externals->firstline_length = firstline_length;
 
 
@@ -232,14 +235,14 @@ catapult_dct2000_open(wtap *wth, int *err, gchar **err_info)
     file_externals->start_usecs = usecs;
 
     /* Copy this second line into buffer so could write out later */
-    g_strlcpy(file_externals->secondline, linebuff, file_externals->secondline_length+1);
+    (void) g_strlcpy(file_externals->secondline, linebuff, file_externals->secondline_length+1);
 
 
     /************************************************************/
     /* File is for us. Fill in details so packets can be read   */
 
     /* Set our file type */
-    wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_CATAPULT_DCT2000;
+    wth->file_type_subtype = dct2000_file_type_subtype;
 
     /* Use our own encapsulation to send all packets to our stub dissector */
     wth->file_encap = WTAP_ENCAP_CATAPULT_DCT2000;
@@ -274,7 +277,7 @@ catapult_dct2000_open(wtap *wth, int *err, gchar **err_info)
     return WTAP_OPEN_MINE;
 }
 
-/* Ugly, but much faster than using g_snprintf! */
+/* Ugly, but much faster than using snprintf! */
 static void write_timestamp_string(char *timestamp_string, int secs, int tenthousandths)
 {
     int idx = 0;
@@ -314,7 +317,7 @@ static void write_timestamp_string(char *timestamp_string, int secs, int tenthou
         timestamp_string[idx++] = ((secs % 10))               + '0';
     }
     else {
-        g_snprintf(timestamp_string, MAX_TIMESTAMP_LEN, "%d.%04d", secs, tenthousandths);
+        snprintf(timestamp_string, MAX_TIMESTAMP_LEN, "%d.%04d", secs, tenthousandths);
         return;
     }
 
@@ -501,8 +504,8 @@ catapult_dct2000_seek_read(wtap *wth, gint64 seek_off,
 
     /* If get here, must have failed */
     *err = errno;
-    *err_info = g_strdup_printf("catapult dct2000: seek_read failed to read/parse "
-                                "line at position %" G_GINT64_MODIFIER "d",
+    *err_info = ws_strdup_printf("catapult dct2000: seek_read failed to read/parse "
+                                "line at position %" PRId64,
                                 seek_off);
     return FALSE;
 }
@@ -541,7 +544,7 @@ typedef struct {
 /* The file that we are writing to has been opened.  */
 /* Set other dump callbacks.                         */
 /*****************************************************/
-gboolean
+static gboolean
 catapult_dct2000_dump_open(wtap_dumper *wdh, int *err _U_, gchar **err_info _U_)
 {
     /* Fill in other dump callbacks */
@@ -554,7 +557,7 @@ catapult_dct2000_dump_open(wtap_dumper *wdh, int *err _U_, gchar **err_info _U_)
 /* Respond to queries about which encap types we support */
 /* writing to.                                           */
 /*********************************************************/
-int
+static int
 catapult_dct2000_dump_can_write_encap(int encap)
 {
     switch (encap) {
@@ -623,7 +626,7 @@ catapult_dct2000_dump(wtap_dumper *wdh, const wtap_rec *rec,
         }
 
         /* Allocate the dct2000-specific dump structure */
-        dct2000 = (dct2000_dump_t *)g_malloc(sizeof(dct2000_dump_t));
+        dct2000 = g_new(dct2000_dump_t, 1);
         wdh->priv = (void *)dct2000;
 
         /* Copy time of beginning of file */
@@ -842,7 +845,7 @@ parse_line(gchar *linebuff, gint line_length,
             }
 
             /* There is no variant, outhdr, etc.  Set protocol to be a comment */
-            g_strlcpy(protocol_name, "comment", MAX_PROTOCOL_NAME);
+            (void) g_strlcpy(protocol_name, "comment", MAX_PROTOCOL_NAME);
             *is_comment = TRUE;
             break;
         }
@@ -908,7 +911,7 @@ parse_line(gchar *linebuff, gint line_length,
              (linebuff[n] != '/') && (protocol_chars < MAX_PROTOCOL_NAME) && (n < line_length);
              n++, protocol_chars++) {
 
-            if (!g_ascii_isalnum(linebuff[n]) && linebuff[n] != '_') {
+            if (!g_ascii_isalnum(linebuff[n]) && (linebuff[n] != '_') && (linebuff[n] != '.')) {
                 return FALSE;
             }
             protocol_name[protocol_chars] = linebuff[n];
@@ -1224,7 +1227,7 @@ parse_line(gchar *linebuff, gint line_length,
     if (*is_comment) {
         if (strncmp(linebuff+n, "l $", 3) != 0) {
             *is_sprint = TRUE;
-            g_strlcpy(protocol_name, "sprint", MAX_PROTOCOL_NAME);
+            (void) g_strlcpy(protocol_name, "sprint", MAX_PROTOCOL_NAME);
         }
     }
 
@@ -1275,6 +1278,7 @@ process_parsed_line(wtap *wth, dct2000_file_externals_t *file_externals,
     guint8 *frame_buffer;
 
     rec->rec_type = REC_TYPE_PACKET;
+    rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
     rec->presence_flags = WTAP_HAS_TS;
 
     /* Make sure all packets go to Catapult DCT2000 dissector */
@@ -1308,7 +1312,7 @@ process_parsed_line(wtap *wth, dct2000_file_externals_t *file_externals,
          * space for an immensely-large packet.
          */
         *err = WTAP_ERR_BAD_FILE;
-        *err_info = g_strdup_printf("catapult dct2000: File has %u-byte packet, bigger than maximum of %u",
+        *err_info = ws_strdup_printf("catapult dct2000: File has %u-byte packet, bigger than maximum of %u",
                                     rec->rec_header.packet_header.caplen, WTAP_MAX_PACKET_SIZE_STANDARD);
         return FALSE;
     }
@@ -1646,6 +1650,31 @@ free_line_prefix_info(gpointer key, gpointer value,
 
     /* Item will always be removed from table */
     return TRUE;
+}
+
+static const struct supported_block_type dct2000_blocks_supported[] = {
+    /*
+     * We support packet blocks, with no comments or other options.
+     */
+    { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info dct2000_info = {
+    "Catapult DCT2000 trace (.out format)", "dct2000", "out", NULL,
+    FALSE, BLOCKS_SUPPORTED(dct2000_blocks_supported),
+    catapult_dct2000_dump_can_write_encap, catapult_dct2000_dump_open, NULL
+};
+
+void register_dct2000(void)
+{
+    dct2000_file_type_subtype = wtap_register_file_type_subtype(&dct2000_info);
+
+    /*
+     * Register name for backwards compatibility with the
+     * wtap_filetypes table in Lua.
+     */
+    wtap_register_backwards_compatibility_lua_name("CATAPULT_DCT2000",
+                                                   dct2000_file_type_subtype);
 }
 
 /*

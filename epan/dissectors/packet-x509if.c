@@ -291,7 +291,7 @@ static gboolean rdn_one_value = FALSE; /* have we seen one value in an RDN yet *
 static gboolean dn_one_rdn = FALSE; /* have we seen one RDN in a DN yet */
 static gboolean doing_attr = FALSE;
 
-#define MAX_RDN_STR_LEN   64
+#define MAX_RDN_STR_LEN   128
 #define MAX_DN_STR_LEN    (20 * MAX_RDN_STR_LEN)
 
 static char *last_dn = NULL;
@@ -652,7 +652,7 @@ dissect_x509if_AttributeValueAssertion(gboolean implicit_tag _U_, tvbuff_t *tvb 
 #line 404 "./asn1/x509if/x509if.cnf"
 
 	ava_hf_index = hf_index;
-	last_ava = (char *)wmem_alloc(wmem_packet_scope(), MAX_AVA_STR_LEN); *last_ava = '\0';
+	last_ava = (char *)wmem_alloc(actx->pinfo->pool, MAX_AVA_STR_LEN); *last_ava = '\0';
 	register_frame_end_routine (actx->pinfo, x509if_frame_end);
 
 	  offset = dissect_ber_sequence(implicit_tag, actx, tree, tvb, offset,
@@ -716,12 +716,12 @@ dissect_x509if_T_type_02(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offse
 
   if(actx->external.direct_reference) {
     /* see if we can find a nice name */
-    name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference);
+    name = oid_resolved_from_string(actx->pinfo->pool, actx->external.direct_reference);
     if(!name) name = actx->external.direct_reference;
 
     if(last_rdn) { /* append it to the RDN */
-      g_strlcat(last_rdn, name, MAX_RDN_STR_LEN);
-      g_strlcat(last_rdn, "=", MAX_RDN_STR_LEN);
+      (void) g_strlcat(last_rdn, name, MAX_RDN_STR_LEN);
+      (void) g_strlcat(last_rdn, "=", MAX_RDN_STR_LEN);
 
      /* append it to the tree */
      proto_item_append_text(tree, " (%s=", name);
@@ -732,10 +732,10 @@ dissect_x509if_T_type_02(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offse
 
     if((fmt = val_to_str_const(hf_index, fmt_vals, "")) && *fmt) {
       /* we have a format */
-      last_ava = (char *)wmem_alloc(wmem_packet_scope(), MAX_AVA_STR_LEN); *last_ava = '\0';
+      last_ava = (char *)wmem_alloc(actx->pinfo->pool, MAX_AVA_STR_LEN); *last_ava = '\0';
       register_frame_end_routine (actx->pinfo, x509if_frame_end);
 
-      g_snprintf(last_ava, MAX_AVA_STR_LEN, "%s %s", name, fmt);
+      snprintf(last_ava, MAX_AVA_STR_LEN, "%s %s", name, fmt);
 
       proto_item_append_text(tree, " %s", last_ava);
 
@@ -773,10 +773,10 @@ dissect_x509if_T_atadv_value(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int o
 
   if(out_tvb) {
     /* it was a string - format it */
-    value = tvb_format_text(out_tvb, 0, tvb_reported_length(out_tvb));
+    value = tvb_format_text(actx->pinfo->pool, out_tvb, 0, tvb_reported_length(out_tvb));
 
     if(last_rdn) {
-      g_strlcat(last_rdn, value, MAX_RDN_STR_LEN);
+      (void) g_strlcat(last_rdn, value, MAX_RDN_STR_LEN);
 
       /* append it to the tree*/
       proto_item_append_text(tree, "%s)", value);
@@ -786,12 +786,12 @@ dissect_x509if_T_atadv_value(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int o
       /* we have a format */
 
       if (!last_ava) {
-        last_ava = (char *)wmem_alloc(wmem_packet_scope(), MAX_AVA_STR_LEN);
+        last_ava = (char *)wmem_alloc(actx->pinfo->pool, MAX_AVA_STR_LEN);
       }
 
-      if(!(name = oid_resolved_from_string(wmem_packet_scope(), actx->external.direct_reference)))
+      if(!(name = oid_resolved_from_string(actx->pinfo->pool, actx->external.direct_reference)))
         name = actx->external.direct_reference;
-      g_snprintf(last_ava, MAX_AVA_STR_LEN, "%s %s %s", name, fmt, value);
+      snprintf(last_ava, MAX_AVA_STR_LEN, "%s %s %s", name, fmt, value);
 
       proto_item_append_text(tree, " %s", last_ava);
 
@@ -872,7 +872,7 @@ dissect_x509if_RelativeDistinguishedName_item(gboolean implicit_tag _U_, tvbuff_
 
    if(last_rdn)
      /* this is an additional value - delimit */
-     g_strlcat(last_rdn, "+", MAX_RDN_STR_LEN);
+     (void) g_strlcat(last_rdn, "+", MAX_RDN_STR_LEN);
   }
 
     offset = dissect_x509if_AttributeTypeAndDistinguishedValue(implicit_tag, tvb, offset, actx, tree, hf_index);
@@ -897,7 +897,7 @@ dissect_x509if_RelativeDistinguishedName(gboolean implicit_tag _U_, tvbuff_t *tv
 
   rdn_one_value = FALSE;
   top_of_rdn = tree;
-  last_rdn = (char *)wmem_alloc(wmem_packet_scope(), MAX_DN_STR_LEN); *last_rdn = '\0';
+  last_rdn = (char *)wmem_alloc(actx->pinfo->pool, MAX_DN_STR_LEN); *last_rdn = '\0';
   register_frame_end_routine (actx->pinfo, x509if_frame_end);
 
     offset = dissect_ber_set_of(implicit_tag, actx, tree, tvb, offset,
@@ -910,11 +910,11 @@ dissect_x509if_RelativeDistinguishedName(gboolean implicit_tag _U_, tvbuff_t *tv
   /* now append this to the DN */
   if (last_dn) {
     if(*last_dn) {
-      temp_dn = (char *)wmem_strdup_printf(wmem_packet_scope(), "%s,%s", last_rdn, last_dn);
+      temp_dn = (char *)wmem_strdup_printf(actx->pinfo->pool, "%s,%s", last_rdn, last_dn);
       last_dn[0] = '\0';
-      g_strlcat(last_dn, temp_dn, MAX_DN_STR_LEN);
+      (void) g_strlcat(last_dn, temp_dn, MAX_DN_STR_LEN);
     } else {
-      g_strlcat(last_dn, last_rdn, MAX_DN_STR_LEN);
+      (void) g_strlcat(last_dn, last_rdn, MAX_DN_STR_LEN);
     }
   }
 
@@ -957,7 +957,7 @@ dissect_x509if_RDNSequence(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int off
   const char *fmt;
 
   dn_one_rdn = FALSE; /* reset */
-  last_dn = (char *)wmem_alloc(wmem_packet_scope(), MAX_DN_STR_LEN); *last_dn = '\0';
+  last_dn = (char *)wmem_alloc(actx->pinfo->pool, MAX_DN_STR_LEN); *last_dn = '\0';
   top_of_dn = NULL;
   register_frame_end_routine (actx->pinfo, x509if_frame_end);
 
@@ -2129,7 +2129,7 @@ void proto_register_x509if(void) {
   /* List of fields */
   static hf_register_info hf[] = {
     { &hf_x509if_object_identifier_id,
-      { "Id", "x509if.id", FT_OID, BASE_NONE, NULL, 0,
+      { "Object Id", "x509if.oid", FT_OID, BASE_NONE, NULL, 0,
 	"Object identifier Id", HFILL }},
     { &hf_x509if_any_string,
       { "AnyString", "x509if.any.String", FT_BYTES, BASE_NONE,

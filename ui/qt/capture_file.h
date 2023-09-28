@@ -1,4 +1,4 @@
-/* capture_file.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -35,13 +35,6 @@ public:
      * is closed.
      */
     bool isValid() const;
-
-    /** Get the current selected row
-     *
-     * @return the current selected index of the packet list if the capture
-     * file is open and a packet is selected, otherwise -1.
-     */
-    int currentRow();
 
     /** Return the full pathname.
      *
@@ -117,6 +110,10 @@ public:
      */
     void reload();
 
+    /** Return any set display filter
+     */
+    QString displayFilter() const;
+
     // XXX This shouldn't be needed.
     static capture_file *globalCapFile();
 
@@ -165,16 +162,3 @@ private:
 };
 
 #endif // CAPTURE_FILE_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

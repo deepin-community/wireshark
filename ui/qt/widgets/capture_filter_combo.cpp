@@ -17,7 +17,7 @@
 
 #include <ui/qt/widgets/capture_filter_combo.h>
 #include <ui/qt/utils/color_utils.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 
 CaptureFilterCombo::CaptureFilterCombo(QWidget *parent, bool plain) :
     QComboBox(parent),
@@ -44,8 +44,8 @@ CaptureFilterCombo::CaptureFilterCombo(QWidget *parent, bool plain) :
             this, &CaptureFilterCombo::captureFilterSyntaxChanged);
     connect(cf_edit_, &CaptureFilterEdit::startCapture, this, &CaptureFilterCombo::startCapture);
     connect(cf_edit_, &CaptureFilterEdit::startCapture, this, &CaptureFilterCombo::saveAndRebuildFilterList);
-    connect(wsApp, &WiresharkApplication::appInitialized, this, &CaptureFilterCombo::rebuildFilterList);
-    connect(wsApp, &WiresharkApplication::preferencesChanged, this, &CaptureFilterCombo::rebuildFilterList);
+    connect(mainApp, &MainApplication::appInitialized, this, &CaptureFilterCombo::rebuildFilterList);
+    connect(mainApp, &MainApplication::preferencesChanged, this, &CaptureFilterCombo::rebuildFilterList);
 
     rebuildFilterList();
     clearEditText();
@@ -131,16 +131,3 @@ void CaptureFilterCombo::rebuildFilterList()
     lineEdit()->setText(cur_filter);
     lineEdit()->blockSignals(false);
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

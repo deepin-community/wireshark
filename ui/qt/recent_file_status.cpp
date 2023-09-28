@@ -12,7 +12,7 @@
 RecentFileStatus::RecentFileStatus(const QString filename, QObject *parent) :
     QObject(parent),
     // Force a deep copy.
-    filename_(QString::fromUtf16(filename.utf16()))
+    filename_(QString::fromStdU16String(filename.toStdU16String()))
 {
     // We're a QObject, which means that we emit a destroyed signal,
     // which might happen at the wrong time when automatic deletion is
@@ -34,16 +34,3 @@ void RecentFileStatus::run() {
     }
     deleteLater();
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

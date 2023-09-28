@@ -13,7 +13,7 @@
 
 #include "config.h"
 
-#include <stdio.h>
+#include <stdio.h>	/* fprintf() */
 #include <epan/packet.h>
 #include <epan/expert.h>
 #include <epan/exceptions.h>
@@ -271,6 +271,7 @@ static gint ett_gss_context = -1;
 static gint ett_gss_wrap = -1;
 
 static expert_field ei_rpc_cannot_dissect = EI_INIT;
+static expert_field ei_rpc_segment_needed = EI_INIT;
 
 static dissector_handle_t rpc_tcp_handle;
 static dissector_handle_t rpc_handle;
@@ -305,7 +306,7 @@ static const fragment_items rpc_frag_items = {
 GHashTable *rpc_progs = NULL;
 
 typedef gboolean (*rec_dissector_t)(tvbuff_t *, packet_info *, proto_tree *,
-	tvbuff_t *, fragment_head *, gboolean, guint32, gboolean);
+	tvbuff_t *, fragment_head *, gboolean, guint32, gboolean, gboolean);
 
 static void show_rpc_fraginfo(tvbuff_t *tvb, tvbuff_t *frag_tvb, proto_tree *tree,
 			      guint32 rpc_rm, fragment_head *ipfd_head, packet_info *pinfo);
@@ -355,7 +356,7 @@ rpcstat_init(struct register_srt* srt, GArray* srt_array)
 	hf_index=rpc_prog_hf(tap_data->program, tap_data->version);
 	hfi=proto_registrar_get_nth(hf_index);
 
-	g_snprintf(table_name, sizeof(table_name), "%s Version %u", tap_data->prog, tap_data->version);
+	snprintf(table_name, sizeof(table_name), "%s Version %u", tap_data->prog, tap_data->version);
 	rpc_srt_table = init_srt_table(table_name, NULL, srt_array, tap_data->num_procedures, NULL, hfi->abbrev, tap_data);
 	for (i = 0; i < rpc_srt_table->num_procs; i++)
 	{
@@ -366,15 +367,14 @@ rpcstat_init(struct register_srt* srt, GArray* srt_array)
 }
 
 static tap_packet_status
-rpcstat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv)
+rpcstat_packet(void *pss, packet_info *pinfo, epan_dissect_t *edt _U_, const void *prv, tap_flags_t flags _U_)
 {
-	guint i = 0;
 	srt_stat_table *rpc_srt_table;
 	srt_data_t *data = (srt_data_t *)pss;
 	const rpc_call_info_value *ri = (const rpc_call_info_value *)prv;
 	rpcstat_tap_data_t* tap_data;
 
-	rpc_srt_table = g_array_index(data->srt_array, srt_stat_table*, i);
+	rpc_srt_table = g_array_index(data->srt_array, srt_stat_table*, 0);
 	tap_data = (rpcstat_tap_data_t*)rpc_srt_table->table_specific_data;
 
 	if ((int)ri->proc >= rpc_srt_table->num_procs) {
@@ -422,7 +422,7 @@ rpcstat_param(register_srt_t* srt, const char* opt_arg, char** err)
 
 		tap_data->num_procedures = rpc_max_proc+1;
 		if (rpc_min_proc == -1) {
-			*err = g_strdup_printf("Program:%u version:%u isn't supported", rpc_program, rpc_version);
+			*err = ws_strdup_printf("Program:%u version:%u isn't supported", rpc_program, rpc_version);
 		}
 	}
 	else
@@ -477,6 +477,7 @@ rpc_proc_name_internal(wmem_allocator_t *allocator, guint32 prog, guint32 vers, 
 	key.proc = proc;
 
 	/* Look at both tables for possible procedure names */
+	/* XXX - dissector name, or protocol name? */
 	if ((dissect_function = dissector_get_custom_table_handle(subdissector_call_table, &key)) != NULL)
 		procname = wmem_strdup(allocator, dissector_handle_get_dissector_name(dissect_function));
 	else if ((dissect_function = dissector_get_custom_table_handle(subdissector_reply_table, &key)) != NULL)
@@ -521,7 +522,7 @@ rpc_init_prog(int proto, guint32 prog, int ett, size_t nvers,
 	size_t versidx;
 	const vsff *proc;
 
-	value = (rpc_prog_info_value *) g_malloc(sizeof(rpc_prog_info_value));
+	value = g_new(rpc_prog_info_value, 1);
 	value->proto = find_protocol_by_id(proto);
 	value->proto_id = proto;
 	value->ett = ett;
@@ -562,7 +563,7 @@ rpc_init_prog(int proto, guint32 prog, int ett, size_t nvers,
 
 				continue;
 			}
-			dissector_add_custom_table_handle("rpc.call", g_memdup(&key, sizeof(rpc_proc_info_key)),
+			dissector_add_custom_table_handle("rpc.call", g_memdup2(&key, sizeof(rpc_proc_info_key)),
 						create_dissector_handle_with_name(proc->dissect_call, value->proto_id, proc->strptr));
 
 			if (proc->dissect_reply == NULL) {
@@ -577,7 +578,7 @@ rpc_init_prog(int proto, guint32 prog, int ett, size_t nvers,
 
 				continue;
 			}
-			dissector_add_custom_table_handle("rpc.reply", g_memdup(&key, sizeof(rpc_proc_info_key)),
+			dissector_add_custom_table_handle("rpc.reply", g_memdup2(&key, sizeof(rpc_proc_info_key)),
 					create_dissector_handle_with_name(proc->dissect_reply, value->proto_id, proc->strptr));
 		}
 	}
@@ -1678,7 +1679,7 @@ get_conversation_for_call(packet_info *pinfo)
 	 * might send retransmissions from a different port from
 	 * the original request.
 	 */
-	if (pinfo->ptype == PT_TCP || pinfo->ptype == PT_IBQP) {
+	if (pinfo->ptype == PT_TCP || pinfo->ptype == PT_IBQP || pinfo->ptype == PT_IWARP_MPA) {
 		conversation = find_conversation_pinfo(pinfo, 0);
 	} else {
 		/*
@@ -1687,18 +1688,18 @@ get_conversation_for_call(packet_info *pinfo)
 		 * if you use NO_ADDR_B.
 		 */
 		conversation = find_conversation(pinfo->num,
-		    &pinfo->src, &null_address, conversation_pt_to_endpoint_type(pinfo->ptype),
+		    &pinfo->src, &null_address, conversation_pt_to_conversation_type(pinfo->ptype),
 		    pinfo->destport, 0, NO_ADDR_B|NO_PORT_B);
 	}
 
 	if (conversation == NULL) {
-		if (pinfo->ptype == PT_TCP || pinfo->ptype == PT_IBQP) {
+		if (pinfo->ptype == PT_TCP || pinfo->ptype == PT_IBQP || pinfo->ptype == PT_IWARP_MPA) {
 			conversation = conversation_new(pinfo->num,
-			    &pinfo->src, &pinfo->dst, conversation_pt_to_endpoint_type(pinfo->ptype),
+			    &pinfo->src, &pinfo->dst, conversation_pt_to_conversation_type(pinfo->ptype),
 			    pinfo->srcport, pinfo->destport, 0);
 		} else {
 			conversation = conversation_new(pinfo->num,
-			    &pinfo->src, &null_address, conversation_pt_to_endpoint_type(pinfo->ptype),
+			    &pinfo->src, &null_address, conversation_pt_to_conversation_type(pinfo->ptype),
 			    pinfo->destport, 0, NO_ADDR2|NO_PORT2);
 		}
 	}
@@ -1730,7 +1731,7 @@ find_conversation_for_reply(packet_info *pinfo)
 	 * to the original call and a retransmission of the call
 	 * might be sent to different ports.
 	 */
-	if (pinfo->ptype == PT_TCP || pinfo->ptype == PT_IBQP) {
+	if (pinfo->ptype == PT_TCP || pinfo->ptype == PT_IBQP || pinfo->ptype == PT_IWARP_MPA) {
 		conversation = find_conversation_pinfo(pinfo, 0);
 	} else {
 		/*
@@ -1739,7 +1740,7 @@ find_conversation_for_reply(packet_info *pinfo)
 		 * if you use NO_ADDR_B.
 		 */
 		conversation = find_conversation(pinfo->num,
-		    &pinfo->dst, &null_address, conversation_pt_to_endpoint_type(pinfo->ptype),
+		    &pinfo->dst, &null_address, conversation_pt_to_conversation_type(pinfo->ptype),
 		    pinfo->srcport, 0, NO_ADDR_B|NO_PORT_B);
 	}
 	return conversation;
@@ -1754,17 +1755,22 @@ new_conversation_for_reply(packet_info *pinfo)
 	{
 	case PT_TCP:
 		conversation = conversation_new(pinfo->num,
-		    &pinfo->src, &pinfo->dst, ENDPOINT_TCP,
+		    &pinfo->src, &pinfo->dst, CONVERSATION_TCP,
 		    pinfo->srcport, pinfo->destport, 0);
 		break;
 	case PT_IBQP:
 		conversation = conversation_new(pinfo->num,
-		    &pinfo->src, &pinfo->dst, ENDPOINT_IBQP,
+		    &pinfo->src, &pinfo->dst, CONVERSATION_IBQP,
+		    pinfo->srcport, pinfo->destport, 0);
+		break;
+	case PT_IWARP_MPA:
+		conversation = conversation_new(pinfo->num,
+		    &pinfo->src, &pinfo->dst, CONVERSATION_IWARP_MPA,
 		    pinfo->srcport, pinfo->destport, 0);
 		break;
 	default:
 		conversation = conversation_new(pinfo->num,
-		    &pinfo->dst, &null_address, conversation_pt_to_endpoint_type(pinfo->ptype),
+		    &pinfo->dst, &null_address, conversation_pt_to_conversation_type(pinfo->ptype),
 		    pinfo->srcport, 0, NO_ADDR2|NO_PORT2);
 		break;
 	}
@@ -1932,6 +1938,7 @@ dissect_rpc_indir_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
 	dissect_function = dissector_get_custom_table_handle(subdissector_reply_table, &key);
 	if (dissect_function != NULL) {
+		/* XXX - dissector name, or protocol name? */
 		procname = dissector_handle_get_dissector_name(dissect_function);
 	}
 	else {
@@ -2148,7 +2155,7 @@ looks_like_rpc_reply(tvbuff_t *tvb, packet_info *pinfo, int offset)
 		 * and this is a connection-oriented transport,
 		 * give up.
 		 */
-		if (((! rpc_find_fragment_start) || (pinfo->ptype != PT_TCP)) && (pinfo->ptype != PT_IBQP)) {
+		if (((! rpc_find_fragment_start) || (pinfo->ptype != PT_TCP)) && (pinfo->ptype != PT_IBQP) && (pinfo->ptype != PT_IWARP_MPA)) {
 			return NULL;
 		}
 
@@ -2199,7 +2206,7 @@ looks_like_rpc_reply(tvbuff_t *tvb, packet_info *pinfo, int offset)
 static gboolean
 dissect_rpc_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		    tvbuff_t *frag_tvb, fragment_head *ipfd_head, gboolean is_tcp,
-		    guint32 rpc_rm, gboolean first_pdu)
+		    guint32 rpc_rm, gboolean first_pdu, gboolean can_defragment)
 {
 	guint32	msg_type;
 	rpc_call_info_value *rpc_call;
@@ -2298,7 +2305,7 @@ dissect_rpc_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 			 * the beginning of an RPC message,
 			 * and let them do fragment reassembly.
 			 */
-			if (rpc_defragment)
+			if (can_defragment)
 				return TRUE;
 		}
 	}
@@ -2366,6 +2373,7 @@ dissect_rpc_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		key.proc = proc;
 
 		if ((dissect_function = dissector_get_custom_table_handle(subdissector_call_table, &key)) != NULL) {
+			/* XXX - dissector name, or protocol name? */
 			procname = dissector_handle_get_dissector_name(dissect_function);
 		}
 		else {
@@ -2526,15 +2534,10 @@ dissect_rpc_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 		offset += 16;
 
 		offset = dissect_rpc_cred(tvb, rpc_tree, offset, pinfo, rpc_conv_info);
+		offset = dissect_rpc_verf(tvb, rpc_tree, offset, msg_type, pinfo);
+
 		/* pass rpc_info to subdissectors */
 		rpc_call->request=TRUE;
-
-		if (gss_proc == RPCSEC_GSS_DESTROY) {
-			/* there is no verifier for GSS destroy packets */
-			break;
-		}
-
-		offset = dissect_rpc_verf(tvb, rpc_tree, offset, msg_type, pinfo);
 
 		/* go to the next dissector */
 
@@ -2552,6 +2555,7 @@ dissect_rpc_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
 		dissect_function = dissector_get_custom_table_handle(subdissector_reply_table, &key);
 		if (dissect_function != NULL) {
+			/* XXX - dissector name, or protocol name? */
 			procname = dissector_handle_get_dissector_name(dissect_function);
 		}
 		else {
@@ -3034,14 +3038,14 @@ static gboolean
 dissect_rpc_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data _U_)
 {
 	return dissect_rpc_message(tvb, pinfo, tree, NULL, NULL, FALSE, 0,
-	    TRUE);
+	    TRUE, FALSE);
 }
 
 static int
 dissect_rpc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 {
 	if (!dissect_rpc_message(tvb, pinfo, tree, NULL, NULL, FALSE, 0,
-	    TRUE)) {
+	    TRUE, FALSE)) {
 		if (tvb_reported_length(tvb) != 0)
 			dissect_rpc_continuation(tvb, pinfo, tree);
 	}
@@ -3172,7 +3176,8 @@ show_rpc_fraginfo(tvbuff_t *tvb, tvbuff_t *frag_tvb, proto_tree *tree,
 static gboolean
 call_message_dissector(tvbuff_t *tvb, tvbuff_t *rec_tvb, packet_info *pinfo,
 		       proto_tree *tree, tvbuff_t *frag_tvb, rec_dissector_t dissector,
-		       fragment_head *ipfd_head, guint32 rpc_rm, gboolean first_pdu)
+		       fragment_head *ipfd_head, guint32 rpc_rm, gboolean first_pdu,
+		       gboolean can_defragment)
 {
 	const char *saved_proto;
 	volatile gboolean rpc_succeeded;
@@ -3181,7 +3186,8 @@ call_message_dissector(tvbuff_t *tvb, tvbuff_t *rec_tvb, packet_info *pinfo,
 	rpc_succeeded = FALSE;
 	TRY {
 		rpc_succeeded = (*dissector)(rec_tvb, pinfo, tree,
-		    frag_tvb, ipfd_head, TRUE, rpc_rm, first_pdu);
+		    frag_tvb, ipfd_head, TRUE, rpc_rm, first_pdu,
+		    can_defragment);
 	}
 	CATCH_NONFATAL_ERRORS {
 		/*
@@ -3216,12 +3222,12 @@ dissect_rpc_fragment(tvbuff_t *tvb, int offset, packet_info *pinfo,
 	guint32 seq;
 	guint32 rpc_rm;
 	guint32 len;
-	gint32 seglen;
 	gint tvb_len, tvb_reported_len;
 	tvbuff_t *frag_tvb;
 	conversation_t *conversation = NULL;
 	gboolean rpc_succeeded;
 	gboolean save_fragmented;
+	gboolean can_defragment;
 	rpc_fragment_key old_rfk, *rfk, *new_rfk;
 	fragment_head *ipfd_head;
 	tvbuff_t *rec_tvb;
@@ -3258,94 +3264,92 @@ dissect_rpc_fragment(tvbuff_t *tvb, int offset, packet_info *pinfo,
 	if (len > max_rpc_tcp_pdu_size)
 		return 0;	/* pretend it's not valid */
 
-	if (rpc_desegment) {
-		seglen = tvb_reported_length_remaining(tvb, offset + 4);
+	can_defragment = rpc_defragment;
+	len += 4;	/* include record mark */
+	tvb_reported_len = tvb_reported_length_remaining(tvb, offset);
 
-		if ((gint)len > seglen && pinfo->can_desegment) {
-			/*
-			 * This frame doesn't have all of the
-			 * data for this message, but we can do
-			 * reassembly on it.
-			 *
-			 * If this is a heuristic dissector, check
-			 * whether it looks like the beginning of
-			 * an RPC call or reply.  If not, then, just
-			 * return 0 - we don't want to try to get
-			 * more data, as that's too likely to cause
-			 * us to misidentify this as valid.  Otherwise,
-			 * mark this conversation as being for RPC and
-			 * try to get more data.
-			 *
-			 * If this isn't a heuristic dissector,
-			 * we've already identified this conversation
-			 * as containing data for this protocol, as we
-			 * saw valid data in previous frames.  Try to
-			 * get more data.
-			 */
-			if (is_heur) {
-				guint32 msg_type;
+	if ((gint)len > tvb_reported_len) {
+		/* This frame doesn't have all the data for this message.
+		 *
+		 * If this is a heuristic dissector, check whether it looks
+		 * like the beginning of an RPC call or reply.
+		 */
+		if (is_heur) {
+			guint32 msg_type;
 
-				if (!tvb_bytes_exist(tvb, offset + 4, 8)) {
-					/*
-					 * Captured data in packet isn't
-					 * enough to let us tell.
-					 */
-					return 0;
-				}
-
-				/* both directions need at least this */
-				msg_type = tvb_get_ntohl(tvb, offset + 4 + 4);
-
-				switch (msg_type) {
-
-				case RPC_CALL:
-					/* Check for RPC call. */
-					if (looks_like_rpc_call(tvb,
-					    offset + 4) == NULL) {
-						/* Doesn't look like a call. */
-						return 0;
-					}
-					break;
-
-				case RPC_REPLY:
-					/* Check for RPC reply. */
-					if (looks_like_rpc_reply(tvb, pinfo,
-					    offset + 4) == NULL) {
-						/* Doesn't look like a reply. */
-						return 0;
-					}
-					break;
-
-				default:
-					/* The putative message type field
-					   contains neither RPC_CALL nor
-					   RPC_REPLY, so it's not an RPC
-					   call or reply. */
-					return 0;
-				}
-
-				/* Get this conversation, creating it if
-				   it doesn't already exist, and make the
-				   dissector for it the non-heuristic RPC
-				   dissector for RPC-over-TCP. */
-				conversation = find_or_create_conversation(pinfo);
-				conversation_set_dissector(conversation,
-				    rpc_tcp_handle);
+			if (!tvb_bytes_exist(tvb, offset + 4, 8)) {
+				/*
+				 * Captured data in packet isn't
+				 * enough to let us tell.
+				 */
+				return 0;
 			}
 
-			/* Try to get more data. */
-			pinfo->desegment_offset = offset;
-			pinfo->desegment_len = len - seglen;
-			return -((gint32) pinfo->desegment_len);
+			/* both directions need at least this */
+			msg_type = tvb_get_ntohl(tvb, offset + 4 + 4);
+
+			switch (msg_type) {
+
+			case RPC_CALL:
+				/* Check for RPC call. */
+				if (looks_like_rpc_call(tvb,
+				    offset + 4) == NULL) {
+					/* Doesn't look like a call. */
+					return 0;
+				}
+				break;
+
+			case RPC_REPLY:
+				/* Check for RPC reply. */
+				if (looks_like_rpc_reply(tvb, pinfo,
+				    offset + 4) == NULL) {
+					/* Doesn't look like a reply. */
+					return 0;
+				}
+				break;
+
+			default:
+				/* The putative message type field
+				   contains neither RPC_CALL nor
+				   RPC_REPLY, so it's not an RPC
+				   call or reply. */
+				return 0;
+			}
+
+			/* Get this conversation, creating it if
+			   it doesn't already exist, and make the
+			   dissector for it the non-heuristic RPC
+			   dissector for RPC-over-TCP. */
+			conversation = find_or_create_conversation(pinfo);
+			conversation_set_dissector(conversation,
+			    rpc_tcp_handle);
 		}
-	}
-	len += 4;	/* include record mark */
-	tvb_len = tvb_captured_length_remaining(tvb, offset);
-	tvb_reported_len = tvb_reported_length_remaining(tvb, offset);
-	if (tvb_len > (gint)len)
-		tvb_len = len;
-	if (tvb_reported_len > (gint)len)
+
+		/* OK, we think it is RPC. Can we desegment? */
+		if (rpc_desegment && pinfo->can_desegment) {
+			/* Yes, so tell the TCP dissector how much
+			 * more data we need. */
+
+			pinfo->desegment_offset = offset;
+			pinfo->desegment_len = len - tvb_reported_len;
+			return -((gint32) pinfo->desegment_len);
+		} else {
+			/* No. */
+			expert_add_info(pinfo, NULL, &ei_rpc_segment_needed);
+			can_defragment = FALSE;
+		}
+	} else if (tvb_reported_len > (gint)len) {
 		tvb_reported_len = len;
+	}
+
+	tvb_len = tvb_captured_length_remaining(tvb, offset);
+	if (tvb_len < (gint)len) {
+		/*  We don't have all the data for this fragment. */
+		can_defragment = FALSE;
+	}if (tvb_len > (gint)len) {
+		tvb_len = len;
+	}
+
 	frag_tvb = tvb_new_subset_length_caplen(tvb, offset, tvb_len,
 	    tvb_reported_len);
 
@@ -3353,15 +3357,12 @@ dissect_rpc_fragment(tvbuff_t *tvb, int offset, packet_info *pinfo,
 	 * If we're not defragmenting, just hand this to the
 	 * disssector.
 	 *
-	 * We defragment only if we should (rpc_defragment true) *and*
-	 * we can (tvb_len == tvb_reported_len, so that we have all the
-	 * data in the fragment).
+	 * We defragment only if we should (rpc_defragment true) *and* we
+	 * can (tvb_len <= len, so that we have all the data in the fragment).
 	 */
-	if (!rpc_defragment || tvb_len != tvb_reported_len) {
+	if (!can_defragment) {
 		/*
-		 * This is the first fragment we've seen, and it's also
-		 * the last fragment; that means the record wasn't
-		 * fragmented.  Hand the dissector the tvbuff for the
+		 * We can't defragment.  Hand the dissector the tvbuff for the
 		 * fragment as the tvbuff for the record.
 		 */
 		rec_tvb = frag_tvb;
@@ -3374,7 +3375,8 @@ dissect_rpc_fragment(tvbuff_t *tvb, int offset, packet_info *pinfo,
 		save_fragmented = pinfo->fragmented;
 		pinfo->fragmented = TRUE;
 		rpc_succeeded = call_message_dissector(tvb, rec_tvb, pinfo,
-		    tree, frag_tvb, dissector, ipfd_head, rpc_rm, first_pdu);
+		    tree, frag_tvb, dissector, ipfd_head, rpc_rm, first_pdu,
+		    can_defragment);
 		pinfo->fragmented = save_fragmented;
 		if (!rpc_succeeded)
 			return 0;	/* not RPC */
@@ -3421,7 +3423,7 @@ dissect_rpc_fragment(tvbuff_t *tvb, int offset, packet_info *pinfo,
 			 * an exception.
 			 */
 			if (!(*dissector)(frag_tvb, pinfo, tree, frag_tvb,
-			    NULL, TRUE, rpc_rm, first_pdu))
+			    NULL, TRUE, rpc_rm, first_pdu, can_defragment))
 				return 0;	/* not valid */
 
 			/*
@@ -3606,7 +3608,8 @@ dissect_rpc_fragment(tvbuff_t *tvb, int offset, packet_info *pinfo,
 	 * dissector.
 	 */
 	if (!call_message_dissector(tvb, rec_tvb, pinfo, tree,
-	    frag_tvb, dissector, ipfd_head, rpc_rm, first_pdu))
+	    frag_tvb, dissector, ipfd_head, rpc_rm, first_pdu,
+	    can_defragment))
 		return 0;	/* not RPC */
 	return len;
 }  /* end of dissect_rpc_fragment() */
@@ -3927,16 +3930,24 @@ static stat_tap_table_item rpc_prog_stat_fields[] = {
 
 static void rpc_prog_stat_init(stat_tap_table_ui* new_stat)
 {
+	const char *table_name = "ONC-RPC Program Statistics";
 	int num_fields = sizeof(rpc_prog_stat_fields)/sizeof(stat_tap_table_item);
-	stat_tap_table* table;
+	stat_tap_table *table;
 
-	table = stat_tap_init_table("ONC-RPC Program Statistics", num_fields, 0, NULL);
+	table = stat_tap_find_table(new_stat, table_name);
+	if (table) {
+		if (new_stat->stat_tap_reset_table_cb) {
+			new_stat->stat_tap_reset_table_cb(table);
+		}
+		return;
+	}
+
+	table = stat_tap_init_table(table_name, num_fields, 0, NULL);
 	stat_tap_add_table(new_stat, table);
-
 }
 
 static tap_packet_status
-rpc_prog_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *rciv_ptr)
+rpc_prog_stat_packet(void *tapdata, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *rciv_ptr, tap_flags_t flags _U_)
 {
 	stat_data_t* stat_data = (stat_data_t*)tapdata;
 	const rpc_call_info_value *ri = (const rpc_call_info_value *)rciv_ptr;
@@ -4319,6 +4330,7 @@ proto_register_rpc(void)
 	};
 	static ei_register_info ei[] = {
 		{ &ei_rpc_cannot_dissect, { "rpc.cannot_dissect", PI_UNDECODED, PI_WARN, "Cannot dissect", EXPFILL }},
+		{ &ei_rpc_segment_needed, { "rpc.segment_needed", PI_REASSEMBLE, PI_NOTE, "Need another TCP segment but cannot desegment or not enabled (check RPC and TCP preferences)", EXPFILL }},
 	};
 
 	module_t *rpc_module;
@@ -4329,7 +4341,7 @@ proto_register_rpc(void)
 	};
 
 	static stat_tap_table_ui rpc_prog_stat_table = {
-		REGISTER_STAT_GROUP_UNSORTED,
+		REGISTER_PACKET_STAT_GROUP_UNSORTED,
 		"ONC-RPC Programs",
 		"rpc",
 		"rpc,programs",

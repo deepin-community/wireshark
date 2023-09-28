@@ -1,4 +1,4 @@
-/* related_packet_delegate.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -46,22 +46,6 @@ private:
     void drawArrow(QPainter *painter, const QPoint tail, const QPoint head, int head_size) const;
     void drawChevrons(QPainter *painter, const QPoint tail, const QPoint head, int head_size) const;
     void drawCheckMark(QPainter *painter, const QRect bbox) const;
-signals:
-
-
 };
 
 #endif // RELATED_PACKET_DELEGATE_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Ref: 3GPP TS 25.331 V16.1.0 (2020-09)
+ * Ref: 3GPP TS 25.331 V17.1.0 (2022-06)
  */
 
 /**
@@ -26,6 +26,7 @@
 #include <epan/conversation.h>
 #include <epan/expert.h>
 #include <epan/proto_data.h>
+#include <epan/prefs.h>
 
 #include "packet-ber.h"
 #include "packet-per.h"
@@ -55,6 +56,7 @@ GTree * hsdsch_muxed_flows = NULL;
 GTree * rrc_ciph_info_tree = NULL;
 wmem_tree_t* rrc_global_urnti_crnti_map = NULL;
 static int msg_type _U_;
+static gboolean rrc_nas_in_root_tree;
 
 enum rrc_sib_segment_type {
   RRC_SIB_SEG_NO_SEGMENT = 0,
@@ -85,7 +87,7 @@ typedef struct umts_rrc_private_data_t
   enum nas_sys_info_gsm_map cn_domain;
   wmem_strbuf_t* digits_strbuf; /* A collection of digits in a string. Used for reconstructing IMSIs or MCC-MNC pairs */
   wmem_strbuf_t* last_mcc_strbuf; /* Last seen MCC digits string */
-  gboolean digits_strbuf_parsing_failed_flag; /* Whether an error occured when creating the IMSI/MCC-MNC pair string */
+  gboolean digits_strbuf_parsing_failed_flag; /* Whether an error occurred when creating the IMSI/MCC-MNC pair string */
   guint32 rbid;
   guint32 rlc_ciphering_sqn; /* Sequence number where ciphering starts in a given bearer */
   rrc_ciphering_info* ciphering_info;
@@ -99,7 +101,7 @@ typedef struct umts_rrc_private_data_t
 static umts_rrc_private_data_t* umts_rrc_get_private_data(asn1_ctx_t *actx)
 {
   if (actx->private_data == NULL) {
-    actx->private_data = wmem_new0(wmem_packet_scope(), umts_rrc_private_data_t);
+    actx->private_data = wmem_new0(actx->pinfo->pool, umts_rrc_private_data_t);
   }
   return (umts_rrc_private_data_t*)actx->private_data;
 }
@@ -428,6 +430,11 @@ get_or_create_cipher_info(fp_info *fpinf, rlc_info *rlcinf) {
       cipher_info->seq_no[i][0] = -1;
       cipher_info->seq_no[i][1] = -1;
     }
+
+    /* Set algorithms to 'unknown' since 0s are valid values */
+    cipher_info->ciphering_algorithm = -1;
+    cipher_info->integrity_algorithm = -1;
+
     g_tree_insert(rrc_ciph_info_tree, GINT_TO_POINTER((gint)rlcinf->ueid[fpinf->cur_tb]), cipher_info);
   }
   return cipher_info;
@@ -608,6 +615,7 @@ void proto_register_rrc(void) {
   };
 
   expert_module_t* expert_rrc;
+  module_t *rrc_module;
 
   /* Register protocol */
   proto_rrc = proto_register_protocol(PNAME, PSNAME, PFNAME);
@@ -621,11 +629,15 @@ void proto_register_rrc(void) {
 
 #include "packet-rrc-dis-reg.c"
 
+  register_init_routine(rrc_init);
+  register_cleanup_routine(rrc_cleanup);
 
-
-
-    register_init_routine(rrc_init);
-    register_cleanup_routine(rrc_cleanup);
+  /* Register configuration preferences */
+  rrc_module = prefs_register_protocol(proto_rrc, NULL);
+  prefs_register_bool_preference(rrc_module, "nas_in_root_tree",
+                                 "Show NAS PDU in root packet details",
+                                 "Whether the NAS PDU should be shown in the root packet details tree",
+                                 &rrc_nas_in_root_tree);
 }
 
 

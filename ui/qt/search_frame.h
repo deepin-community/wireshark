@@ -1,4 +1,4 @@
-/* search_frame.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -47,7 +47,7 @@ private:
 
     Ui::SearchFrame *sf_ui_;
     capture_file *cap_file_;
-    GRegex *regex_;
+    ws_regex_t *regex_;
     QString regex_error_;
 
 private slots:
@@ -61,16 +61,3 @@ private slots:
 };
 
 #endif // SEARCH_FRAME_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

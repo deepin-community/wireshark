@@ -10,6 +10,7 @@
 ADD_CUSTOM_CMAKE_INCLUDE()
 
 set(ASN1_SRC_DIRS
+	lix2
 	HI2Operations
 	acp133
 	acse
@@ -34,9 +35,11 @@ set(ASN1_SRC_DIRS
 	dop
 	dsp
 	e1ap
+        e2ap
 	ess
 	f1ap
 	ftam
+        gdt
 	glow
 	goose
 	gprscdr

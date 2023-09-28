@@ -25,6 +25,7 @@
 #include <wsutil/file_util.h>
 #include <wsutil/str_util.h>
 #include <wsutil/report_message.h>
+#include <wsutil/ws_assert.h>
 
 #include <wsutil/filesystem.h>
 #include <epan/packet.h>
@@ -54,7 +55,7 @@ uat_t* uat_new(const char* name,
                uat_reset_cb_t reset_cb,
                uat_field_t* flds_array) {
     /* Create new uat */
-    uat_t* uat = (uat_t *)g_malloc(sizeof(uat_t));
+    uat_t* uat = g_new(uat_t, 1);
     guint i;
 
     /* Add to global array of uats */
@@ -64,7 +65,7 @@ uat_t* uat_new(const char* name,
     g_ptr_array_add(all_uats,uat);
 
     /* Check params */
-    g_assert(name && size && filename && data_ptr && numitems_ptr);
+    ws_assert(name && size && filename && data_ptr && numitems_ptr);
 
     /* Set uat values from inputs */
     uat->name = g_strdup(name);
@@ -84,6 +85,7 @@ uat_t* uat_new(const char* name,
     uat->post_update_cb = post_update_cb;
     uat->reset_cb = reset_cb;
     uat->fields = flds_array;
+    uat->default_values = NULL;
     uat->user_data = g_array_new(FALSE,FALSE,(guint)uat->record_size);
     uat->raw_data = g_array_new(FALSE,FALSE,(guint)uat->record_size);
     uat->valid_data = g_array_new(FALSE,FALSE,sizeof(gboolean));
@@ -96,7 +98,7 @@ uat_t* uat_new(const char* name,
     uat->flags = flags;
 
     for (i=0;flds_array[i].title;i++) {
-        fld_data_t* f = (fld_data_t *)g_malloc(sizeof(fld_data_t));
+        fld_data_t* f = g_new(fld_data_t, 1);
 
         f->colnum = i+1;
         f->rep = NULL;
@@ -153,7 +155,7 @@ void uat_update_record(uat_t *uat, const void *record, gboolean valid_rec) {
     }
     if (pos == uat->raw_data->len) {
         /* Data is not within list?! */
-        g_assert_not_reached();
+        ws_assert_not_reached();
     }
 
     valid = &g_array_index(uat->valid_data, gboolean, pos);
@@ -165,7 +167,7 @@ void uat_swap(uat_t* uat, guint a, guint b) {
     void* tmp;
     gboolean tmp_bool;
 
-    g_assert( a < uat->raw_data->len && b < uat->raw_data->len );
+    ws_assert( a < uat->raw_data->len && b < uat->raw_data->len );
 
     if (a == b) return;
 
@@ -184,7 +186,7 @@ void uat_swap(uat_t* uat, guint a, guint b) {
 
 void uat_insert_record_idx(uat_t* uat, guint idx, const void *src_record) {
     /* Allow insert before an existing item or append after the last item. */
-    g_assert( idx <= uat->raw_data->len );
+    ws_assert( idx <= uat->raw_data->len );
 
     /* Store a copy of the record and invoke copy_cb to clone pointers too. */
     g_array_insert_vals(uat->raw_data, idx, src_record, 1);
@@ -203,7 +205,7 @@ void uat_insert_record_idx(uat_t* uat, guint idx, const void *src_record) {
 
 void uat_remove_record_idx(uat_t* uat, guint idx) {
 
-    g_assert( idx < uat->raw_data->len );
+    ws_assert( idx < uat->raw_data->len );
 
     if (uat->free_cb) {
         uat->free_cb(UAT_INDEX_PTR(uat,idx));
@@ -264,6 +266,11 @@ uat_t* uat_get_table_by_name(const char* name) {
     return NULL;
 }
 
+void uat_set_default_values(uat_t *uat_in, const char *default_values[])
+{
+    uat_in->default_values = default_values;
+}
+
 char *uat_fld_tostr(void *rec, uat_field_t *f) {
     guint        len;
     char       *ptr;
@@ -295,7 +302,7 @@ char *uat_fld_tostr(void *rec, uat_field_t *f) {
             break;
         }
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
             out = NULL;
             break;
     }
@@ -350,7 +357,7 @@ static void putfld(FILE* fp, void* rec, uat_field_t* f) {
             break;
         }
         default:
-            g_assert_not_reached();
+            ws_assert_not_reached();
     }
 
     g_free(fld_ptr);
@@ -369,7 +376,7 @@ gboolean uat_save(uat_t* uat, char** error) {
         /* Parent directory does not exist, try creating first */
         gchar *pf_dir_path = NULL;
         if (create_persconffile_dir(&pf_dir_path) != 0) {
-            *error = g_strdup_printf("uat_save: error creating '%s'", pf_dir_path);
+            *error = ws_strdup_printf("uat_save: error creating '%s'", pf_dir_path);
             g_free (pf_dir_path);
             return FALSE;
         }
@@ -377,7 +384,7 @@ gboolean uat_save(uat_t* uat, char** error) {
     }
 
     if (!fp) {
-        *error = g_strdup_printf("uat_save: error opening '%s': %s",fname,g_strerror(errno));
+        *error = ws_strdup_printf("uat_save: error opening '%s': %s",fname,g_strerror(errno));
         return FALSE;
     }
 
@@ -604,6 +611,32 @@ gboolean uat_fld_chk_proto(void* u1 _U_, const char* strptr, guint len, const vo
     }
 }
 
+static gboolean uat_fld_chk_num_check_result(gboolean result, const char* strn, char** err) {
+    if (result && ((*strn != '\0') && (*strn != ' '))) {
+        /* string valid, but followed by something other than a space */
+        result = FALSE;
+        errno = EINVAL;
+    }
+    if (!result) {
+        switch (errno) {
+
+        case EINVAL:
+            *err = g_strdup("Invalid value");
+            break;
+
+        case ERANGE:
+            *err = g_strdup("Value too large");
+            break;
+
+        default:
+            *err = g_strdup(g_strerror(errno));
+            break;
+        }
+    }
+
+    return result;
+}
+
 static gboolean uat_fld_chk_num(int base, const char* strptr, guint len, char** err) {
     if (len > 0) {
         char* str = g_strndup(strptr, len);
@@ -612,29 +645,25 @@ static gboolean uat_fld_chk_num(int base, const char* strptr, guint len, char** 
         guint32 value;
 
         result = ws_basestrtou32(str, &strn, &value, base);
-        if (result && ((*strn != '\0') && (*strn != ' '))) {
-            /* string valid, but followed by something other than a space */
-            result = FALSE;
-            errno = EINVAL;
-        }
-        if (!result) {
-            switch (errno) {
-
-            case EINVAL:
-                *err = g_strdup("Invalid value");
-                break;
-
-            case ERANGE:
-                *err = g_strdup("Value too large");
-                break;
-
-            default:
-                *err = g_strdup(g_strerror(errno));
-                break;
-            }
-        }
+        result = uat_fld_chk_num_check_result(result, strn, err);
         g_free(str);
+        return result;
+    }
 
+    *err = NULL;
+    return TRUE;
+}
+
+static gboolean uat_fld_chk_num64(int base, const char* strptr, guint len, char** err) {
+    if (len > 0) {
+        char* str = g_strndup(strptr, len);
+        const char* strn;
+        gboolean result;
+        guint64 value64;
+
+        result = ws_basestrtou64(str, &strn, &value64, base);
+        result = uat_fld_chk_num_check_result(result, strn, err);
+        g_free(str);
         return result;
     }
 
@@ -650,6 +679,14 @@ gboolean uat_fld_chk_num_hex(void* u1 _U_, const char* strptr, guint len, const 
     return uat_fld_chk_num(16, strptr, len, err);
 }
 
+gboolean uat_fld_chk_num_dec64(void* u1 _U_, const char* strptr, guint len, const void* u2 _U_, const void* u3 _U_, char** err) {
+    return uat_fld_chk_num64(10, strptr, len, err);
+}
+
+gboolean uat_fld_chk_num_hex64(void* u1 _U_, const char* strptr, guint len, const void* u2 _U_, const void* u3 _U_, char** err) {
+    return uat_fld_chk_num64(16, strptr, len, err);
+}
+
 gboolean uat_fld_chk_num_signed_dec(void* u1 _U_, const char* strptr, guint len, const void* u2 _U_, const void* u3 _U_, char** err) {
     if (len > 0) {
         char* str = g_strndup(strptr,len);
@@ -658,27 +695,25 @@ gboolean uat_fld_chk_num_signed_dec(void* u1 _U_, const char* strptr, guint len,
         gint32 value;
 
         result = ws_strtoi32(str, &strn, &value);
-        if (result && ((*strn != '\0') && (*strn != ' '))) {
-            /* string valid, but followed by something other than a space */
-            result = FALSE;
-            errno = EINVAL;
-        }
-        if (!result) {
-            switch (errno) {
+        result = uat_fld_chk_num_check_result(result, strn, err);
+        g_free(str);
 
-            case EINVAL:
-                *err = g_strdup("Invalid value");
-                break;
+        return result;
+    }
 
-            case ERANGE:
-                *err = g_strdup("Value too large");
-                break;
+    *err = NULL;
+    return TRUE;
+}
 
-            default:
-                *err = g_strdup(g_strerror(errno));
-                break;
-            }
-        }
+gboolean uat_fld_chk_num_signed_dec64(void* u1 _U_, const char* strptr, guint len, const void* u2 _U_, const void* u3 _U_, char** err) {
+    if (len > 0) {
+        char* str = g_strndup(strptr, len);
+        const char* strn;
+        gboolean result;
+        gint64 value;
+
+        result = ws_strtoi64(str, &strn, &value);
+        result = uat_fld_chk_num_check_result(result, strn, err);
         g_free(str);
 
         return result;
@@ -699,7 +734,7 @@ gboolean uat_fld_chk_bool(void* u1 _U_, const char* strptr, guint len, const voi
         return TRUE;
     }
 
-    *err = g_strdup_printf("invalid value: %s (must be TRUE or FALSE)", str);
+    *err = ws_strdup_printf("invalid value: %s (must be TRUE or FALSE)", str);
     g_free(str);
     return FALSE;
 }
@@ -718,7 +753,7 @@ gboolean uat_fld_chk_enum(void* u1 _U_, const char* strptr, guint len, const voi
         }
     }
 
-    *err = g_strdup_printf("invalid value: %s",str);
+    *err = ws_strdup_printf("invalid value: %s",str);
     g_free(str);
     return FALSE;
 }
@@ -735,11 +770,11 @@ gboolean uat_fld_chk_range(void* u1 _U_, const char* strptr, guint len, const vo
             ret_value = TRUE;
             break;
         case CVT_SYNTAX_ERROR:
-            *err = g_strdup_printf("syntax error in range: %s",str);
+            *err = ws_strdup_printf("syntax error in range: %s",str);
             ret_value = FALSE;
             break;
         case CVT_NUMBER_TOO_BIG:
-            *err = g_strdup_printf("value too large in range: '%s' (max = %u)",str,GPOINTER_TO_UINT(u3));
+            *err = ws_strdup_printf("value too large in range: '%s' (max = %u)",str,GPOINTER_TO_UINT(u3));
             ret_value = FALSE;
             break;
         default:
@@ -884,7 +919,7 @@ char* uat_esc(const char* buf, guint len) {
 
     for (b = (const guint8 *)buf; b < end; b++) {
         if (*b == '"' || *b == '\\' || ! g_ascii_isprint(*b) ) {
-            g_snprintf(s,5,"\\x%02x",((guint)*b));
+            snprintf(s,5,"\\x%02x",((guint)*b));
             s+=4;
         } else {
             *(s++) = (*b);
@@ -901,7 +936,7 @@ gboolean uat_fld_chk_str_isprint(void* u1 _U_, const char* strptr, guint len, co
     for (i = 0; i < len; i++) {
         char c = strptr[i];
         if (! g_ascii_isprint(c)) {
-            *err = g_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
+            *err = ws_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
             return FALSE;
         }
     }
@@ -915,7 +950,7 @@ gboolean uat_fld_chk_str_isalpha(void* u1 _U_, const char* strptr, guint len, co
     for (i = 0; i < len; i++) {
         char c = strptr[i];
         if (! g_ascii_isalpha(c)) {
-            *err = g_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
+            *err = ws_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
             return FALSE;
         }
     }
@@ -929,7 +964,7 @@ gboolean uat_fld_chk_str_isalnum(void* u1 _U_, const char* strptr, guint len, co
     for (i = 0; i < len; i++) {
         char c = strptr[i];
         if (! g_ascii_isalnum(c)) {
-            *err = g_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
+            *err = ws_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
             return FALSE;
         }
     }
@@ -943,7 +978,7 @@ gboolean uat_fld_chk_str_isdigit(void* u1 _U_, const char* strptr, guint len, co
     for (i = 0; i < len; i++) {
         char c = strptr[i];
         if (! g_ascii_isdigit(c)) {
-            *err = g_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
+            *err = ws_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
             return FALSE;
         }
     }
@@ -957,7 +992,7 @@ gboolean uat_fld_chk_str_isxdigit(void* u1 _U_, const char* strptr, guint len, c
     for (i = 0; i < len; i++) {
         char c = strptr[i];
         if (! g_ascii_isxdigit(c)) {
-            *err = g_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
+            *err = ws_strdup_printf("invalid char pos=%d value=%02x", i, (guchar) c);
             return FALSE;
         }
     }

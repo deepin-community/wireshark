@@ -11,6 +11,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+#include "config.h"
+
 #include "mate.h"
 #include "mate_util.h"
 #include <wsutil/file_util.h>
@@ -25,7 +27,7 @@
 /* dbg_print:
  * which:  a pointer to the current level of debugging for a feature
  * how: the level over which this message should be printed out
- * where: the file on which to print (g_message if null)
+ * where: the file on which to print (ws_message if null)
  * fmt, ...: what to print
  */
 
@@ -36,11 +38,11 @@ void dbg_print(const gint* which, gint how, FILE* where, const gchar* fmt, ... )
 	if ( ! which || *which < how ) return;
 
 	va_start( list, fmt );
-	g_vsnprintf(debug_buffer,DEBUG_BUFFER_SIZE,fmt,list);
+	vsnprintf(debug_buffer,DEBUG_BUFFER_SIZE,fmt,list);
 	va_end( list );
 
 	if (! where) {
-		g_message("%s", debug_buffer);
+		ws_message("%s", debug_buffer);
 	} else {
 		fputs(debug_buffer,where);
 		fputs("\n",where);
@@ -78,7 +80,7 @@ static void destroy_scs_collection(SCS_collection* c) {
 }
 
 static SCS_collection* scs_init(void) {
-	SCS_collection* c = (SCS_collection *)g_malloc(sizeof(SCS_collection));
+	SCS_collection* c = g_new(SCS_collection, 1);
 
 	c->hash =  g_hash_table_new(g_str_hash,g_str_equal);
 
@@ -123,11 +125,11 @@ gchar* scs_subscribe(SCS_collection* c, const gchar* s) {
 			len = SCS_HUGE_SIZE;
 		} else {
 			len = SCS_HUGE_SIZE;
-			g_warning("mate SCS: string truncated due to huge size");
+			ws_warning("mate SCS: string truncated due to huge size");
 		}
 
 		orig = (gchar *)g_slice_alloc(len);
-		g_strlcpy(orig,s,len);
+		(void) g_strlcpy(orig,s,len);
 
 		g_hash_table_insert(c->hash,orig,ip);
 	}
@@ -173,7 +175,7 @@ void scs_unsubscribe(SCS_collection* c, gchar* s) {
 			(*ip)--;
 		}
 	} else {
-		g_warning("unsubscribe: not subscribed");
+		ws_warning("unsubscribe: not subscribed");
 	}
 }
 
@@ -191,7 +193,7 @@ gchar* scs_subscribe_printf(SCS_collection* c, gchar* fmt, ...) {
 	static gchar buf[SCS_HUGE_SIZE];
 
 	va_start( list, fmt );
-	g_vsnprintf(buf, SCS_HUGE_SIZE, fmt, list);
+	vsnprintf(buf, SCS_HUGE_SIZE, fmt, list);
 	va_end( list );
 
 	return scs_subscribe(c,buf);
@@ -1433,13 +1435,13 @@ static LoAL* load_loal_error(FILE* fp, LoAL* loal, AVPL* curr, int linenum, cons
 	gchar* err;
 
 	va_start( list, fmt );
-	desc = g_strdup_vprintf(fmt, list);
+	desc = ws_strdup_vprintf(fmt, list);
 	va_end( list );
 
 	if (loal) {
-		err = g_strdup_printf("Error Loading LoAL from file: in %s at line: %i, %s",loal->name,linenum,desc);
+		err = ws_strdup_printf("Error Loading LoAL from file: in %s at line: %i, %s",loal->name,linenum,desc);
 	} else {
-		err = g_strdup_printf("Error Loading LoAL at line: %i, %s",linenum,desc);
+		err = ws_strdup_printf("Error Loading LoAL at line: %i, %s",linenum,desc);
 	}
 	ret = new_loal(err);
 
@@ -1557,7 +1559,7 @@ extern LoAL* loal_from_file(gchar* filename) {
 							i = 0;
 							name[i++] = c;
 							name[i] = '\0';
-							g_snprintf(linenum_buf,MAX_ITEM_LEN,"%s:%u",filename,linenum);
+							snprintf(linenum_buf,MAX_ITEM_LEN,"%s:%u",filename,linenum);
 							curr = new_avpl(linenum_buf);
 							continue;
 						case '#':

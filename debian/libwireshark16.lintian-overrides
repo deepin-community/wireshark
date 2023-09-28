@@ -1,0 +1,7 @@
+libwireshark16: library-not-linked-against-libc [usr/lib/*/wireshark/plugins/*/codecs/g7*.so]
+libwireshark16: library-not-linked-against-libc [usr/lib/*/wireshark/plugins/*/codecs/l16mono.so]
+
+# Typo directly on IANA enterprise-numbers (epan/enterprise-numbers)
+libwireshark16: spelling-error-in-binary Nam Name [usr/lib/*/libwireshark.so.*]
+libwireshark16: spelling-error-in-binary Informations Information [usr/lib/*/libwireshark.so.*]
+libwireshark16: spelling-error-in-binary Dont Don't [usr/lib/*/libwireshark.so.*]

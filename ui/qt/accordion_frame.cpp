@@ -38,7 +38,7 @@ AccordionFrame::AccordionFrame(QWidget *parent) :
     animation_ = new QPropertyAnimation(this, "maximumHeight", this);
     animation_->setDuration(duration_);
     animation_->setEasingCurve(QEasingCurve::InOutQuad);
-    connect(animation_, SIGNAL(finished()), this, SLOT(animationFinished()));
+    connect(animation_, &QPropertyAnimation::finished, this, &AccordionFrame::animationFinished);
 }
 
 void AccordionFrame::animatedShow()
@@ -93,16 +93,3 @@ void AccordionFrame::animationFinished()
         setMaximumHeight(frame_height_);
     }
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

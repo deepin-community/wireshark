@@ -37,6 +37,8 @@ typedef struct packetlogger_header {
 #define PKT_HCI_EVENT       0x01
 #define PKT_SENT_ACL_DATA   0x02
 #define PKT_RECV_ACL_DATA   0x03
+#define PKT_SENT_SCO_DATA   0x08
+#define PKT_RECV_SCO_DATA   0x09
 #define PKT_LMP_SEND        0x0A
 #define PKT_LMP_RECV        0x0B
 #define PKT_SYSLOG          0xF7
@@ -65,6 +67,10 @@ static wtap_open_return_val packetlogger_check_record(wtap *wth,
 static gboolean packetlogger_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec,
 					 Buffer *buf, int *err,
 					 gchar **err_info);
+
+static int packetlogger_file_type_subtype = -1;
+
+void register_packetlogger(void);
 
 /*
  * Number of packets to try reading.
@@ -191,7 +197,7 @@ wtap_open_return_val packetlogger_open(wtap *wth, int *err, gchar **err_info)
 		return WTAP_OPEN_ERROR;
 
 	/* This is a PacketLogger file */
-	packetlogger = (packetlogger_t *)g_malloc(sizeof(packetlogger_t));
+	packetlogger = g_new(packetlogger_t, 1);
 	packetlogger->byte_swapped = byte_swapped;
 	wth->priv = (void *)packetlogger;
 
@@ -199,7 +205,7 @@ wtap_open_return_val packetlogger_open(wtap *wth, int *err, gchar **err_info)
 	wth->subtype_read = packetlogger_read;
 	wth->subtype_seek_read = packetlogger_seek_read;
 
-	wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_PACKETLOGGER;
+	wth->file_type_subtype = packetlogger_file_type_subtype;
 	wth->file_encap = WTAP_ENCAP_PACKETLOGGER;
 	wth->file_tsprec = WTAP_TSPREC_USEC;
 
@@ -301,6 +307,8 @@ packetlogger_check_record(wtap *wth, packetlogger_header_t *pl_hdr, int *err,
 		case PKT_HCI_EVENT:
 		case PKT_SENT_ACL_DATA:
 		case PKT_RECV_ACL_DATA:
+		case PKT_SENT_SCO_DATA:
+		case PKT_RECV_SCO_DATA:
 		case PKT_LMP_SEND:
 		case PKT_LMP_RECV:
 		case PKT_SYSLOG:
@@ -347,7 +355,7 @@ packetlogger_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
 
 	if (pl_hdr.len < 8) {
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("packetlogger: record length %u is too small", pl_hdr.len);
+		*err_info = ws_strdup_printf("packetlogger: record length %u is too small", pl_hdr.len);
 		return FALSE;
 	}
 	if (pl_hdr.len - 8 > WTAP_MAX_PACKET_SIZE_STANDARD) {
@@ -356,12 +364,13 @@ packetlogger_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
 		 * to allocate space for an immensely-large packet.
 		 */
 		*err = WTAP_ERR_BAD_FILE;
-		*err_info = g_strdup_printf("packetlogger: File has %u-byte packet, bigger than maximum of %u",
+		*err_info = ws_strdup_printf("packetlogger: File has %u-byte packet, bigger than maximum of %u",
 		    pl_hdr.len - 8, WTAP_MAX_PACKET_SIZE_STANDARD);
 		return FALSE;
 	}
 
 	rec->rec_type = REC_TYPE_PACKET;
+	rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
 	rec->presence_flags = WTAP_HAS_TS;
 
 	rec->rec_header.packet_header.len = pl_hdr.len - 8;
@@ -371,6 +380,31 @@ packetlogger_read_packet(wtap *wth, FILE_T fh, wtap_rec *rec, Buffer *buf,
 	rec->ts.nsecs = (int)(pl_hdr.ts_usecs * 1000);
 
 	return wtap_read_packet_bytes(fh, buf, rec->rec_header.packet_header.caplen, err, err_info);
+}
+
+static const struct supported_block_type packetlogger_blocks_supported[] = {
+	/*
+	 * We support packet blocks, with no comments or other options.
+	 */
+	{ WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info packetlogger_info = {
+	"macOS PacketLogger", "pklg", "pklg", NULL,
+	FALSE, BLOCKS_SUPPORTED(packetlogger_blocks_supported),
+	NULL, NULL, NULL
+};
+
+void register_packetlogger(void)
+{
+	packetlogger_file_type_subtype = wtap_register_file_type_subtype(&packetlogger_info);
+
+	/*
+	 * Register name for backwards compatibility with the
+	 * wtap_filetypes table in Lua.
+	 */
+	wtap_register_backwards_compatibility_lua_name("PACKETLOGGER",
+	    packetlogger_file_type_subtype);
 }
 
 /*

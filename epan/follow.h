@@ -1,4 +1,4 @@
-/* follow.h
+/** @file
  *
  * Copyright 1998 Mike Hall <mlh@io.com>
  *
@@ -17,7 +17,7 @@
 #include <epan/packet.h>
 #include <epan/ipv6.h>
 #include <epan/tap.h>
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 #include "ws_symbol_export.h"
 
 #ifdef __cplusplus
@@ -42,9 +42,11 @@ typedef enum {
     FOLLOW_TCP,
     FOLLOW_TLS,
     FOLLOW_UDP,
+    FOLLOW_DCCP,
     FOLLOW_HTTP,
     FOLLOW_HTTP2,
     FOLLOW_QUIC,
+    FOLLOW_SIP,
 } follow_type_t;
 
 /* Show Type */
@@ -76,10 +78,13 @@ struct _follow_info;
 typedef gboolean (*follow_print_line_func)(char *, size_t, gboolean, void *);
 typedef frs_return_t (*follow_read_stream_func)(struct _follow_info *follow_info, follow_print_line_func follow_print, void *arg);
 
+#define SUBSTREAM_UNUSED	G_GUINT64_CONSTANT(0xFFFFFFFFFFFFFFFF)
+
 typedef struct {
     gboolean is_server;
     guint32 packet_num;
     guint32 seq; /* TCP only */
+    nstime_t abs_ts; /**< Packet absolute time stamp */
     GByteArray *data;
 } follow_record_t;
 
@@ -95,12 +100,13 @@ typedef struct _follow_info {
     address         client_ip;
     address         server_ip;
     void*           gui_data;
+    guint64         substream_id;  /**< Sub-stream; used only by HTTP2 and QUIC */
 } follow_info_t;
 
 struct register_follow;
 typedef struct register_follow register_follow_t;
 
-typedef gchar* (*follow_conv_filter_func)(packet_info *pinfo, guint *stream, guint *sub_stream);
+typedef gchar* (*follow_conv_filter_func)(epan_dissect_t *edt, packet_info *pinfo, guint *stream, guint *sub_stream);
 typedef gchar* (*follow_index_filter_func)(guint stream, guint sub_stream);
 typedef gchar* (*follow_address_filter_func)(address* src_addr, address* dst_addr, int src_port, int dst_port);
 typedef gchar* (*follow_port_to_display_func)(wmem_allocator_t *allocator, guint port);
@@ -171,7 +177,7 @@ WS_DLL_PUBLIC tap_packet_cb get_follow_tap_handler(register_follow_t* follower);
  * Used by TCP, UDP and HTTP followers
  */
 WS_DLL_PUBLIC tap_packet_status
-follow_tvb_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data);
+follow_tvb_tap_listener(void *tapdata, packet_info *pinfo, epan_dissect_t *edt _U_, const void *data, tap_flags_t flags);
 
 /** Interator to walk all registered followers and execute func
  *

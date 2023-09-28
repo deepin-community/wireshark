@@ -68,15 +68,15 @@ static int dissect_bencoding_str(tvbuff_t *tvb, packet_info *pinfo,
          }
          if (tree) {
             proto_tree_add_uint(tree, hf_bencode_str_length, tvb, offset, used, stringlen);
-            proto_tree_add_item(tree, hf_bencode_str, tvb, offset + used, stringlen, ENC_ASCII|ENC_NA);
+            proto_tree_add_item(tree, hf_bencode_str, tvb, offset + used, stringlen, ENC_ASCII);
 
             if (treeadd == 1) {
                proto_item_append_text(ti, " Key: %s",
-                                      tvb_format_text(tvb, offset + used, stringlen));
+                                      tvb_format_text(pinfo->pool, tvb, offset + used, stringlen));
             }
             if (treeadd == 2) {
                proto_item_append_text(ti, "  Value: %s",
-                                      tvb_format_text(tvb, offset + used, stringlen));
+                                      tvb_format_text(pinfo->pool, tvb, offset + used, stringlen));
             }
          }
          return used + stringlen;
@@ -183,9 +183,7 @@ static int dissect_bencoding_rec(tvbuff_t *tvb, packet_info *pinfo,
    }
 
    op = tvb_get_guint8(tvb, offset);
-   oplen = dissect_bencoding_rec(tvb, pinfo, offset, length, NULL, level + 1, NULL, 0);
-   if (oplen < 0)
-      oplen = length;
+   oplen = length;
 
    switch (op) {
    case 'd':
@@ -226,7 +224,7 @@ static int dissect_bencoding_rec(tvbuff_t *tvb, packet_info *pinfo,
          length -= op1len + op2len;
       }
 
-      proto_tree_add_item(dtree, hf_bencode_truncated_data, tvb, offset + used, -1, ENC_NA);
+      proto_tree_add_item(dtree, hf_bencode_truncated_data, tvb, offset + used, length ? -1 : 0, ENC_NA);
       return -1;
 
    case 'l':

@@ -1,4 +1,4 @@
-/* wtap-int.h
+/** @file
  *
  * Wiretap Library
  * Copyright (c) 1998 by Gilbert Ramirez <gram@alumni.rice.edu>
@@ -9,7 +9,7 @@
 #ifndef __WTAP_INT_H__
 #define __WTAP_INT_H__
 
-#include <glib.h>
+#include "wtap.h"
 #include <time.h>
 
 #ifdef _WIN32
@@ -18,8 +18,9 @@
 
 #include <wsutil/file_util.h>
 
-#include "wtap.h"
 #include "wtap_opttypes.h"
+
+void wtap_init_file_type_subtypes(void);
 
 WS_DLL_PUBLIC
 int wtap_fstat(wtap *wth, ws_statb64 *statb, int *err);
@@ -43,6 +44,8 @@ struct wtap {
     guint                       next_interface_data;    /**< Next interface data that wtap_get_next_interface_description() will show */
     GArray                      *nrb_hdrs;              /**< holds the Name Res Block's comment/custom_opts, or NULL */
     GArray                      *dsbs;                  /**< An array of DSBs (of type wtap_block_t), or NULL if not supported. */
+
+    char                        *pathname;              /**< File pathname; might just be "-" */
 
     void                        *priv;          /* this one holds per-file state and is free'd automatically by wtap_close() */
     void                        *wslua_data;    /* this one holds wslua state info and is not free'd */
@@ -122,7 +125,6 @@ WS_DLL_PUBLIC gboolean wtap_dump_file_write(wtap_dumper *wdh, const void *buf,
     size_t bufsize, int *err);
 WS_DLL_PUBLIC gint64 wtap_dump_file_seek(wtap_dumper *wdh, gint64 offset, int whence, int *err);
 WS_DLL_PUBLIC gint64 wtap_dump_file_tell(wtap_dumper *wdh, int *err);
-
 
 extern gint wtap_num_file_types;
 
@@ -343,6 +345,63 @@ wtap_add_idb(wtap *wth, wtap_block_t idb);
  */
 void
 wtapng_process_dsb(wtap *wth, wtap_block_t dsb);
+
+void
+wtap_register_compatibility_file_subtype_name(const char *old_name,
+    const char *new_name);
+
+void
+wtap_register_backwards_compatibility_lua_name(const char *name, int ft);
+
+struct backwards_compatibiliity_lua_name {
+	const char *name;
+	int ft;
+};
+
+WS_DLL_PUBLIC
+const GArray *get_backwards_compatibility_lua_table(void);
+
+/**
+ * @brief Gets new section header block for new file, based on existing info.
+ * @details Creates a new wtap_block_t section header block and only
+ *          copies appropriate members of the SHB for a new file. In
+ *          particular, the comment string is copied, and any custom options
+ *          which should be copied are copied. The os, hardware, and
+ *          application strings are *not* copied.
+ *
+ * @note Use wtap_free_shb() to free the returned section header.
+ *
+ * @param wth The wiretap session.
+ * @return The new section header, which must be wtap_free_shb'd.
+ */
+GArray* wtap_file_get_shb_for_new_file(wtap *wth);
+
+/**
+ * @brief Generate an IDB, given a wiretap handle for the file,
+ *      using the file's encapsulation type, snapshot length,
+ *      and time stamp resolution, and add it to the interface
+ *      data for a file.
+ * @note This requires that the encapsulation type and time stamp
+ *      resolution not be per-packet; it will terminate the process
+ *      if either of them are.
+ *
+ * @param wth The wiretap handle for the file.
+ */
+WS_DLL_PUBLIC
+void wtap_add_generated_idb(wtap *wth);
+
+/**
+ * @brief Gets new name resolution info for new file, based on existing info.
+ * @details Creates a new wtap_block_t of name resolution info and only
+ *          copies appropriate members for a new file.
+ *
+ * @note Use wtap_free_nrb() to free the returned pointer.
+ *
+ * @param wth The wiretap session.
+ * @return The new name resolution info, which must be freed.
+ */
+GArray* wtap_file_get_nrb_for_new_file(wtap *wth);
+
 #endif /* __WTAP_INT_H__ */
 
 /*

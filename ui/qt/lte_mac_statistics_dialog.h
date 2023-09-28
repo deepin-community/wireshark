@@ -1,4 +1,4 @@
-/* lte_mac_statistics_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -43,6 +43,7 @@ public:
     ~LteMacStatisticsDialog();
 
 protected:
+    void captureFileClosing();
 
 private:
     // Extra controls needed for this dialog.
@@ -54,7 +55,7 @@ private:
 
     // Callbacks for register_tap_listener
     static void tapReset(void *ws_dlg_ptr);
-    static tap_packet_status tapPacket(void *ws_dlg_ptr, struct _packet_info *, struct epan_dissect *, const void *mac_lte_tap_info_ptr);
+    static tap_packet_status tapPacket(void *ws_dlg_ptr, struct _packet_info *, struct epan_dissect *, const void *mac_lte_tap_info_ptr, tap_flags_t flags);
     static void tapDraw(void *ws_dlg_ptr);
 
     virtual const QString filterExpression();
@@ -73,21 +74,7 @@ private:
 private slots:
     virtual void fillTree();
     void updateHeaderLabels();
-    void captureFileClosing();
     void filterUpdated(QString filter);
 };
 
 #endif // __LTE_MAC_STATISTICS_DIALOG_H__
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

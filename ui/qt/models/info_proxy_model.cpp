@@ -38,7 +38,7 @@ void InfoProxyModel::clearInfos()
 
 int InfoProxyModel::rowCount(const QModelIndex &parent) const
 {
-    return sourceModel()->rowCount(parent) + infos_.count();
+    return static_cast<int>(sourceModel()->rowCount(parent) + infos_.count());
 }
 
 QVariant InfoProxyModel::data (const QModelIndex &index, int role) const
@@ -117,16 +117,3 @@ void InfoProxyModel::setColumn(int column)
         emit dataChanged(index(0, column_), index(rowCount(), column_), roles);
     }
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

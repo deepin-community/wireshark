@@ -378,9 +378,9 @@ dissect_erspan_88BE(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *d
 		 */
 		has_erspan_header = FALSE;
 	} else {
-		guint16 gre_flags_and_ver = *(guint16 *)data;
+		gre_hdr_info_t *gre_hdr_info = (gre_hdr_info_t *)data;
 
-		if (gre_flags_and_ver & GRE_SEQUENCE) {
+		if (gre_hdr_info->flags_and_ver & GRE_SEQUENCE) {
 			/*
 			 * "sequence number present" set, so it has a
 			 * header.
@@ -519,7 +519,7 @@ proto_register_erspan(void)
 			0x03fff000, NULL, HFILL }},
 
 		{ &hf_erspan_pid1_domain_id,
-		{ "VSM Domain ID", "erspan.pid1.vsmid", FT_UINT16, BASE_DEC, NULL,
+		{ "VSM Domain ID", "erspan.pid1.vsmid", FT_UINT32, BASE_DEC, NULL,
 			0x00000fff, NULL, HFILL }},
 
 		{ &hf_erspan_pid1_port_index,
@@ -532,7 +532,7 @@ proto_register_erspan(void)
 			0x03ffc000, NULL, HFILL }},
 
 		{ &hf_erspan_pid3_port_index,
-		{ "Port ID/Index", "erspan.pid3.port_index", FT_UINT16, BASE_DEC, NULL,
+		{ "Port ID/Index", "erspan.pid3.port_index", FT_UINT32, BASE_DEC, NULL,
 			0x00003fff, NULL, HFILL }},
 
 		{ &hf_erspan_pid3_timestamp,
@@ -554,11 +554,11 @@ proto_register_erspan(void)
 
 		/* ID = 5 or 6 */
 		{ &hf_erspan_pid5_switchid,
-		{ "Switch ID", "erspan.pid5.switchid", FT_UINT16, BASE_DEC, NULL,
+		{ "Switch ID", "erspan.pid5.switchid", FT_UINT32, BASE_DEC, NULL,
 			0x03ff0000, NULL, HFILL }},
 
 		{ &hf_erspan_pid5_port_index,
-		{ "Port ID/Index", "erspan.pid5.port_index", FT_UINT16, BASE_DEC, NULL,
+		{ "Port ID/Index", "erspan.pid5.port_index", FT_UINT32, BASE_DEC, NULL,
 			0x0000ffff, NULL, HFILL }},
 
 		{ &hf_erspan_pid5_timestamp,

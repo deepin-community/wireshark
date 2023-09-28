@@ -125,7 +125,7 @@ dissect_dmx_chan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 			"0x%03x: %s",
 			"%3u: %s"
 		};
-		wmem_strbuf_t *chan_str = wmem_strbuf_new_label(wmem_packet_scope());
+		wmem_strbuf_t *chan_str = wmem_strbuf_new_label(pinfo->pool);
 		proto_item    *item;
 		guint16        length,r,c,row_count;
 		guint8         v;
@@ -355,7 +355,7 @@ dissect_dmx_text(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data
 		size = tvb_reported_length_remaining(tvb, offset);
 
 		proto_tree_add_item(dmx_text_tree, hf_dmx_text_string, tvb,
-							offset, size, ENC_ASCII|ENC_NA);
+							offset, size, ENC_ASCII);
 	}
 	return tvb_captured_length(tvb);
 }

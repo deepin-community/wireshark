@@ -135,6 +135,10 @@ static gboolean parse_single_hex_dump_line(char* rec, guint8 *buf,
 static gboolean parse_vms_packet(FILE_T fh, wtap_rec *rec,
     Buffer *buf, int *err, gchar **err_info);
 
+static int vms_file_type_subtype = -1;
+
+void register_vms(void);
+
 #ifdef TCPIPTRACE_FRAGMENTS_HAVE_HEADER_LINE
 /* Seeks to the beginning of the next packet, and returns the
    byte offset.  Returns -1 on failure, and sets "*err" to the error
@@ -159,7 +163,7 @@ static long vms_seek_next_packet(wtap *wth, int *err, gchar **err_info)
         if (strstr(buf, VMS_REC_MAGIC_STR1) ||
             strstr(buf, VMS_REC_MAGIC_STR2) ||
             strstr(buf, VMS_REC_MAGIC_STR2)) {
-            g_strlcpy(hdr, buf,VMS_LINE_LENGTH);
+            (void) g_strlcpy(hdr, buf,VMS_LINE_LENGTH);
             return cur_off;
         }
     }
@@ -232,7 +236,7 @@ wtap_open_return_val vms_open(wtap *wth, int *err, gchar **err_info)
     }
 
     wth->file_encap = WTAP_ENCAP_RAW_IP;
-    wth->file_type_subtype = WTAP_FILE_TYPE_SUBTYPE_VMS;
+    wth->file_type_subtype = vms_file_type_subtype;
     wth->snapshot_length = 0; /* not known */
     wth->subtype_read = vms_read;
     wth->subtype_seek_read = vms_seek_read;
@@ -318,6 +322,7 @@ parse_vms_packet(FILE_T fh, wtap_rec *rec, Buffer *buf, int *err, gchar **err_in
 {
     char    line[VMS_LINE_LENGTH + 1];
     int     num_items_scanned;
+    gboolean have_pkt_len = FALSE;
     guint32 pkt_len = 0;
     int     pktnum;
     int     csec = 101;
@@ -374,7 +379,7 @@ parse_vms_packet(FILE_T fh, wtap_rec *rec, Buffer *buf, int *err, gchar **err_in
                 return FALSE;
             }
         }
-        if ( (! pkt_len) && (p = strstr(line, "Length"))) {
+        if ( (! have_pkt_len) && (p = strstr(line, "Length "))) {
             p += sizeof("Length ");
             while (*p && ! g_ascii_isdigit(*p))
                 p++;
@@ -387,12 +392,18 @@ parse_vms_packet(FILE_T fh, wtap_rec *rec, Buffer *buf, int *err, gchar **err_in
 
             if (!ws_strtou32(p, &endp, &pkt_len) || (*endp != '\0' && !g_ascii_isspace(*endp))) {
                 *err = WTAP_ERR_BAD_FILE;
-                *err_info = g_strdup_printf("vms: Length field '%s' not valid", p);
+                *err_info = ws_strdup_printf("vms: Length field '%s' not valid", p);
                 return FALSE;
             }
+            have_pkt_len = TRUE;
             break;
         }
     } while (! isdumpline(line));
+    if (! have_pkt_len) {
+        *err = WTAP_ERR_BAD_FILE;
+        *err_info = ws_strdup_printf("vms: Length field not found");
+        return FALSE;
+    }
     if (pkt_len > WTAP_MAX_PACKET_SIZE_STANDARD) {
         /*
          * Probably a corrupt capture file; return an error,
@@ -400,7 +411,7 @@ parse_vms_packet(FILE_T fh, wtap_rec *rec, Buffer *buf, int *err, gchar **err_in
          * space for an immensely-large packet.
          */
         *err = WTAP_ERR_BAD_FILE;
-        *err_info = g_strdup_printf("vms: File has %u-byte packet, bigger than maximum of %u",
+        *err_info = ws_strdup_printf("vms: File has %u-byte packet, bigger than maximum of %u",
                                     pkt_len, WTAP_MAX_PACKET_SIZE_STANDARD);
         return FALSE;
     }
@@ -412,6 +423,7 @@ parse_vms_packet(FILE_T fh, wtap_rec *rec, Buffer *buf, int *err, gchar **err_in
     tm.tm_isdst = -1;
 
     rec->rec_type = REC_TYPE_PACKET;
+    rec->block = wtap_block_create(WTAP_BLOCK_PACKET);
     rec->presence_flags = WTAP_HAS_TS;
     rec->ts.secs = mktime(&tm);
     rec->ts.nsecs = csec * 10000000;
@@ -522,6 +534,31 @@ parse_single_hex_dump_line(char* rec, guint8 *buf, long byte_offset,
     }
 
     return TRUE;
+}
+
+static const struct supported_block_type vms_blocks_supported[] = {
+    /*
+     * We support packet blocks, with no comments or other options.
+     */
+    { WTAP_BLOCK_PACKET, MULTIPLE_BLOCKS_SUPPORTED, NO_OPTIONS_SUPPORTED }
+};
+
+static const struct file_type_subtype_info vms_info = {
+    "TCPIPtrace (VMS)", "tcpiptrace", "txt", NULL,
+    FALSE, BLOCKS_SUPPORTED(vms_blocks_supported),
+    NULL, NULL, NULL
+};
+
+void register_vms(void)
+{
+    vms_file_type_subtype = wtap_register_file_type_subtype(&vms_info);
+
+    /*
+     * Register name for backwards compatibility with the
+     * wtap_filetypes table in Lua.
+     */
+    wtap_register_backwards_compatibility_lua_name("VMS",
+                                                   vms_file_type_subtype);
 }
 
 /*

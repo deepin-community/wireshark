@@ -610,7 +610,7 @@ decode_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, hislipinfo *dat
             if (data->payloadlength <= datalength)
                 datalength = data->payloadlength;
 
-            col_append_fstr(pinfo->cinfo, COL_INFO, " %s", tvb_format_text(tvb, data->offset, (guint32)datalength));
+            col_append_fstr(pinfo->cinfo, COL_INFO, " %s", tvb_format_text(pinfo->pool, tvb, data->offset, (guint32)datalength));
             proto_tree_add_item(tree, hf_hislip_data, tvb, data->offset, -1, ENC_UTF_8 |ENC_NA);
 
             break;
@@ -827,7 +827,7 @@ dissect_hislip_message(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
     /* Actually dissect fields */
 
     /* TODO: could control whether this is shown by preference? */
-    proto_tree_add_item(hislip_tree, hf_hislip_prologue, tvb, hislip_data.offset, 2, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(hislip_tree, hf_hislip_prologue, tvb, hislip_data.offset, 2, ENC_ASCII);
     hislip_data.offset += 2;
 
     proto_tree_add_item(hislip_tree, hf_hislip_messagetype, tvb, hislip_data.offset, 1, ENC_BIG_ENDIAN);

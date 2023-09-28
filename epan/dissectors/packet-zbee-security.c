@@ -148,7 +148,7 @@ static gboolean uat_key_record_update_cb(void* r, char** err) {
         if (rec->string[0] != 0) {
             *err = NULL;
             if ( !zbee_security_parse_key(rec->string, key, rec->byte_order) ) {
-                *err = g_strdup_printf("Expecting %d hexadecimal bytes or\n"
+                *err = ws_strdup_printf("Expecting %d hexadecimal bytes or\n"
                         "a %d character double-quoted string", ZBEE_SEC_CONST_KEYSIZE, ZBEE_SEC_CONST_KEYSIZE);
                 return FALSE;
             }
@@ -192,7 +192,7 @@ static void uat_key_record_post_update(void) {
             key_record.frame_num = ZBEE_SEC_PC_KEY; /* means it's a user PC key */
             key_record.label = g_strdup(uat_key_records[i].label);
             memcpy(key_record.key, key, ZBEE_SEC_CONST_KEYSIZE);
-            zbee_pc_keyring = g_slist_prepend(zbee_pc_keyring, g_memdup(&key_record, sizeof(key_record_t)));
+            zbee_pc_keyring = g_slist_prepend(zbee_pc_keyring, g_memdup2(&key_record, sizeof(key_record_t)));
         }
     }
 }
@@ -476,14 +476,14 @@ dissect_zbee_secure(tvbuff_t *tvb, packet_info *pinfo, proto_tree* tree, guint o
      * Eww, I think I just threw up a little...  ZigBee requires this field
      * to be patched before computing the MIC, but we don't have write-access
      * to the tvbuff. So we need to allocate a copy of the whole thing just
-     * so we can fix these 3 bits. Memory allocated by tvb_memdup(wmem_packet_scope(),...)
+     * so we can fix these 3 bits. Memory allocated by tvb_memdup(pinfo->pool,...)
      * is automatically freed before the next packet is processed.
      */
-    enc_buffer = (guint8 *)tvb_memdup(wmem_packet_scope(), tvb, 0, tvb_captured_length(tvb));
+    enc_buffer = (guint8 *)tvb_memdup(pinfo->pool, tvb, 0, tvb_captured_length(tvb));
     /*
      * Override the const qualifiers and patch the security level field, we
      * know it is safe to overide the const qualifiers because we just
-     * allocated this memory via tvb_memdup(wmem_packet_scope(),...).
+     * allocated this memory via tvb_memdup(pinfo->pool,...).
      */
     enc_buffer[offset] = packet.control;
     packet.level    = zbee_get_bit_field(packet.control, ZBEE_SEC_CONTROL_LEVEL);
@@ -1129,7 +1129,7 @@ zbee_sec_hash(guint8 *input, guint input_len, guint8 *output)
      * append the byte 0x80.
      */
     cipher_in[j++] = 0x80;
-    /* Pad with '0' until the the current block is exactly 'n' bits from the
+    /* Pad with '0' until the current block is exactly 'n' bits from the
      * end.
      */
     while (j!=(ZBEE_SEC_CONST_BLOCKSIZE-2)) {
@@ -1224,7 +1224,7 @@ void zbee_sec_add_key_to_keyring(packet_info *pinfo, const guint8 *key)
         if ( !nwk_keyring ) {
             nwk_keyring = (GSList **)g_malloc0(sizeof(GSList*));
             g_hash_table_insert(zbee_table_nwk_keyring,
-                    g_memdup(&nwk_hints->src_pan, sizeof(nwk_hints->src_pan)), nwk_keyring);
+                    g_memdup2(&nwk_hints->src_pan, sizeof(nwk_hints->src_pan)), nwk_keyring);
         }
 
         if ( nwk_keyring ) {
@@ -1235,7 +1235,7 @@ void zbee_sec_add_key_to_keyring(packet_info *pinfo, const guint8 *key)
                 key_record.frame_num = pinfo->num;
                 key_record.label = NULL;
                 memcpy(&key_record.key, key, ZBEE_APS_CMD_KEY_LENGTH);
-                *nwk_keyring = g_slist_prepend(*nwk_keyring, g_memdup(&key_record, sizeof(key_record_t)));
+                *nwk_keyring = g_slist_prepend(*nwk_keyring, g_memdup2(&key_record, sizeof(key_record_t)));
             }
         }
     }

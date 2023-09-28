@@ -9,6 +9,7 @@
  */
 
 #include <config.h>
+#define WS_LOG_DOMAIN LOG_DOMAIN_EPAN
 
 #include <stdio.h>
 
@@ -25,6 +26,7 @@
 #include <epan/packet_info.h>
 #include <epan/dfilter/dfilter.h>
 #include <epan/tap.h>
+#include <wsutil/wslog.h>
 
 static gboolean tapping_is_active=FALSE;
 
@@ -93,14 +95,21 @@ typedef struct _tap_listener_t {
 
 static tap_listener_t *tap_listener_queue=NULL;
 
-#ifdef HAVE_PLUGINS
 static GSList *tap_plugins = NULL;
 
+#ifdef HAVE_PLUGINS
 void
 tap_register_plugin(const tap_plugin *plug)
 {
 	tap_plugins = g_slist_prepend(tap_plugins, (tap_plugin *)plug);
 }
+#else /* HAVE_PLUGINS */
+void
+tap_register_plugin(const tap_plugin *plug _U_)
+{
+	ws_warning("tap_register_plugin: built without support for binary plugins");
+}
+#endif /* HAVE_PLUGINS */
 
 static void
 call_plugin_register_tap_listener(gpointer data, gpointer user_data _U_)
@@ -113,14 +122,24 @@ call_plugin_register_tap_listener(gpointer data, gpointer user_data _U_)
 }
 
 /*
- * For all tap plugins, call their register routines.
+ * For all taps, call their register routines.
+ *
+ * The table of register routines is part of the main program, not
+ * part of libwireshark, so it must be passed to us as an argument.
  */
 void
-register_all_plugin_tap_listeners(void)
+register_all_tap_listeners(tap_reg_t *tap_reg_listeners)
 {
+	/* we register the plugin taps before the other taps because
+         * stats_tree taps plugins will be registered as tap listeners
+         * by stats_tree_stat.c and need to registered before that */
 	g_slist_foreach(tap_plugins, call_plugin_register_tap_listener, NULL);
+
+	/* Register all builtin listeners. */
+	for (tap_reg_t *t = &tap_reg_listeners[0]; t->cb_func != NULL; t++) {
+		t->cb_func();
+	}
 }
-#endif /* HAVE_PLUGINS */
 
 /* **********************************************************************
  * Init routine only called from epan at application startup
@@ -172,7 +191,7 @@ register_tap(const char *name)
 		tdl = tdl_prev;
 	}
 
-	td=(tap_dissector_t *)g_malloc(sizeof(tap_dissector_t));
+	td=g_new(tap_dissector_t, 1);
 	td->next=NULL;
 	td->name = g_strdup(name);
 
@@ -219,7 +238,7 @@ tap_queue_packet(int tap_id, packet_info *pinfo, const void *tap_specific_data)
 	 * rather than having a fixed maximum number of entries?
 	 */
 	if(tap_packet_index >= TAP_PACKET_QUEUE_LEN){
-		g_warning("Too many taps queued");
+		ws_warning("Too many taps queued");
 		return;
 	}
 
@@ -329,18 +348,22 @@ tap_push_tapped_queue(epan_dissect_t *edt)
 					/* If we have a filter, see if the
 					 * packet passes.
 					 */
+					guint flags = tl->flags;
 					if(tl->code){
 						if (!dfilter_apply_edt(tl->code, edt)){
 							/* The packet didn't
 							 * pass the filter. */
-							continue;
+							if (tl->flags & TL_IGNORE_DISPLAY_FILTER)
+								flags |= TL_DISPLAY_FILTER_IGNORED;
+							else
+								continue;
 						}
 					}
 
 					/* So call the per-packet routine. */
 					tap_packet_status status;
 
-					status = tl->packet(tl->tapdata, tp->pinfo, edt, tp->tap_specific_data);
+					status = tl->packet(tl->tapdata, tp->pinfo, edt, tp->tap_specific_data, flags);
 
 					switch (status) {
 
@@ -527,7 +550,7 @@ register_tap_listener(const char *tapname, void *tapdata, const char *fstring,
 		return error_string;
 	}
 
-	tl=(tap_listener_t *)g_malloc0(sizeof(tap_listener_t));
+	tl=g_new0(tap_listener_t, 1);
 	tl->needs_redraw=TRUE;
 	tl->failed=FALSE;
 	tl->flags=flags;
@@ -662,7 +685,7 @@ remove_tap_listener(void *tapdata)
 
 		}
 		if(!tl) {
-			g_warning("remove_tap_listener(): no listener found with that tap data");
+			ws_warning("remove_tap_listener(): no listener found with that tap data");
 			return;
 		}
 	}
@@ -749,6 +772,7 @@ void tap_cleanup(void)
 		head_lq = head_lq->next;
 		free_tap_listener(elem_lq);
 	}
+	tap_listener_queue = NULL;
 
 	while(head_dl){
 		elem_dl = head_dl;
@@ -756,11 +780,10 @@ void tap_cleanup(void)
 		g_free(elem_dl->name);
 		g_free((gpointer)elem_dl);
 	}
+	tap_dissector_list = NULL;
 
-#ifdef HAVE_PLUGINS
 	g_slist_free(tap_plugins);
 	tap_plugins = NULL;
-#endif /* HAVE_PLUGINS */
 }
 
 /*

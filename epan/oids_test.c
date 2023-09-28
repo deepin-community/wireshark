@@ -10,13 +10,14 @@
  */
 
 #include "config.h"
+#undef G_DISABLE_ASSERT
 
 #include <stdio.h>
 #include <string.h>
 #include <glib.h>
 
 #include "oids.h"
-#include "wmem/wmem.h"
+#include <epan/wmem_scopes.h>
 
 #include <ws_diag_control.h>
 
@@ -74,9 +75,9 @@ oids_test_2subids_encoded(void)
     guint i;
 
     len = oid_encoded2subid(NULL, ex1.encoded, ex1.encoded_len, &subids);
-    g_assert(len == ex1.subids_len);
+    g_assert_true(len == ex1.subids_len);
     for (i=0; i < len; i++)
-        g_assert(subids[i] == ex1.subids[i]);
+        g_assert_true(subids[i] == ex1.subids[i]);
     wmem_free(NULL, subids);
 }
 
@@ -88,9 +89,9 @@ oids_test_2subids_encoded_long(void)
     guint i;
 
     len = oid_encoded2subid(NULL, ex3.encoded, ex3.encoded_len, &subids);
-    g_assert(len == ex3.subids_len);
+    g_assert_true(len == ex3.subids_len);
     for (i=0; i < len; i++)
-        g_assert(subids[i] == ex3.subids[i]);
+        g_assert_true(subids[i] == ex3.subids[i]);
     wmem_free(NULL, subids);
 }
 
@@ -102,9 +103,9 @@ oids_test_2subids_encoded_absviasub(void)
     guint i;
 
     len = oid_encoded2subid_sub(NULL, ex1.encoded, ex1.encoded_len, &subids, TRUE);
-    g_assert(len == ex1.subids_len);
+    g_assert_true(len == ex1.subids_len);
     for (i=0; i < len; i++)
-        g_assert(subids[i] == ex1.subids[i]);
+        g_assert_true(subids[i] == ex1.subids[i]);
     wmem_free(NULL, subids);
 }
 
@@ -116,9 +117,9 @@ oids_test_2subids_encoded_relviasub(void)
     guint i;
 
     len = oid_encoded2subid_sub(NULL, ex2rel.encoded, ex2rel.encoded_len, &subids, FALSE);
-    g_assert(len == ex2rel.subids_len);
+    g_assert_true(len == ex2rel.subids_len);
     for (i=0; i < len; i++)
-        g_assert(subids[i] == ex2rel.subids[i]);
+        g_assert_true(subids[i] == ex2rel.subids[i]);
     wmem_free(NULL, subids);
 }
 
@@ -129,9 +130,9 @@ oids_test_2subids_string(void)
     guint len, i;
 
     len = oid_string2subid(test_scope, ex1.string, &subids);
-    g_assert(len == ex1.subids_len);
+    g_assert_true(len == ex1.subids_len);
     for (i=0; i < len; i++)
-        g_assert(subids[i] == ex1.subids[i]);
+        g_assert_true(subids[i] == ex1.subids[i]);
 }
 
 static void
@@ -141,9 +142,9 @@ oids_test_2subids_string_tooshort(void)
     guint len, i;
 
     len = oid_string2subid(test_scope, ex5.string, &subids);
-    g_assert(len == ex5.subids_len);
+    g_assert_true(len == ex5.subids_len);
     for (i=0; i < len; i++)
-        g_assert(subids[i] == ex5.subids[i]);
+        g_assert_true(subids[i] == ex5.subids[i]);
 }
 
 /* OIDS TESTING FUNCTIONS (/oids/2encoded/) */
@@ -155,8 +156,8 @@ oids_test_2encoded_string_simple(void)
     guint len;
 
     len = oid_string2encoded(NULL, ex1.string, &encoded);
-    g_assert(len == ex1.encoded_len);
-    g_assert(0 == memcmp(encoded, ex1.encoded, len));
+    g_assert_true(len == ex1.encoded_len);
+    g_assert_true(0 == memcmp(encoded, ex1.encoded, len));
     wmem_free(NULL, encoded);
 }
 
@@ -167,8 +168,8 @@ oids_test_2encoded_string_short(void)
     guint len;
 
     len = oid_string2encoded(NULL, ex4.string, &encoded);
-    g_assert(len == ex4.encoded_len);
-    g_assert(0 == memcmp(encoded, ex4.encoded, len));
+    g_assert_true(len == ex4.encoded_len);
+    g_assert_true(0 == memcmp(encoded, ex4.encoded, len));
     wmem_free(NULL, encoded);
 }
 
@@ -179,8 +180,8 @@ oids_test_2encoded_string_long(void)
     guint len;
 
     len = oid_string2encoded(NULL, ex3.string, &encoded);
-    g_assert(len == ex3.encoded_len);
-    g_assert(0 == memcmp(encoded, ex3.encoded, len));
+    g_assert_true(len == ex3.encoded_len);
+    g_assert_true(0 == memcmp(encoded, ex3.encoded, len));
     wmem_free(NULL, encoded);
 }
 
@@ -191,8 +192,8 @@ oids_test_2encoded_string_tooshort(void)
     guint len;
 
     len = oid_string2encoded(NULL, ex5.string, &encoded);
-    g_assert(len == ex5.encoded_len);
-    g_assert(0 == memcmp(encoded, ex5.encoded, len));
+    g_assert_true(len == ex5.encoded_len);
+    g_assert_true(0 == memcmp(encoded, ex5.encoded, len));
     wmem_free(NULL, encoded);
 }
 
@@ -203,8 +204,8 @@ oids_test_2encoded_subids_simple(void)
     guint len;
 
     len = oid_subid2encoded(NULL, ex1.subids_len, ex1.subids, &encoded);
-    g_assert(len == ex1.encoded_len);
-    g_assert(0 == memcmp(encoded, ex1.encoded, len));
+    g_assert_true(len == ex1.encoded_len);
+    g_assert_true(0 == memcmp(encoded, ex1.encoded, len));
     wmem_free(NULL, encoded);
 }
 
@@ -215,8 +216,8 @@ oids_test_2encoded_subids_bad(void)
     guint len;
 
     len = oid_subid2encoded(NULL, ex5.subids_len, ex5.subids, &encoded);
-    g_assert(len == ex5.encoded_len);
-    g_assert(0 == memcmp(encoded, ex5.encoded, len));
+    g_assert_true(len == ex5.encoded_len);
+    g_assert_true(0 == memcmp(encoded, ex5.encoded, len));
     wmem_free(NULL, encoded);
 }
 
@@ -376,9 +377,9 @@ oids_test_2struct_subids(void)
     oid_info_t *st;
 
     st = oid_get(ex1.subids_len, ex1.subids, &matched, &left);
-    g_assert(matched == 1);
-    g_assert(left == ex1.subids_len - 1);
-    g_assert(st != NULL);
+    g_assert_true(matched == 1);
+    g_assert_true(left == ex1.subids_len - 1);
+    g_assert_true(st != NULL);
     g_assert_cmpstr(st->name, ==, "joint-iso-itu-t");
 }
 
@@ -392,14 +393,14 @@ oids_test_2struct_encoded(void)
     guint len, i;
 
     st = oid_get_from_encoded(NULL, ex1.encoded, ex1.encoded_len, &subids, &matched, &left);
-    g_assert(matched == 1);
-    g_assert(left == ex1.subids_len - 1);
-    g_assert(st != NULL);
+    g_assert_true(matched == 1);
+    g_assert_true(left == ex1.subids_len - 1);
+    g_assert_true(st != NULL);
     g_assert_cmpstr(st->name, ==, "joint-iso-itu-t");
     len = matched + left;
-    g_assert(len == ex1.subids_len);
+    g_assert_true(len == ex1.subids_len);
     for (i=0; i < len; i++)
-        g_assert(subids[i] == ex1.subids[i]);
+        g_assert_true(subids[i] == ex1.subids[i]);
     wmem_free(NULL, subids);
 }
 
@@ -413,14 +414,14 @@ oids_test_2struct_string(void)
     guint len, i;
 
     st = oid_get_from_string(test_scope, ex1.string, &subids, &matched, &left);
-    g_assert(matched == 1);
-    g_assert(left == ex1.subids_len - 1);
-    g_assert(st != NULL);
+    g_assert_true(matched == 1);
+    g_assert_true(left == ex1.subids_len - 1);
+    g_assert_true(st != NULL);
     g_assert_cmpstr(st->name, ==, "joint-iso-itu-t");
     len = matched + left;
-    g_assert(len == ex1.subids_len);
+    g_assert_true(len == ex1.subids_len);
     for (i=0; i < len; i++)
-        g_assert(subids[i] == ex1.subids[i]);
+        g_assert_true(subids[i] == ex1.subids[i]);
 }
 
 static void
@@ -509,13 +510,13 @@ main(int argc, char **argv)
     g_test_add_func("/oids/add/encoded",   oids_test_add_encoded);
     g_test_add_func("/oids/add/string",   oids_test_add_string);
 
-    wmem_init();
+    wmem_init_scopes();
     test_scope = wmem_allocator_new(WMEM_ALLOCATOR_STRICT);
     oids_init();
     result = g_test_run();
     oids_cleanup();
     wmem_destroy_allocator(test_scope);
-    wmem_cleanup();
+    wmem_cleanup_scopes();
 
     return result;
 }

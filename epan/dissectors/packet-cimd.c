@@ -442,7 +442,7 @@ static void dissect_cimd_parameter(tvbuff_t *tvb, proto_tree *tree, gint pindex,
                                    (*vals_hdr_PC[pindex].ett_p), NULL, cimd_vals_PC[pindex].strptr);
 
   proto_tree_add_item(param_tree, hf_cimd_pcode_indicator, tvb,
-    startOffset + 1, CIMD_PC_LENGTH, ENC_ASCII|ENC_NA);
+    startOffset + 1, CIMD_PC_LENGTH, ENC_ASCII);
   proto_tree_add_item(param_tree, (*vals_hdr_PC[pindex].hf_p), tvb,
     startOffset + 1 + CIMD_PC_LENGTH + 1, endOffset - (startOffset + 1 + CIMD_PC_LENGTH + 1), ENC_ASCII|ENC_NA);
 }
@@ -475,12 +475,12 @@ static void dissect_cimd_ud(tvbuff_t *tvb, proto_tree *tree, gint pindex, gint s
     (*vals_hdr_PC[pindex].ett_p), NULL, cimd_vals_PC[pindex].strptr
   );
   proto_tree_add_item(param_tree, hf_cimd_pcode_indicator, tvb,
-    startOffset + 1, CIMD_PC_LENGTH, ENC_ASCII|ENC_NA);
+    startOffset + 1, CIMD_PC_LENGTH, ENC_ASCII);
 
   g_offset = startOffset + 1 + CIMD_PC_LENGTH + 1;
   g_size   = endOffset - g_offset;
 
-  payloadText = tvb_format_text(tvb, g_offset, g_size);
+  payloadText = tvb_format_text(wmem_packet_scope(), tvb, g_offset, g_size);
   size = (int)strlen(payloadText);
   tmpBuffer = (gchar*)wmem_alloc(wmem_packet_scope(), size+1);
   for (loop = 0; loop < size; loop++)
@@ -680,7 +680,7 @@ static void dissect_cimd_dcs(tvbuff_t *tvb, proto_tree *tree, gint pindex, gint 
   );
 
   proto_tree_add_item(param_tree, hf_cimd_pcode_indicator, tvb,
-    startOffset + 1, CIMD_PC_LENGTH, ENC_ASCII|ENC_NA);
+    startOffset + 1, CIMD_PC_LENGTH, ENC_ASCII);
 
   offset = startOffset + 1 + CIMD_PC_LENGTH + 1;
   dcs    = (guint32) strtoul(tvb_get_string_enc(wmem_packet_scope(), tvb, offset, endOffset - offset, ENC_ASCII), NULL, 10);
@@ -728,7 +728,7 @@ static void dissect_cimd_error_code( tvbuff_t *tvb, proto_tree *tree, gint pinde
   param_tree = proto_tree_add_subtree(tree, tvb, startOffset + 1, endOffset - (startOffset + 1),
                                       (*vals_hdr_PC[pindex].ett_p), NULL, cimd_vals_PC[pindex].strptr);
 
-  proto_tree_add_item(param_tree, hf_cimd_pcode_indicator, tvb, startOffset + 1, CIMD_PC_LENGTH, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(param_tree, hf_cimd_pcode_indicator, tvb, startOffset + 1, CIMD_PC_LENGTH, ENC_ASCII);
 
   err_code = (guint32) strtoul(tvb_get_string_enc(wmem_packet_scope(), tvb,
                                                   startOffset + 1 + CIMD_PC_LENGTH + 1, endOffset - (startOffset + 1 + CIMD_PC_LENGTH + 1), ENC_ASCII),

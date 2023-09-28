@@ -16,9 +16,14 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
+
+#include "config.h"
+
+#define WS_LOG_DOMAIN LOG_DOMAIN_EPAN
+
 #include <stdio.h>
 #include "reedsolomon.h"
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
+#include <wsutil/wslog.h>
 
 #ifdef CCSDS
 /* CCSDS field generator polynomial: 1+x+x^2+x^7+x^8 */
@@ -338,7 +343,7 @@ gen_poly(void)
  */
 
 int
-encode_rs(dtype data[KK], dtype bb[NN-KK])
+encode_rs(dtype data[], dtype bb[])
 {
   register int i, j;
   gf feedback;
@@ -406,7 +411,7 @@ encode_rs(dtype data[KK], dtype bb[NN-KK])
  */
 
 int
-eras_dec_rs(dtype data[NN], int eras_pos[NN-KK], int no_eras)
+eras_dec_rs(dtype data[], int eras_pos[], int no_eras)
 {
   int deg_lambda, el, deg_omega;
   int i, j, r,k;
@@ -451,7 +456,7 @@ eras_dec_rs(dtype data[NN], int eras_pos[NN-KK], int no_eras)
   syn_error = 0;
   for(i=1;i<=NN-KK;i++){
     syn_error |= s[i];
-        /*ws_debug_printf("syndrome %d = %x\n",i,s[i]);*/
+        /*ws_debug("syndrome %d = %x\n",i,s[i]);*/
     s[i] = Index_of[s[i]];
   }
 
@@ -499,15 +504,15 @@ eras_dec_rs(dtype data[NN], int eras_pos[NN-KK], int no_eras)
       count++;
     }
     if (count != no_eras) {
-      ws_debug_printf("\n lambda(x) is WRONG\n");
+      ws_debug("\n lambda(x) is WRONG\n");
       count = -1;
       goto finish;
     }
 #if DEBUG >= 2
-    ws_debug_printf("\n Erasure positions as determined by roots of Eras Loc Poly:\n");
+    printf("\n Erasure positions as determined by roots of Eras Loc Poly:\n");
     for (i = 0; i < count; i++)
-      ws_debug_printf("%d ", loc[i]);
-    ws_debug_printf("\n");
+      printf("%d ", loc[i]);
+    printf("\n");
 #endif
 #endif
   }
@@ -637,7 +642,7 @@ eras_dec_rs(dtype data[NN], int eras_pos[NN-KK], int no_eras)
     }
     if (den == 0) {
 #if DEBUG >= 1
-      ws_debug_printf("\n ERROR: denominator = 0\n");
+      ws_debug("\n ERROR: denominator = 0\n");
 #endif
       /* Convert to dual- basis */
       count = -1;

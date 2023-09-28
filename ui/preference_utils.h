@@ -1,4 +1,5 @@
-/* preference_utils.h
+/** @file
+ *
  * Routines for handling preferences
  *
  * Wireshark - Network traffic analyzer
@@ -79,6 +80,21 @@ gint column_prefs_add_custom(gint fmt, const gchar *title,
  */
 gint column_prefs_has_custom(const gchar *custom_field);
 
+/** Check if a custom column's data can be displayed differently
+ * resolved or unresolved, e.g. it has a field with a value string.
+ *
+ * This is for when adding or editing custom columns. Compare with
+ * resolve_column() in packet_list_utils.h, which is for columns
+ * that have already been added.
+ *
+ * @param custom_field column custom field
+ *
+ * @return TRUE if a custom column with the field description
+ * would support being displayed differently resolved or unresolved,
+ * FALSE otherwise.
+ */
+gboolean column_prefs_custom_resolve(const gchar *custom_field);
+
 /** Remove a column.
  *
  * @param col_link Column list entry
@@ -101,16 +117,3 @@ void save_migrated_uat(const char *uat_name, gboolean *old_pref);
 #endif /* __cplusplus */
 
 #endif /* __PREFRENCE_UTILS_H__ */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

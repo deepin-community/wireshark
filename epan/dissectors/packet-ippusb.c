@@ -21,7 +21,7 @@
 #include <epan/strutil.h>
 #include <epan/to_str.h>
 #include <epan/conversation.h>
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 #include <reassemble.h>
 #include <packet-usb.h>
 
@@ -110,7 +110,7 @@ struct ippusb_multisegment_pdu {
     #define MSP_FLAGS_MISSING_FIRST_SEGMENT     0x00000004
 };
 
-struct ippusb_multisegment_pdu *
+static struct ippusb_multisegment_pdu *
 pdu_store(packet_info *pinfo, wmem_tree_t *multisegment_pdus, guint32 first_frame, gboolean is_ipp, guint document)
 {
     struct ippusb_multisegment_pdu *msp;
@@ -143,7 +143,7 @@ init_ippusb_conversation_data(void)
     return ippusbd;
 }
 
-struct ippusb_analysis *
+static struct ippusb_analysis *
 get_ippusb_conversation_data(conversation_t *conv, packet_info *pinfo)
 {
     struct ippusb_analysis *ippusbd;
@@ -177,7 +177,7 @@ static void ippusb_free_temporary_key(gpointer ptr _U_) { }
 
 static void ippusb_free_persistent_key(gpointer ptr _U_) { }
 
-reassembly_table_functions ippusb_reassembly_table_functions =
+static reassembly_table_functions ippusb_reassembly_table_functions =
 {
     g_direct_hash,
     g_direct_equal,
@@ -219,7 +219,7 @@ dissect_ippusb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
         }
     }
     else {
-        conv = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, ENDPOINT_TCP,
+        conv = conversation_new(pinfo->num, &pinfo->src, &pinfo->dst, CONVERSATION_TCP,
                      pinfo->srcport, pinfo->destport, 0);
     }
 
@@ -401,7 +401,7 @@ dissect_ippusb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
                     }
                 }
             }
-            else if ((last_chunk && strncmp(last_chunk, CHUNKED_END, CHUNK_LENGTH_MIN) == 0)) {
+            else if (current_msp &&last_chunk && strncmp(last_chunk, CHUNKED_END, CHUNK_LENGTH_MIN) == 0) {
                 /* This is the last segment of the chunked transfer and reassembled packet */
 
                 proto_tree_add_item(tree, proto_ippusb, tvb, offset, -1, 0);
@@ -533,13 +533,7 @@ proto_reg_handoff_ippusb(void)
 {
     dissector_handle_t ippusb_handle;
 
-    /*
-     * Register ourselves under usb bulk
-     * IPP packets could come from a variety of usb class types
-     */
     ippusb_handle = create_dissector_handle(dissect_ippusb, proto_ippusb);
-    dissector_add_uint("usb.bulk", IF_CLASS_UNKNOWN, ippusb_handle);
-    dissector_add_uint("usb.bulk", IF_CLASS_VENDOR_SPECIFIC, ippusb_handle);
     dissector_add_uint("usb.bulk", IF_CLASS_PRINTER, ippusb_handle);
 }
 

@@ -12,6 +12,8 @@
 
 #include <ui/qt/models/uat_delegate.h>
 #include "epan/value_string.h"
+#include <wsutil/ws_assert.h>
+#include <QRegularExpression>
 #include <QComboBox>
 #include <QEvent>
 #include <QFileDialog>
@@ -22,6 +24,7 @@
 #include <ui/qt/widgets/display_filter_edit.h>
 #include <ui/qt/widgets/field_filter_edit.h>
 #include <ui/qt/widgets/editor_file_dialog.h>
+#include <ui/qt/widgets/path_selection_edit.h>
 
 // The Qt docs suggest overriding updateEditorGeometry, but the
 // defaults seem sane.
@@ -44,31 +47,14 @@ QWidget *UatDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &
 
     switch (field->mode) {
     case PT_TXTMOD_DIRECTORYNAME:
-        if (index.isValid()) {
-            QString filename_old = index.model()->data(index, Qt::EditRole).toString();
-            EditorFileDialog* fileDialog = new EditorFileDialog(index, EditorFileDialog::Directory, parent, QString(field->title), filename_old);
-
-            // Use signals to accept data from cell
-            connect(fileDialog, &EditorFileDialog::acceptEdit, this, &UatDelegate::applyFilename);
-            // Don't fall through and set setAutoFillBackground(true)
-            return fileDialog;
-        }
-        break;
-
     case PT_TXTMOD_FILENAME:
         if (index.isValid()) {
             QString filename_old = index.model()->data(index, Qt::EditRole).toString();
-            EditorFileDialog* fileDialog = new EditorFileDialog(index, EditorFileDialog::ExistingFile, parent, QString(field->title), filename_old);
-
-            fileDialog->setOption(QFileDialog::DontConfirmOverwrite);
-
-            // Use signals to accept data from cell
-            connect(fileDialog, &EditorFileDialog::acceptEdit, this, &UatDelegate::applyFilename);
-            // Don't fall through and set setAutoFillBackground(true)
-            return fileDialog;
+            PathSelectionEdit * pathEdit = new PathSelectionEdit(field->title, QString(), field->mode != PT_TXTMOD_DIRECTORYNAME, parent);
+            connect(pathEdit, &PathSelectionEdit::pathChanged, this, &UatDelegate::pathHasChanged);
+            return pathEdit;
         }
         break;
-
    case PT_TXTMOD_COLOR:
         if (index.isValid()) {
             QColor color(index.model()->data(index, Qt::DecorationRole).toString());
@@ -87,6 +73,7 @@ QWidget *UatDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &
             cb_editor->addItem(enum_vals[i].strptr);
         }
         editor = cb_editor;
+        cb_editor->setMinimumWidth(cb_editor->minimumSizeHint().width());
         break;
     }
 
@@ -107,14 +94,14 @@ QWidget *UatDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &
     {
         // Requires input of the form "ab cd ef" (with possibly no or a colon
         // separator instead of a single whitespace) for the editor to accept.
-        QRegExp hexbytes_regex("([0-9a-f]{2}[ :]?)*");
-        hexbytes_regex.setCaseSensitivity(Qt::CaseInsensitive);
+        QRegularExpression hexbytes_regex("([0-9a-f]{2}[ :]?)*");
+        hexbytes_regex.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
         // QString types from QStyledItemDelegate are documented to return a
         // QLineEdit. Note that Qt returns a subclass from QLineEdit which
         // automatically adapts the width to the typed contents.
         QLineEdit *le_editor = static_cast<QLineEdit *>(
                 QStyledItemDelegate::createEditor(parent, option, index));
-        le_editor->setValidator(new QRegExpValidator(hexbytes_regex, le_editor));
+        le_editor->setValidator(new QRegularExpressionValidator(hexbytes_regex, le_editor));
         editor = le_editor;
         break;
     }
@@ -127,7 +114,7 @@ QWidget *UatDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &
         break;
 
     default:
-        g_assert_not_reached();
+        ws_assert_not_reached();
         break;
     }
 
@@ -142,6 +129,11 @@ void UatDelegate::setEditorData(QWidget *editor, const QModelIndex &index) const
     uat_field_t *field = indexToField(index);
 
     switch (field->mode) {
+    case PT_TXTMOD_DIRECTORYNAME:
+    case PT_TXTMOD_FILENAME:
+        if (index.isValid() && qobject_cast<PathSelectionEdit *>(editor))
+            qobject_cast<PathSelectionEdit *>(editor)->setPath(index.model()->data(index, Qt::EditRole).toString());
+        break;
     case PT_TXTMOD_ENUM:
     {
         QComboBox *combobox = static_cast<QComboBox *>(editor);
@@ -171,6 +163,11 @@ void UatDelegate::setModelData(QWidget *editor, QAbstractItemModel *model,
     uat_field_t *field = indexToField(index);
 
     switch (field->mode) {
+    case PT_TXTMOD_DIRECTORYNAME:
+    case PT_TXTMOD_FILENAME:
+        if (index.isValid() && qobject_cast<PathSelectionEdit *>(editor))
+            const_cast<QAbstractItemModel *>(index.model())->setData(index, qobject_cast<PathSelectionEdit *>(editor)->path(), Qt::EditRole);
+        break;
     case PT_TXTMOD_ENUM:
     {
         QComboBox *combobox = static_cast<QComboBox *>(editor);
@@ -183,7 +180,7 @@ void UatDelegate::setModelData(QWidget *editor, QAbstractItemModel *model,
         if (qobject_cast<QColorDialog *>(editor))
         {
             QColor newColor = qobject_cast<QColorDialog *>(editor)->currentColor();
-            ((QAbstractItemModel *)index.model())->setData(index, newColor.name(), Qt::EditRole);
+            const_cast<QAbstractItemModel *>(index.model())->setData(index, newColor.name(), Qt::EditRole);
         }
         break;
 
@@ -192,22 +189,25 @@ void UatDelegate::setModelData(QWidget *editor, QAbstractItemModel *model,
     }
 }
 
-void UatDelegate::applyFilename(const QModelIndex& index)
+void UatDelegate::updateEditorGeometry(QWidget *editor,
+                                           const QStyleOptionViewItem &option,
+                                           const QModelIndex &index) const
 {
-    if (index.isValid()) {
-        EditorFileDialog* fileDialog = static_cast<EditorFileDialog*>(sender());
-        ((QAbstractItemModel *)index.model())->setData(index, fileDialog->text(), Qt::EditRole);
+    uat_field_t *field = indexToField(index);
+
+    switch (field->mode) {
+    case PT_TXTMOD_DIRECTORYNAME:
+    case PT_TXTMOD_FILENAME:
+        editor->setGeometry(option.rect);
+        break;
+    default:
+        QStyledItemDelegate::updateEditorGeometry(editor, option, index);
     }
 }
 
-/* * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
+void UatDelegate::pathHasChanged(QString)
+{
+    PathSelectionEdit * editor = qobject_cast<PathSelectionEdit *>(sender());
+    if (editor)
+        emit commitData(editor);
+}

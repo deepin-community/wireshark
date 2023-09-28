@@ -290,16 +290,16 @@ dissect_fullcollectionname(tvbuff_t *tvb, guint offset, proto_tree *tree)
   proto_tree *fcn_tree;
 
   fcn_length = tvb_strsize(tvb, offset);
-  ti = proto_tree_add_item(tree, hf_mongo_fullcollectionname, tvb, offset, fcn_length, ENC_ASCII|ENC_NA);
+  ti = proto_tree_add_item(tree, hf_mongo_fullcollectionname, tvb, offset, fcn_length, ENC_ASCII);
 
   /* If this doesn't find anything, we'll just throw an exception below */
   dbn_length = tvb_find_guint8(tvb, offset, fcn_length, '.') - offset;
 
   fcn_tree = proto_item_add_subtree(ti, ett_mongo_fcn);
 
-  proto_tree_add_item(fcn_tree, hf_mongo_database_name, tvb, offset, dbn_length, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(fcn_tree, hf_mongo_database_name, tvb, offset, dbn_length, ENC_ASCII);
 
-  proto_tree_add_item(fcn_tree, hf_mongo_collection_name, tvb, offset + 1 + dbn_length, fcn_length - dbn_length - 2, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(fcn_tree, hf_mongo_collection_name, tvb, offset + 1 + dbn_length, fcn_length - dbn_length - 2, ENC_ASCII);
 
   return fcn_length;
 }
@@ -323,14 +323,6 @@ dissect_bson_document(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
 
   proto_tree_add_item(doc_tree, hf_mongo_document_length, tvb, offset, 4, ENC_LITTLE_ENDIAN);
 
-  unsigned nest_level = p_get_proto_depth(pinfo, proto_mongo);
-  if (++nest_level > BSON_MAX_NESTING) {
-      expert_add_info_format(pinfo, ti, &ei_mongo_document_recursion_exceeded, "BSON document recursion exceeds %u", BSON_MAX_NESTING);
-      /* return the number of bytes we consumed, these are at least the 4 bytes for the length field */
-      return MAX(4, document_length);
-  }
-  p_set_proto_depth(pinfo, proto_mongo, nest_level);
-
   if (document_length < 5) {
       expert_add_info_format(pinfo, ti, &ei_mongo_document_length_bad, "BSON document length too short: %u", document_length);
       return MAX(4, document_length); /* see the comment above */
@@ -348,6 +340,14 @@ dissect_bson_document(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
     return document_length;
   }
 
+  unsigned nest_level = p_get_proto_depth(pinfo, proto_mongo);
+  if (++nest_level > BSON_MAX_NESTING) {
+      expert_add_info_format(pinfo, ti, &ei_mongo_document_recursion_exceeded, "BSON document recursion exceeds %u", BSON_MAX_NESTING);
+      /* return the number of bytes we consumed, these are at least the 4 bytes for the length field */
+      return MAX(4, document_length);
+  }
+  p_set_proto_depth(pinfo, proto_mongo, nest_level);
+
   final_offset = offset + document_length;
   offset += 4;
 
@@ -362,9 +362,9 @@ dissect_bson_document(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
     gint doc_len = -1;   /* Document length */
 
     e_type = tvb_get_guint8(tvb, offset);
-    tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset+1, &str_len, ENC_ASCII);
+    tvb_get_stringz_enc(pinfo->pool, tvb, offset+1, &str_len, ENC_ASCII);
 
-    element = proto_tree_add_item(elements_tree, hf_mongo_element_name, tvb, offset+1, str_len-1, ENC_UTF_8|ENC_NA);
+    element = proto_tree_add_item(elements_tree, hf_mongo_element_name, tvb, offset+1, str_len-1, ENC_UTF_8);
     element_sub_tree = proto_item_add_subtree(element, ett_mongo_element);
     proto_tree_add_item(element_sub_tree, hf_mongo_element_type, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 
@@ -380,7 +380,7 @@ dissect_bson_document(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
       case BSON_ELEMENT_TYPE_SYMBOL:
         str_len = tvb_get_letohl(tvb, offset);
         proto_tree_add_item(element_sub_tree, hf_mongo_element_value_string_length, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        proto_tree_add_item(element_sub_tree, hf_mongo_element_value_string, tvb, offset+4, str_len, ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(element_sub_tree, hf_mongo_element_value_string, tvb, offset+4, str_len, ENC_UTF_8);
         offset += str_len+4;
         break;
       case BSON_ELEMENT_TYPE_DOC:
@@ -420,18 +420,18 @@ dissect_bson_document(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
         break;
       case BSON_ELEMENT_TYPE_REGEX:
         /* regex pattern */
-        tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &str_len, ENC_ASCII);
-        proto_tree_add_item(element_sub_tree, hf_mongo_element_value_regex_pattern, tvb, offset, str_len, ENC_UTF_8|ENC_NA);
+        tvb_get_stringz_enc(pinfo->pool, tvb, offset, &str_len, ENC_ASCII);
+        proto_tree_add_item(element_sub_tree, hf_mongo_element_value_regex_pattern, tvb, offset, str_len, ENC_UTF_8);
         offset += str_len;
         /* regex options */
-        tvb_get_stringz_enc(wmem_packet_scope(), tvb, offset, &str_len, ENC_ASCII);
-        proto_tree_add_item(element_sub_tree, hf_mongo_element_value_regex_options, tvb, offset, str_len, ENC_UTF_8|ENC_NA);
+        tvb_get_stringz_enc(pinfo->pool, tvb, offset, &str_len, ENC_ASCII);
+        proto_tree_add_item(element_sub_tree, hf_mongo_element_value_regex_options, tvb, offset, str_len, ENC_UTF_8);
         offset += str_len;
         break;
       case BSON_ELEMENT_TYPE_DB_PTR:
         str_len = tvb_get_letohl(tvb, offset);
         proto_tree_add_item(element_sub_tree, hf_mongo_element_value_string_length, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        proto_tree_add_item(element_sub_tree, hf_mongo_element_value_string, tvb, offset+4, str_len, ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(element_sub_tree, hf_mongo_element_value_string, tvb, offset+4, str_len, ENC_UTF_8);
         offset += str_len;
         proto_tree_add_item(element_sub_tree, hf_mongo_element_value_db_ptr, tvb, offset, 12, ENC_NA);
         offset += 12;
@@ -445,7 +445,7 @@ dissect_bson_document(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
         js_code = proto_tree_add_item(element_sub_tree, hf_mongo_element_value_js_code, tvb, offset, str_len+4, ENC_NA);
         js_code_sub_tree = proto_item_add_subtree(js_code, ett_mongo_code);
         proto_tree_add_item(js_code_sub_tree, hf_mongo_element_value_string_length, tvb, offset, 4, ENC_LITTLE_ENDIAN);
-        proto_tree_add_item(js_code_sub_tree, hf_mongo_element_value_string, tvb, offset+4, str_len, ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(js_code_sub_tree, hf_mongo_element_value_string, tvb, offset+4, str_len, ENC_UTF_8);
         offset += str_len+4;
         doc_len = e_len - (str_len + 8);
         js_scope = proto_tree_add_item(element_sub_tree, hf_mongo_element_value_js_scope, tvb, offset, doc_len, ENC_NA);
@@ -468,6 +468,10 @@ dissect_bson_document(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tre
         break;
     }  /* end switch() */
   } while (offset < final_offset-1);
+
+  // Restore depth.
+  nest_level--;
+  p_set_proto_depth(pinfo, proto_mongo, nest_level);
 
   return document_length;
 }
@@ -507,7 +511,7 @@ dissect_mongo_reply(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tree 
 static int
 dissect_mongo_msg(tvbuff_t *tvb, guint offset, proto_tree *tree)
 {
-  proto_tree_add_item(tree, hf_mongo_message, tvb, offset, -1, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(tree, hf_mongo_message, tvb, offset, -1, ENC_ASCII);
   offset += tvb_strsize(tvb, offset);
 
   return offset;
@@ -652,11 +656,11 @@ dissect_mongo_op_command(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_
   gint32 db_length, cmd_length;
 
   db_length = tvb_strsize(tvb, offset);
-  proto_tree_add_item(tree, hf_mongo_database, tvb, offset, db_length, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(tree, hf_mongo_database, tvb, offset, db_length, ENC_ASCII);
   offset += db_length;
 
   cmd_length = tvb_strsize(tvb, offset);
-  proto_tree_add_item(tree, hf_mongo_commandname, tvb, offset, cmd_length, ENC_ASCII|ENC_NA);
+  proto_tree_add_item(tree, hf_mongo_commandname, tvb, offset, cmd_length, ENC_ASCII);
   offset += cmd_length;
 
   offset += dissect_bson_document(tvb, pinfo, offset, tree, hf_mongo_metadata);
@@ -806,7 +810,7 @@ dissect_op_msg_section(tvbuff_t *tvb, packet_info *pinfo, guint offset, proto_tr
       to_read -= 4;
 
       dsi_length = tvb_strsize(tvb, offset);
-      proto_tree_add_item(section_tree, hf_mongo_msg_sections_section_doc_sequence_id, tvb, offset, dsi_length, ENC_ASCII|ENC_NA);
+      proto_tree_add_item(section_tree, hf_mongo_msg_sections_section_doc_sequence_id, tvb, offset, dsi_length, ENC_ASCII);
       offset += dsi_length;
       to_read -= dsi_length;
 

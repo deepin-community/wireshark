@@ -198,7 +198,7 @@ static void
 prepare_ldss_transfer_conv(ldss_broadcast_t *broadcast)
 {
 	if (!find_conversation(broadcast->num, &broadcast->broadcaster->addr, &broadcast->broadcaster->addr,
-						ENDPOINT_TCP, broadcast->broadcaster->port, broadcast->broadcaster->port, NO_ADDR2|NO_PORT2)) {
+						CONVERSATION_TCP, broadcast->broadcaster->port, broadcast->broadcaster->port, NO_ADDR_B|NO_PORT_B)) {
 		conversation_t *transfer_conv;
 		ldss_transfer_info_t *transfer_info;
 
@@ -207,7 +207,7 @@ prepare_ldss_transfer_conv(ldss_broadcast_t *broadcast)
 
 		/* Preparation for later push/pull dissection */
 		transfer_conv = conversation_new (broadcast->num, &broadcast->broadcaster->addr, &broadcast->broadcaster->addr,
-						ENDPOINT_TCP, broadcast->broadcaster->port, broadcast->broadcaster->port, NO_ADDR2|NO_PORT2);
+						CONVERSATION_TCP, broadcast->broadcaster->port, broadcast->broadcaster->port, NO_ADDR2|NO_PORT2);
 		conversation_add_proto_data(transfer_conv, proto_ldss, transfer_info);
 		conversation_set_dissector(transfer_conv, ldss_tcp_handle);
 	}
@@ -446,7 +446,7 @@ dissect_ldss_transfer (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 	/* Look for the transfer conversation; this was created during
 	 * earlier broadcast dissection (see prepare_ldss_transfer_conv) */
 	transfer_conv = find_conversation (pinfo->num, &pinfo->src, &pinfo->dst,
-					   ENDPOINT_TCP, pinfo->srcport, pinfo->destport, 0);
+					   CONVERSATION_TCP, pinfo->srcport, pinfo->destport, 0);
 	DISSECTOR_ASSERT(transfer_conv);
 	transfer_info = (ldss_transfer_info_t *)conversation_get_proto_data(transfer_conv, proto_ldss);
 	DISSECTOR_ASSERT(transfer_info);
@@ -492,11 +492,11 @@ dissect_ldss_transfer (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void
 			linelen = tvb_find_line_end(tvb, offset, -1, &next_offset, FALSE);
 
 			/* Include new-line in line */
-			line = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, linelen, ENC_ASCII);
+			line = tvb_get_string_enc(pinfo->pool, tvb, offset, linelen, ENC_ASCII);
 
 			line_tree = proto_tree_add_subtree(ldss_tree, tvb, offset, linelen,
 							 ett_ldss_transfer_req, NULL,
-							 tvb_format_text(tvb, offset, next_offset-offset));
+							 tvb_format_text(pinfo->pool, tvb, offset, next_offset-offset));
 
 			if (strncmp(line,"md5:",4)==0) {
 				digest_type_len = 4;

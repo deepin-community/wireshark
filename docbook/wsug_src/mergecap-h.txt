@@ -1,4 +1,4 @@
-Mergecap (Wireshark) 3.4.9 (v3.4.9rc0-5-g9ce83d4cc5c9)
+Mergecap (Wireshark) 4.0.8 (v4.0.8rc0-7-ge4898e0e1677)
 Merge two or more capture files into one.
 See https://www.wireshark.org for more information.
 
@@ -15,6 +15,6 @@ Output:
                     an empty "-I" option will list the merge modes.
 
 Miscellaneous:
-  -h                display this help and exit.
-  -v                verbose output.
-  -V                print version information and exit.
+  -h, --help        display this help and exit.
+  -V                verbose output.
+  -v, --version     print version information and exit.

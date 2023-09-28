@@ -61,7 +61,7 @@ static dissector_handle_t rmp_handle;
 #define RMP_E_BADSID    25      /* read reply: bad session ID */
 #define RMP_E_BADPACKET 27      /* Bad packet detected */
 
-const value_string rmp_type_vals[] = {
+static const value_string rmp_type_vals[] = {
 	{ RMP_BOOT_REQ,       "Boot Request" },
 	{ RMP_BOOT_REPL,      "Boot Reply" },
 	{ RMP_READ_REQ,       "Read Request" },
@@ -70,7 +70,7 @@ const value_string rmp_type_vals[] = {
 	{ 0x00,               NULL }
 };
 
-const value_string rmp_error_vals[] = {
+static const value_string rmp_error_vals[] = {
 	{ RMP_E_OKAY,         "OK" },
 	{ RMP_E_EOF,          "End Of File" },
 	{ RMP_E_ABORT,        "Abort Operation" },
@@ -116,7 +116,7 @@ dissect_rmp(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 			proto_tree_add_item(rmp_tree,
 				hf_rmp_version, tvb, 8, 2, ENC_BIG_ENDIAN);
 			proto_tree_add_item(rmp_tree,
-				hf_rmp_machtype, tvb, 10, 20, ENC_ASCII|ENC_NA);
+				hf_rmp_machtype, tvb, 10, 20, ENC_ASCII);
 			/* The remaining fields are optional */
 			if(!tvb_offset_exists(tvb, 30))
 				return 30;

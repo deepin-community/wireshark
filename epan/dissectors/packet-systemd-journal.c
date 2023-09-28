@@ -287,13 +287,13 @@ static void init_jf_to_hf_map(void) {
         { hf_sj_systemd_user_slice, "_SYSTEMD_USER_SLICE=" },
         { 0, NULL }
     };
-    jf_to_hf = (journal_field_hf_map*) g_memdup(jhmap, sizeof(jhmap));
+    jf_to_hf = (journal_field_hf_map*) g_memdup2(jhmap, sizeof(jhmap));
 }
 
 static void
 dissect_sjle_time_usecs(proto_tree *tree, int hf_idx, tvbuff_t *tvb, int offset, int len) {
     guint64 rt_ts = 0;
-    char *time_str = tvb_format_text(tvb, offset, len);
+    char *time_str = tvb_format_text(wmem_packet_scope(), tvb, offset, len);
     gboolean ok = ws_strtou64(time_str, NULL, &rt_ts);
     if (ok) {
         nstime_t ts;
@@ -307,13 +307,13 @@ dissect_sjle_time_usecs(proto_tree *tree, int hf_idx, tvbuff_t *tvb, int offset,
 
 static void
 dissect_sjle_uint(proto_tree *tree, int hf_idx, tvbuff_t *tvb, int offset, int len) {
-    guint32 uint_val = (guint32) strtoul(tvb_format_text(tvb, offset, len), NULL, 10);
+    guint32 uint_val = (guint32) strtoul(tvb_format_text(wmem_packet_scope(), tvb, offset, len), NULL, 10);
     proto_tree_add_uint(tree, hf_idx, tvb, offset, len, uint_val);
 }
 
 static void
 dissect_sjle_int(proto_tree *tree, int hf_idx, tvbuff_t *tvb, int offset, int len) {
-    gint32 int_val = (gint32) strtol(tvb_format_text(tvb, offset, len), NULL, 10);
+    gint32 int_val = (gint32) strtol(tvb_format_text(wmem_packet_scope(), tvb, offset, len), NULL, 10);
     proto_tree_add_int(tree, hf_idx, tvb, offset, len, int_val);
 }
 
@@ -369,14 +369,14 @@ dissect_systemd_journal_line_entry(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
                 default:
                 {
                     proto_item *expert_ti = proto_tree_add_item(sje_tree, hf_sj_unhandled_field_type, tvb, offset, line_len,
-                                                                    ENC_UTF_8|ENC_NA);
+                                                                    ENC_UTF_8);
                     expert_add_info(pinfo, expert_ti, &ei_unhandled_field_type);
                     break;
                 }
                 }
                 if (hf_idx == hf_sj_message) {
                     col_clear(pinfo->cinfo, COL_INFO);
-                    col_add_str(pinfo->cinfo, COL_INFO, (char *) tvb_get_string_enc(wmem_packet_scope(), tvb, eq_off, val_len, ENC_UTF_8));
+                    col_add_str(pinfo->cinfo, COL_INFO, (char *) tvb_get_string_enc(pinfo->pool, tvb, eq_off, val_len, ENC_UTF_8));
                 }
                 found = TRUE;
             }
@@ -384,10 +384,10 @@ dissect_systemd_journal_line_entry(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
 
         if (!found && eq_off > offset + 1) {
             proto_item *unk_ti = proto_tree_add_none_format(sje_tree, hf_sj_unknown_field, tvb, offset, line_len,
-                                                            "Unknown text field: %s", tvb_get_string_enc(wmem_packet_scope(), tvb, offset, eq_off - offset - 1, ENC_UTF_8));
+                                                            "Unknown text field: %s", tvb_get_string_enc(pinfo->pool, tvb, offset, eq_off - offset - 1, ENC_UTF_8));
             proto_tree *unk_tree = proto_item_add_subtree(unk_ti, ett_systemd_unknown_field);
-            proto_tree_add_item(unk_tree, hf_sj_unknown_field_name, tvb, offset, eq_off - offset - 1, ENC_UTF_8|ENC_NA);
-            proto_tree_add_item(unk_tree, hf_sj_unknown_field_value, tvb, eq_off, val_len, ENC_UTF_8|ENC_NA);
+            proto_tree_add_item(unk_tree, hf_sj_unknown_field_name, tvb, offset, eq_off - offset - 1, ENC_UTF_8);
+            proto_tree_add_item(unk_tree, hf_sj_unknown_field_value, tvb, eq_off, val_len, ENC_UTF_8);
             offset = next_offset;
             continue;
         }
@@ -407,14 +407,14 @@ dissect_systemd_journal_line_entry(tvbuff_t *tvb, packet_info *pinfo _U_, proto_
                         proto_tree_add_item(bin_tree, hf_sj_binary_data_len, tvb, offset + noeql_len + 1, 8, ENC_LITTLE_ENDIAN);
                         if (hf_idx == hf_sj_message) {
                             col_clear(pinfo->cinfo, COL_INFO);
-                            col_add_str(pinfo->cinfo, COL_INFO, tvb_format_text(tvb, data_off, (int) data_len));
+                            col_add_str(pinfo->cinfo, COL_INFO, tvb_format_text(pinfo->pool, tvb, data_off, (int) data_len));
                         }
                     } else {
                         proto_item *unk_ti = proto_tree_add_none_format(sje_tree, hf_sj_unknown_field, tvb, offset, line_len,
-                                                                        "Unknown data field: %s", tvb_format_text(tvb, offset, eq_off - offset - 1));
+                                                                        "Unknown data field: %s", tvb_format_text(pinfo->pool, tvb, offset, eq_off - offset - 1));
                         proto_tree *unk_tree = proto_item_add_subtree(unk_ti, ett_systemd_unknown_field);
-                        proto_item *expert_ti = proto_tree_add_item(unk_tree, hf_sj_unknown_field_name, tvb, offset, offset + noeql_len, ENC_UTF_8|ENC_NA);
-                        proto_tree_add_item(unk_tree, hf_sj_unknown_field_data, tvb, data_off, (int) data_len, ENC_UTF_8|ENC_NA);
+                        proto_item *expert_ti = proto_tree_add_item(unk_tree, hf_sj_unknown_field_name, tvb, offset, offset + noeql_len, ENC_UTF_8);
+                        proto_tree_add_item(unk_tree, hf_sj_unknown_field_data, tvb, data_off, (int) data_len, ENC_UTF_8);
                         expert_add_info(pinfo, expert_ti, &ei_nonbinary_field);
                     }
                 }
@@ -437,11 +437,11 @@ proto_register_systemd_journal(void)
     static hf_register_info hf[] = {
         { &hf_sj_message,
           { "Message", "systemd_journal.message",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_message_id,
           { "Message ID", "systemd_journal.message_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_priority,
           { "Priority", "systemd_journal.priority",
@@ -449,7 +449,7 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_code_file,
           { "Code file", "systemd_journal.code_file",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_code_line,
           { "Code line", "systemd_journal.code_line",
@@ -457,7 +457,7 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_code_func,
           { "Code func", "systemd_journal.code_func",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_errno,
           { "Errno", "systemd_journal.errno",
@@ -469,7 +469,7 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_syslog_identifier,
           { "Syslog identifier", "systemd_journal.syslog_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_syslog_pid,
           { "Syslog PID", "systemd_journal.syslog_pid",
@@ -490,19 +490,19 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_comm,
           { "Command name", "systemd_journal.comm",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_exe,
           { "Executable path", "systemd_journal.exe",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_cmdline,
           { "Command line", "systemd_journal.cmdline",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_cap_effective,
           { "Effective capability", "systemd_journal.cap_effective",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_audit_session,
           { "Audit session", "systemd_journal.audit_session",
@@ -515,19 +515,19 @@ proto_register_systemd_journal(void)
 
         { &hf_sj_systemd_cgroup,
           { "Systemd cgroup", "systemd_journal.systemd_cgroup",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_systemd_slice,
           { "Systemd slice", "systemd_journal.systemd_slice",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_systemd_unit,
           { "Systemd unit", "systemd_journal.systemd_unit",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_systemd_user_unit,
           { "Systemd user unit", "systemd_journal.systemd_user_unit",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_systemd_session,
           { "Systemd session", "systemd_journal.systemd_session",
@@ -540,7 +540,7 @@ proto_register_systemd_journal(void)
 
         { &hf_sj_selinux_context,
           { "SELinux context", "systemd_journal.selinux_context",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_source_realtime_timestamp,
           { "Source realtime timestamp", "systemd_journal.source_realtime_timestamp",
@@ -548,61 +548,61 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_boot_id,
           { "Boot ID", "systemd_journal.boot_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_machine_id,
           { "Machine ID", "systemd_journal.machine_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_systemd_invocation_id,
           { "Systemd invocation ID", "systemd_journal.systemd_invocation_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_hostname,
           { "Hostname", "systemd_journal.hostname",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_transport,
           { "Transport", "systemd_journal.transport",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_stream_id,
           { "Stream ID", "systemd_journal.stream_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_line_break,
           { "Line break", "systemd_journal.line_break",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
 
         { &hf_sj_kernel_device,
           { "Kernel device", "systemd_journal.kernel_device",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_kernel_subsystem,
           { "Kernel subsystem", "systemd_journal.kernel_subsystem",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_udev_sysname,
           { "Device tree name", "systemd_journal.udev_sysname",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_udev_devnode,
           { "Device tree node", "systemd_journal.udev_devnode",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_udev_devlink,
           { "Device tree symlink", "systemd_journal.udev_devlink",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
 
         { &hf_sj_coredump_unit,
           { "Coredump unit", "systemd_journal.coredump_unit",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_coredump_user_unit,
           { "Coredump user unit", "systemd_journal.coredump_user_unit",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_pid,
           { "Object PID", "systemd_journal.object_pid",
@@ -618,15 +618,15 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_object_comm,
           { "Object command name", "systemd_journal.object_comm",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_exe,
           { "Object executable path", "systemd_journal.object_exe",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_cmdline,
           { "Object command line", "systemd_journal.object_cmdline",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_audit_session,
           { "Object audit session", "systemd_journal.object_audit_session",
@@ -642,11 +642,11 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_object_selinux_context,
           { "Object SELinux context", "systemd_journal.object_selinux_context",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_systemd_cgroup,
           { "Object systemd cgroup", "systemd_journal.object_systemd_cgroup",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_systemd_session,
           { "Object systemd session", "systemd_journal.object_systemd_session",
@@ -658,28 +658,28 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_object_systemd_unit,
           { "Object systemd unit", "systemd_journal.object_systemd_unit",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_systemd_user_unit,
           { "Object systemd user unit", "systemd_journal.object_systemd_user_unit",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_systemd_slice,
           { "Object systemd slice", "systemd_journal.object_systemd_slice",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_systemd_user_slice,
           { "Object systemd user slice", "systemd_journal.object_systemd_user_slice",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_object_systemd_invocation_id,
           { "Object systemd invocation ID", "systemd_journal.object_systemd_invocation_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
 
         { &hf_sj_cursor,
           { "Cursor", "systemd_journal.cursor",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_realtime_timestamp,
           { "Realtime Timestamp", "systemd_journal.realtime_timestamp",
@@ -692,11 +692,11 @@ proto_register_systemd_journal(void)
 
         { &hf_sj_journal_name,
           { "Journal name", "systemd_journal.journal_name",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_journal_path,
           { "Journal path", "systemd_journal.journal_path",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_current_use,
           { "Current use", "systemd_journal.current_use",
@@ -704,7 +704,7 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_current_use_pretty,
           { "Human readable current use", "systemd_journal.current_use_pretty",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_max_use,
           { "Max use", "systemd_journal.max_use",
@@ -712,7 +712,7 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_max_use_pretty,
           { "Human readable max use", "systemd_journal.max_use_pretty",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_disk_keep_free,
           { "Disk keep free", "systemd_journal.disk_keep_free",
@@ -720,7 +720,7 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_disk_keep_free_pretty,
           { "Human readable disk keep free", "systemd_journal.disk_keep_free_pretty",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_disk_available,
           { "Disk available", "systemd_journal.disk_available",
@@ -728,7 +728,7 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_disk_available_pretty,
           { "Human readable disk available", "systemd_journal.disk_available_pretty",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_limit,
           { "Limit", "systemd_journal.limit",
@@ -736,7 +736,7 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_limit_pretty,
           { "Human readable limit", "systemd_journal.limit_pretty",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_available,
           { "Available", "systemd_journal.available",
@@ -744,11 +744,11 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_available_pretty,
           { "Human readable available", "systemd_journal.available_pretty",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_result,
           { "Result", "systemd_journal.result",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_source_monotonic_timestamp,
           { "Source monotonic timestamp", "systemd_journal.source_monotonic_timestamp",
@@ -764,23 +764,23 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_audit_field_apparmor,
           { "Audit field AppArmor", "systemd_journal.audit_field_apparmor",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_audit_field_operation,
           { "Audit field operation", "systemd_journal.audit_field_operation",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_audit_field_profile,
           { "Audit field profile", "systemd_journal.audit_field_profile",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_audit_field_name,
           { "Audit field name", "systemd_journal.audit_field_name",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_seat_id,
           { "Seat ID", "systemd_journal.seat_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_kernel_usec,
           { "Kernel microseconds", "systemd_journal.kernel_usec",
@@ -796,7 +796,7 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_user_id,
           { "User ID", "systemd_journal.user_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_leader,
           { "Leader", "systemd_journal.leader",
@@ -804,19 +804,19 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_job_type,
           { "Job type", "systemd_journal.job_type",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_job_result,
           { "Job result", "systemd_journal.job_result",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_user_invocation_id,
           { "User invocation ID", "systemd_journal.user_invocation_id",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_systemd_user_slice,
           { "Systemd user slice", "systemd_journal.systemd_user_slice",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
 
         { &hf_sj_binary_data_len,
@@ -829,19 +829,19 @@ proto_register_systemd_journal(void)
         },
         { &hf_sj_unknown_field_name,
           { "Field name", "systemd_journal.field.name",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_unknown_field_value,
           { "Field value", "systemd_journal.field.value",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_unknown_field_data,
           { "Field data", "systemd_journal.field.data",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         },
         { &hf_sj_unhandled_field_type,
           { "Field data", "systemd_journal.unhandled_field_type",
-            FT_STRING, STR_UNICODE, NULL, 0x0, NULL, HFILL }
+            FT_STRING, BASE_NONE, NULL, 0x0, NULL, HFILL }
         }
     };
 
@@ -855,7 +855,7 @@ proto_register_systemd_journal(void)
     /* Setup protocol expert items */
     static ei_register_info ei[] = {
         { &ei_unhandled_field_type,
-          { "systemd_journal.unhandled_field_type", PI_UNDECODED, PI_ERROR,
+          { "systemd_journal.unhandled_field_type.undecoded", PI_UNDECODED, PI_ERROR,
             "Unhandled field type", EXPFILL }
         },
         { &ei_nonbinary_field,
@@ -885,12 +885,16 @@ proto_register_systemd_journal(void)
     init_jf_to_hf_map();
 }
 
-#define BLOCK_TYPE_SYSTEMD_JOURNAL 0x0000009
+#define BLOCK_TYPE_SYSTEMD_JOURNAL_EXPORT 0x0000009
 void
 proto_reg_handoff_systemd_journal(void)
 {
-    dissector_add_uint("wtap_fts_rec", WTAP_FILE_TYPE_SUBTYPE_SYSTEMD_JOURNAL, sje_handle);
-    dissector_add_uint("pcapng.block_type", BLOCK_TYPE_SYSTEMD_JOURNAL, sje_handle);
+    int file_type_subtype_systemd_journal;
+
+    file_type_subtype_systemd_journal = wtap_name_to_file_type_subtype("systemd_journal");
+    if (file_type_subtype_systemd_journal != -1)
+        dissector_add_uint("wtap_fts_rec", file_type_subtype_systemd_journal, sje_handle);
+    dissector_add_uint("pcapng.block_type", BLOCK_TYPE_SYSTEMD_JOURNAL_EXPORT, sje_handle);
     // It's possible to ship journal entries over HTTP/HTTPS using
     // systemd-journal-remote. Dissecting them on the wire isn't very
     // useful since it's easy to end up with a packet containing a

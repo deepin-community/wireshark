@@ -7,6 +7,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+#include "config.h"
+
 #include "wireshark_file_dialog.h"
 
 #ifdef Q_OS_WIN
@@ -76,16 +78,3 @@ QString WiresharkFileDialog::getSaveFileName(QWidget *parent, const QString &cap
 #endif
     return sfn;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

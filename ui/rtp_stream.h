@@ -1,4 +1,5 @@
-/* rtp_stream.h
+/** @file
+ *
  * RTP streams summary addition for Wireshark
  *
  * Copyright 2003, Alcatel Business Systems
@@ -90,6 +91,9 @@ struct _rtpstream_tapinfo {
     void              *tap_data;            /**< data for tap callbacks */
     int                nstreams; /**< number of streams in the list */
     GList             *strinfo_list; /**< list of rtpstream_info_t* */
+    GHashTable        *strinfo_hash; /**< multihash of rtpstream_info_t **/
+                                     /*   multihash means that there can be */
+                                     /*   more values related to one hash key */
     int                npackets; /**< total number of rtp packets of all streams */
     /* used while tapping. user shouldn't modify these */
     tap_mode_t         mode;
@@ -97,12 +101,13 @@ struct _rtpstream_tapinfo {
     rtpstream_info_t  *filter_stream_rev; /**< used as filter in some tap modes */
     FILE              *save_file;
     gboolean           is_registered; /**< if the tap listener is currently registered or not */
+    gboolean           apply_display_filter; /**< if apply display filter during analyse */
 };
 
 #if 0
 #define RTP_STREAM_DEBUG(...) { \
-    char *RTP_STREAM_DEBUG_MSG = g_strdup_printf(__VA_ARGS__); \
-    g_warning("rtp_stream: %s:%d %s", G_STRFUNC, __LINE__, RTP_STREAM_DEBUG_MSG); \
+    char *RTP_STREAM_DEBUG_MSG = ws_strdup_printf(__VA_ARGS__); \
+    ws_warning("rtp_stream: %s:%d %s", G_STRFUNC, __LINE__, RTP_STREAM_DEBUG_MSG); \
     g_free(RTP_STREAM_DEBUG_MSG); \
 }
 #else
@@ -133,6 +138,9 @@ gboolean rtpstream_save(rtpstream_tapinfo_t *tapinfo, capture_file *cap_file, rt
 */
 void rtpstream_mark(rtpstream_tapinfo_t *tapinfo, capture_file *cap_file, rtpstream_info_t* stream_fwd, rtpstream_info_t* stream_rev);
 
+/* Constant based on fix for bug 4119/5902: don't insert too many silence
+ * frames.
+ */
 #define MAX_SILENCE_FRAMES 14400000
 
 #ifdef __cplusplus
@@ -140,16 +148,3 @@ void rtpstream_mark(rtpstream_tapinfo_t *tapinfo, capture_file *cap_file, rtpstr
 #endif /* __cplusplus */
 
 #endif /* __RTP_STREAM_H__ */
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

@@ -1349,7 +1349,7 @@ static void dissect_cops_object_data(tvbuff_t *tvb, packet_info *pinfo, guint32 
             ifindex = tvb_get_ntohl(tvb, offset + 4);
             itf_tree = proto_tree_add_subtree_format(tree, tvb, offset, 8, ett_cops_itf, NULL,
                                      "Contents: IPv4 address %s, ifIndex: %u",
-                                     tvb_ip_to_str(tvb, offset), ifindex);
+                                     tvb_ip_to_str(pinfo->pool, tvb, offset), ifindex);
             proto_tree_add_item(itf_tree,
                                 (c_num == COPS_OBJ_IN_INT) ? hf_cops_in_int_ipv4 : hf_cops_out_int_ipv4,
                                 tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -1358,7 +1358,7 @@ static void dissect_cops_object_data(tvbuff_t *tvb, packet_info *pinfo, guint32 
             ifindex = tvb_get_ntohl(tvb, offset + (int)sizeof ipv6addr);
             itf_tree = proto_tree_add_subtree_format(tree, tvb, offset, 20, ett_cops_itf, NULL,
                                      "Contents: IPv6 address %s, ifIndex: %u",
-                                     tvb_ip6_to_str(tvb, offset), ifindex);
+                                     tvb_ip6_to_str(pinfo->pool, tvb, offset), ifindex);
             proto_tree_add_item(itf_tree,
                                 (c_num == COPS_OBJ_IN_INT) ? hf_cops_in_int_ipv6 : hf_cops_out_int_ipv6,
                                 tvb, offset, 16, ENC_NA);
@@ -1463,12 +1463,12 @@ static void dissect_cops_object_data(tvbuff_t *tvb, packet_info *pinfo, guint32 
             break;
 
         if (tvb_strnlen(tvb, offset, len) == -1) {
-            ti = proto_tree_add_item(tree, hf_cops_pepid, tvb, offset, len, ENC_ASCII|ENC_NA);
+            ti = proto_tree_add_item(tree, hf_cops_pepid, tvb, offset, len, ENC_ASCII);
             expert_add_info(pinfo, ti, &ei_cops_pepid_not_null);
         }
         else
             proto_tree_add_item(tree, hf_cops_pepid, tvb, offset,
-                                tvb_strnlen(tvb, offset, len) + 1, ENC_ASCII|ENC_NA);
+                                tvb_strnlen(tvb, offset, len) + 1, ENC_ASCII);
 
         break;
     case COPS_OBJ_REPORT_TYPE:
@@ -1484,7 +1484,7 @@ static void dissect_cops_object_data(tvbuff_t *tvb, packet_info *pinfo, guint32 
             tcp_port = tvb_get_ntohs(tvb, offset + 4 + 2);
             pdp_tree = proto_tree_add_subtree_format(tree, tvb, offset, 8, ett_cops_pdp, NULL,
                                      "Contents: IPv4 address %s, TCP Port Number: %u",
-                                     tvb_ip_to_str(tvb, offset), tcp_port);
+                                     tvb_ip_to_str(pinfo->pool, tvb, offset), tcp_port);
             proto_tree_add_item(pdp_tree,
                                 (c_num == COPS_OBJ_PDPREDIRADDR) ? hf_cops_pdprediraddr_ipv4 : hf_cops_lastpdpaddr_ipv4,
                                 tvb, offset, 4, ENC_BIG_ENDIAN);
@@ -1493,7 +1493,7 @@ static void dissect_cops_object_data(tvbuff_t *tvb, packet_info *pinfo, guint32 
             tcp_port = tvb_get_ntohs(tvb, offset + (int)sizeof ipv6addr + 2);
             pdp_tree = proto_tree_add_subtree_format(tree, tvb, offset, 20, ett_cops_pdp, NULL,
                                      "Contents: IPv6 address %s, TCP Port Number: %u",
-                                     tvb_ip6_to_str(tvb, offset), tcp_port);
+                                     tvb_ip6_to_str(pinfo->pool, tvb, offset), tcp_port);
             proto_tree_add_item(pdp_tree,
                                 (c_num == COPS_OBJ_PDPREDIRADDR) ? hf_cops_pdprediraddr_ipv6 : hf_cops_lastpdpaddr_ipv6,
                                 tvb, offset, 16, ENC_NA);
@@ -3019,7 +3019,7 @@ info_to_display(tvbuff_t *tvb, proto_item *stt, int offset, int octets, const ch
         } else if (mode==FMT_DEC && octets==8) {
             code64 = tvb_get_ntoh64(tvb, offset);
             pi = proto_tree_add_uint64_format(stt, *hf_proto_parameter, tvb, offset, octets,
-                                              code64, "%-28s : %" G_GINT64_MODIFIER "u", str, code64);
+                                              code64, "%-28s : %" PRIu64, str, code64);
         } else {
             pi = proto_tree_add_uint_format(stt, *hf_proto_parameter,
                                             tvb, offset, octets, code32,"%s",str);
@@ -3062,7 +3062,7 @@ cops_transaction_id(tvbuff_t *tvb, packet_info *pinfo, proto_tree *st, guint8 op
                                val_to_str(code16,table_cops_dqos_transaction_id, "Unknown (0x%04x)"),code16);
 
     /* Write the right data into the 'info field' on the Gui */
-    g_snprintf(info,sizeof(info),"COPS %-20s - %s",val_to_str_const(op_code,cops_op_code_vals, "Unknown"),
+    snprintf(info,sizeof(info),"COPS %-20s - %s",val_to_str_const(op_code,cops_op_code_vals, "Unknown"),
                val_to_str_const(code16,table_cops_dqos_transaction_id, "Unknown"));
 
     col_add_str(pinfo->cinfo, COL_INFO,info);
@@ -3260,11 +3260,11 @@ cops_surveillance_parameters(tvbuff_t *tvb, proto_tree *st, guint n, guint32 off
      offset += 4;
 
      /* BCID Element ID */
-     proto_tree_add_item(stt, hf_cops_pc_bcid_id, tvb, offset, 8, ENC_ASCII|ENC_NA);
+     proto_tree_add_item(stt, hf_cops_pc_bcid_id, tvb, offset, 8, ENC_ASCII);
      offset += 8;
 
      /* BCID Time Zone */
-     proto_tree_add_item(stt, hf_cops_pc_bcid_tz, tvb, offset, 8, ENC_ASCII|ENC_NA);
+     proto_tree_add_item(stt, hf_cops_pc_bcid_tz, tvb, offset, 8, ENC_ASCII);
      offset += 8;
 
      /* BCID Event Counter */
@@ -3318,11 +3318,11 @@ cops_event_generation_info(tvbuff_t *tvb, proto_tree *st, guint n, guint32 offse
      offset += 4;
 
      /* BCID Element ID */
-     proto_tree_add_item(stt, hf_cops_pc_bcid_id, tvb, offset, 8, ENC_ASCII|ENC_NA);
+     proto_tree_add_item(stt, hf_cops_pc_bcid_id, tvb, offset, 8, ENC_ASCII);
      offset += 8;
 
      /* BCID Time Zone */
-     proto_tree_add_item(stt, hf_cops_pc_bcid_tz, tvb, offset, 8, ENC_ASCII|ENC_NA);
+     proto_tree_add_item(stt, hf_cops_pc_bcid_tz, tvb, offset, 8, ENC_ASCII);
      offset += 8;
 
      /* BCID Event Counter */
@@ -3448,7 +3448,7 @@ cops_mm_transaction_id(tvbuff_t *tvb, packet_info *pinfo, proto_tree *st, guint8
             val_to_str(code16,table_cops_mm_transaction_id, "Unknown (0x%04x)"),code16);
 
      /* Write the right data into the 'info field' on the Gui */
-     g_snprintf(info,sizeof(info),"COPS %-20s - %s",val_to_str_const(op_code,cops_op_code_vals, "Unknown"),
+     snprintf(info,sizeof(info),"COPS %-20s - %s",val_to_str_const(op_code,cops_op_code_vals, "Unknown"),
                 val_to_str_const(code16,table_cops_mm_transaction_id, "Unknown"));
 
      col_add_str(pinfo->cinfo, COL_INFO,info);
@@ -3842,7 +3842,7 @@ cops_docsis_service_class_name(tvbuff_t *tvb, packet_info *pinfo, proto_tree *st
     offset += 3;
 
     if (object_len >= 12) {
-        proto_tree_add_item(stt, hf_cops_pcmm_docsis_scn, tvb, offset, object_len - 8, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(stt, hf_cops_pcmm_docsis_scn, tvb, offset, object_len - 8, ENC_ASCII);
         offset += object_len - 8;
     } else {
         proto_tree_add_expert_format(stt, pinfo, &ei_cops_bad_cops_object_length,
@@ -5676,11 +5676,11 @@ cops_mm_event_generation_info(tvbuff_t *tvb, proto_tree *st, guint n, guint32 of
      offset += 4;
 
      /* BCID Element ID */
-     proto_tree_add_item(stt, hf_cops_pc_bcid_id, tvb, offset, 8, ENC_ASCII|ENC_NA);
+     proto_tree_add_item(stt, hf_cops_pc_bcid_id, tvb, offset, 8, ENC_ASCII);
      offset += 8;
 
      /* BCID Time Zone */
-     proto_tree_add_item(stt, hf_cops_pc_bcid_tz, tvb, offset, 8, ENC_ASCII|ENC_NA);
+     proto_tree_add_item(stt, hf_cops_pc_bcid_tz, tvb, offset, 8, ENC_ASCII);
      offset += 8;
 
      /* BCID Event Counter */

@@ -16,7 +16,7 @@
 
 #include "config.h"
 #include "wslua.h"
-#include <wsutil/ws_printf.h> /* ws_debug_printf */
+#include <stdio.h>
 
 /* Several implementation details (__getters, __setters, __methods) were exposed
  * to Lua code. These are normally not used by dissectors, just for debugging
@@ -177,9 +177,9 @@ WSLUA_API void wslua_print_stack(char* s, lua_State* L) {
     int i;
 
     for (i=1;i<=lua_gettop(L);i++) {
-        ws_debug_printf("%s-%i: %s\n",s,i,lua_typename (L,lua_type(L, i)));
+        printf("%s-%i: %s\n",s,i,lua_typename (L,lua_type(L, i)));
     }
-    ws_debug_printf("\n");
+    printf("\n");
 }
 
 /* C-code function equivalent of the typeof() function we created in Lua.
@@ -445,7 +445,7 @@ static void wslua_push_attributes(lua_State *L, const wslua_attribute_table *t, 
             if (methods_idx) {
                 lua_rawgetfield(L, methods_idx, t->fieldname);
                 if (!lua_isnil(L, -1)) {
-                    g_error("'%s' attribute name already exists as method name for class\n", t->fieldname);
+                    ws_error("'%s' attribute name already exists as method name for class\n", t->fieldname);
                 }
                 lua_pop(L,1);  /* pop the nil */
             }
@@ -541,7 +541,7 @@ void wslua_register_class(lua_State *L, const wslua_class *cls_def)
     /* Check for existing global variables/classes with the same name. */
     lua_getglobal(L, cls_def->name);
     if (!lua_isnil (L, -1)) {
-        g_error("Attempt to register class '%s' which already exists in global Lua table\n", cls_def->name);
+        ws_error("Attempt to register class '%s' which already exists in global Lua table\n", cls_def->name);
     }
     lua_pop(L, 1);
 

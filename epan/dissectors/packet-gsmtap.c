@@ -67,6 +67,7 @@ static int hf_gsmtap_antenna = -1;
 
 static int hf_sacch_l1h_power_lev = -1;
 static int hf_sacch_l1h_fpc = -1;
+static int hf_sacch_l1h_sro_srr = -1;
 static int hf_sacch_l1h_ta = -1;
 
 static int hf_ptcch_spare = -1;
@@ -487,6 +488,8 @@ dissect_sacch_l1h(tvbuff_t *tvb, proto_tree *tree)
 	proto_tree_add_item(l1h_tree, hf_sacch_l1h_power_lev, tvb, 0, 1, ENC_BIG_ENDIAN);
 	/* Fast Power Control */
 	proto_tree_add_item(l1h_tree, hf_sacch_l1h_fpc, tvb, 0, 1, ENC_BIG_ENDIAN);
+	/* SRO/SRR (SACCH Repetition) bit */
+	proto_tree_add_item(l1h_tree, hf_sacch_l1h_sro_srr, tvb, 0, 1, ENC_BIG_ENDIAN);
 	/* Acutal Timing Advance */
 	proto_tree_add_item(l1h_tree, hf_sacch_l1h_ta, tvb, 1, 1, ENC_BIG_ENDIAN);
 }
@@ -850,7 +853,7 @@ dissect_gsmtap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _
 
 	/* Try to build an identifier of different 'streams' */
 	/* (AFCN _cant_ be used because of hopping */
-	conversation_create_endpoint_by_id(pinfo, ENDPOINT_GSMTAP, (timeslot << 3) | subslot, 0);
+	conversation_set_elements_by_id(pinfo, CONVERSATION_GSMTAP, (timeslot << 3) | subslot);
 
 	if (tree) {
 		guint8 channel;
@@ -1070,7 +1073,13 @@ dissect_gsmtap(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _
 		switch (sub_type) {
 		case GSMTAP_E1T1_LAPD:
 			sub_handle = GSMTAP_SUB_LAPD;
-			break;
+			if (sub_handles[sub_handle]) {
+				struct isdn_phdr isdn;
+				isdn.uton = pinfo->p2p_dir == P2P_DIR_SENT ? 1 : 0;
+				isdn.channel = 0;
+				call_dissector_with_data(sub_handles[sub_handle], payload_tvb, pinfo, tree, &isdn);
+			}
+			return tvb_captured_length(tvb);
 		case GSMTAP_E1T1_FR:
 			sub_handle = GSMTAP_SUB_FR;
 			break;
@@ -1129,10 +1138,10 @@ proto_register_gsmtap(void)
 		  FT_UINT16, BASE_DEC, NULL, GSMTAP_ARFCN_F_UPLINK, NULL, HFILL } },
 		{ &hf_gsmtap_pcs, { "PCS band indicator", "gsmtap.pcs_band",
 		  FT_UINT16, BASE_DEC, NULL, GSMTAP_ARFCN_F_PCS, NULL, HFILL } },
-		{ &hf_gsmtap_signal_dbm, { "Signal Level (dBm)", "gsmtap.signal_dbm",
-		  FT_INT8, BASE_DEC, NULL, 0, NULL, HFILL } },
-		{ &hf_gsmtap_snr_db, { "Signal/Noise Ratio (dB)", "gsmtap.snr_db",
-		  FT_INT8, BASE_DEC, NULL, 0, NULL, HFILL } },
+		{ &hf_gsmtap_signal_dbm, { "Signal Level", "gsmtap.signal_dbm",
+		  FT_INT8, BASE_DEC | BASE_UNIT_STRING, &units_dbm, 0, NULL, HFILL } },
+		{ &hf_gsmtap_snr_db, { "Signal/Noise Ratio", "gsmtap.snr_db",
+		  FT_INT8, BASE_DEC | BASE_UNIT_STRING, &units_decibels, 0, NULL, HFILL } },
 		{ &hf_gsmtap_frame_nr, { "GSM Frame Number", "gsmtap.frame_nr",
 		  FT_UINT32, BASE_DEC, NULL, 0, NULL, HFILL } },
 		{ &hf_gsmtap_burst_type, { "Burst Type", "gsmtap.burst_type",
@@ -1154,9 +1163,10 @@ proto_register_gsmtap(void)
 
 		{ &hf_sacch_l1h_power_lev, { "MS power level", "gsmtap.sacch_l1.power_lev",
 		  FT_UINT8, BASE_DEC, NULL, 0x1f, NULL, HFILL } },
-		{ &hf_sacch_l1h_fpc, { "FPC", "gsmtap.sacch_l1.fpc",
-		  FT_BOOLEAN, 8, TFS(&sacch_l1h_fpc_mode_vals), 0x20,
-		  NULL, HFILL } },
+		{ &hf_sacch_l1h_fpc, { "FPC (Fast Power Control)", "gsmtap.sacch_l1.fpc",
+		  FT_BOOLEAN, 8, TFS(&sacch_l1h_fpc_mode_vals), 0x20, NULL, HFILL } },
+		{ &hf_sacch_l1h_sro_srr, { "SRO/SRR (SACCH Repetition)", "gsmtap.sacch_l1.sro_srr",
+		  FT_BOOLEAN, 8, TFS(&tfs_required_not_required), 0x40, NULL, HFILL } },
 		{ &hf_sacch_l1h_ta, { "Actual Timing Advance", "gsmtap.sacch_l1.ta",
 		  FT_UINT8, BASE_DEC, NULL, 0, NULL, HFILL } },
 		{ &hf_um_voice_type, { "GSM Um Voice Type", "gsmtap.um_voice_type",
@@ -1210,7 +1220,7 @@ proto_reg_handoff_gsmtap(void)
 	sub_handles[GSMTAP_SUB_GMR1_LAPSAT] = find_dissector_add_dependency("lapsat", proto_gsmtap);
 	sub_handles[GSMTAP_SUB_GMR1_RACH] = find_dissector_add_dependency("gmr1_rach", proto_gsmtap);
 	sub_handles[GSMTAP_SUB_UMTS_RRC] = find_dissector_add_dependency("rrc", proto_gsmtap);
-	sub_handles[GSMTAP_SUB_LAPD] = find_dissector_add_dependency("lapd", proto_gsmtap);
+	sub_handles[GSMTAP_SUB_LAPD] = find_dissector_add_dependency("lapd-phdr", proto_gsmtap);
 	sub_handles[GSMTAP_SUB_FR] = find_dissector_add_dependency("fr", proto_gsmtap);
 
 	rrc_sub_handles[GSMTAP_RRC_SUB_DL_DCCH_Message] = find_dissector_add_dependency("rrc.dl.dcch", proto_gsmtap);

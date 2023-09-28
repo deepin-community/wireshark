@@ -273,7 +273,7 @@ dissect_fp_common ( tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int hea
       ti = proto_tree_add_protocol_format(tree, proto_fp, tvb, 0, header_size,
                                           "Cisco FabricPath, Src: %03x.%02x.%04x, Dst: %s",
                                           sswid, ssswid, slid,
-                                          address_with_resolution_to_str(wmem_packet_scope(), &ether_addr));
+                                          address_with_resolution_to_str(pinfo->pool, &ether_addr));
     } else {
       ti = proto_tree_add_protocol_format(tree, proto_fp, tvb, 0, header_size,
                                           "Cisco FabricPath, Src: %03x.%02x.%04x, Dst: %03x.%02x.%04x",
@@ -463,7 +463,7 @@ proto_register_mim(void)
 
   proto_fp = proto_register_protocol("Cisco FabricPath", "CFP", "cfp");
 
-  mim_module = prefs_register_protocol (proto_fp, proto_reg_handoff_fabricpath);
+  mim_module = prefs_register_protocol (proto_fp, NULL);
 
   prefs_register_obsolete_preference (mim_module, "enable");
 
@@ -482,25 +482,20 @@ proto_register_mim(void)
 void
 proto_reg_handoff_fabricpath(void)
 {
-  static gboolean prefs_initialized = FALSE;
+  /*
+   * Using Heuristic dissector (As opposed to
+   * registering the ethertype) in order to
+   * get outer source and destination MAC
+   * before the standard ethernet dissector
+   */
+  heur_dissector_add ("eth", dissect_fp_heur, "Cisco FabricPath over Ethernet", "fp_eth", proto_fp, HEURISTIC_ENABLE);
 
-  if (!prefs_initialized) {
-    /*
-     * Using Heuristic dissector (As opposed to
-     * registering the ethertype) in order to
-     * get outer source and destination MAC
-     * before the standard ethernet dissector
-     */
-    heur_dissector_add ("eth", dissect_fp_heur, "Cisco FabricPath over Ethernet", "fp_eth", proto_fp, HEURISTIC_ENABLE);
-
-    /*
-     * The FCS in FabricPath frames covers the entire FabricPath frame,
-     * not the encapsulated Ethernet frame, so we don't want to treat
-     * the encapsulated frame as if it had an FCS.
-     */
-    eth_withoutfcs_dissector = find_dissector_add_dependency( "eth_withoutfcs", proto_fp );
-    prefs_initialized = TRUE;
-  }
+  /*
+   * The FCS in FabricPath frames covers the entire FabricPath frame,
+   * not the encapsulated Ethernet frame, so we don't want to treat
+   * the encapsulated frame as if it had an FCS.
+   */
+  eth_withoutfcs_dissector = find_dissector_add_dependency( "eth_withoutfcs", proto_fp );
 }
 
 /*

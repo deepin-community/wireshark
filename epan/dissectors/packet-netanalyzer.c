@@ -237,7 +237,7 @@ dissect_netanalyzer_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
           proto_tree_add_bitmask(netanalyzer_header_tree, tvb, 0, hf_netanalyzer_status, ett_netanalyzer_status, hfx_netanalyzer_status, ENC_LITTLE_ENDIAN);
 
-          strbuf = wmem_strbuf_new_label(wmem_packet_scope());
+          strbuf = wmem_strbuf_new_label(pinfo->pool);
           for (idx = 0; idx < 8; idx++)
           {
             if (packet_status & (1 << idx))
@@ -348,7 +348,7 @@ dissect_netanalyzer_common(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
         ti = proto_tree_add_item (netanalyzer_header_tree, hf_netanalyzer_gpio_edge, tvb, offset, 1, ENC_LITTLE_ENDIAN);
         gpio_edge = (tvb_get_guint8(tvb, offset) & 0x01);
 
-        g_snprintf(szTemp, MAX_BUFFER,
+        snprintf(szTemp, MAX_BUFFER,
                    "GPIO event on GPIO %d (%sing edge)", gpio_num, (gpio_edge == 0x00) ? "ris" : "fall");
 
         col_add_fstr(pinfo->cinfo, COL_INFO, "%s", szTemp);

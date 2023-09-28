@@ -1,4 +1,4 @@
-/* help_dlg.h
+/** @file
  *
  * Some content from gtk/help_dlg.h by Laurent Deniel <laurent.deniel@free.fr>
  *
@@ -59,7 +59,6 @@ typedef enum {
     HELP_FILTER_EXPRESSION_DIALOG,
     HELP_COLORING_RULES_DIALOG,
     HELP_CONFIG_PROFILES_DIALOG,
-    HELP_MANUAL_ADDR_RESOLVE_DIALOG, /* GTK+ only? */
     HELP_PRINT_DIALOG,
     HELP_FIND_DIALOG,
     HELP_FILESET_DIALOG,
@@ -80,13 +79,11 @@ typedef enum {
     HELP_STATS_ENDPOINTS_DIALOG,
     HELP_STATS_CONVERSATIONS_DIALOG,
     HELP_STATS_IO_GRAPH_DIALOG,
-    HELP_STATS_COMPARE_FILES_DIALOG,
     HELP_STATS_LTE_MAC_TRAFFIC_DIALOG,
     HELP_STATS_LTE_RLC_TRAFFIC_DIALOG,
     HELP_STATS_TCP_STREAM_GRAPHS_DIALOG,
     HELP_STATS_WLAN_TRAFFIC_DIALOG,
     HELP_CAPTURE_INTERFACE_OPTIONS_DIALOG,
-    HELP_CAPTURE_INTERFACES_DETAILS_DIALOG,
     HELP_PREFERENCES_DIALOG,
     HELP_CAPTURE_INFO_DIALOG,
     HELP_EXPORT_FILE_DIALOG,
@@ -101,17 +98,17 @@ typedef enum {
     HELP_MERGE_WIN32_DIALOG,
     HELP_SAVE_WIN32_DIALOG,
     HELP_TIME_SHIFT_DIALOG,
-    HELP_FILTER_SAVE_DIALOG,
     HELP_TELEPHONY_VOIP_CALLS_DIALOG,
-    HELP_RTP_ANALYSIS_DIALOG,
+    HELP_TELEPHONY_RTP_ANALYSIS_DIALOG,
+    HELP_TELEPHONY_RTP_STREAMS_DIALOG,
     HELP_NEW_PACKET_DIALOG,
     HELP_IAX2_ANALYSIS_DIALOG,
-    HELP_TELEPHONY_RTP_PLAYER_DIALOG
+    HELP_TELEPHONY_RTP_PLAYER_DIALOG,
+    HELP_STAT_FLOW_GRAPH
 } topic_action_e;
 
-/** Given a page in the Wireshark User's Guide return its URL. On Windows
- *  an attempt will be made to open User Guide URLs with HTML Help. If
- *  the attempt succeeds NULL will be returned.
+/** Given a page in the Wireshark User's Guide return its URL. If the
+ *  attempt succeeds NULL will be returned.
  *
  * @param page A page in the User's Guide.
  * @return A static URL or NULL. A non-NULL return value must be freed
@@ -119,9 +116,8 @@ typedef enum {
  */
 gchar *user_guide_url(const gchar *page);
 
-/** Given a topic action return its URL. On Windows an attempt will be
- *  made to open User Guide URLs with HTML Help. If the attempt succeeds
- *  NULL will be returned.
+/** Given a topic action return its URL. If the attempt succeeds NULL
+ *  will be returned.
  *
  * @param action Topic action.
  * @return A static URL or NULL. A non-NULL return value must be freed
@@ -140,16 +136,3 @@ void topic_action(topic_action_e topic);
 #endif /* __cplusplus */
 
 #endif /* __HELP_URL_H__ */
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

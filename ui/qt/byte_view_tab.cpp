@@ -18,7 +18,7 @@
 #include "epan/epan_dissect.h"
 #include "epan/tvbuff-int.h"
 
-#include <wireshark_application.h>
+#include <main_application.h>
 
 #include <ui/qt/utils/variant_pointer.h>
 #include <ui/qt/widgets/byte_view_text.h>
@@ -33,7 +33,8 @@ ByteViewTab::ByteViewTab(QWidget *parent, epan_dissect_t *edt_fixed) :
     QTabWidget(parent),
     cap_file_(0),
     is_fixed_packet_(edt_fixed != NULL),
-    edt_(edt_fixed)
+    edt_(edt_fixed),
+    disable_hover_(false)
 {
     setAccessibleName(tr("Packet bytes"));
     setTabPosition(QTabWidget::South);
@@ -44,7 +45,7 @@ ByteViewTab::ByteViewTab(QWidget *parent, epan_dissect_t *edt_fixed) :
     setMinimumSize(one_em, one_em);
 
     if (!edt_fixed) {
-        connect(wsApp, SIGNAL(appInitialized()), this, SLOT(connectToMainWindow()));
+        connect(mainApp, SIGNAL(appInitialized()), this, SLOT(connectToMainWindow()));
     }
 }
 
@@ -54,16 +55,16 @@ ByteViewTab::ByteViewTab(QWidget *parent, epan_dissect_t *edt_fixed) :
 void ByteViewTab::connectToMainWindow()
 {
     connect(this, SIGNAL(fieldSelected(FieldInformation *)),
-            wsApp->mainWindow(), SIGNAL(fieldSelected(FieldInformation *)));
+            mainApp->mainWindow(), SIGNAL(fieldSelected(FieldInformation *)));
     connect(this, SIGNAL(fieldHighlight(FieldInformation *)),
-            wsApp->mainWindow(), SIGNAL(fieldHighlight(FieldInformation *)));
+            mainApp->mainWindow(), SIGNAL(fieldHighlight(FieldInformation *)));
 
     /* Connect change of packet selection */
-    connect(wsApp->mainWindow(), SIGNAL(framesSelected(QList<int>)), this, SLOT(selectedFrameChanged(QList<int>)));
-    connect(wsApp->mainWindow(), SIGNAL(setCaptureFile(capture_file*)), this, SLOT(setCaptureFile(capture_file*)));
-    connect(wsApp->mainWindow(), SIGNAL(fieldSelected(FieldInformation *)), this, SLOT(selectedFieldChanged(FieldInformation *)));
+    connect(mainApp->mainWindow(), SIGNAL(framesSelected(QList<int>)), this, SLOT(selectedFrameChanged(QList<int>)));
+    connect(mainApp->mainWindow(), SIGNAL(setCaptureFile(capture_file*)), this, SLOT(setCaptureFile(capture_file*)));
+    connect(mainApp->mainWindow(), SIGNAL(fieldSelected(FieldInformation *)), this, SLOT(selectedFieldChanged(FieldInformation *)));
 
-    connect(wsApp->mainWindow(), SIGNAL(captureActive(int)), this, SLOT(captureActive(int)));
+    connect(mainApp->mainWindow(), SIGNAL(captureActive(int)), this, SLOT(captureActive(int)));
 }
 
 void ByteViewTab::captureActive(int cap)
@@ -104,13 +105,13 @@ void ByteViewTab::addTab(const char *name, tvbuff_t *tvb) {
 
     ByteViewText * byte_view_text = new ByteViewText(data, encoding, this);
     byte_view_text->setAccessibleName(name);
-    byte_view_text->setMonospaceFont(wsApp->monospaceFont(true));
+    byte_view_text->setMonospaceFont(mainApp->monospaceFont(true));
 
     if (tvb)
     {
         byte_view_text->setProperty(tvb_data_property, VariantPointer<tvbuff_t>::asQVariant(tvb));
 
-        connect(wsApp, SIGNAL(zoomMonospaceFont(QFont)), byte_view_text, SLOT(setMonospaceFont(QFont)));
+        connect(mainApp, SIGNAL(zoomMonospaceFont(QFont)), byte_view_text, SLOT(setMonospaceFont(QFont)));
 
         connect(byte_view_text, SIGNAL(byteHovered(int)), this, SLOT(byteViewTextHovered(int)));
         connect(byte_view_text, SIGNAL(byteSelected(int)), this, SLOT(byteViewTextMarked(int)));
@@ -179,7 +180,6 @@ ByteViewText * ByteViewTab::findByteViewTextForTvb(tvbuff_t * search_tvb, int * 
     bool found = false;
 
     QList<ByteViewText *> allBVTs = findChildren<ByteViewText *>();
-    unsigned int length = search_tvb->length;
     for (int i = 0; i < allBVTs.size() && ! found; ++i)
     {
         ByteViewText * bvt = allBVTs.at(i);
@@ -187,19 +187,6 @@ ByteViewText * ByteViewTab::findByteViewTextForTvb(tvbuff_t * search_tvb, int * 
         if (stored == search_tvb)
         {
             found = true;
-        }
-        else if (stored)
-        {
-            if (stored->length >= length && tvb_memeql(search_tvb, 0, tvb_get_ptr(stored, 0, length), length) == 0)
-            {
-                /* In packetDialog we do not match, because we came from different data sources.
-                 * Assuming the capture files match, this should be a sufficient enough difference */
-                found = true;
-            }
-        }
-
-        if (found)
-        {
             int wdgIdx = bvt->property("tab_index").toInt();
             if (idx)
             {
@@ -351,16 +338,3 @@ void ByteViewTab::setCaptureFile(capture_file *cf)
 
     cap_file_ = cf;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

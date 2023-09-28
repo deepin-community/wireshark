@@ -41,7 +41,7 @@
 
 #include "progress_frame.h"
 #include <ui/qt/utils/qt_ui_utils.h>
-#include "wireshark_application.h"
+#include "main_application.h"
 
 #include <QClipboard>
 #include <QContextMenuEvent>
@@ -79,10 +79,10 @@ TapParameterDialog::TapParameterDialog(QWidget &parent, CaptureFile &cf, int hel
 
     QPushButton *button;
     button = ui->buttonBox->addButton(tr("Copy"), QDialogButtonBox::ActionRole);
-    connect(button, SIGNAL(clicked()), this, SLOT(on_actionCopyToClipboard_triggered()));
+    connect(button, &QPushButton::clicked, this, &TapParameterDialog::on_actionCopyToClipboard_triggered);
 
     button = ui->buttonBox->addButton(tr("Save as…"), QDialogButtonBox::ActionRole);
-    connect(button, SIGNAL(clicked()), this, SLOT(on_actionSaveAs_triggered()));
+    connect(button, &QPushButton::clicked, this, &TapParameterDialog::on_actionSaveAs_triggered);
 
     connect(ui->displayFilterLineEdit, SIGNAL(textChanged(QString)),
             this, SLOT(updateWidgets()));
@@ -123,10 +123,10 @@ void TapParameterDialog::registerDialog(const QString title, const char *cfg_abb
     QString cfg_str = cfg_abbr;
     cfg_str_to_creator_[cfg_str] = creator;
 
-    QAction *tpd_action = new QAction(title, wsApp);
+    QAction *tpd_action = new QAction(title, mainApp);
     tpd_action->setObjectName(action_name_);
     tpd_action->setData(cfg_str);
-    wsApp->addDynamicMenuGroupItem(group, tpd_action);
+    mainApp->addDynamicMenuGroupItem(group, tpd_action);
 }
 
 TapParameterDialog *TapParameterDialog::showTapParameterStatistics(QWidget &parent, CaptureFile &cf, const QString cfg_str, const QString arg, void *)
@@ -201,20 +201,27 @@ void TapParameterDialog::filterActionTriggered()
     emit filterAction(filter_expr, fa->action(), fa->actionType());
 }
 
+void TapParameterDialog::collapseAllActionTriggered() {
+    ui->statsTreeWidget->collapseAll();
+}
+void TapParameterDialog::expandAllActionTriggered() {
+    ui->statsTreeWidget->expandAll();
+}
+
 QString TapParameterDialog::itemDataToPlain(QVariant var, int width)
 {
     QString plain_str;
     int align_mul = 1;
 
-    switch (var.type()) {
-    case QVariant::String:
+    switch (var.userType()) {
+    case QMetaType::QString:
         align_mul = -1;
         // Fall through
-    case QVariant::Int:
-    case QVariant::UInt:
+    case QMetaType::Int:
+    case QMetaType::UInt:
         plain_str = var.toString();
         break;
-    case QVariant::Double:
+    case QMetaType::Double:
         plain_str = QString::number(var.toDouble(), 'f', 6);
         break;
     default:
@@ -252,11 +259,11 @@ QByteArray TapParameterDialog::getTreeAsString(st_format_type format)
             // Iterating over items within this tree.
             for (int col=0; col < ui->statsTreeWidget->columnCount(); col++) {
                 if (col_widths.size() <= col) {
-                    col_widths.append(ui->statsTreeWidget->headerItem()->text(col).length());
+                    col_widths.append(static_cast<int>(ui->statsTreeWidget->headerItem()->text(col).length()));
                 }
                 QVariant var = ui->statsTreeWidget->headerItem()->data(col, Qt::DisplayRole);
-                if (var.type() == QVariant::String) {
-                    col_widths[col] = qMax(col_widths[col], itemDataToPlain(var).length());
+                if (var.userType() == QMetaType::QString) {
+                    col_widths[col] = qMax(col_widths[col], static_cast<int>(itemDataToPlain(var).length()));
                 }
             }
             ++width_it;
@@ -353,7 +360,7 @@ QByteArray TapParameterDialog::getTreeAsString(st_format_type format)
         }
         case ST_FORMAT_CSV:
             foreach (QVariant var, tid) {
-                if (var.type() == QVariant::String) {
+                if (var.userType() == QMetaType::QString) {
                     parts << QString("\"%1\"").arg(var.toString());
                 } else {
                     parts << var.toString();
@@ -378,7 +385,7 @@ QByteArray TapParameterDialog::getTreeAsString(st_format_type format)
             QString indent = "-";
             foreach (QVariant var, tid) {
                 QString entry;
-                if (var.type() == QVariant::String) {
+                if (var.userType() == QMetaType::QString) {
                     entry = QString("\"%1\"").arg(var.toString());
                 } else {
                     entry = var.toString();
@@ -421,7 +428,7 @@ void TapParameterDialog::contextMenuEvent(QContextMenuEvent *event)
         fa->setEnabled(enable);
     }
 
-    ctx_menu_.exec(event->globalPos());
+    ctx_menu_.popup(event->globalPos());
 }
 
 void TapParameterDialog::addFilterActions()
@@ -471,6 +478,19 @@ void TapParameterDialog::addFilterActions()
     ctx_menu_.insertSeparator(insert_action);
 }
 
+void TapParameterDialog::addTreeCollapseAllActions()
+{
+    ctx_menu_.addSeparator();
+
+    QAction *collapse = new QAction(tr("Collapse All"), this);
+    ctx_menu_.addAction(collapse);
+    connect(collapse, SIGNAL(triggered()), this, SLOT(collapseAllActionTriggered()));
+
+    QAction *expand = new QAction(tr("Expand All"), this);
+    ctx_menu_.addAction(expand);
+    connect(expand, SIGNAL(triggered()), this, SLOT(expandAllActionTriggered()));
+}
+
 void TapParameterDialog::updateWidgets()
 {
     bool edit_enable = true;
@@ -513,7 +533,7 @@ void TapParameterDialog::on_applyFilterButton_clicked()
 
 void TapParameterDialog::on_actionCopyToClipboard_triggered()
 {
-    wsApp->clipboard()->setText(getTreeAsString(ST_FORMAT_PLAIN));
+    mainApp->clipboard()->setText(getTreeAsString(ST_FORMAT_PLAIN));
 }
 
 void TapParameterDialog::on_actionSaveAs_triggered()
@@ -528,7 +548,7 @@ void TapParameterDialog::on_actionSaveAs_triggered()
 #ifdef Q_OS_WIN
     HANDLE da_ctx = set_thread_per_monitor_v2_awareness();
 #endif
-    QFileDialog SaveAsDialog(this, wsApp->windowTitleString(tr("Save Statistics As…")),
+    QFileDialog SaveAsDialog(this, mainApp->windowTitleString(tr("Save Statistics As…")),
                                                             get_last_open_dir());
     SaveAsDialog.setNameFilter(tr("Plain text file (*.txt);;"
                                     "Comma separated values (*.csv);;"
@@ -588,19 +608,6 @@ void TapParameterDialog::on_actionSaveAs_triggered()
 void TapParameterDialog::on_buttonBox_helpRequested()
 {
     if (help_topic_ > 0) {
-        wsApp->helpTopicAction((topic_action_e) help_topic_);
+        mainApp->helpTopicAction((topic_action_e) help_topic_);
     }
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

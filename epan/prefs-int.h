@@ -14,7 +14,7 @@
 
 #include <stdio.h>
 #include "ws_symbol_export.h"
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -101,6 +101,7 @@ struct pref_custom_cbs {
 #define PREF_DECODE_AS_UINT   (1u << 12)     /* XXX - These are only supported for "internal" (non-protocol) */
 #define PREF_DECODE_AS_RANGE  (1u << 13) /* use and not as a generic protocol preference */
 #define PREF_OPEN_FILENAME    (1u << 14)
+#define PREF_PASSWORD         (1u << 15) /* like string, but never saved to prefs file */
 
 typedef enum {
 	GUI_ALL,
@@ -139,11 +140,8 @@ WS_DLL_PUBLIC guint32 prefs_get_max_value(pref_t *pref);
 /* Bitmask of flags for the effect of a preference in Wireshark */
 #define PREF_EFFECT_DISSECTION        (1u << 0)
 #define PREF_EFFECT_CAPTURE           (1u << 1)
-#define PREF_EFFECT_GUI               (1u << 2)
-#define PREF_EFFECT_FONT              (1u << 3)
-#define PREF_EFFECT_GUI_LAYOUT        (1u << 4)
-#define PREF_EFFECT_FIELDS            (1u << 5)
-#define PREF_EFFECT_CUSTOM            (1u << 31)
+#define PREF_EFFECT_GUI_LAYOUT        (1u << 2)
+#define PREF_EFFECT_FIELDS            (1u << 3)
 
 /** Fetch flags that show the effect of the preference
  *
@@ -231,6 +229,7 @@ WS_DLL_PUBLIC guint prefs_get_uint_value_real(pref_t *pref, pref_source_t source
 
 
 WS_DLL_PUBLIC unsigned int prefs_set_enum_value(pref_t *pref, gint value, pref_source_t source);
+WS_DLL_PUBLIC unsigned int prefs_set_enum_string_value(pref_t *pref, const gchar *value, pref_source_t source);
 WS_DLL_PUBLIC gint prefs_get_enum_value(pref_t *pref, pref_source_t source);
 WS_DLL_PUBLIC const enum_val_t* prefs_get_enumvals(pref_t *pref);
 WS_DLL_PUBLIC gboolean prefs_get_enum_radiobuttons(pref_t *pref);
@@ -250,6 +249,9 @@ WS_DLL_PUBLIC range_t* prefs_get_range_value_real(pref_t *pref, pref_source_t so
 
 WS_DLL_PUBLIC gboolean prefs_add_decode_as_value(pref_t *pref, guint value, gboolean replace);
 WS_DLL_PUBLIC gboolean prefs_remove_decode_as_value(pref_t *pref, guint value, gboolean set_default);
+
+WS_DLL_PUBLIC unsigned int prefs_set_password_value(pref_t *pref, const char* value, pref_source_t source);
+WS_DLL_PUBLIC char* prefs_get_password_value(pref_t *pref, pref_source_t source);
 
 WS_DLL_PUBLIC void reset_pref(pref_t *pref);
 

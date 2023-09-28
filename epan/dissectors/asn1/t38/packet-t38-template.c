@@ -213,14 +213,14 @@ void t38_add_address(packet_info *pinfo,
          * Check if the ip address and port combination is not
          * already registered as a conversation.
          */
-        p_conversation = find_conversation( setup_frame_number, addr, &null_addr, ENDPOINT_UDP, port, other_port,
+        p_conversation = find_conversation( setup_frame_number, addr, &null_addr, CONVERSATION_UDP, port, other_port,
                                 NO_ADDR_B | (!other_port ? NO_PORT_B : 0));
 
         /*
          * If not, create a new conversation.
          */
         if ( !p_conversation || p_conversation->setup_frame != setup_frame_number) {
-                p_conversation = conversation_new( setup_frame_number, addr, &null_addr, ENDPOINT_UDP,
+                p_conversation = conversation_new( setup_frame_number, addr, &null_addr, CONVERSATION_UDP,
                                            (guint32)port, (guint32)other_port,
                                                                    NO_ADDR2 | (!other_port ? NO_PORT2 : 0));
         }
@@ -246,7 +246,7 @@ void t38_add_address(packet_info *pinfo,
         /*
          * Update the conversation data.
          */
-        g_strlcpy(p_conversation_data->setup_method, setup_method, MAX_T38_SETUP_METHOD_SIZE);
+        (void) g_strlcpy(p_conversation_data->setup_method, setup_method, MAX_T38_SETUP_METHOD_SIZE);
         p_conversation_data->setup_frame_number = setup_frame_number;
         p_conversation_data->src_t38_info.reass_ID = 0;
         p_conversation_data->src_t38_info.reass_start_seqnum = -1;
@@ -408,13 +408,13 @@ init_t38_info_conv(packet_info *pinfo)
 
 	/* find the conversation used for Reassemble and Setup Info */
 	p_conv = find_conversation(pinfo->num, &pinfo->net_dst, &pinfo->net_src,
-                                   conversation_pt_to_endpoint_type(pinfo->ptype),
+                                   conversation_pt_to_conversation_type(pinfo->ptype),
                                    pinfo->destport, pinfo->srcport, NO_ADDR_B | NO_PORT_B);
 
 	/* create a conv if it doen't exist */
 	if (!p_conv) {
 		p_conv = conversation_new(pinfo->num, &pinfo->net_src, &pinfo->net_dst,
-			      conversation_pt_to_endpoint_type(pinfo->ptype), pinfo->srcport, pinfo->destport, NO_ADDR_B | NO_PORT_B);
+			      conversation_pt_to_conversation_type(pinfo->ptype), pinfo->srcport, pinfo->destport, NO_ADDR2 | NO_PORT2);
 
 		/* Set dissector */
 		conversation_set_dissector(p_conv, t38_udp_handle);
@@ -454,7 +454,7 @@ init_t38_info_conv(packet_info *pinfo)
 	if (!p_t38_packet_conv) {
 		/* copy the t38 conversation info to the packet t38 conversation */
 		p_t38_packet_conv = wmem_new(wmem_file_scope(), t38_conv);
-		g_strlcpy(p_t38_packet_conv->setup_method, p_t38_conv->setup_method, MAX_T38_SETUP_METHOD_SIZE);
+		(void) g_strlcpy(p_t38_packet_conv->setup_method, p_t38_conv->setup_method, MAX_T38_SETUP_METHOD_SIZE);
 		p_t38_packet_conv->setup_frame_number = p_t38_conv->setup_frame_number;
 
 		memcpy(&(p_t38_packet_conv->src_t38_info), &(p_t38_conv->src_t38_info), sizeof(t38_conv_info));

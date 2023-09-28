@@ -1,4 +1,4 @@
-/* srt_table.h
+/** @file
  * GUI independent helper routines common to all service response time (SRT) taps.
  *
  * Wireshark - Network traffic analyzer
@@ -13,7 +13,7 @@
 
 #include "tap.h"
 #include "timestats.h"
-#include "wmem/wmem.h"
+#include <epan/wmem_scopes.h>
 
 #ifdef __cplusplus
 extern "C" {

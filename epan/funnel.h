@@ -1,5 +1,4 @@
-/*
- *  funnel.h
+/** @file
  *
  * EPAN's GUI mini-API
  *
@@ -17,16 +16,14 @@
 #include <glib.h>
 #include <epan/stat_groups.h>
 #include "ws_symbol_export.h"
+#include <ws_log_defs.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
 typedef struct _funnel_ops_id_t funnel_ops_id_t; /* Opaque pointer to ops instance */
-typedef struct _funnel_progress_window_t funnel_progress_window_t ;
 typedef struct _funnel_text_window_t funnel_text_window_t ;
-typedef struct _funnel_tree_window_t funnel_tree_window_t ; /* XXX Unused? */
-typedef struct _funnel_node_t funnel_node_t ; /* XXX Unused? */
 
 typedef void (*text_win_close_cb_t)(void*);
 
@@ -50,7 +47,7 @@ struct progdlg;
 
 typedef struct _funnel_ops_t {
     funnel_ops_id_t *ops_id;
-    funnel_text_window_t* (*new_text_window)(const char* label);
+    funnel_text_window_t* (*new_text_window)(funnel_ops_id_t *ops_id, const char* label);
     void (*set_text)(funnel_text_window_t*  win, const char* text);
     void (*append_text)(funnel_text_window_t*  win, const char* text);
     void (*prepend_text)(funnel_text_window_t*  win, const char* text);
@@ -61,16 +58,18 @@ typedef struct _funnel_ops_t {
     void (*destroy_text_window)(funnel_text_window_t*  win);
     void (*add_button)(funnel_text_window_t*  win, funnel_bt_t* cb, const char* label);
 
-    void (*new_dialog)(const gchar* title,
-		       const gchar** fieldnames,
-		       funnel_dlg_cb_t dlg_cb,
-		       void* data,
-		       funnel_dlg_cb_data_free_t dlg_cb_data_free);
+    void (*new_dialog)(funnel_ops_id_t *ops_id,
+                    const gchar* title,
+                    const gchar** field_names,
+                    const gchar** field_values,
+                    funnel_dlg_cb_t dlg_cb,
+                    void* data,
+                    funnel_dlg_cb_data_free_t dlg_cb_data_free);
 
     void (*close_dialogs)(void);
 
     void (*logger)(const gchar *log_domain,
-                   GLogLevelFlags log_level,
+                   enum ws_log_level log_level,
                    const gchar *message,
                    gpointer user_data);
 
@@ -84,6 +83,7 @@ typedef struct _funnel_ops_t {
     void (*set_color_filter_slot)(guint8 filt_nr, const gchar* filter);
     gboolean (*open_file)(funnel_ops_id_t *ops_id, const char* fname, const char* filter, char** error);
     void (*reload_packets)(funnel_ops_id_t *ops_id);
+    void (*redissect_packets)(funnel_ops_id_t *ops_id);
     void (*reload_lua_plugins)(funnel_ops_id_t *ops_id);
     void (*apply_filter)(funnel_ops_id_t *ops_id);
 

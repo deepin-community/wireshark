@@ -18,12 +18,12 @@
 #include <string.h>
 
 #include <wsutil/file_util.h>
+#include <wsutil/filesystem.h>
 #include <ui/cmdarg_err.h>
 
 #include <epan/packet_info.h>
 #include <epan/packet.h>
 #include <epan/export_object.h>
-#include <ui/export_object_ui.h>
 #include "tap-exportobject.h"
 
 typedef struct _export_object_list_gui_t {
@@ -130,7 +130,7 @@ eo_draw(void *tapdata)
                 char generic_name[EXPORT_OBJECT_MAXFILELEN+1];
                 const char *ext;
                 ext = eo_ct2ext(entry->content_type);
-                g_snprintf(generic_name, sizeof(generic_name),
+                snprintf(generic_name, sizeof(generic_name),
                     "object%u%s%s", entry->pkt_num, ext ? "." : "", ext ? ext : "");
                 safe_filename = eo_massage_str(generic_name,
                     EXPORT_OBJECT_MAXFILELEN, count);
@@ -139,7 +139,7 @@ eo_draw(void *tapdata)
             g_string_free(safe_filename, TRUE);
         } while (g_file_test(save_as_fullpath, G_FILE_TEST_EXISTS) && ++count < prefs.gui_max_export_objects);
         count = 0;
-        eo_save_entry(save_as_fullpath, entry);
+        write_file_binary_mode(save_as_fullpath, entry->payload_data, entry->payload_len);
         g_free(save_as_fullpath);
         save_as_fullpath = NULL;
         slist = slist->next;
@@ -188,16 +188,3 @@ void start_exportobjects(void)
     if (eo_opts != NULL)
         g_hash_table_foreach(eo_opts, exportobject_handler, NULL);
 }
-
-/*
- * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
- *
- * Local variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * vi: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

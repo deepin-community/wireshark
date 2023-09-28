@@ -11,18 +11,20 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN LOG_DOMAIN_EPAN
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include <wsutil/ws_printf.h>
 
 #include "packet.h"
 #include "expert.h"
 #include "uat.h"
 #include "prefs.h"
-#include "wmem/wmem.h"
+#include <epan/prefs-int.h>
+#include <epan/wmem_scopes.h>
 #include "tap.h"
+
+#include <wsutil/wslog.h>
 
 /* proto_expert cannot be static because it's referenced in the
  * print routines
@@ -85,7 +87,6 @@ const value_string expert_severity_vals[] = {
 	{ PI_NOTE,              "Note" },
 	{ PI_CHAT,              "Chat" },
 	{ PI_COMMENT,           "Comment" },
-	{ 1,                    "Ok" },
 	{ 0, NULL }
 };
 
@@ -122,7 +123,7 @@ static gboolean uat_expert_update_cb(void *r, char **err)
 	expert_level_entry_t *rec = (expert_level_entry_t *)r;
 
 	if (expert_registrar_get_byname(rec->field) == NULL) {
-		*err = g_strdup_printf("Expert Info field doesn't exist");
+		*err = ws_strdup_printf("Expert Info field doesn't exist");
 		return FALSE;
 	}
 	return TRUE;
@@ -175,7 +176,7 @@ static void uat_expert_post_update_cb(void)
 
 #define EXPERT_REGISTRAR_GET_NTH(eiindex, expinfo)                                               \
 	if((guint)eiindex >= gpa_expertinfo.len && wireshark_abort_on_dissector_bug)   \
-		g_error("Unregistered expert info! index=%d", eiindex);                          \
+		ws_error("Unregistered expert info! index=%d", eiindex);                          \
 	DISSECTOR_ASSERT_HINT((guint)eiindex < gpa_expertinfo.len, "Unregistered expert info!"); \
 	DISSECTOR_ASSERT_HINT(gpa_expertinfo.ei[eiindex] != NULL, "Unregistered expert info!");	\
 	expinfo = gpa_expertinfo.ei[eiindex];
@@ -220,6 +221,11 @@ expert_packet_init(void)
 		proto_set_cant_toggle(proto_expert);
 
 		module_expert = prefs_register_protocol(proto_expert, NULL);
+		//Since "expert" is really a pseudo protocol, it shouldn't be
+		//categorized with other "real" protocols when it comes to
+		//preferences.  Since it's just a UAT, don't bury it in
+		//with the other protocols
+		module_expert->use_gui = FALSE;
 
 		expert_uat = uat_new("Expert Info Severity Level Configuration",
 			sizeof(expert_level_entry_t),
@@ -355,6 +361,37 @@ expert_free_deregistered_expertinfos (void)
 static int
 expert_register_field_init(expert_field_info *expinfo, expert_module_t *module)
 {
+	/* Check for valid group and severity vals */
+	switch (expinfo->group) {
+		case PI_CHECKSUM:
+		case PI_SEQUENCE:
+		case PI_RESPONSE_CODE:
+		case PI_REQUEST_CODE:
+		case PI_UNDECODED:
+		case PI_REASSEMBLE:
+		case PI_MALFORMED:
+		case PI_DEBUG:
+		case PI_PROTOCOL:
+		case PI_SECURITY:
+		case PI_COMMENTS_GROUP:
+		case PI_DECRYPTION:
+		case PI_ASSUMPTION:
+		case PI_DEPRECATED:
+			break;
+		default:
+			REPORT_DISSECTOR_BUG("Expert info for %s has invalid group=0x%08x\n", expinfo->name, expinfo->group);
+	}
+	switch (expinfo->severity) {
+		case PI_COMMENT:
+		case PI_CHAT:
+		case PI_NOTE:
+		case PI_WARN:
+		case PI_ERROR:
+			break;
+		default:
+			REPORT_DISSECTOR_BUG("Expert info for %s has invalid severity=0x%08x\n", expinfo->name, expinfo->severity);
+	}
+
 	expinfo->protocol      = module->proto_name;
 
 	/* if we always add and never delete, then id == len - 1 is correct */
@@ -526,9 +563,9 @@ expert_set_info_vformat(packet_info *pinfo, proto_item *pi, int group, int sever
 	}
 
 	if (use_vaformat) {
-		ws_vsnprintf(formatted, ITEM_LABEL_LENGTH, format, ap);
+		vsnprintf(formatted, ITEM_LABEL_LENGTH, format, ap);
 	} else {
-		g_strlcpy(formatted, format, ITEM_LABEL_LENGTH);
+		(void) g_strlcpy(formatted, format, ITEM_LABEL_LENGTH);
 	}
 
 	tree = expert_create_tree(pi, group, severity, formatted);
@@ -558,14 +595,14 @@ expert_set_info_vformat(packet_info *pinfo, proto_item *pi, int group, int sever
 	if (!tap)
 		return;
 
-	ei = wmem_new(wmem_packet_scope(), expert_info_t);
+	ei = wmem_new(pinfo->pool, expert_info_t);
 
 	ei->packet_num  = pinfo->num;
 	ei->group       = group;
 	ei->severity    = severity;
 	ei->hf_index    = hf_index;
 	ei->protocol    = pinfo->current_proto;
-	ei->summary     = wmem_strdup(wmem_packet_scope(), formatted);
+	ei->summary     = wmem_strdup(pinfo->pool, formatted);
 
 	/* if we have a proto_item (not a faked item), set expert attributes to it */
 	if (pi != NULL && PITEM_FINFO(pi) != NULL) {

@@ -1,4 +1,4 @@
-/* capture_options_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -60,8 +60,10 @@ public:
     explicit CaptureOptionsDialog(QWidget *parent = 0);
     ~CaptureOptionsDialog();
 
-    void setTab(int idx);
     void updateInterfaces();
+
+public slots:
+    void interfaceSelected();
 
 protected:
     virtual void showEvent(QShowEvent *);
@@ -81,7 +83,6 @@ private slots:
     void on_buttonBox_accepted();
     void on_buttonBox_rejected();
     void on_buttonBox_helpRequested();
-    void interfaceSelected();
     void filterEdited();
     void updateWidgets();
     void updateStatistics(void);
@@ -89,18 +90,21 @@ private slots:
     void updateLocalInterfaces();
     void browseButtonClicked();
     void interfaceItemChanged(QTreeWidgetItem *item, int column);
+    void itemClicked(QTreeWidgetItem *item, int column);
+    void itemDoubleClicked(QTreeWidgetItem *item, int column);
     void changeEvent(QEvent* event);
+    void tempDirBrowseButtonClicked();
 
 signals:
     void startCapture();
     void stopCapture();
-    void getPoints(int row, PointList *pts);
     void setSelectedInterfaces();
     void setFilterValid(bool valid, const QString capture_filter);
     void interfacesChanged();
     void ifsChanged();
     void interfaceListChanged();
     void captureFilterTextEdited(const QString & text);
+    void showExtcapOptions(QString &device_name, bool startCaptureOnClose);
 
 private:
     Ui::CaptureOptionsDialog *ui;
@@ -120,16 +124,3 @@ private:
 #endif /* HAVE_LIBPCAP */
 
 #endif // CAPTURE_OPTIONS_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

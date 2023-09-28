@@ -56,7 +56,6 @@ static gint ett_caneth_can = -1;
 
 static int proto_can = -1;      // use CAN protocol for consistent filtering
 
-static dissector_table_t can_subdissector_table;
 /* A sample #define of the minimum length (in bytes) of the protocol data.
  * If data is received with fewer than this many bytes it is rejected by
  * the current dissector. */
@@ -103,14 +102,15 @@ dissect_caneth_can(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
 
     ext_flag = tvb_get_guint8(tvb, CAN_EXT_FLAG_OFFSET);
     rtr_flag = tvb_get_guint8(tvb, CAN_RTR_FLAG_OFFSET);
-    proto_tree_add_item_ret_uint(can_tree, hf_caneth_can_ident_ext, tvb, CAN_ID_OFFSET, 4, ENC_LITTLE_ENDIAN, &raw_can_id);
 
     if (ext_flag)
     {
+        proto_tree_add_item_ret_uint(can_tree, hf_caneth_can_ident_ext, tvb, CAN_ID_OFFSET, 4, ENC_LITTLE_ENDIAN, &raw_can_id);
         can_info.id = raw_can_id & CAN_EFF_MASK;
     }
     else
     {
+        proto_tree_add_item_ret_uint(can_tree, hf_caneth_can_ident_std, tvb, CAN_ID_OFFSET, 4, ENC_LITTLE_ENDIAN, &raw_can_id);
         can_info.id = raw_can_id & CAN_SFF_MASK;
     }
 
@@ -122,8 +122,7 @@ dissect_caneth_can(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *da
 
     next_tvb = tvb_new_subset_length(tvb, CAN_DATA_OFFSET, data_len);
 
-    if (!dissector_try_payload_new(can_subdissector_table, next_tvb, pinfo, tree, TRUE, &can_info))
-    {
+    if (!socketcan_call_subdissectors(next_tvb, pinfo, tree, &can_info, FALSE)) {
         call_data_dissector(next_tvb, pinfo, tree);
     }
 
@@ -151,7 +150,7 @@ dissect_caneth(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     ti = proto_tree_add_item(tree, proto_caneth, tvb, 0, -1, ENC_NA);
     caneth_tree = proto_item_add_subtree(ti, ett_caneth);
 
-    proto_tree_add_item(caneth_tree, hf_caneth_magic, tvb, 0, 8, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(caneth_tree, hf_caneth_magic, tvb, 0, 8, ENC_ASCII);
     proto_tree_add_item(caneth_tree, hf_caneth_version, tvb, 8, 1, ENC_NA);
     proto_tree_add_item_ret_uint(caneth_tree, hf_caneth_frames, tvb, 9, 1, ENC_NA, &frame_count);
 
@@ -184,7 +183,7 @@ proto_register_caneth(void)
             &hf_caneth_magic,
             {
                 "Magic", "caneth.magic",
-                FT_STRING, STR_ASCII,
+                FT_STRING, BASE_NONE,
                 NULL, 0x0,
                 "The magic identifier used to denote the start of a CAN-ETH packet", HFILL
             }
@@ -292,7 +291,6 @@ proto_reg_handoff_caneth(void)
 
     heur_dissector_add("udp", dissect_caneth_heur_udp, "CAN-ETH over UDP", "caneth_udp", proto_caneth, HEURISTIC_ENABLE);
 
-    can_subdissector_table = find_dissector_table("can.subdissector");
     proto_can = proto_get_id_by_filter_name("can");
 }
 

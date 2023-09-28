@@ -21,6 +21,7 @@
 
 #include <wsutil/file_util.h>
 #include <wsutil/filesystem.h>
+#include <wsutil/ws_assert.h>
 
 #include <epan/strutil.h>
 
@@ -124,8 +125,8 @@ fileset_is_file_in_set(const char *fname1, const char *fname2)
 
 
     /* just to be sure ... */
-    g_assert(fileset_filename_match_pattern(fname1));
-    g_assert(fileset_filename_match_pattern(fname2));
+    ws_assert(fileset_filename_match_pattern(fname1));
+    ws_assert(fileset_filename_match_pattern(fname2));
 
     dup_f1 = g_strdup(fname1);
     dup_f2 = g_strdup(fname2);
@@ -212,7 +213,7 @@ fileset_add_file(const char *dirname, const char *fname, gboolean current)
     fileset_entry *entry = NULL;
 
 
-    path = g_strdup_printf("%s%s", dirname, fname);
+    path = ws_strdup_printf("%s%s", dirname, fname);
 
     fh = ws_open( path, O_RDONLY, 0000 /* no creation so don't matter */);
     if(fh !=  -1) {
@@ -222,7 +223,7 @@ fileset_add_file(const char *dirname, const char *fname, gboolean current)
 
         /* Show statistics if they are valid */
         if( result == 0 ) {
-            entry = (fileset_entry *)g_malloc(sizeof(fileset_entry));
+            entry = g_new(fileset_entry, 1);
 
             entry->fullname = g_strdup(path);
             entry->name     = g_strdup(fname);

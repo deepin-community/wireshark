@@ -324,7 +324,7 @@ dissect_hci_mon(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
     if (adapter_disconnect_in_frame) {
         bluetooth_data->adapter_disconnect_in_frame = adapter_disconnect_in_frame;
     } else {
-        bluetooth_data->adapter_disconnect_in_frame = &max_disconnect_in_frame;
+        bluetooth_data->adapter_disconnect_in_frame = &bluetooth_max_disconnect_in_frame;
     }
 
     pinfo->ptype = PT_BLUETOOTH;
@@ -535,7 +535,7 @@ proto_register_hci_mon(void)
         },
         {  &hf_manufacturer,
             { "Manufacturer",                    "hci_mon.manufacturer",
-            FT_UINT16, BASE_HEX, NULL, 0x000,
+            FT_UINT16, BASE_HEX, NULL, 0x0,
             NULL, HFILL }
         },
         { &hf_system_note,

@@ -313,7 +313,9 @@ static const value_string a21_band_class_values[] = {
     { 0, NULL }
 };
 
-value_string_ext a21_band_class_values_ext = VALUE_STRING_EXT_INIT(a21_band_class_values);
+#if 0
+static value_string_ext a21_band_class_values_ext = VALUE_STRING_EXT_INIT(a21_band_class_values);
+#endif
 
 static void
 dissect_a21_pilot_list(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, proto_item *item _U_, guint16 length _U_, guint8 message_type _U_)
@@ -1067,7 +1069,7 @@ void proto_register_a21(void)
 		  },
 		  { &hf_a21_service_option,
 			 {"Service Option", "a21.service_option",
-			  FT_UINT8, BASE_DEC, VALS(a21_service_option_vals), 0x7f,
+			  FT_UINT16, BASE_DEC, VALS(a21_service_option_vals), 0x7f,
 			  NULL, HFILL }
 		  },
 		  { &hf_a21_gcsna_status_reserved,

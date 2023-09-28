@@ -166,7 +166,7 @@ epm_dissect_ept_entry_t(tvbuff_t *tvb, int offset,
                                  hf_epm_ann_offset, NULL);
     offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep,
                                  hf_epm_ann_len, &len);
-    proto_tree_add_item_ret_string(tree, hf_epm_annotation, tvb, offset, len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &str);
+    proto_tree_add_item_ret_string(tree, hf_epm_annotation, tvb, offset, len, ENC_ASCII|ENC_NA, pinfo->pool, &str);
     offset += len;
 
     if(str&&str[0]){
@@ -334,7 +334,7 @@ epm_dissect_tower_data (tvbuff_t *tvb, int offset,
         case PROTO_ID_UUID:
             dcerpc_tvb_get_uuid (tvb, offset+1, &u8little_endian, &uuid);
 
-            uuid_name = guids_get_uuid_name(&uuid);
+            uuid_name = guids_get_uuid_name(&uuid, pinfo->pool);
 
             if(uuid_name != NULL) {
                 proto_tree_add_guid_format (tr, hf_epm_uuid, tvb, offset+1, 16, (e_guid_t *) &uuid,
@@ -399,7 +399,7 @@ epm_dissect_tower_data (tvbuff_t *tvb, int offset,
 
         case PROTO_ID_IP: /* this one is always big endian */
             proto_tree_add_item(tr, hf_epm_proto_ip, tvb, offset, 4, ENC_BIG_ENDIAN);
-            proto_item_append_text(tr, "IP:%s", tvb_ip_to_str(tvb, offset));
+            proto_item_append_text(tr, "IP:%s", tvb_ip_to_str(pinfo->pool, tvb, offset));
             break;
 
         case PROTO_ID_RPC_CO:
@@ -413,17 +413,17 @@ epm_dissect_tower_data (tvbuff_t *tvb, int offset,
             break;
 
         case PROTO_ID_NAMED_PIPES: /* \\PIPE\xxx   named pipe */
-            proto_tree_add_item_ret_string(tr, hf_epm_proto_named_pipes, tvb, offset, len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &str);
+            proto_tree_add_item_ret_string(tr, hf_epm_proto_named_pipes, tvb, offset, len, ENC_ASCII|ENC_NA, pinfo->pool, &str);
             proto_item_append_text(tr, "NamedPipe:%s", str);
             break;
 
         case PROTO_ID_NAMED_PIPES_2: /* PIPENAME  named pipe */
-            proto_tree_add_item_ret_string(tr, hf_epm_proto_named_pipes, tvb, offset, len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &str);
+            proto_tree_add_item_ret_string(tr, hf_epm_proto_named_pipes, tvb, offset, len, ENC_ASCII|ENC_NA, pinfo->pool, &str);
             proto_item_append_text(tr, "PIPE:%s", str);
             break;
 
         case PROTO_ID_NETBIOS: /* \\NETBIOS   netbios name */
-            proto_tree_add_item_ret_string(tr, hf_epm_proto_netbios_name, tvb, offset, len, ENC_ASCII|ENC_NA, wmem_packet_scope(), &str);
+            proto_tree_add_item_ret_string(tr, hf_epm_proto_netbios_name, tvb, offset, len, ENC_ASCII|ENC_NA, pinfo->pool, &str);
             proto_item_append_text(tr, "NetBIOS:%s", str);
             break;
         case PROTO_ID_HTTP: /* RPC over HTTP */
@@ -447,7 +447,7 @@ epm_dissect_tower_data (tvbuff_t *tvb, int offset,
 static void
 epm_fmt_uuid_version( gchar *result, guint32 revision )
 {
-   g_snprintf( result, ITEM_LABEL_LENGTH, "%d.%02d", (guint8)(( revision & 0xFF00 ) >> 8), (guint8)(revision & 0xFF) );
+   snprintf( result, ITEM_LABEL_LENGTH, "%d.%02d", (guint8)(( revision & 0xFF00 ) >> 8), (guint8)(revision & 0xFF) );
 }
 
 /* typedef struct {

@@ -76,35 +76,45 @@ function package.prepend_path(name)
     package.path = name .. sep .. "?.lua;" .. package.path
 end
 
-%WTAP_ENCAPS%
+${WTAP_ENCAPS}
 
-%WTAP_FILETYPES%
+--
+-- Generate the wtap_filetypes items for file types, for backwards
+-- compatibility.
+-- We no longer have WTAP_FILE_TYPE_SUBTYPE_ #defines;
+-- built-in file types are registered the same way that
+-- plugin file types are registered.
+--
+-- New code should use wtap_name_to_file_type_subtype to
+-- look up file types by name.
+--
+wtap_filetypes = get_wtap_filetypes()
 
-%WTAP_TSPRECS%
+${WTAP_TSPRECS}
 
-%WTAP_COMMENTTYPES%
+${WTAP_COMMENT_TYPES}
 
-%FT_TYPES%
+${FT_TYPES}
 
 -- the following table is since 2.0
-%FT_FRAME_TYPES%
+${FT_FRAME_TYPES}
 
 -- the following table is since 1.12
-%WTAP_REC_TYPES%
+${WTAP_REC_TYPES}
 
 -- the following table is since 1.11.3
-%WTAP_PRESENCE_FLAGS%
+${WTAP_PRESENCE_FLAGS}
 
-%BASES%
+${BASES}
 
-%ENCODINGS%
+${ENCODINGS}
 
-%EXPERT%
+${EXPERT}
 
 -- the following table is since 1.11.3
-%EXPERT_TABLE%
+${EXPERT_TABLE}
 
-%MENU_GROUPS%
+${MENU_GROUPS}
 
 -- the possible values for Pinfo's p2p_dir attribute
 P2P_DIR_UNKNOWN = -1

@@ -1,4 +1,4 @@
-/* tap_parameter_dialog.h
+/** @file
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -72,6 +72,7 @@ public slots:
 protected:
     void contextMenuEvent(QContextMenuEvent *event);
     void addFilterActions();
+    void addTreeCollapseAllActions();
     QString displayFilter();
     void setDisplayFilter(const QString &filter);
     void setHint(const QString &hint);
@@ -80,6 +81,8 @@ protected:
 
 protected slots:
     void filterActionTriggered();
+    void collapseAllActionTriggered();
+    void expandAllActionTriggered();
     void updateWidgets();
 
 private:
@@ -106,16 +109,3 @@ private slots:
 };
 
 #endif // TAP_PARAMETER_DIALOG_H
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

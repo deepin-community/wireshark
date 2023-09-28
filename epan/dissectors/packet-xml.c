@@ -25,7 +25,6 @@
 #include <wsutil/filesystem.h>
 #include <epan/prefs.h>
 #include <epan/expert.h>
-#include <epan/garrayfix.h>
 #include <wsutil/str_util.h>
 #include <wsutil/report_message.h>
 
@@ -174,6 +173,33 @@ static const gchar *default_media_types[] = {
     "application/vnd.3gpp.cw+xml",
     "application/vnd.3gpp.iut+xml",             /*3GPP TS 24.337*/
     "application/vnc.3gpp.iut-config+xml",      /*3GPP TS 24.337*/
+    "application/vnd.3gpp.mcptt-info+xml",                 /*3GPP TS 24.379 version 17.6.0*/
+    "application/vnd.3gpp.mcptt-mbms-usage-info+xml",      /*3GPP TS 24.379 version 17.6.0*/
+    "application/vnd.3gpp.mcptt-location-info+xml",        /*3GPP TS 24.379 version 17.6.0*/
+    "application/vnd.3gpp.mcptt-affiliation-command+xml",  /*3GPP TS 24.379 version 17.6.0*/
+    "application/vnd.3gpp.mcptt-floor-request+xml",        /*3GPP TS 24.379 version 17.6.0*/
+    "application/vnd.3gpp.mcptt-signed+xml",               /*3GPP TS 24.379 version 17.6.0*/
+    "application/vnd.3gpp.mcptt-regroup+xml",              /*3GPP TS 24.379 version 17.6.0*/
+    "application/vnd.3gpp.mcdata-info+xml",                /*3GPP TS 24.282 version 17.6.2*/
+    "application/vnd.3gpp.mcdata-mbms-usage-info+xml",     /*3GPP TS 24.282 version 17.6.2*/
+    "application/vnd.3gpp.mcdata-location-info+xml",       /*3GPP TS 24.282 version 17.6.2*/
+    "application/vnd.3gpp.mcdata-affiliation-command+xml", /*3GPP TS 24.282 version 17.6.2*/
+    "application/vnd.3gpp.mcdata-regroup+xml",             /*3GPP TS 24.282 version 17.6.2*/
+    "application/vnd.3gpp.mcvideo-info+xml",               /*3GPP TS 24.281 version 17.6.0*/
+    "application/vnd.3gpp.mcvideo-mbms-usage-info+xml",    /*3GPP TS 24.281 version 17.6.0*/
+    "application/vnd.3gpp.mcvideo-location-info+xml",      /*3GPP TS 24.281 version 17.6.0*/
+    "application/vnd.3gpp.mcvideo-affiliation-command+xml",/*3GPP TS 24.281 version 17.6.0*/
+    "application/vnd.3gpp.transmission-request+xml",       /*3GPP TS 24.281 version 17.6.0*/
+    "application/vnd.3gpp.mcptt-ue-init-config+xml",       /*3GPP TS 24.484 version 17.5.0*/
+    "application/vnd.3gpp.mcptt-ue-config+xml",            /*3GPP TS 24.484 version 17.5.0*/
+    "application/vnd.3gpp.mcptt-user-profile+xml",         /*3GPP TS 24.484 version 17.5.0*/
+    "application/vnd.3gpp.mcptt-service-config+xml",       /*3GPP TS 24.484 version 17.5.0*/
+    "application/vnd.3gpp.mcdata-service-config+xml",      /*3GPP TS 24.484 version 17.5.0*/
+    "application/vnd.3gpp.mcvideo-service-config+xml",     /*3GPP TS 24.484 version 17.5.0*/
+    "application/vnd.3gpp.mcvideo-ue-config+xml",          /*3GPP TS 24.484 version 17.5.0*/
+    "application/vnd.3gpp.mcvideo-user-profile+xml",       /*3GPP TS 24.484 version 17.5.0*/
+    "application/vnd.3gpp.mcdata-ue-config+xml",           /*3GPP TS 24.484 version 17.5.0*/
+    "application/vnd.3gpp.mcdata-user-profile+xml",        /*3GPP TS 24.484 version 17.5.0*/
     "application/vnd.3gpp.mid-call+xml",
     "application/vnd.3gpp-prose-pc3ch+xml",
     "application/vnd.3gpp-prose+xml",
@@ -233,7 +259,6 @@ dissect_xml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
     const char       *colinfo_str;
     tvbuff_t         *decoded;
     guint16           try_bom;
-    int               start_offset   = 0;
 
     if (stack != NULL)
         g_ptr_array_free(stack, TRUE);
@@ -249,7 +274,7 @@ dissect_xml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
     g_ptr_array_add(stack, current_frame);
 
     /* Detect and act on possible byte-order mark (BOM) */
-    try_bom = tvb_get_ntohs(tvb, start_offset);
+    try_bom = tvb_get_ntohs(tvb, 0);
     if (try_bom == 0xFEFF) {
         /* UTF-16BE */
         const guint8 *data_str = tvb_get_string_enc(pinfo->pool, tvb, 0, tvb_captured_length(tvb), ENC_UTF_16|ENC_BIG_ENDIAN);
@@ -265,19 +290,14 @@ dissect_xml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
         add_new_data_source(pinfo, decoded, "Decoded UTF-16LE text");
     }
     /* Could also test if try_bom is 0xnn00 or 0x00nn to guess endianness if we wanted */
-    else if(tvb_get_ntoh24(tvb, start_offset) == 0xEFBBBF) {
-        /* UTF-8 BOM; just skip over it */
-        decoded = tvb;
-        start_offset += 3;
-    }
     else {
-        /* Assume it's UTF-8 */
+        /* Assume it's UTF-8, either with or without BOM */
         decoded = tvb;
     }
 
-    tt = tvbparse_init(decoded, start_offset, -1, stack, want_ignore);
+    tt = tvbparse_init(pinfo->pool, decoded, 0, -1, stack, want_ignore);
     current_frame->start_offset = 0;
-    current_frame->length = tvb_captured_length(decoded) - start_offset;
+    current_frame->length = tvb_captured_length(decoded);
 
     root_ns = NULL;
 
@@ -298,7 +318,7 @@ dissect_xml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
     current_frame->ns = root_ns;
 
-    current_frame->item = proto_tree_add_item(tree, current_frame->ns->hf_tag, decoded, start_offset, -1, ENC_UTF_8|ENC_NA);
+    current_frame->item = proto_tree_add_item(tree, current_frame->ns->hf_tag, decoded, 0, -1, ENC_UTF_8|ENC_NA);
     current_frame->tree = proto_item_add_subtree(current_frame->item, current_frame->ns->ett);
     current_frame->last_item = current_frame->item;
 
@@ -312,7 +332,7 @@ dissect_xml(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
 
 static gboolean dissect_xml_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
-    if (tvbparse_peek(tvbparse_init(tvb, 0, -1, NULL, want_ignore), want_heur)) {
+    if (tvbparse_peek(tvbparse_init(pinfo->pool, tvb, 0, -1, NULL, want_ignore), want_heur)) {
         dissect_xml(tvb, pinfo, tree, data);
         return TRUE;
     } else if (pref_heuristic_unicode) {
@@ -334,7 +354,7 @@ static gboolean dissect_xml_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *
         data_str    = tvb_get_string_enc(pinfo->pool, tvb, 0, tvb_captured_length(tvb), enc);
         l           = strlen(data_str);
         unicode_tvb = tvb_new_child_real_data(tvb, data_str, (guint)l, (gint)l);
-        if (tvbparse_peek(tvbparse_init(unicode_tvb, 0, -1, NULL, want_ignore), want_heur)) {
+        if (tvbparse_peek(tvbparse_init(pinfo->pool, unicode_tvb, 0, -1, NULL, want_ignore), want_heur)) {
             add_new_data_source(pinfo, unicode_tvb, "UTF8");
             dissect_xml(unicode_tvb, pinfo, tree, data);
             return TRUE;
@@ -418,7 +438,7 @@ static void after_token(void *tvbparse_data, const void *wanted_data _U_, tvbpar
     pi = proto_tree_add_item(current_frame->tree, hfid, tok->tvb, tok->offset, tok->len, ENC_UTF_8|ENC_NA);
 
     proto_item_set_text(pi, "%s",
-                        tvb_format_text(tok->tvb, tok->offset, tok->len));
+                        tvb_format_text(wmem_packet_scope(), tok->tvb, tok->offset, tok->len));
 
     if (is_cdata) {
         new_frame                 = wmem_new(wmem_packet_scope(), xml_frame_t);
@@ -462,7 +482,7 @@ static void before_xmpli(void *tvbparse_data, const void *wanted_data _U_, tvbpa
 
     pi = proto_tree_add_item(current_frame->tree, hf_tag, tok->tvb, tok->offset, tok->len, ENC_UTF_8|ENC_NA);
 
-    proto_item_set_text(pi, "%s", tvb_format_text(tok->tvb, tok->offset, (name_tok->offset - tok->offset) + name_tok->len));
+    proto_item_set_text(pi, "%s", tvb_format_text(wmem_packet_scope(), tok->tvb, tok->offset, (name_tok->offset - tok->offset) + name_tok->len));
 
     pt = proto_item_add_subtree(pi, ett);
 
@@ -550,7 +570,7 @@ static void before_tag(void *tvbparse_data, const void *wanted_data _U_, tvbpars
     }
 
     pi = proto_tree_add_item(current_frame->tree, ns->hf_tag, tok->tvb, tok->offset, tok->len, ENC_UTF_8|ENC_NA);
-    proto_item_set_text(pi, "%s", tvb_format_text(tok->tvb,
+    proto_item_set_text(pi, "%s", tvb_format_text(wmem_packet_scope(), tok->tvb,
                                                   tok->offset,
                                                   (name_tok->offset - tok->offset) + name_tok->len));
 
@@ -623,9 +643,9 @@ static void before_dtd_doctype(void *tvbparse_data, const void *wanted_data _U_,
     tvbparse_elem_t *name_tok      = tok->sub->next->next->next->sub->sub;
     proto_tree      *dtd_item      = proto_tree_add_item(current_frame->tree, hf_doctype,
                                                          name_tok->tvb, name_tok->offset,
-                                                         name_tok->len, ENC_ASCII|ENC_NA);
+                                                         name_tok->len, ENC_ASCII);
 
-    proto_item_set_text(dtd_item, "%s", tvb_format_text(tok->tvb, tok->offset, tok->len));
+    proto_item_set_text(dtd_item, "%s", tvb_format_text(wmem_packet_scope(), tok->tvb, tok->offset, tok->len));
 
     new_frame = wmem_new(wmem_packet_scope(), xml_frame_t);
     new_frame->type           = XML_FRAME_DTD_DOCTYPE;
@@ -703,7 +723,7 @@ static void after_attrib(void *tvbparse_data, const void *wanted_data _U_, tvbpa
     }
 
     pi = proto_tree_add_item(current_frame->tree, hfid, value->tvb, value->offset, value->len, ENC_UTF_8|ENC_NA);
-    proto_item_set_text(pi, "%s", tvb_format_text(tok->tvb, tok->offset, tok->len));
+    proto_item_set_text(pi, "%s", tvb_format_text(wmem_packet_scope(), tok->tvb, tok->offset, tok->len));
 
     current_frame->last_item = pi;
 
@@ -1326,7 +1346,7 @@ static void register_dtd(dtd_build_data_t *dtd_data, GString *errors)
 
         root_element->hf_tag = proto_register_protocol(full_name, short_name, short_name);
         proto_register_field_array(root_element->hf_tag, (hf_register_info*)wmem_array_get_raw(hfs), wmem_array_get_count(hfs));
-        proto_register_subtree_array((gint **)g_array_data(etts), etts->len);
+        proto_register_subtree_array((gint **)etts->data, etts->len);
 
         if (dtd_data->media_type) {
             gchar* media_type = wmem_strdup(wmem_epan_scope(), dtd_data->media_type);
@@ -1516,7 +1536,7 @@ proto_register_xml(void)
     xml_ns.hf_tag = proto_register_protocol("eXtensible Markup Language", "XML", xml_ns.name);
 
     proto_register_field_array(xml_ns.hf_tag, (hf_register_info*)wmem_array_get_raw(hf_arr), wmem_array_get_count(hf_arr));
-    proto_register_subtree_array((gint **)g_array_data(ett_arr), ett_arr->len);
+    proto_register_subtree_array((gint **)ett_arr->data, ett_arr->len);
     expert_xml = expert_register_protocol(xml_ns.hf_tag);
     expert_register_field_array(expert_xml, ei, array_length(ei));
 

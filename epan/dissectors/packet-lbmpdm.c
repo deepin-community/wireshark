@@ -596,7 +596,7 @@ static void dissect_field_value(tvbuff_t * tvb, int offset, proto_tree * tree, g
                         shift_count--;
                     }
                     proto_tree_add_none_format(tree, hf_lbmpdm_field_value_decimal, tvb, offset, field_length,
-                        "DECIMAL Value: %" G_GINT64_FORMAT " (%" G_GINT64_FORMAT "e%d)", whole, mantissa, exponent);
+                        "DECIMAL Value: %" PRId64 " (%" PRId64 "e%d)", whole, mantissa, exponent);
                 }
                 else
                 {
@@ -623,7 +623,7 @@ static void dissect_field_value(tvbuff_t * tvb, int offset, proto_tree * tree, g
                         whole *= -1;
                     }
                     proto_tree_add_none_format(tree, hf_lbmpdm_field_value_decimal, tvb, offset, field_length,
-                        "DECIMAL Value: %" G_GINT64_FORMAT ".%0*" G_GUINT64_FORMAT " (%" G_GINT64_FORMAT "e%d)",
+                        "DECIMAL Value: %" PRId64 ".%0*" PRIu64 " (%" PRId64 "e%d)",
                         whole, decimal_digits, fraction, mantissa, exponent);
                 }
             }
@@ -810,8 +810,8 @@ static int dissect_segment_ofstable(tvbuff_t * tvb, int offset, packet_info * pi
     proto_tree_add_item(subtree, hf_lbmpdm_segment_res, tvb, offset + O_LBMPDM_SEG_HDR_T_RES, L_LBMPDM_SEG_HDR_T_RES, encoding);
     proto_tree_add_item(subtree, hf_lbmpdm_segment_len, tvb, offset + O_LBMPDM_SEG_HDR_T_LEN, L_LBMPDM_SEG_HDR_T_LEN, encoding);
     field_count = datalen / L_LBMPDM_OFFSET_ENTRY_T;
-    id_list = wmem_alloc_array(wmem_packet_scope(), gint32, field_count);
-    ofs_list = wmem_alloc_array(wmem_packet_scope(), gint32, field_count);
+    id_list = wmem_alloc_array(pinfo->pool, gint32, field_count);
+    ofs_list = wmem_alloc_array(pinfo->pool, gint32, field_count);
     for (idx = 0; idx < field_count; ++idx)
     {
         id_list[idx] = -1;
@@ -841,10 +841,10 @@ static int dissect_segment_ofstable(tvbuff_t * tvb, int offset, packet_info * pi
             min_offset = ofs_list[idx];
         }
     }
-    ofs_table = wmem_new(wmem_packet_scope(), lbmpdm_offset_table_t);
+    ofs_table = wmem_new(pinfo->pool, lbmpdm_offset_table_t);
     ofs_table->num_flds = max_index + 1;
     ofs_table->min_set_offset = NULL;
-    ofs_table->offset_list = wmem_alloc_array(wmem_packet_scope(), gint32, ofs_table->num_flds);
+    ofs_table->offset_list = wmem_alloc_array(pinfo->pool, gint32, ofs_table->num_flds);
     for (idx = 0; idx < (int)ofs_table->num_flds; ++idx)
     {
         ofs_table->offset_list[idx] = -1;
@@ -959,7 +959,7 @@ static int dissect_segment_defn(tvbuff_t * tvb, int offset, packet_info * pinfo,
             if (string_name_len > 0)
             {
                 string_name_ofs = ofs + def_ofs + L_LBMPDM_FIELD_INFO_T;
-                proto_tree_add_item(field_tree, hf_lbmpdm_segment_def_field_str_name, tvb, string_name_ofs, (int)string_name_len, ENC_ASCII|ENC_NA);
+                proto_tree_add_item(field_tree, hf_lbmpdm_segment_def_field_str_name, tvb, string_name_ofs, (int)string_name_len, ENC_ASCII);
                 type_ofs += string_name_len;
             }
         }

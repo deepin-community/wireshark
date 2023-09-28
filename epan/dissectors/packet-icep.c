@@ -226,9 +226,9 @@ static void dissect_ice_string(packet_info *pinfo, proto_tree *tree, proto_item 
 
 
     if ( Size != 0 ) {
-        proto_tree_add_item_ret_string(tree, hf_icep, tvb, offset, Size, ENC_ASCII, wmem_packet_scope(), &s);
+        proto_tree_add_item_ret_string(tree, hf_icep, tvb, offset, Size, ENC_ASCII, pinfo->pool, &s);
     } else {
-        s = wmem_strdup(wmem_packet_scope(), "(empty)");
+        s = wmem_strdup(pinfo->pool, "(empty)");
         /* display the 0x00 Size byte when click on a empty ice_string */
         proto_tree_add_string(tree, hf_icep, tvb, offset - 1, 1, s);
     }
@@ -943,7 +943,7 @@ static int dissect_icep_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
 
         /* message header */
 
-        proto_tree_add_item(icep_tree, hf_icep_magic_number, tvb, offset, 4, ENC_ASCII|ENC_NA);
+        proto_tree_add_item(icep_tree, hf_icep_magic_number, tvb, offset, 4, ENC_ASCII);
         offset += 4;
 
         proto_tree_add_item(icep_tree, hf_icep_protocol_major,

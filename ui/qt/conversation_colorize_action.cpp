@@ -41,7 +41,7 @@ void ConversationAction::setPacketInfo(struct _packet_info *pinfo)
     setEnabled(enable);
 
     // If we're the "New Coloring Rule" item, enable or disable our parent menu.
-    QMenu *parent_submenu = qobject_cast<QMenu *>(parentWidget());
+    QMenu *parent_submenu = qobject_cast<QMenu *>(parent());
     if (color_number_ < 0 || !parent_submenu) return;
     parent_submenu->setEnabled(enable);
 }
@@ -60,16 +60,3 @@ bool ConversationAction::isFilterValid(struct _packet_info *pinfo)
     }
     return valid;
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */

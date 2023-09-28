@@ -650,7 +650,7 @@ static gchar *key_to_str( const iax_circuit_key *key )
   strp = str[i];
 
   addrstr = address_to_str(NULL, &key->addr);
-  g_snprintf(strp, 80, "{%s:%i,%i}",
+  snprintf(strp, 80, "{%s:%i,%i}",
              addrstr,
              key->port,
              key->callno);
@@ -671,7 +671,7 @@ static gint iax_circuit_equal(gconstpointer v, gconstpointer w)
             v1->port  == v2->port  &&
             v1->callno== v2->callno);
 #ifdef DEBUG_HASHING
-  g_debug("+++ Comparing for equality: %s, %s: %u", key_to_str(v1), key_to_str(v2), result);
+  ws_debug("+++ Comparing for equality: %s, %s: %u", key_to_str(v1), key_to_str(v2), result);
 #endif
 
   return result;
@@ -689,7 +689,7 @@ static guint iax_circuit_hash(gconstpointer v)
   hash_val += (guint)(key->callno);
 
 #ifdef DEBUG_HASHING
-  g_debug("+++ Hashing key: %s, result %#x", key_to_str(key), hash_val);
+  ws_debug("+++ Hashing key: %s, result %#x", key_to_str(key), hash_val);
 #endif
 
   return (guint)hash_val;
@@ -731,7 +731,7 @@ static guint iax_circuit_lookup(const address *address_p,
     g_hash_table_insert(iax_circuit_hashtab, new_key, circuit_id_p);
 
 #ifdef DEBUG_HASHING
-    g_debug("Created new circuit id %u for node %s", *circuit_id_p, key_to_str(new_key));
+    ws_debug("Created new circuit id %u for node %s", *circuit_id_p, key_to_str(new_key));
 #endif
   }
 
@@ -786,12 +786,12 @@ typedef struct iax_call_data {
 
 
 
-/* creates a new ENDPOINT_IAX2 circuit with a specified circuit id for a call
+/* creates a new CONVERSATION_IAX2 circuit with a specified circuit id for a call
  *
  * typically a call has up to three associated circuits: an original source, an
  * original destination, and the result of a transfer.
  *
- * For each endpoint, a ENDPOINT_IAX2 circuit is created and added to the call_data
+ * For each endpoint, a CONVERSATION_IAX2 circuit is created and added to the call_data
  * by this function
  *
  * 'reversed' should be true if this end is the one which would have _received_
@@ -814,8 +814,8 @@ static conversation_t *iax2_new_circuit_for_call(packet_info *pinfo, proto_item 
     return NULL;
   }
 
-  conv = conversation_new_by_id(framenum, ENDPOINT_IAX2,
-                    circuit_id, 0);
+  conv = conversation_new_by_id(framenum, CONVERSATION_IAX2,
+                    circuit_id);
 
   conversation_add_proto_data(conv, proto_iax2, iax_call);
 
@@ -867,11 +867,11 @@ static iax_call_data *iax_lookup_call_from_dest(packet_info *pinfo, proto_item *
   iax_call_data *iax_call;
   gboolean       reversed = FALSE;
 
-  dst_conv = find_conversation_by_id(framenum, ENDPOINT_IAX2, dst_circuit_id, 0);
+  dst_conv = find_conversation_by_id(framenum, CONVERSATION_IAX2, dst_circuit_id);
 
   if (!dst_conv) {
 #ifdef DEBUG_HASHING
-    g_debug("++ destination circuit not found, must have missed NEW packet");
+    ws_debug("++ destination circuit not found, must have missed NEW packet");
 #endif
     if (reversed_p)
       *reversed_p = FALSE;
@@ -879,18 +879,18 @@ static iax_call_data *iax_lookup_call_from_dest(packet_info *pinfo, proto_item *
   }
 
 #ifdef DEBUG_HASHING
-  g_debug("++ found destination circuit");
+  ws_debug("++ found destination circuit");
 #endif
 
   iax_call = (iax_call_data *)conversation_get_proto_data(dst_conv, proto_iax2);
 
-  /* there's no way we can create a ENDPOINT_IAX2 circuit without adding
+  /* there's no way we can create a CONVERSATION_IAX2 circuit without adding
      iax call data to it; assert this */
   DISSECTOR_ASSERT(iax_call);
 
   if (is_forward_circuit(dst_circuit_id, iax_call)) {
 #ifdef DEBUG_HASHING
-    g_debug("++ destination circuit matches forward_circuit_id of call, "
+    ws_debug("++ destination circuit matches forward_circuit_id of call, "
              "therefore packet is reversed");
 #endif
 
@@ -901,13 +901,13 @@ static iax_call_data *iax_lookup_call_from_dest(packet_info *pinfo, proto_item *
          doesn't have a reverse circuit associated with it.
          create one now. */
 #ifdef DEBUG_HASHING
-      g_debug("++ reverse_circuit_id of call is zero, need to create a "
+      ws_debug("++ reverse_circuit_id of call is zero, need to create a "
               "new reverse circuit for this call");
 #endif
 
       iax2_new_circuit_for_call(pinfo, item, src_circuit_id, framenum, iax_call, TRUE);
 #ifdef DEBUG_HASHING
-      g_debug("++ done");
+      ws_debug("++ done");
 #endif
     } else if (!is_reverse_circuit(src_circuit_id, iax_call)) {
       expert_add_info_format(pinfo, item, &ei_iax_circuit_id_conflict,
@@ -920,7 +920,7 @@ static iax_call_data *iax_lookup_call_from_dest(packet_info *pinfo, proto_item *
     }
   } else if (is_reverse_circuit(dst_circuit_id, iax_call)) {
 #ifdef DEBUG_HASHING
-    g_debug("++ destination circuit matches reverse_circuit_id of call, "
+    ws_debug("++ destination circuit matches reverse_circuit_id of call, "
             "therefore packet is forward");
 #endif
 
@@ -963,7 +963,7 @@ static iax_call_data *iax_lookup_call( packet_info *pinfo,
 #ifdef DEBUG_HASHING
   srcstr = address_to_str(NULL, &pinfo->src);
   dststr = address_to_str(NULL, &pinfo->dst);
-  g_debug("++ iax_lookup_circuit_details: Looking up circuit for frame %u, "
+  ws_debug("++ iax_lookup_circuit_details: Looking up circuit for frame %u, "
           "from {%s:%u:%u} to {%s:%u:%u}", pinfo->num,
           srcstr, pinfo->srcport, scallno,
           dststr, pinfo->destport, dcallno);
@@ -981,7 +981,7 @@ static iax_call_data *iax_lookup_call( packet_info *pinfo,
   if (dcallno != 0) {
     guint dst_circuit_id;
 #ifdef DEBUG_HASHING
-    g_debug("++ dcallno non-zero, looking up destination circuit");
+    ws_debug("++ dcallno non-zero, looking up destination circuit");
 #endif
 
     dst_circuit_id = iax_circuit_lookup(&pinfo->dst, pinfo->ptype,
@@ -997,12 +997,12 @@ static iax_call_data *iax_lookup_call( packet_info *pinfo,
      * packet.
      */
 
-    src_conv = find_conversation_by_id(pinfo->num, ENDPOINT_IAX2, src_circuit_id, 0);
+    src_conv = find_conversation_by_id(pinfo->num, CONVERSATION_IAX2, src_circuit_id);
 
     if (src_conv) {
       iax_call = (iax_call_data *)conversation_get_proto_data(src_conv, proto_iax2);
 
-      /* there's no way we can create a ENDPOINT_IAX2 circuit without adding
+      /* there's no way we can create a CONVERSATION_IAX2 circuit without adding
          iax call data to it; assert this */
       DISSECTOR_ASSERT(iax_call);
 
@@ -1025,9 +1025,9 @@ static iax_call_data *iax_lookup_call( packet_info *pinfo,
 
 #ifdef DEBUG_HASHING
   if (iax_call) {
-    g_debug("++ Found call for packet: id %u, reversed=%c", iax_call->forward_circuit_ids[0], reversed?'1':'0');
+    ws_debug("++ Found call for packet: id %u, reversed=%c", iax_call->forward_circuit_ids[0], reversed?'1':'0');
   } else {
-    g_debug("++ Call not found. Must have missed the NEW packet?");
+    ws_debug("++ Call not found. Must have missed the NEW packet?");
   }
 #endif
 
@@ -1053,7 +1053,7 @@ static iax_call_data *iax_new_call( packet_info *pinfo,
   static const nstime_t  millisecond = NSTIME_INIT_SECS_MSECS(0, 1);
 
 #ifdef DEBUG_HASHING
-  g_debug("+ new_circuit: Handling NEW packet, frame %u", pinfo->num);
+  ws_debug("+ new_circuit: Handling NEW packet, frame %u", pinfo->num);
 #endif
 
   circuit_id = iax_circuit_lookup(&pinfo->src, pinfo->ptype,
@@ -1305,10 +1305,10 @@ static guint32 dissect_ies(tvbuff_t *tvb, packet_info *pinfo, guint32 offset,
         break;
 
       case IAX_IE_CALLED_NUMBER:
-        iax2_info->calledParty = wmem_strdup(wmem_packet_scope(), tvb_format_text(tvb, offset+2, ies_len));
+        iax2_info->calledParty = tvb_format_text(pinfo->pool, tvb, offset+2, ies_len);
         break;
       case IAX_IE_CALLING_NUMBER:
-        iax2_info->callingParty = wmem_strdup(wmem_packet_scope(), tvb_format_text(tvb, offset+2, ies_len));
+        iax2_info->callingParty = tvb_format_text(pinfo->pool, tvb, offset+2, ies_len);
         break;
 
       case IAX_IE_APPARENT_ADDR:
@@ -1850,7 +1850,7 @@ dissect_fullpacket(tvbuff_t *tvb, guint32 offset,
 
   case AST_FRAME_DTMF_BEGIN:
   case AST_FRAME_DTMF_END:
-    proto_tree_add_item(packet_type_tree, hf_iax2_dtmf_csub, tvb, offset+9, 1, ENC_ASCII|ENC_NA);
+    proto_tree_add_item(packet_type_tree, hf_iax2_dtmf_csub, tvb, offset+9, 1, ENC_ASCII);
     offset += 10;
 
     col_append_fstr(pinfo->cinfo, COL_INFO, " digit %c", csub);
@@ -1938,7 +1938,7 @@ dissect_fullpacket(tvbuff_t *tvb, guint32 offset,
       int textlen = tvb_captured_length_remaining(tvb, offset);
       if (textlen > 0)
       {
-        proto_tree_add_item(packet_type_tree, hf_iax2_text_text, tvb, offset, textlen, ENC_UTF_8|ENC_NA);
+        proto_tree_add_item(packet_type_tree, hf_iax2_text_text, tvb, offset, textlen, ENC_UTF_8);
         offset += textlen;
       }
     }
@@ -1953,7 +1953,7 @@ dissect_fullpacket(tvbuff_t *tvb, guint32 offset,
       int urllen = tvb_captured_length_remaining(tvb, offset);
       if (urllen > 0)
       {
-        proto_item *pi = proto_tree_add_item(packet_type_tree, hf_iax2_html_url, tvb, offset, urllen, ENC_UTF_8|ENC_NA);
+        proto_item *pi = proto_tree_add_item(packet_type_tree, hf_iax2_html_url, tvb, offset, urllen, ENC_UTF_8);
         proto_item_set_url(pi);
         offset += urllen;
       }
@@ -2295,7 +2295,7 @@ static void process_iax_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   iax_call_data *iax_call = iax_packet -> call_data;
 
 #ifdef DEBUG_DESEGMENT
-  g_debug("calling process_iax_pdu; len = %u", tvb_reported_length(tvb));
+  ws_debug("calling process_iax_pdu; len = %u", tvb_reported_length(tvb));
 #endif
 
   if (!video && iax_call && iax_call->subdissector) {
@@ -2308,7 +2308,7 @@ static void process_iax_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       * tbd what the best thing to do here is. */
       memset(&dissector_info, 0, sizeof(dissector_info));
     } else {
-      dissector_info.etype = ENDPOINT_IAX2;
+      dissector_info.ctype = CONVERSATION_IAX2;
       dissector_info.circuit_id = (guint32)iax_packet->call_data->forward_circuit_ids[0];
     }
 
@@ -2321,7 +2321,7 @@ static void process_iax_pdu(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   }
 
 #ifdef DEBUG_DESEGMENT
-  g_debug("called process_iax_pdu; pinfo->desegment_len=%u; pinfo->desegment_offset=%u",
+  ws_debug("called process_iax_pdu; pinfo->desegment_len=%u; pinfo->desegment_offset=%u",
             pinfo->desegment_len, pinfo->desegment_offset);
 #endif
 }
@@ -2344,7 +2344,7 @@ static void desegment_iax(tvbuff_t *tvb, packet_info *pinfo, proto_tree *iax2_tr
   pinfo->desegment_len    = 0;
 
 #ifdef DEBUG_DESEGMENT
-  g_debug("dissecting packet %u", pinfo->num);
+  ws_debug("dissecting packet %u", pinfo->num);
 #endif
 
   dirdata = &(iax_call->dirdata[!!(iax_packet->reversed)]);
@@ -2358,7 +2358,7 @@ static void desegment_iax(tvbuff_t *tvb, packet_info *pinfo, proto_tree *iax2_tr
     gboolean complete;
 
 #ifdef DEBUG_DESEGMENT
-    g_debug("visited: %i; c_f_b: %u; hash: %u->%u", pinfo->fd->visited?1:0,
+    ws_debug("visited: %i; c_f_b: %u; hash: %u->%u", pinfo->fd->visited?1:0,
             dirdata->current_frag_bytes, pinfo->num, dirdata->current_frag_id);
 #endif
 
@@ -2372,7 +2372,7 @@ static void desegment_iax(tvbuff_t *tvb, packet_info *pinfo, proto_tree *iax2_tr
       dirdata->current_frag_bytes += frag_len;
       complete                     = dirdata->current_frag_bytes > tot_len;
 #ifdef DEBUG_DESEGMENT
-      g_debug("hash: %u->%u; frag_offset: %u; c_f_b: %u; totlen: %u",
+      ws_debug("hash: %u->%u; frag_offset: %u; c_f_b: %u; totlen: %u",
               pinfo->num, fid, frag_offset, dirdata->current_frag_bytes, tot_len);
 #endif
     } else {
@@ -2474,7 +2474,7 @@ static void desegment_iax(tvbuff_t *tvb, packet_info *pinfo, proto_tree *iax2_tr
                            tvb, deseg_offset, pinfo, fid, NULL,
                            0, frag_len, TRUE);
 #ifdef DEBUG_DESEGMENT
-    g_debug("Start offset of undissected bytes: %u; "
+    ws_debug("Start offset of undissected bytes: %u; "
             "Bytes remaining in this segment: %u; min required bytes: %u\n",
             deseg_offset, frag_len, frag_len + pinfo->desegment_len);
 #endif

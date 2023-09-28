@@ -11,6 +11,7 @@
  */
 
 #include "config.h"
+#define WS_LOG_DOMAIN "sshdump"
 
 #include <extcap/extcap-base.h>
 #include <extcap/ssh-base.h>
@@ -20,6 +21,7 @@
 #include <wsutil/filesystem.h>
 #include <wsutil/privileges.h>
 #include <wsutil/please_report_bug.h>
+#include <wsutil/wslog.h>
 
 #include <errno.h>
 #include <string.h>
@@ -35,7 +37,7 @@ static gchar* sshdump_extcap_interface;
 #endif
 
 #define SSHDUMP_VERSION_MAJOR "1"
-#define SSHDUMP_VERSION_MINOR "0"
+#define SSHDUMP_VERSION_MINOR "1"
 #define SSHDUMP_VERSION_RELEASE "0"
 
 #define SSH_READ_BLOCK_SIZE 256
@@ -49,6 +51,7 @@ enum {
 	OPT_REMOTE_USERNAME,
 	OPT_REMOTE_PASSWORD,
 	OPT_REMOTE_INTERFACE,
+	OPT_REMOTE_CAPTURE_COMMAND_SELECT,
 	OPT_REMOTE_CAPTURE_COMMAND,
 	OPT_REMOTE_FILTER,
 	OPT_SSHKEY,
@@ -59,14 +62,15 @@ enum {
 	OPT_REMOTE_NOPROM
 };
 
-static struct option longopts[] = {
+static struct ws_option longopts[] = {
 	EXTCAP_BASE_OPTIONS,
-	{ "help", no_argument, NULL, OPT_HELP},
-	{ "version", no_argument, NULL, OPT_VERSION},
+	{ "help", ws_no_argument, NULL, OPT_HELP},
+	{ "version", ws_no_argument, NULL, OPT_VERSION},
 	SSH_BASE_OPTIONS,
-	{ "remote-capture-command", required_argument, NULL, OPT_REMOTE_CAPTURE_COMMAND},
-	{ "remote-sudo", no_argument, NULL, OPT_REMOTE_SUDO },
-	{ "remote-noprom", no_argument, NULL, OPT_REMOTE_NOPROM },
+	{ "remote-capture-command-select", ws_required_argument, NULL, OPT_REMOTE_CAPTURE_COMMAND_SELECT},
+	{ "remote-capture-command", ws_required_argument, NULL, OPT_REMOTE_CAPTURE_COMMAND},
+	{ "remote-sudo", ws_no_argument, NULL, OPT_REMOTE_SUDO },
+	{ "remote-noprom", ws_no_argument, NULL, OPT_REMOTE_NOPROM },
 	{ 0, 0, 0, 0}
 };
 
@@ -82,14 +86,14 @@ static int ssh_loop_read(ssh_channel channel, FILE* fp)
 	while (ssh_channel_is_open(channel) && !ssh_channel_is_eof(channel)) {
 		nbytes = ssh_channel_read(channel, buffer, SSH_READ_BLOCK_SIZE, 0);
 		if (nbytes < 0) {
-			g_warning("Error reading from channel");
+			ws_warning("Error reading from channel");
 			goto end;
 		}
 		if (nbytes == 0) {
 			break;
 		}
 		if (fwrite(buffer, 1, nbytes, fp) != (guint)nbytes) {
-			g_warning("Error writing to fifo");
+			ws_warning("Error writing to fifo");
 			ret = EXIT_FAILURE;
 			goto end;
 		}
@@ -100,18 +104,18 @@ static int ssh_loop_read(ssh_channel channel, FILE* fp)
 	while (ssh_channel_is_open(channel) && !ssh_channel_is_eof(channel)) {
 		nbytes = ssh_channel_read(channel, buffer, SSH_READ_BLOCK_SIZE, 1);
 		if (nbytes < 0) {
-			g_warning("Error reading from channel");
+			ws_warning("Error reading from channel");
 			goto end;
 		}
 		if (fwrite(buffer, 1, nbytes, stderr) != (guint)nbytes) {
-			g_warning("Error writing to stderr");
+			ws_warning("Error writing to stderr");
 			break;
 		}
 	}
 
 end:
 	if (ssh_channel_send_eof(channel) != SSH_OK) {
-		g_warning("Error sending EOF in ssh channel");
+		ws_warning("Error sending EOF in ssh channel");
 		ret = EXIT_FAILURE;
 	}
 	return ret;
@@ -125,11 +129,16 @@ static char* local_interfaces_to_filter(const guint16 remote_port)
 	return filter;
 }
 
-static ssh_channel run_ssh_command(ssh_session sshs, const char* capture_command, const gboolean use_sudo, gboolean noprom,
+static ssh_channel run_ssh_command(ssh_session sshs, const char* capture_command_select,
+		const char* capture_command, const gboolean use_sudo, gboolean noprom,
 		const char* iface, const char* cfilter, const guint32 count)
 {
-	gchar* cmdline;
+	gchar* cmdline = NULL;
 	ssh_channel channel;
+	char** ifaces_array = NULL;
+	int ifaces_array_num = 0;
+	GString *ifaces_string;
+	gchar *ifaces = NULL;
 	char* quoted_iface = NULL;
 	char* quoted_filter = NULL;
 	char* count_str = NULL;
@@ -137,40 +146,71 @@ static ssh_channel run_ssh_command(ssh_session sshs, const char* capture_command
 
 	channel = ssh_channel_new(sshs);
 	if (!channel) {
-		g_warning("Can't create channel");
+		ws_warning("Can't create channel");
 		return NULL;
 	}
 
 	if (ssh_channel_open_session(channel) != SSH_OK) {
-		g_warning("Can't open session");
+		ws_warning("Can't open session");
 		ssh_channel_free(channel);
 		return NULL;
 	}
 
 	ssh_options_get_port(sshs, &remote_port);
 
+	if (capture_command_select == NULL || !g_strcmp0(capture_command_select, "other")) {
+		if (capture_command && *capture_command) {
+			cmdline = g_strdup(capture_command);
+			ws_debug("Remote capture command has disabled other options");
+		} else {
+			capture_command_select = "tcpdump";
+		}
+	}
+
 	/* escape parameters to go save with the shell */
-	if (capture_command && *capture_command) {
-		cmdline = g_strdup(capture_command);
-		g_debug("Remote capture command has disabled other options");
-	} else {
+	if (!g_strcmp0(capture_command_select, "tcpdump")) {
 		quoted_iface = iface ? g_shell_quote(iface) : NULL;
 		quoted_filter = g_shell_quote(cfilter ? cfilter : "");
 		if (count > 0)
-			count_str = g_strdup_printf("-c %u", count);
+			count_str = ws_strdup_printf("-c %u", count);
 
-		cmdline = g_strdup_printf("%s tcpdump -U %s%s %s -w - %s %s",
+		cmdline = ws_strdup_printf("%s tcpdump -U %s%s %s -w - %s %s",
 			use_sudo ? "sudo" : "",
 			quoted_iface ? "-i " : "",
 			quoted_iface ? quoted_iface : "",
 			noprom ? "-p" : "",
 			count_str ? count_str : "",
 			quoted_filter);
+	} else if (!g_strcmp0(capture_command_select, "dumpcap")) {
+		if (iface) {
+			ifaces_array = g_strsplit(iface, " ", -1);
+			ifaces_string = g_string_new(NULL);
+			while (ifaces_array[ifaces_array_num])
+			{
+				quoted_iface = g_shell_quote(ifaces_array[ifaces_array_num]);
+				g_string_append_printf(ifaces_string, "-i %s ", quoted_iface);
+				ifaces_array_num++;
+			}
+			ifaces = g_string_free(ifaces_string, FALSE);
+		}
+		quoted_filter = g_shell_quote(cfilter ? cfilter : "");
+		if (count > 0)
+			count_str = ws_strdup_printf("-c %u", count);
+
+		cmdline = ws_strdup_printf("%s dumpcap %s %s -w - %s -f %s",
+			use_sudo ? "sudo" : "",
+			noprom ? "-p" : "",
+			ifaces ? ifaces : "",
+			count_str ? count_str : "",
+			quoted_filter);
+
+		g_free(ifaces);
+		g_strfreev(ifaces_array);
 	}
 
-	g_debug("Running: %s", cmdline);
+	ws_debug("Running: %s", cmdline);
 	if (ssh_channel_request_exec(channel, cmdline) != SSH_OK) {
-		g_warning("Can't request exec");
+		ws_warning("Can't request exec");
 		ssh_channel_close(channel);
 		ssh_channel_free(channel);
 		channel = NULL;
@@ -185,7 +225,8 @@ static ssh_channel run_ssh_command(ssh_session sshs, const char* capture_command
 }
 
 static int ssh_open_remote_connection(const ssh_params_t* params, const char* iface, const char* cfilter,
-	const char* capture_command, const gboolean use_sudo, gboolean noprom, const guint32 count, const char* fifo)
+	const char* capture_command_select, const char* capture_command, const gboolean use_sudo,
+	gboolean noprom, const guint32 count, const char* fifo)
 {
 	ssh_session sshs = NULL;
 	ssh_channel channel = NULL;
@@ -197,7 +238,7 @@ static int ssh_open_remote_connection(const ssh_params_t* params, const char* if
 		/* Open or create the output file */
 		fp = fopen(fifo, "wb");
 		if (fp == NULL) {
-			g_warning("Error creating output file: %s (%s)", fifo, g_strerror(errno));
+			ws_warning("Error creating output file: %s (%s)", fifo, g_strerror(errno));
 			return EXIT_FAILURE;
 		}
 	}
@@ -205,20 +246,20 @@ static int ssh_open_remote_connection(const ssh_params_t* params, const char* if
 	sshs = create_ssh_connection(params, &err_info);
 
 	if (!sshs) {
-		g_warning("Error creating connection.");
+		ws_warning("Error creating connection.");
 		goto cleanup;
 	}
 
-	channel = run_ssh_command(sshs, capture_command, use_sudo, noprom, iface, cfilter, count);
+	channel = run_ssh_command(sshs, capture_command_select, capture_command, use_sudo, noprom, iface, cfilter, count);
 
 	if (!channel) {
-		g_warning("Can't run ssh command.");
+		ws_warning("Can't run ssh command.");
 		goto cleanup;
 	}
 
 	/* read from channel and write into fp */
 	if (ssh_loop_read(channel, fp) != EXIT_SUCCESS) {
-		g_warning("Error in read loop.");
+		ws_warning("Error in read loop.");
 		ret = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -226,7 +267,7 @@ static int ssh_open_remote_connection(const ssh_params_t* params, const char* if
 	ret = EXIT_SUCCESS;
 cleanup:
 	if (err_info)
-		g_warning("%s", err_info);
+		ws_warning("%s", err_info);
 	g_free(err_info);
 
 	/* clean up and exit */
@@ -269,12 +310,12 @@ static int list_config(char *interface, unsigned int remote_port)
 	char* ipfilter;
 
 	if (!interface) {
-		g_warning("ERROR: No interface specified.");
+		ws_warning("ERROR: No interface specified.");
 		return EXIT_FAILURE;
 	}
 
 	if (g_strcmp0(interface, sshdump_extcap_interface)) {
-		g_warning("ERROR: interface must be %s", sshdump_extcap_interface);
+		ws_warning("ERROR: interface must be %s", sshdump_extcap_interface);
 		return EXIT_FAILURE;
 	}
 
@@ -293,7 +334,7 @@ static int list_config(char *interface, unsigned int remote_port)
 		"{type=password}{tooltip=The SSH password, used when other methods (SSH agent "
 		"or key files) are unavailable.}{group=Authentication}\n", inc++);
 	printf("arg {number=%u}{call=--sshkey}{display=Path to SSH private key}"
-		"{type=fileselect}{tooltip=The path on the local filesystem of the private ssh key}"
+		"{type=fileselect}{tooltip=The path on the local filesystem of the private SSH key (OpenSSH format)}"
 		"{mustexist=true}{group=Authentication}\n", inc++);
 	printf("arg {number=%u}{call=--sshkey-passphrase}{display=SSH key passphrase}"
 		"{type=password}{tooltip=Passphrase to unlock the SSH private key}{group=Authentication}\n",
@@ -304,10 +345,15 @@ static int list_config(char *interface, unsigned int remote_port)
 	printf("arg {number=%u}{call=--remote-interface}{display=Remote interface}"
 		"{type=string}{tooltip=The remote network interface used for capture"
 		"}{group=Capture}\n", inc++);
+	printf("arg {number=%u}{call=--remote-capture-command-select}{display=Remote capture command selection}"
+		"{type=radio}{tooltip=The remote capture command to build a command line for}{group=Capture}\n", inc);
+	printf("value {arg=%u}{value=dumpcap}{display=dumpcap}\n", inc);
+	printf("value {arg=%u}{value=tcpdump}{display=tcpdump}{default=true}\n", inc);
+	printf("value {arg=%u}{value=other}{display=Other:}\n", inc++);
 	printf("arg {number=%u}{call=--remote-capture-command}{display=Remote capture command}"
 		"{type=string}{tooltip=The remote command used to capture}{group=Capture}\n", inc++);
 	printf("arg {number=%u}{call=--remote-sudo}{display=Use sudo on the remote machine}"
-		"{type=boolean}{tooltip=Prepend the capture command with sudo on the remote machine}"
+		"{type=boolflag}{tooltip=Prepend the capture command with sudo on the remote machine}"
 		"{group=Capture}\n", inc++);
 	printf("arg {number=%u}{call=--remote-noprom}{display=No promiscuous mode}"
 		"{type=boolflag}{tooltip=Don't use promiscuous mode on the remote machine}{group=Capture}"
@@ -339,7 +385,7 @@ static char* concat_filters(const char* extcap_filter, const char* remote_filter
 	if (!remote_filter && !extcap_filter)
 		return NULL;
 
-	return g_strdup_printf("(%s) and (%s)", extcap_filter, remote_filter);
+	return ws_strdup_printf("(%s) and (%s)", extcap_filter, remote_filter);
 }
 
 int main(int argc, char *argv[])
@@ -349,6 +395,7 @@ int main(int argc, char *argv[])
 	int option_idx = 0;
 	ssh_params_t* ssh_params = ssh_params_new();
 	char* remote_interface = NULL;
+	char* remote_capture_command_select = NULL;
 	char* remote_capture_command = NULL;
 	char* remote_filter = NULL;
 	guint32 count = 0;
@@ -359,6 +406,9 @@ int main(int argc, char *argv[])
 	gboolean use_sudo = FALSE;
 	gboolean noprom = FALSE;
 	gchar* interface_description = g_strdup("SSH remote capture");
+
+	/* Initialize log handler early so we can have proper logging during startup. */
+	extcap_log_init("sshdump");
 
 	sshdump_extcap_interface = g_path_get_basename(argv[0]);
 
@@ -371,9 +421,9 @@ int main(int argc, char *argv[])
 	 * Attempt to get the pathname of the directory containing the
 	 * executable file.
 	 */
-	err_msg = init_progfile_dir(argv[0]);
+	err_msg = configuration_init(argv[0], NULL);
 	if (err_msg != NULL) {
-		g_warning("Can't get pathname of directory containing the captype program: %s.",
+		ws_warning("Can't get pathname of directory containing the extcap program: %s.",
 			err_msg);
 		g_free(err_msg);
 	}
@@ -385,13 +435,13 @@ int main(int argc, char *argv[])
 	add_libssh_info(extcap_conf);
 	if (g_strcmp0(sshdump_extcap_interface, DEFAULT_SSHDUMP_EXTCAP_INTERFACE)) {
 		gchar* temp = interface_description;
-		interface_description = g_strdup_printf("%s, custom version", interface_description);
+		interface_description = ws_strdup_printf("%s, custom version", interface_description);
 		g_free(temp);
 	}
 	extcap_base_register_interface(extcap_conf, sshdump_extcap_interface, interface_description, 147, "Remote capture dependent DLT");
 	g_free(interface_description);
 
-	help_header = g_strdup_printf(
+	help_header = ws_strdup_printf(
 		" %s --extcap-interfaces\n"
 		" %s --extcap-interface=%s --extcap-dlts\n"
 		" %s --extcap-interface=%s --extcap-config\n"
@@ -407,26 +457,26 @@ int main(int argc, char *argv[])
 	extcap_help_add_option(extcap_conf, "--remote-port <port>", "the remote SSH port");
 	extcap_help_add_option(extcap_conf, "--remote-username <username>", "the remote SSH username");
 	extcap_help_add_option(extcap_conf, "--remote-password <password>", "the remote SSH password. If not specified, ssh-agent and ssh-key are used");
-	extcap_help_add_option(extcap_conf, "--sshkey <public key path>", "the path of the ssh key");
-	extcap_help_add_option(extcap_conf, "--sshkey-passphrase <public key passphrase>", "the passphrase to unlock public ssh");
-	extcap_help_add_option(extcap_conf, "--proxycommand <proxy command>", "the command to use as proxy the the ssh connection");
+	extcap_help_add_option(extcap_conf, "--sshkey <private key path>", "the path of the SSH key (OpenSSH format)");
+	extcap_help_add_option(extcap_conf, "--sshkey-passphrase <private key passphrase>", "the passphrase to unlock private SSH key");
+	extcap_help_add_option(extcap_conf, "--proxycommand <proxy command>", "the command to use as proxy for the SSH connection");
 	extcap_help_add_option(extcap_conf, "--remote-interface <iface>", "the remote capture interface");
+	extcap_help_add_option(extcap_conf, "--remote-capture-command-select <selection>", "dumpcap, tcpdump or other remote capture command");
 	extcap_help_add_option(extcap_conf, "--remote-capture-command <capture command>", "the remote capture command");
 	extcap_help_add_option(extcap_conf, "--remote-sudo", "use sudo on the remote machine to capture");
 	extcap_help_add_option(extcap_conf, "--remote-noprom", "don't use promiscuous mode on the remote machine");
-	extcap_help_add_option(extcap_conf, "--remote-filter <filter>", "a filter for remote capture (default: don't "
-		"listen on local interfaces IPs)");
+	extcap_help_add_option(extcap_conf, "--remote-filter <filter>", "a filter for remote capture (default: don't listen on local interfaces IPs)");
 	extcap_help_add_option(extcap_conf, "--remote-count <count>", "the number of packets to capture");
 
-	opterr = 0;
-	optind = 0;
+	ws_opterr = 0;
+	ws_optind = 0;
 
 	if (argc == 1) {
 		extcap_help_print(extcap_conf);
 		goto end;
 	}
 
-	while ((result = getopt_long(argc, argv, ":", longopts, &option_idx)) != -1) {
+	while ((result = ws_getopt_long(argc, argv, ":", longopts, &option_idx)) != -1) {
 
 		switch (result) {
 
@@ -442,51 +492,56 @@ int main(int argc, char *argv[])
 
 		case OPT_REMOTE_HOST:
 			g_free(ssh_params->host);
-			ssh_params->host = g_strdup(optarg);
+			ssh_params->host = g_strdup(ws_optarg);
 			break;
 
 		case OPT_REMOTE_PORT:
-			if (!ws_strtou16(optarg, NULL, &ssh_params->port) || ssh_params->port == 0) {
-				g_warning("Invalid port: %s", optarg);
+			if (!ws_strtou16(ws_optarg, NULL, &ssh_params->port) || ssh_params->port == 0) {
+				ws_warning("Invalid port: %s", ws_optarg);
 				goto end;
 			}
 			break;
 
 		case OPT_REMOTE_USERNAME:
 			g_free(ssh_params->username);
-			ssh_params->username = g_strdup(optarg);
+			ssh_params->username = g_strdup(ws_optarg);
 			break;
 
 		case OPT_REMOTE_PASSWORD:
 			g_free(ssh_params->password);
-			ssh_params->password = g_strdup(optarg);
-			memset(optarg, 'X', strlen(optarg));
+			ssh_params->password = g_strdup(ws_optarg);
+			memset(ws_optarg, 'X', strlen(ws_optarg));
 			break;
 
 		case OPT_SSHKEY:
 			g_free(ssh_params->sshkey_path);
-			ssh_params->sshkey_path = g_strdup(optarg);
+			ssh_params->sshkey_path = g_strdup(ws_optarg);
 			break;
 
 		case OPT_SSHKEY_PASSPHRASE:
 			g_free(ssh_params->sshkey_passphrase);
-			ssh_params->sshkey_passphrase = g_strdup(optarg);
-			memset(optarg, 'X', strlen(optarg));
+			ssh_params->sshkey_passphrase = g_strdup(ws_optarg);
+			memset(ws_optarg, 'X', strlen(ws_optarg));
 			break;
 
 		case OPT_PROXYCOMMAND:
 			g_free(ssh_params->proxycommand);
-			ssh_params->proxycommand = g_strdup(optarg);
+			ssh_params->proxycommand = g_strdup(ws_optarg);
 			break;
 
 		case OPT_REMOTE_INTERFACE:
 			g_free(remote_interface);
-			remote_interface = g_strdup(optarg);
+			remote_interface = g_strdup(ws_optarg);
+			break;
+
+		case OPT_REMOTE_CAPTURE_COMMAND_SELECT:
+			g_free(remote_capture_command_select);
+			remote_capture_command_select = g_strdup(ws_optarg);
 			break;
 
 		case OPT_REMOTE_CAPTURE_COMMAND:
 			g_free(remote_capture_command);
-			remote_capture_command = g_strdup(optarg);
+			remote_capture_command = g_strdup(ws_optarg);
 			break;
 
 		case OPT_REMOTE_SUDO:
@@ -495,12 +550,12 @@ int main(int argc, char *argv[])
 
 		case OPT_REMOTE_FILTER:
 			g_free(remote_filter);
-			remote_filter = g_strdup(optarg);
+			remote_filter = g_strdup(ws_optarg);
 			break;
 
 		case OPT_REMOTE_COUNT:
-			if (!ws_strtou32(optarg, NULL, &count)) {
-				g_warning("Invalid value for count: %s", optarg);
+			if (!ws_strtou32(ws_optarg, NULL, &count)) {
+				ws_warning("Invalid value for count: %s", ws_optarg);
 				goto end;
 			}
 			break;
@@ -511,12 +566,12 @@ int main(int argc, char *argv[])
 
 		case ':':
 			/* missing option argument */
-			g_warning("Option '%s' requires an argument", argv[optind - 1]);
+			ws_warning("Option '%s' requires an argument", argv[ws_optind - 1]);
 			break;
 
 		default:
-			if (!extcap_base_parse_options(extcap_conf, result - EXTCAP_OPT_LIST_INTERFACES, optarg)) {
-				g_warning("Invalid option: %s", argv[optind - 1]);
+			if (!extcap_base_parse_options(extcap_conf, result - EXTCAP_OPT_LIST_INTERFACES, ws_optarg)) {
+				ws_warning("Invalid option: %s", argv[ws_optind - 1]);
 				goto end;
 			}
 		}
@@ -536,9 +591,9 @@ int main(int argc, char *argv[])
 
 	err_msg = ws_init_sockets();
 	if (err_msg != NULL) {
-		g_warning("ERROR: %s", err_msg);
+		ws_warning("ERROR: %s", err_msg);
 		g_free(err_msg);
-		g_warning("%s", please_report_bug());
+		ws_warning("%s", please_report_bug());
 		goto end;
 	}
 
@@ -546,22 +601,24 @@ int main(int argc, char *argv[])
 		char* filter;
 
 		if (!ssh_params->host) {
-			g_warning("Missing parameter: --remote-host");
+			ws_warning("Missing parameter: --remote-host");
 			goto end;
 		}
 		filter = concat_filters(extcap_conf->capture_filter, remote_filter);
 		ssh_params->debug = extcap_conf->debug;
 		ret = ssh_open_remote_connection(ssh_params, remote_interface,
-			filter, remote_capture_command, use_sudo, noprom, count, extcap_conf->fifo);
+			filter, remote_capture_command_select, remote_capture_command,
+			use_sudo, noprom, count, extcap_conf->fifo);
 		g_free(filter);
 	} else {
-		g_debug("You should not come here... maybe some parameter missing?");
+		ws_debug("You should not come here... maybe some parameter missing?");
 		ret = EXIT_FAILURE;
 	}
 
 end:
 	/* clean up stuff */
 	ssh_params_free(ssh_params);
+	g_free(remote_capture_command_select);
 	g_free(remote_capture_command);
 	g_free(remote_interface);
 	g_free(remote_filter);

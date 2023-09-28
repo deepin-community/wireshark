@@ -85,7 +85,7 @@ static gint ett_usb_hid_wValue = -1;
 static gint ett_usb_hid_descriptor = -1;
 static gint ett_usb_hid_data = -1;
 static gint ett_usb_hid_unknown_data = -1;
-static gint ett_usb_hid_key_array = -1;
+static gint ett_usb_hid_array = -1;
 
 static int hf_usb_hid_request = -1;
 static int hf_usb_hid_value = -1;
@@ -158,7 +158,8 @@ static int hf_usbhid_axis_vbrz = -1;
 static int hf_usbhid_axis_vno = -1;
 static int hf_usbhid_button = -1;
 static int hf_usbhid_key = -1;
-static int hf_usbhid_key_array = -1;
+static int hf_usbhid_array = -1;
+static int hf_usbhid_array_usage = -1;
 
 static const true_false_string tfs_mainitem_bit0 = {"Constant", "Data"};
 static const true_false_string tfs_mainitem_bit1 = {"Variable", "Array"};
@@ -195,6 +196,8 @@ static wmem_tree_t *report_descriptors = NULL;
 #define HID_OUTPUT          (1 << 9)
 #define HID_FEATURE         (1 << 10)
 
+#define HID_EXTENDED_USAGE  (1 << 11)
+
 /* masks */
 
 #define HID_GLOBAL_MASK     (HID_REPORT_ID | \
@@ -229,10 +232,12 @@ static wmem_tree_t *report_descriptors = NULL;
 #define HID_USAGE_RANGE         2
 
 
+#define USAGE_ID(usage)    (usage & 0x0000FFFF)
+#define USAGE_PAGE(usage) ((usage & 0xFFFF0000) >> 16)
+
 typedef struct _hid_field hid_field_t;
 
 struct _hid_field {
-    guint32         usage_page;
     wmem_array_t   *usages;
 
     guint32         report_id;  /* optional */
@@ -3637,7 +3642,7 @@ static const value_string keycode_vals[] = {
 
     {0, NULL}
 };
-value_string_ext keycode_vals_ext = VALUE_STRING_EXT_INIT(keycode_vals);
+static value_string_ext keycode_vals_ext = VALUE_STRING_EXT_INIT(keycode_vals);
 
 static guint32
 hid_unpack_value(guint8 *data, unsigned int idx, unsigned int size)
@@ -3665,8 +3670,6 @@ hid_unpack_signed(guint8 *data, unsigned int idx, unsigned int size, gint32 *val
     return FALSE;
 }
 
-
-#define MAX_REPORT_DESCRIPTOR_COUNT 100000 // Arbitrary
 static gboolean
 parse_report_descriptor(report_descriptor_t *rdesc)
 {
@@ -3674,7 +3677,7 @@ parse_report_descriptor(report_descriptor_t *rdesc)
     guint8 *data = rdesc->desc_body;
     unsigned int tag, type, size;
     guint8 prefix;
-    guint32 defined = 0, usage = 0, usage_min = 0, usage_max = 0;
+    guint32 defined = 0, usage_page = 0, usage = 0, usage_min = 0, usage_max = 0;
     wmem_allocator_t *scope = wmem_file_scope();
     gboolean first_item = TRUE;
 
@@ -3752,7 +3755,9 @@ parse_report_descriptor(report_descriptor_t *rdesc)
                 switch (tag)
                 {
                     case USBHID_GLOBALITEM_TAG_USAGE_PAGE:
-                        field.usage_page = hid_unpack_value(data, i, size);
+                        usage_page = hid_unpack_value(data, i, size);
+                        if (usage_page > G_MAXUINT16)
+                            goto err;
                         defined |= HID_USAGE_PAGE;
                         break;
 
@@ -3802,29 +3807,55 @@ parse_report_descriptor(report_descriptor_t *rdesc)
                 switch (tag)
                 {
                     case USBHID_LOCALITEM_TAG_USAGE:
-                        if (!(defined & HID_USAGE_PAGE))
-                            return FALSE;
-
                         usage = hid_unpack_value(data, i, size);
+
+                        /* Extended usage (size 4) combines both usage page and id */
+                        if (size != 4) {
+                            if (!(defined & HID_USAGE_PAGE))
+                                goto err;
+                            usage |= usage_page << 16;
+                        }
 
                         wmem_array_append_one(field.usages, usage);
                         break;
 
                     case USBHID_LOCALITEM_TAG_USAGE_MIN:
                         usage_min = hid_unpack_value(data, i, size);
+                        if (size == 4) {
+                            /* Usage max must be extended as well */
+                            defined |= HID_EXTENDED_USAGE;
+                        } else {
+                            if (!(defined & HID_USAGE_PAGE))
+                                goto err;
+                            usage_min |= usage_page << 16;
+                        }
                         defined |= HID_USAGE_MIN;
                         break;
 
                     case USBHID_LOCALITEM_TAG_USAGE_MAX:
                         if (!(defined & HID_USAGE_MIN))
-                            return FALSE;
+                            goto err;
 
                         usage_max = hid_unpack_value(data, i, size);
-                        if (usage_min > usage_max) {
+                        if (defined & HID_EXTENDED_USAGE) {
+                            /* Fail if max is not extended usage (HID spec 6.2.2.8) */
+                            if (size != 4)
+                                goto err;
+                        } else if (size == 4) {
+                            /* Fail because min wasn't extended, but max is */
+                            goto err;
+                        } else {
+                            if (!(defined & HID_USAGE_PAGE))
+                                goto err;
+                            usage_max |= usage_page << 16;
+                        }
+
+                        /* Usage min and max must be on the same page */
+                        if (USAGE_PAGE(usage_min) != USAGE_PAGE(usage_max)) {
                             goto err;
                         }
 
-                        if (wmem_array_get_count(field.usages) + usage_max - usage_min >= MAX_REPORT_DESCRIPTOR_COUNT) {
+                        if (usage_min > usage_max) {
                             goto err;
                         }
 
@@ -3834,7 +3865,7 @@ parse_report_descriptor(report_descriptor_t *rdesc)
                             wmem_array_append_one(field.usages, j);
                         }
 
-                        defined ^= HID_USAGE_MIN;
+                        defined &= ~(HID_USAGE_MIN | HID_EXTENDED_USAGE);
                         break;
 
                     default: /* TODO */
@@ -3932,9 +3963,10 @@ get_usage_page_string(guint32 usage_page)
 
 /* Returns usage page item string */
 static gchar*
-get_usage_page_item_string(guint32 usage_page, guint32 id)
+get_usage_page_item_string(wmem_allocator_t *pool, guint32 usage_page, guint32 id)
 {
     const char *str = NULL;
+    const char *fmt_str = NULL;
 
     switch (usage_page)
     {
@@ -3965,7 +3997,7 @@ get_usage_page_item_string(guint32 usage_page, guint32 id)
     case BUTTON_PAGE:
         str = try_val_to_str(id, usb_hid_button_usage_page_vals);
         if (!str)
-            str = "Button %u";
+            fmt_str = "Button %u";
         break;
     case ORDINAL_PAGE:
         str = try_val_to_str(id, usb_hid_ordinal_usage_page_vals);
@@ -3976,7 +4008,7 @@ get_usage_page_item_string(guint32 usage_page, guint32 id)
     case CONSUMER_PAGE:
         str = try_val_to_str(id, usb_hid_consumer_usage_page_vals);
         if (!str)
-            str = "Instance %u";
+            fmt_str = "Instance %u";
         break;
     case DIGITIZER_PAGE:
         str = try_val_to_str(id, usb_hid_digitizers_usage_page_vals);
@@ -3990,7 +4022,7 @@ get_usage_page_item_string(guint32 usage_page, guint32 id)
         str = try_val_to_str(id, usb_hid_physical_input_device_usage_page_vals);
         break;
     case UNICODE_PAGE:
-        str = "Character U+%04X";
+        fmt_str = "Character U+%04X";
         break;
     case EYE_AND_HEAD_TRACKER_PAGE:
         str = try_val_to_str(id, usb_hid_eye_and_head_tracker_usage_page_vals);
@@ -4016,7 +4048,7 @@ get_usage_page_item_string(guint32 usage_page, guint32 id)
         str = try_val_to_str(id, usb_hid_monitor_usage_page_vals);
         break;
     case USB_ENUMERATED_VALUES_PAGE:
-        str = "ENUM_%u";
+        fmt_str = "ENUM_%u";
         break;
     case VESA_VIRTUAL_CONTROLS_PAGE:
         str = try_val_to_str(id, usb_hid_vesa_virtual_control_usage_page_vals);
@@ -4051,10 +4083,13 @@ get_usage_page_item_string(guint32 usage_page, guint32 id)
         break;
     }
 
-    if (!str)
+    if (fmt_str) {
+        return wmem_strdup_printf(pool, fmt_str, id);
+    }
+    if (!str) {
         str = "Reserved";
-
-    return wmem_strdup_printf(wmem_packet_scope(), str, id);
+    }
+    return wmem_strdup_printf(pool, "%s", str);
 }
 
 /* Dissector for the data in a HID main report. */
@@ -4062,7 +4097,7 @@ static int
 dissect_usb_hid_report_mainitem_data(packet_info *pinfo _U_, proto_tree *tree, tvbuff_t *tvb, int offset, unsigned int bSize, unsigned int bTag)
 {
     proto_item *ti = proto_tree_get_parent(tree);
-    guint32 val;
+    guint32 val = 0;
 
     switch (bTag) {
         case USBHID_MAINITEM_TAG_INPUT:
@@ -4133,8 +4168,8 @@ dissect_usb_hid_report_globalitem_data(packet_info *pinfo _U_, proto_tree *tree,
 {
     const char *str = NULL;
     proto_item *ti = proto_tree_get_parent(tree);
-    guint32 val;
-    gint32 val_sig;
+    guint32 val = 0;
+    gint32 val_sig = 0;
 
     switch (bTag) {
         case USBHID_GLOBALITEM_TAG_USAGE_PAGE:
@@ -4195,12 +4230,18 @@ dissect_usb_hid_report_globalitem_data(packet_info *pinfo _U_, proto_tree *tree,
             proto_item_append_text(ti, " (%u)", val);
             break;
         case USBHID_GLOBALITEM_TAG_PUSH:
-            proto_tree_add_item_ret_uint(tree, hf_usb_hid_globalitem_push, tvb, offset, bSize, ENC_LITTLE_ENDIAN, &val);
-            proto_item_append_text(ti, " (%u)", val);
+            // Push and Pop have no data, but the HID spec 6.2.2.7 doesn't prohibit it.
+            if(bSize > 0) {
+                proto_tree_add_item_ret_uint(tree, hf_usb_hid_globalitem_push, tvb, offset, bSize, ENC_LITTLE_ENDIAN, &val);
+                proto_item_append_text(ti, " (%u)", val);
+            }
             break;
         case USBHID_GLOBALITEM_TAG_POP:
-            proto_tree_add_item_ret_uint(tree, hf_usb_hid_globalitem_pop, tvb, offset, bSize, ENC_LITTLE_ENDIAN, &val);
-            proto_item_append_text(ti, " (%u)", val);
+            // Push and Pop have no data, but the HID spec 6.2.2.7 doesn't prohibit it.
+            if(bSize > 0) {
+                proto_tree_add_item_ret_uint(tree, hf_usb_hid_globalitem_pop, tvb, offset, bSize, ENC_LITTLE_ENDIAN, &val);
+                proto_item_append_text(ti, " (%u)", val);
+            }
             break;
         default:
             proto_tree_add_item(tree, hf_usb_hid_item_unk_data, tvb, offset, bSize, ENC_NA);
@@ -4213,12 +4254,12 @@ dissect_usb_hid_report_globalitem_data(packet_info *pinfo _U_, proto_tree *tree,
 
 /* Dissector for the data in a HID main report. */
 static int
-dissect_usb_hid_report_localitem_data(packet_info *pinfo _U_, proto_tree *tree, tvbuff_t *tvb, int offset, unsigned int bSize, unsigned int bTag, struct usb_hid_global_state *global)
+dissect_usb_hid_report_localitem_data(packet_info *pinfo, proto_tree *tree, tvbuff_t *tvb, int offset, unsigned int bSize, unsigned int bTag, struct usb_hid_global_state *global)
 {
     guint32 id = 0xffff;
     proto_item *ti = proto_tree_get_parent(tree);
     gchar *str = NULL;
-    guint32 val;
+    guint32 val = 0;
 
     switch (bTag) {
         case USBHID_LOCALITEM_TAG_USAGE:
@@ -4231,7 +4272,7 @@ dissect_usb_hid_report_localitem_data(packet_info *pinfo _U_, proto_tree *tree, 
                     id = tvb_get_guint8(tvb, offset);
                 else if (bSize == 2)
                     id = tvb_get_ntohs(tvb, offset);
-                str = get_usage_page_item_string(global->usage_page, id);
+                str = get_usage_page_item_string(pinfo->pool, global->usage_page, id);
                 proto_tree_add_uint_format(tree, hf_usb_hid_localitem_usage, tvb, offset, bSize, id, "Usage: %s (0x%02x)", str, id);
                 proto_item_append_text(ti, " (%s)", str);
             }
@@ -4979,242 +5020,256 @@ dissect_usb_hid_control_class_intf(tvbuff_t *tvb, packet_info *pinfo,
 /* unpack a HID logical report field */
 static int hid_unpack_logical(tvbuff_t *tvb, int bit_offset, guint32 size, gint32 min, gint32 *val)
 {
-    size_t bytes_length;
-    guint8 *bytes = tvb_get_bits_array(NULL, tvb, bit_offset, size, &bytes_length);
+    if (size > 32)
+        return -1;
 
-    switch (size / 8)
-    {
-        case 0:
-        case 1:
-            *val = bytes[0];
-            break;
-
-        case 2:
-            *val = pletoh16(bytes);
-            break;
-
-        case 3:
-            *val = pletoh24(bytes);
-            break;
-
-        case 4:
-            *val = pletoh32(bytes);
-            break;
-
-        default:
-            goto err;
-    }
+    *val = tvb_get_bits32(tvb, bit_offset, size, ENC_LITTLE_ENDIAN);
 
     if (min < 0)
         *val = ws_sign_ext32(*val, size);
 
-    wmem_free(NULL, bytes);
     return 0;
-
-err:
-    wmem_free(NULL, bytes);
-    return -1;
 }
 
 static gint
 dissect_usb_hid_int_dynamic_value_variable(tvbuff_t *tvb, proto_tree *tree, hid_field_t *field,
-        int *bit_offset, int hf)
+        int bit_offset, int hf)
 {
     gint32 val = 0;
 
-    if (hid_unpack_logical(tvb, *bit_offset, field->report_size, field->logical_min, &val))
+    if (hid_unpack_logical(tvb, bit_offset, field->report_size, field->logical_min, &val))
         return -1;
 
-    proto_tree_add_int_bits_format_value(tree, hf, tvb, *bit_offset, field->report_size, val, "%d", val);
-    *bit_offset += field->report_size;
-
+    proto_tree_add_int_bits_format_value(tree, hf, tvb, bit_offset, field->report_size, val, ENC_LITTLE_ENDIAN, "%d", val);
     return 0;
 }
 
 /* dissect the Generic Desktop Controls (0x0001) usage page */
 static gint
 dissect_usb_hid_generic_desktop_controls_page(tvbuff_t *tvb, packet_info _U_ *pinfo,
-        proto_tree *tree, hid_field_t *field, int *bit_offset)
+        proto_tree *tree, hid_field_t *field, guint usage, int bit_offset)
 {
     gint ret = 0;
-    guint32 usage;
-    unsigned int usage_count = wmem_array_get_count(field->usages);
 
-    if ((field->properties & HID_MAIN_TYPE) != HID_MAIN_VARIABLE)
-        return -1;
+    DISSECTOR_ASSERT(USAGE_PAGE(usage) == GENERIC_DESKTOP_CONTROLS_PAGE);
+    usage = USAGE_ID(usage);
+    switch (usage)
+    {
+        case USBHID_GENERIC_DESKTOP_CONTROLS_X:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_x);
+            break;
 
-    if (usage_count != field->report_count)
-        return -1;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_Y:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_y);
+            break;
 
-    for(unsigned int i = 0; i < usage_count; i++) {
-        usage = *((guint32*) wmem_array_index(field->usages, i));
-        switch (usage)
-        {
-            case USBHID_GENERIC_DESKTOP_CONTROLS_X:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_x);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_Z:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_z);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_Y:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_y);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_RX:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_rx);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_Z:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_z);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_RY:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_ry);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_RX:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_rx);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_RZ:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_rz);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_RY:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_ry);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_SLIDER:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_slider);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_RZ:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_rz);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_VX:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vx);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_SLIDER:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_slider);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_VY:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vy);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_VX:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vx);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_VZ:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vz);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_VY:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vy);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_VBRX:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vbrx);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_VZ:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vz);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_VBRY:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vbry);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_VBRX:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vbrx);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_VBRZ:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vbrz);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_VBRY:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vbry);
-                break;
+        case USBHID_GENERIC_DESKTOP_CONTROLS_VNO:
+            ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vno);
+            break;
 
-            case USBHID_GENERIC_DESKTOP_CONTROLS_VBRZ:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vbrz);
-                break;
-
-            case USBHID_GENERIC_DESKTOP_CONTROLS_VNO:
-                ret = dissect_usb_hid_int_dynamic_value_variable(tvb, tree, field, bit_offset, hf_usbhid_axis_vno);
-                break;
-
-            default:
-                proto_tree_add_bits_item(tree, hf_usbhid_unknown_data, tvb, *bit_offset, field->report_size, ENC_NA);
-                break;
-        }
-
-        if (ret)
-            return ret;
+        default:
+            ret = -1;
+            break;
     }
 
-    return 0;
+    return ret;
 }
 
 /* dissect the Keyboard/Keypad (0x0007) usage page */
 static gint
 dissect_usb_hid_keyboard_page(tvbuff_t *tvb, packet_info _U_ *pinfo,
-        proto_tree *tree, hid_field_t *field, int *bit_offset)
+        proto_tree *tree, hid_field_t *field, guint32 usage, int bit_offset)
 {
     gint32 val = 0;
-    unsigned int usage_count = wmem_array_get_count(field->usages);
-    guint32 usage;
-    proto_item *array_ti;
-    proto_tree *array_tree = NULL;
-    int array_offset = -1;
 
-    if ((field->properties & HID_MAIN_TYPE) == HID_MAIN_ARRAY) {
-        array_ti = proto_tree_add_bits_item(tree, hf_usbhid_key_array, tvb, *bit_offset,
-                                field->report_size * field->report_count, ENC_NA);
-        array_tree = proto_item_add_subtree(array_ti, ett_usb_hid_key_array);
-        array_offset = *bit_offset;
-        *bit_offset += field->report_size * field->report_count;
-    }
+    /* the data is a boolean state for the usage (eg. KEY_SHIFT = 1, KEY_CONTROL = 0) */
+    if (hid_unpack_logical(tvb, bit_offset, field->report_size, field->logical_min, &val))
+        return -1;
 
-    for(unsigned int i = 0; i < field->report_count; i++) {
-        switch (field->properties & HID_MAIN_TYPE)
-        {
-            case HID_MAIN_ARRAY:
-                /* the data is the usage (eg. KEY_A + KEY_B) */
+    DISSECTOR_ASSERT(USAGE_PAGE(usage) == KEYBOARD_KEYPAD_PAGE);
+    usage = USAGE_ID(usage);
 
-                if (hid_unpack_logical(tvb, array_offset, field->report_size, field->logical_min, &val))
-                    return -1;
-
-                if (val) /* val == 0 means no key in this array element*/
-                    proto_tree_add_boolean_bits_format_value(array_tree, hf_usbhid_key, tvb, array_offset, field->report_size,
-                                val, "%s (0x%02x)", val_to_str_ext(val, &keycode_vals_ext, "Unknown"), val);
-                array_offset += field->report_size;
-                break;
-
-            case HID_MAIN_VARIABLE:
-                /* the data is a boolean state for the usage (eg. KEY_SHIFT = 1, KEY_CONTROL = 0) */
-
-                if (hid_unpack_logical(tvb, *bit_offset, field->report_size, field->logical_min, &val))
-                    return -1;
-
-                if (i >= usage_count) {
-                    proto_tree_add_bits_item(tree, hf_usbhid_padding, tvb, *bit_offset, field->report_size, ENC_NA);
-                    *bit_offset += field->report_size;
-                    continue;
-                }
-
-                usage = *((guint32*) wmem_array_index(field->usages, i));
-
-                proto_tree_add_boolean_bits_format_value(tree, hf_usbhid_key, tvb, *bit_offset, field->report_size, val,
-                            "%s (0x%02x) = %s", val_to_str_ext(usage, &keycode_vals_ext, "Unknown"), usage, val ? "DOWN" : "UP");
-                *bit_offset += field->report_size;
-                break;
-
-            default:
-                return -1;
-        }
-    }
-
+    proto_tree_add_boolean_bits_format_value(tree, hf_usbhid_key, tvb, bit_offset, field->report_size, val, ENC_LITTLE_ENDIAN,
+        "%s (0x%02x): %s", val_to_str_ext(usage, &keycode_vals_ext, "Unknown"), usage, val ? "DOWN" : "UP");
     return 0;
 }
 
 /* dissect the Button (0x0009) usage page */
 static gint
 dissect_usb_hid_button_page(tvbuff_t *tvb, packet_info _U_ *pinfo,
-        proto_tree *tree, hid_field_t *field, int *bit_offset)
+        proto_tree *tree, hid_field_t *field, guint32 usage, int bit_offset)
 {
     gint32 val = 0;
-    unsigned int usage_count = wmem_array_get_count(field->usages);
-    guint32 usage;
     proto_item *ti;
 
-    if ((field->properties & HID_MAIN_TYPE) != HID_MAIN_VARIABLE)
+    DISSECTOR_ASSERT(USAGE_PAGE(usage) == BUTTON_PAGE);
+    usage = USAGE_ID(usage);
+
+    if (hid_unpack_logical(tvb, bit_offset, field->report_size, field->logical_min, &val))
         return -1;
 
-    for(unsigned int i = 0; i < usage_count; i++) {
-        usage = *((guint32*) wmem_array_index(field->usages, i));
+    ti = proto_tree_add_boolean_bits_format_value(tree, hf_usbhid_button, tvb, bit_offset, field->report_size, val, ENC_LITTLE_ENDIAN, "%u", usage);
 
-        if (hid_unpack_logical(tvb, *bit_offset, field->report_size, field->logical_min, &val))
-            return -1;
+    if (usage == 0)
+        proto_item_append_text(ti, " (No button pressed)");
+    else if (usage == 1)
+        proto_item_append_text(ti, " (primary/trigger)");
+    else if (usage == 2)
+        proto_item_append_text(ti, " (secondary)");
+    else if (usage == 3)
+        proto_item_append_text(ti, " (tertiary)");
 
-        ti = proto_tree_add_boolean_bits_format_value(tree, hf_usbhid_button, tvb, *bit_offset, field->report_size, val, "%u", usage);
-        *bit_offset += field->report_size;
+    proto_item_append_text(ti, ": %s", val ? "DOWN" : "UP");
+    return 0;
+}
 
-        if (usage == 0)
-            proto_item_append_text(ti, " (No button pressed)");
-        else if (usage == 1)
-            proto_item_append_text(ti, " (primary/trigger)");
-        else if (usage == 2)
-            proto_item_append_text(ti, " (secondary)");
-        else if (usage == 3)
-            proto_item_append_text(ti, " (tertiary)");
+static void
+dissect_hid_variable(tvbuff_t* tvb, packet_info _U_* pinfo, proto_tree* tree, hid_field_t* field,
+                     guint32 usage, int bit_offset)
+{
+    gint ret = 0;
 
-        proto_item_append_text(ti, " = %s", val ? "DOWN" : "UP");
+    /* vendor data (0xff00 - 0xffff) */
+    if ((USAGE_PAGE(usage) & 0xff00) == 0xff00) {
+        proto_tree_add_bits_item(tree, hf_usbhid_vendor_data, tvb, bit_offset, field->report_size, ENC_LITTLE_ENDIAN);
+        return;
     }
 
-    return 0;
+    switch (USAGE_PAGE(usage))
+    {
+    case GENERIC_DESKTOP_CONTROLS_PAGE:
+        ret = dissect_usb_hid_generic_desktop_controls_page(tvb, pinfo, tree, field, usage, bit_offset);
+        break;
+
+    case KEYBOARD_KEYPAD_PAGE:
+        ret = dissect_usb_hid_keyboard_page(tvb, pinfo, tree, field, usage, bit_offset);
+        break;
+
+    case BUTTON_PAGE:
+        ret = dissect_usb_hid_button_page(tvb, pinfo, tree, field, usage, bit_offset);
+        break;
+
+    default:
+        ret = -1;
+        break;
+    }
+
+    if (ret) {
+        guint32 val = 0;
+        proto_item *ti =
+            proto_tree_add_uint_bits_format_value(tree, hf_usb_hid_localitem_usage, tvb, bit_offset, field->report_size,
+                                                  usage, ENC_LITTLE_ENDIAN, "%s", get_usage_page_item_string(pinfo->pool, USAGE_PAGE(usage), USAGE_ID(usage)));
+        if (0 == hid_unpack_logical(tvb, bit_offset, field->report_size, field->logical_min, &val))
+            proto_item_append_text(ti, ": %d", val);
+    }
+}
+
+static gboolean hid_get_usage_from_array(hid_field_t *field, gint32 idx, guint32 *out)
+{
+    if ((idx >= field->logical_min) && (idx <= field->logical_max)) {
+        idx -= field->logical_min;
+        if ((guint32)idx < wmem_array_get_count(field->usages)) {
+            *out = (*((guint32*) wmem_array_index(field->usages, idx)));
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+static gint
+dissect_hid_field(tvbuff_t *tvb, packet_info _U_ *pinfo, proto_tree *tree, hid_field_t *field, int bit_offset)
+{
+    gint start_offset = bit_offset;
+
+    if ((field->properties & HID_MAIN_TYPE) == HID_MAIN_ARRAY) {
+        proto_item *array_ti;
+        proto_tree *array_tree;
+
+        array_ti = proto_tree_add_bits_item(tree, hf_usbhid_array, tvb, bit_offset,
+            field->report_size * field->report_count, ENC_LITTLE_ENDIAN);
+        array_tree = proto_item_add_subtree(array_ti, ett_usb_hid_array);
+
+        for(unsigned int j = 0; j < field->report_count; j++) {
+            guint32 val = 0;
+            gboolean in_range;
+            if (hid_unpack_logical(tvb, bit_offset, field->report_size, field->logical_min, &val)) {
+                in_range = FALSE;
+            } else {
+                in_range = hid_get_usage_from_array(field, val, &val);
+            }
+            if (in_range) {
+                proto_tree_add_boolean_bits_format_value(array_tree, hf_usbhid_array_usage, tvb, bit_offset, field->report_size,
+                    val, ENC_LITTLE_ENDIAN, "%s (0x%04x, 0x%04x)", get_usage_page_item_string(pinfo->pool, USAGE_PAGE(val), USAGE_ID(val)),
+                    USAGE_PAGE(val), USAGE_ID(val));
+            } else {
+                proto_tree_add_boolean_bits_format_value(array_tree, hf_usbhid_array_usage, tvb, bit_offset, field->report_size,
+                    val, ENC_LITTLE_ENDIAN, "No controls asserted");
+            }
+            bit_offset += field->report_size;
+        }
+    } else {
+        unsigned int i;
+        unsigned int count = wmem_array_get_count(field->usages);
+        if (count > field->report_count) {
+            count = field->report_count;
+        }
+        for(i = 0; i < count; i++) {
+            guint32 usage = *((guint32*) wmem_array_index(field->usages, i));
+            dissect_hid_variable(tvb, pinfo, tree, field, usage, bit_offset);
+            bit_offset += field->report_size;
+        }
+        if (field->report_count > count) {
+            gint remaining_bits = (field->report_count - count) * field->report_size;
+            proto_tree_add_bits_item(tree, hf_usbhid_padding, tvb, bit_offset, remaining_bits, ENC_LITTLE_ENDIAN);
+            bit_offset += remaining_bits;
+        }
+    }
+
+    return bit_offset - start_offset;
 }
 
 /* Dissect USB HID data/reports */
@@ -5222,8 +5277,8 @@ static gint
 dissect_usb_hid_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
 {
     guint offset = 0, hid_bit_offset;
-    proto_item *hid_ti, *unk_ti;
-    proto_tree *hid_tree, *unk_tree;
+    proto_item *hid_ti;
+    proto_tree *hid_tree;
     wmem_array_t *fields;
     usb_conv_info_t *usb_data = (usb_conv_info_t*) data;
     report_descriptor_t *rdesc = get_report_descriptor(pinfo, usb_data);
@@ -5235,7 +5290,6 @@ dissect_usb_hid_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
         hid_bit_offset = offset * 8;
         offset += remaining;
         guint8 report_id = tvb_get_bits8(tvb, hid_bit_offset, 8);
-        gint ret;
 
         if (rdesc) {
             if (rdesc->uses_report_id) {
@@ -5258,48 +5312,12 @@ dissect_usb_hid_data(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *
 
                 /* if the item has no usages, it is padding - HID spec 6.2.2.9 */
                 if (wmem_array_get_count(field->usages) == 0) {
-                    proto_tree_add_bits_item(hid_tree, hf_usbhid_padding, tvb, hid_bit_offset, data_size, ENC_NA);
+                    proto_tree_add_bits_item(hid_tree, hf_usbhid_padding, tvb, hid_bit_offset, data_size, ENC_LITTLE_ENDIAN);
                     hid_bit_offset += data_size;
                     continue;
                 }
 
-                /* vendor data (0xff00 - 0xffff) */
-                if ((field->usage_page & 0xff00) == 0xff00) {
-                    proto_tree_add_bits_item(hid_tree, hf_usbhid_vendor_data, tvb, hid_bit_offset, data_size, ENC_NA);
-                    hid_bit_offset += data_size;
-                } else {
-                    switch (field->usage_page)
-                    {
-                        case GENERIC_DESKTOP_CONTROLS_PAGE:
-                            ret = dissect_usb_hid_generic_desktop_controls_page(tvb, pinfo, hid_tree, field, &hid_bit_offset);
-                            break;
-
-                        case KEYBOARD_KEYPAD_PAGE:
-                            ret = dissect_usb_hid_keyboard_page(tvb, pinfo, hid_tree, field, &hid_bit_offset);
-                            break;
-
-                        case BUTTON_PAGE:
-                            ret = dissect_usb_hid_button_page(tvb, pinfo, hid_tree, field, &hid_bit_offset);
-                            break;
-
-                        default:
-                            ret = -1;
-                            break;
-                    }
-
-                    if (ret) {
-                        unk_ti = proto_tree_add_bits_item(hid_tree, hf_usbhid_unknown_data, tvb, hid_bit_offset, data_size, ENC_NA);
-                        proto_item_append_text(unk_ti, " (%s)", get_usage_page_string(field->usage_page));
-
-                        unk_tree = proto_item_add_subtree(unk_ti, ett_usb_hid_unknown_data);
-                        for(unsigned int j = 0; j < wmem_array_get_count(field->usages); j++) {
-                            guint32 usage = *((guint32*) wmem_array_index(field->usages, j));
-                            proto_tree_add_uint_bits_format_value(unk_tree, hf_usb_hid_localitem_usage, tvb, hid_bit_offset, data_size,
-                                    usage, "%s", get_usage_page_item_string(field->usage_page, usage));
-                        }
-                        hid_bit_offset += data_size;
-                    }
-                }
+                hid_bit_offset += dissect_hid_field(tvb, pinfo, hid_tree, field, hid_bit_offset);
             }
         }
     }
@@ -5449,7 +5467,7 @@ proto_register_usb_hid(void)
                 TFS(&tfs_mainitem_bit7), 1<<7, NULL, HFILL }},
 
         { &hf_usb_hid_mainitem_bit7_input,
-            { "[Reserved]", "usbhid.item.main.volatile", FT_BOOLEAN, 9,
+            { "[Reserved]", "usbhid.item.main.reserved", FT_BOOLEAN, 9,
                 NULL, 1<<7, NULL, HFILL }},
 
         { &hf_usb_hid_mainitem_bit8,
@@ -5809,7 +5827,7 @@ proto_register_usb_hid(void)
                 NULL, 0x00, NULL, HFILL }},
 
         { &hf_usbhid_axis_rx,
-            { "Rz Axis", "usbhid.data.axis.rx", FT_INT32, BASE_DEC,
+            { "Rx Axis", "usbhid.data.axis.rx", FT_INT32, BASE_DEC,
                 NULL, 0x00, NULL, HFILL }},
 
         { &hf_usbhid_axis_ry,
@@ -5825,7 +5843,7 @@ proto_register_usb_hid(void)
                 NULL, 0x00, NULL, HFILL }},
 
         { &hf_usbhid_axis_vx,
-            { "Vz Axis", "usbhid.data.axis.vx", FT_INT32, BASE_DEC,
+            { "Vx Axis", "usbhid.data.axis.vx", FT_INT32, BASE_DEC,
                 NULL, 0x00, NULL, HFILL }},
 
         { &hf_usbhid_axis_vy,
@@ -5837,7 +5855,7 @@ proto_register_usb_hid(void)
                 NULL, 0x00, NULL, HFILL }},
 
         { &hf_usbhid_axis_vbrx,
-            { "Vbrz Axis", "usbhid.data.axis.vbrx", FT_INT32, BASE_DEC,
+            { "Vbrx Axis", "usbhid.data.axis.vbrx", FT_INT32, BASE_DEC,
                 NULL, 0x00, NULL, HFILL }},
 
         { &hf_usbhid_axis_vbry,
@@ -5860,9 +5878,13 @@ proto_register_usb_hid(void)
             { "Key", "usbhid.data.key.variable", FT_BOOLEAN, 1,
                 NULL, 0x00, NULL, HFILL }},
 
-        { &hf_usbhid_key_array,
-            { "Keys", "usbhid.data.key.array", FT_BYTES, BASE_NONE,
+        { &hf_usbhid_array,
+            { "Array", "usbhid.data.array", FT_BYTES, BASE_NONE,
                 NULL, 0x00, NULL, HFILL }},
+
+        { &hf_usbhid_array_usage,
+            { "Usage", "usbhid.data.array.usage", FT_BOOLEAN, 1,
+            NULL, 0x00, NULL, HFILL }},
     };
 
     static gint *usb_hid_subtrees[] = {
@@ -5872,7 +5894,7 @@ proto_register_usb_hid(void)
         &ett_usb_hid_descriptor,
         &ett_usb_hid_data,
         &ett_usb_hid_unknown_data,
-        &ett_usb_hid_key_array
+        &ett_usb_hid_array
     };
 
     report_descriptors = wmem_tree_new_autoreset(wmem_epan_scope(), wmem_file_scope());

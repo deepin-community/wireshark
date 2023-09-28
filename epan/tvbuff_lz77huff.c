@@ -21,7 +21,7 @@
 #include <stdlib.h> /* qsort */
 #include <epan/exceptions.h>
 #include <epan/tvbuff.h>
-#include <epan/wmem/wmem.h>
+#include <epan/wmem_scopes.h>
 
 #define MAX_INPUT_SIZE (16*1024*1024) /* 16MB */
 
@@ -194,6 +194,10 @@ static int PrefixCodeTreeRebuild( struct hf_tree *tree,
 
 	j = 1;
 	for (; i < 512; i++) {
+		//ws_assert(j < TREE_SIZE);
+		if (j >= TREE_SIZE) {
+			return -1;
+		}
 		tree->nodes[j].symbol = symbolInfo[i].symbol;
 		tree->nodes[j].leaf = TRUE;
 		mask <<= symbolInfo[i].length - bits;
@@ -289,7 +293,7 @@ static gboolean do_uncompress(struct input *input,
 	if (!input->tvb)
 		return FALSE;
 
-	if (input->size > MAX_INPUT_SIZE)
+	if (!input->size || input->size > MAX_INPUT_SIZE)
 		return FALSE;
 
 	rc = PrefixCodeTreeRebuild(&tree, input);

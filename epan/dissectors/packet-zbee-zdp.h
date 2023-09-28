@@ -234,7 +234,6 @@ extern int hf_zbee_zdp_simple_length;
 extern int hf_zbee_zdp_target;
 extern int hf_zbee_zdp_replacement;
 extern int hf_zbee_zdp_replacement_ep;
-extern int hf_zbee_zdp_bind_src;
 extern int hf_zbee_zdp_bind_src64;
 extern int hf_zbee_zdp_bind_src_ep;
 extern int hf_zbee_zdp_bind_dst;
@@ -261,7 +260,6 @@ extern int hf_zbee_zdp_channel_energy;
 extern int hf_zbee_zdp_pan_eui64;
 extern int hf_zbee_zdp_pan_uint;
 extern int hf_zbee_zdp_channel;
-extern int hf_zbee_zdp_nwk_desc_profile;
 extern int hf_zbee_zdp_profile_version;
 extern int hf_zbee_zdp_beacon;
 extern int hf_zbee_zdp_superframe;
@@ -329,7 +327,7 @@ extern void     zbee_append_info           (proto_item *item, packet_info *pinfo
 extern void     zdp_parse_node_desc        (proto_tree *tree, packet_info *pinfo, gboolean show_ver_flags, gint ettindex, tvbuff_t *tvb, guint *offset, guint8 version);
 extern void     zdp_parse_power_desc       (proto_tree *tree, gint ettindex, tvbuff_t *tvb, guint *offset);
 extern void     zdp_parse_simple_desc      (proto_tree *tree, gint ettindex, tvbuff_t *tvb, guint *offset, guint8 version);
-extern void     zdp_parse_complex_desc     (proto_tree *tree, gint ettindex, tvbuff_t *tvb, guint *offset, guint length);
+extern void     zdp_parse_complex_desc     (packet_info *pinfo, proto_tree *tree, gint ettindex, tvbuff_t *tvb, guint *offset, guint length);
 extern void     zdp_parse_bind_table_entry (proto_tree *tree, tvbuff_t *tvb, guint *offset, guint8 version);
 
 extern guint8   zdp_parse_status           (proto_tree *tree, tvbuff_t *tvb, guint *offset);

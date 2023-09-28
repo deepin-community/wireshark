@@ -1,5 +1,7 @@
-/* sctpppids.h
+/** @file
  * Declarations of SCTP payload protocol IDs.
+ *
+ * Copyright 2011-2021 by Thomas Dreibholz <dreibh [AT] iem.uni-due.de>
  *
  * Wireshark - Network traffic analyzer
  * By Gerald Combs <gerald@wireshark.org>
@@ -68,7 +70,7 @@
 #define DIAMETER_PROTOCOL_ID                           46
 #define DIAMETER_DTLS_PROTOCOL_ID                      47
 #define R14P_BER_PROTOCOL_ID                           48
-/* Unassigned 49 */
+#define GDT_PROTOCOL_ID                                49
 #define WEBRTC_DCEP_PROTOCOL_ID                        50
 #define WEBRTC_STRING_PAYLOAD_PROTOCOL_ID              51
 #define WEBRTC_BINARY_PARTIAL_PAYLOAD_PROTOCOL_ID      52
@@ -93,5 +95,7 @@
 #define E2_UP_PROTOCOL_ID                              71
 #define E2_DU_PROTOCOL_ID                              72
 #define W1AP_PROTOCOL_ID                               73
+
+WS_DLL_PUBLIC value_string_ext sctpppid_val_ext;
 
 #endif /* sctpppids.h */

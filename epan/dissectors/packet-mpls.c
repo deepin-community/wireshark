@@ -204,7 +204,7 @@ static dissector_table_t mpls_subdissector_table;
 
 static void mpls_prompt(packet_info *pinfo, gchar* result)
 {
-    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Data after label %u as",
+    snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Data after label %u as",
         GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, proto_mpls, 0)));
 }
 
@@ -215,7 +215,7 @@ static gpointer mpls_value(packet_info *pinfo)
 
 static void pw_ach_prompt(packet_info *pinfo, gchar* result)
 {
-    g_snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Channel type 0x%x as",
+    snprintf(result, MAX_DECODE_AS_PROMPT_LEN, "Channel type 0x%x as",
         GPOINTER_TO_UINT(p_get_proto_data(pinfo->pool, pinfo, proto_pw_ach, 0)));
 }
 
@@ -473,13 +473,13 @@ dissect_mpls(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_
         }
 
         if ((label == MPLS_LABEL_GACH) && bos) {
-            g_strlcpy(PW_ACH, "Generic Associated Channel Header",50);
+            (void) g_strlcpy(PW_ACH, "Generic Associated Channel Header",50);
             next_tvb = tvb_new_subset_remaining(tvb, offset);
             call_dissector(dissector_pw_ach, next_tvb, pinfo, tree );
             return tvb_captured_length(tvb);
         }
         else
-            g_strlcpy(PW_ACH, "PW Associated Channel Header",50);
+            (void) g_strlcpy(PW_ACH, "PW Associated Channel Header",50);
 
         if (bos)
             break;
@@ -557,13 +557,13 @@ proto_register_mpls(void)
         /* MPLS header fields */
         {&hf_mpls_label,
          {"MPLS Label", "mpls.label",
-          FT_UINT32, BASE_DEC, NULL, 0xFFFFF000,
+          FT_UINT32, BASE_DEC_HEX, NULL, 0xFFFFF000,
           NULL, HFILL }
         },
 
         {&hf_mpls_label_special,
          {"MPLS Label", "mpls.label",
-          FT_UINT32, BASE_DEC, VALS(special_labels), 0xFFFFF000,
+          FT_UINT32, BASE_DEC_HEX, VALS(special_labels), 0xFFFFF000,
           NULL, HFILL }
         },
 
@@ -614,7 +614,7 @@ proto_register_mpls(void)
         /* Generic/Preferred PW MPLS Control Word fields */
         {&hf_mpls_pw_mcw_flags,
          {"Flags", "pwmcw.flags",
-          FT_UINT8, BASE_HEX, NULL, 0x0FC0,
+          FT_UINT16, BASE_HEX, NULL, 0x0FC0,
           "Generic/Preferred PW MPLS Control Word Flags", HFILL }
         },
 
@@ -719,7 +719,7 @@ proto_reg_handoff_mpls(void)
     dissector_add_uint("juniper.proto", JUNIPER_PROTO_CLNP_MPLS, mpls_handle);
     dissector_add_for_decode_as("pwach.channel_type", mpls_handle);
     dissector_add_uint("sflow_245.header_protocol", SFLOW_245_HEADER_MPLS, mpls_handle);
-    dissector_add_uint("l2tp.pw_type", L2TPv3_PROTOCOL_MPLS, mpls_handle);
+    dissector_add_for_decode_as("l2tp.pw_type", mpls_handle);
     dissector_add_uint_with_preference("udp.port", UDP_PORT_MPLS_OVER_UDP, mpls_handle);
     dissector_add_uint("vxlan.next_proto", VXLAN_MPLS, mpls_handle);
     dissector_add_uint("nsh.next_proto", NSH_MPLS, mpls_handle);

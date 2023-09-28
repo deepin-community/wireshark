@@ -7,6 +7,8 @@
  *   5883: Bidirectional Forwarding Detection (BFD) for Multihop Paths
  *   5884: Bidirectional Forwarding Detection (BFD) for MPLS Label Switched Paths (LSPs)
  *   5885: Bidirectional Forwarding Detection (BFD) for the Pseudowire Virtual Circuit Connectivity Verification (VCCV)
+ *   7130: Bidirectional Forwarding Detection (BFD) on Link Aggregation Group (LAG) Interfaces
+ *   7881: Seamless Bidirectional Forwarding Detection (S-BFD) for IPv4, IPv6, and MPLS
  * (and https://tools.ietf.org/html/draft-ietf-bfd-base-01 for version 0)
  *
  * Copyright 2003, Hannes Gredler <hannes@juniper.net>
@@ -38,7 +40,9 @@ void proto_register_bfd(void);
 void proto_reg_handoff_bfd(void);
 
 /* 3784: BFD control, 3785: BFD echo, 4784: BFD multi hop control */
-#define UDP_PORT_RANGE_BFD_CTRL  "3784,4784"
+/* 6784: BFD on LAG, 7784: seamless BFD */
+/* https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml?search=bfd */
+#define UDP_PORT_RANGE_BFD_CTRL  "3784,4784,6784,7784"
 #define UDP_PORT_BFD_ECHO  3785
 
 /* As per RFC 6428 : https://tools.ietf.org/html/rfc6428
@@ -333,7 +337,7 @@ dissect_bfd_authentication(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
     switch (auth_type) {
         case BFD_AUTH_SIMPLE:
             proto_tree_add_item_ret_string(auth_tree, hf_bfd_auth_password, tvb, offset+3,
-                                    auth_len-3, ENC_ASCII|ENC_NA, wmem_packet_scope(), &password);
+                                    auth_len-3, ENC_ASCII|ENC_NA, pinfo->pool, &password);
             proto_item_append_text(auth_item, ": %s", password);
             break;
         case BFD_AUTH_MD5:
@@ -638,7 +642,7 @@ dissect_bfd_mep (tvbuff_t *tvb, proto_tree *tree, const int hfindex)
             proto_tree_add_uint (bfd_tree, hf_mep_agi_len, tvb, (offset + 17),
                                  1, mep_agi_len);
             proto_tree_add_item (bfd_tree, hf_mep_agi_val, tvb, (offset + 18),
-                                 mep_agi_len, ENC_ASCII|ENC_NA);
+                                 mep_agi_len, ENC_ASCII);
 
             break;
 

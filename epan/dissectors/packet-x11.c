@@ -5013,7 +5013,7 @@ static void dissect_x11_requests(tvbuff_t *tvb, packet_info *pinfo,
                    */
                   if (tmp > G_MAXINT32) {
                         ti = proto_tree_add_item(tree, proto_x11, tvb, offset, -1, ENC_NA);
-                        expert_add_info_format(pinfo, ti, &ei_x11_request_length, "Bogus request length (%"G_GINT64_MODIFIER"d)", tmp);
+                        expert_add_info_format(pinfo, ti, &ei_x11_request_length, "Bogus request length (%"PRId64")", tmp);
                         return;
                   }
                   plen = (gint)tmp;
@@ -5207,7 +5207,7 @@ dissect_x11_replies(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
              */
             if (x11_desegment && pinfo->can_desegment) {
                   /*
-                   * Yes - is the X11 reply header split across
+                   * Yes - is the X11 Reply or GenericEvent header split across
                    * segment boundaries?
                    */
                   if (length_remaining < 8) {
@@ -5279,6 +5279,24 @@ dissect_x11_replies(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
                               THROW_ON(tmp_plen < 32, ReportedBoundsError);
                               HANDLE_REPLY(plen, length_remaining,
                                            "Reply", dissect_x11_reply);
+                              break;
+                        }
+
+                        case GenericEvent:
+                        {
+                              /* An Event, but with a length field like a Reply. */
+
+                              /* To avoid an "assert w/side-effect" warning,
+                               * use a non-volatile temp variable instead. */
+                              int tmp_plen;
+
+                              /* GenericEvent's length is also in units of four. */
+                              tmp_plen = plen = 32 + tvb_get_guint32(tvb, offset + 4, byte_order) * 4;
+                              /* If tmp_plen < 32, we got an overflow;
+                               * the event length is too long. */
+                              THROW_ON(tmp_plen < 32, ReportedBoundsError);
+                              HANDLE_REPLY(plen, length_remaining,
+                                           "Event", dissect_x11_event);
                               break;
                         }
 

@@ -36,7 +36,7 @@ typedef struct _tcp_scan_t {
 
 
 static tap_packet_status
-tapall_tcpip_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip)
+tapall_tcpip_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags _U_)
 {
     tcp_scan_t   *ts = (tcp_scan_t *)pct;
     struct tcp_graph *tg  = ts->tg;
@@ -67,7 +67,7 @@ tapall_tcpip_packet(void *pct, packet_info *pinfo, epan_dissect_t *edt _U_, cons
         segment->rel_secs  = (guint32)pinfo->rel_ts.secs;
         segment->rel_usecs = pinfo->rel_ts.nsecs/1000;
         /* Currently unused
-        segment->abs_secs  = (guint32)pinfo->abs_ts.secs;
+        segment->abs_secs  = pinfo->abs_ts.secs;
         segment->abs_usecs = pinfo->abs_ts.nsecs/1000;
         */
         segment->th_seq    = tcphdr->th_seq;
@@ -104,8 +104,6 @@ graph_segment_list_get(capture_file *cf, struct tcp_graph *tg)
 {
     GString    *error_string;
     tcp_scan_t  ts;
-
-    g_log(NULL, G_LOG_LEVEL_DEBUG, "graph_segment_list_get()");
 
     if (!cf || !tg) {
         return;
@@ -211,7 +209,7 @@ typedef struct _th_t {
 } th_t;
 
 static tap_packet_status
-tap_tcpip_packet(void *pct, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *vip)
+tap_tcpip_packet(void *pct, packet_info *pinfo _U_, epan_dissect_t *edt _U_, const void *vip, tap_flags_t flags _U_)
 {
     int       n;
     gboolean  is_unique = TRUE;
@@ -400,17 +398,3 @@ void rtt_destroy_unack_list(struct rtt_unack **l ) {
         g_free(head);
     }
 }
-
-/*
- * Editor modelines
- *
- * Local Variables:
- * c-basic-offset: 4
- * tab-width: 8
- * indent-tabs-mode: nil
- * End:
- *
- * ex: set shiftwidth=4 tabstop=8 expandtab:
- * :indentSize=4:tabSize=8:noTabs=true:
- */
-

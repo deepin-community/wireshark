@@ -771,6 +771,10 @@ static const value_string apdu_ins_vals[] = {
 	{ 0x70, "MANAGE CHANNEL" },
 	{ 0x73, "MANAGE SECURE CHANNEL" },
 	{ 0x75, "TRANSACT DATA" },
+	/* TS 102 221 v15.11.0 */
+	{ 0x78, "GET IDENTITY" },
+	/* GSMA SGP.02 v4.2 */
+	{ 0xCA, "GET DATA" },
 	/* TS TS 102 222 */
 	{ 0xE0, "CREATE FILE" },
 	{ 0xE4, "DELETE FILE" },
@@ -904,7 +908,7 @@ static const value_string df_gsm_dfs[] = {
 	{ 0x5f32, "DF.ICO" },
 	{ 0x5f33, "DF.ACeS" },
 	{ 0x5f3c, "DF.MExE" },
-	{ 0x5f40, "DF.EIA/TIA-533" },
+	{ 0x5f40, "DF.EIA/TIA-533/DF.WLAN" },
 	{ 0x5f60, "DF.CTS" },
 	{ 0x5f70, "DF.SoLSA" },
 #if 0
@@ -915,9 +919,9 @@ static const value_string adf_usim_dfs[] = {
 #endif
 	{ 0x5f3a, "DF.PHONEBOOK" },
 	{ 0x5f3b, "DF.GSM-ACCESS" },
-	{ 0x5f3c, "DF.MexE" },
-	{ 0x5f70, "DF.SoLSA" },
-	{ 0x5f40, "DF.WLAN" },
+//	{ 0x5f3c, "DF.MexE" },
+//	{ 0x5f70, "DF.SoLSA" },
+//	{ 0x5f40, "DF.WLAN" },
 	{ 0x5f50, "DF.HNB" },
 	{ 0x5f90, "DF.ProSe" },
 	{ 0x5fa0, "DF.ACDC" },
@@ -1043,8 +1047,8 @@ static const value_string adf_5gs_efs[] = {
 	{ 0x4f06, "EF.UAC_AIC" },
 	{ 0x4f07, "EF.SUCI_Calc_Info" },
 	{ 0x4f08, "EF.OPL5G" },
-	{ 0x4f09, "EF.EFSUPI_NAI" },
-	{ 0x4f0a, "EF.Routing_Indicator" },
+	{ 0x4f09, "EF.EFSUPI_NAI/EF.PBC" },
+	{ 0x4f0a, "EF.Routing_Indicator/EF.PBC1" },
 	{ 0x4f0b, "EF.URSP" },
 	{ 0x4f0c, "EF.TN3GPPSNN" },
 #if 0
@@ -1053,8 +1057,8 @@ static const value_string adf_5gs_efs[] = {
 
 static const value_string df_phonebook_efs[] = {
 #endif
-	{ 0x4f09, "EF.PBC" },
-	{ 0x4f0a, "EF.PBC1" },
+//	{ 0x4f09, "EF.PBC" },
+//	{ 0x4f0a, "EF.PBC1" },
 	{ 0x4f11, "EF.ANRA" },
 	{ 0x4f12, "EF.ANRA1" },
 	{ 0x4f13, "EF.ANRB" },
@@ -1412,7 +1416,9 @@ dissect_gsm_apdu(guint8 ins, guint8 p1, guint8 p2, guint8 p3, tvbuff_t *tvb,
 			col_append_fstr(pinfo->cinfo, COL_INFO, "(channel: %d) ", p2);
 		}
 		break;
+	case 0x78: /* GET IDENTITY */
 	case 0xC0: /* GET RESPONSE */
+	case 0xCA: /* GET DATA */
 		proto_tree_add_item(tree, hf_le, tvb, offset+P3_OFFS, 1, ENC_BIG_ENDIAN);
 		if (isSIMtrace) {
 			proto_tree_add_item(tree, hf_apdu_data, tvb, offset+DATA_OFFS, p3, ENC_NA);
@@ -1452,7 +1458,6 @@ dissect_rsp_apdu_tvb(tvbuff_t *tvb, gint offset, packet_info *pinfo, proto_tree 
 
 	/* obtain status word */
 	sw = tvb_get_ntohs(tvb, offset);
-	/* proto_tree_add_item(sim_tree, hf_apdu_sw, tvb, offset, 2, ENC_BIG_ENDIAN); */
 	proto_tree_add_uint_format(sim_tree, hf_apdu_sw, tvb, offset, 2, sw,
 							"Status Word: %04x %s", sw, get_sw_string(sw));
 	offset += 2;
