@@ -9,12 +9,9 @@
 
 #include <config.h>
 
-#include <errno.h>
-
 #include <glib.h>
 
-#include <ui/filter_files.h>
-
+#include <wsutil/filter_files.h>
 #include <wsutil/filesystem.h>
 
 #include "filter_dialog.h"

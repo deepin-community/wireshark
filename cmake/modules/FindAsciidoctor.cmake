@@ -8,7 +8,10 @@ INCLUDE(FindChocolatey)
 
 FIND_PROGRAM(ASCIIDOCTOR_EXECUTABLE
     NAMES
+        asciidoctorj.cmd
+        asciidoctorj.bat
         asciidoctorj
+        asciidoctor.cmd
         asciidoctor.bat
         asciidoctor
         asciidoctor.ruby2.1
@@ -42,7 +45,7 @@ if(ASCIIDOCTOR_EXECUTABLE)
         # --failure-level=WARN
         # --trace
         --quiet
-        --attribute build_dir=${CMAKE_CURRENT_BINARY_DIR}
+        --attribute build_dir=${CMAKE_BINARY_DIR}/docbook
         --require ${CMAKE_SOURCE_DIR}/docbook/asciidoctor-macros/ws_utils.rb
         --require ${CMAKE_SOURCE_DIR}/docbook/asciidoctor-macros/commaize-block.rb
         --require ${CMAKE_SOURCE_DIR}/docbook/asciidoctor-macros/cveidlink-inline-macro.rb
@@ -124,7 +127,7 @@ if(ASCIIDOCTOR_EXECUTABLE)
         ADD_CUSTOM_COMMAND(
             OUTPUT
                 ${_output_txt}
-            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/html2text.py
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/html2text.py
                 ${_output_html}
                 > ${_output_txt}
             DEPENDS

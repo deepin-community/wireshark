@@ -66,7 +66,8 @@ public:
         PreferencesChanged,
         ProfileChanging,
         RecentCapturesChanged,
-        RecentPreferencesRead
+        RecentPreferencesRead,
+        FreezePacketList
     };
 
     enum MainMenuItem {
@@ -109,8 +110,7 @@ public:
     QList<recent_item_status *> recentItems() const;
     void addRecentItem(const QString filename, qint64 size, bool accessible);
     void removeRecentItem(const QString &filename);
-    QDir lastOpenDir();
-    void setLastOpenDir(const char *dir_name);
+    QDir openDialogInitialDir();
     void setLastOpenDirFromFilename(QString file_name);
     void helpTopicAction(topic_action_e action);
     const QFont monospaceFont(bool zoomed = false) const;
@@ -157,8 +157,6 @@ private:
     QTimer tap_update_timer_;
     QList<QString> pending_open_files_;
     QSocketNotifier *if_notifier_;
-    QIcon normal_icon_;
-    QIcon capture_icon_;
     static QString window_title_separator_;
     QList<AppSignal> app_signals_;
     int active_captures_;
@@ -168,10 +166,13 @@ private:
 
     void storeCustomColorsInRecent();
     void clearDynamicMenuGroupItems();
-    void initializeIcons();
 
 protected:
     bool event(QEvent *event);
+    virtual void initializeIcons() = 0;
+
+    QIcon normal_icon_;
+    QIcon capture_icon_;
 
 signals:
     void appInitialized();
@@ -185,6 +186,7 @@ signals:
     void profileChanging();
     void profileNameChanged(const gchar *profile_name);
 
+    void freezePacketList(bool changing_profile);
     void columnsChanged(); // XXX This recreates the packet list. We might want to rename it accordingly.
     void captureFilterListChanged();
     void displayFilterListChanged();
@@ -229,6 +231,9 @@ private slots:
     void ifChangeEventsAvailable();
     void itemStatusFinished(const QString filename = "", qint64 size = 0, bool accessible = false);
     void refreshPacketData();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0) && defined(Q_OS_WIN)
+    void colorSchemeChanged();
+#endif
 };
 
 extern MainApplication *mainApp;

@@ -1,0 +1,12 @@
+libwireshark-data (4.2.0~rc3-1~exp0) experimental; urgency=medium
+
+  Wireshark stopped shipping the global /etc/wireshark/init.lua.
+  The "init.lua" file is now loaded from any of the Lua plugin directories,
+  in the order of the global "/usr/lib/*/wireshark/plugins/" directory,
+  then from "$HOME/.local/lib/wireshark/plugins/".
+
+  For backward compatibility "init.lua" is still loaded from
+  "$HOME/.config/wireshark/", too, but this location is deprecated and may
+  be removed from the search path in a future release.
+
+ -- Balint Reczey <balint@balintreczey.hu>  Wed, 01 Nov 2023 20:22:11 +0100

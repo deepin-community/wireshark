@@ -17,11 +17,15 @@
 #include <epan/range.h>
 #include <epan/to_str.h>
 #include <epan/value_string.h>
+#include <epan/prefs.h>
 
 #include <ui/recent.h>
+#include <ui/util.h>
 #include "ui/ws_ui_util.h"
 
 #include <wsutil/str_util.h>
+
+#include <ui/qt/main_application.h>
 
 #include <QAction>
 #include <QApplication>
@@ -60,6 +64,13 @@ QByteArray gstring_free_to_qbytearray(GString *glib_gstring)
 {
     QByteArray qt_ba(glib_gstring->str);
     g_string_free(glib_gstring, TRUE);
+    return qt_ba;
+}
+
+QByteArray gbytearray_free_to_qbytearray(GByteArray *glib_array)
+{
+    QByteArray qt_ba(reinterpret_cast<char *>(glib_array->data), glib_array->len);
+    g_byte_array_free(glib_array, TRUE);
     return qt_ba;
 }
 
@@ -293,5 +304,44 @@ QString make_filter_based_on_rtpstream_id(QVector<rtpstream_id_t *> stream_ids)
     }
 
     return filter;
+}
+
+QString openDialogInitialDir()
+{
+    QString result;
+
+    switch (prefs.gui_fileopen_style) {
+
+    case FO_STYLE_LAST_OPENED:
+        /* The user has specified that we should start out in the last directory
+           we looked in.  If we've already opened a file, use its containing
+           directory, if we could determine it, as the directory, otherwise
+           use the "last opened" directory saved in the preferences file if
+           there was one. */
+        /* This is now the default behaviour in file_selection_new() */
+        result = QString(get_open_dialog_initial_dir());
+        break;
+
+    case FO_STYLE_SPECIFIED:
+        /* The user has specified that we should always start out in a
+           specified directory; if they've specified that directory,
+           start out by showing the files in that dir. */
+        if (prefs.gui_fileopen_dir[0] != '\0')
+            result = QString(prefs.gui_fileopen_dir);
+        break;
+    }
+
+    QDir ld(result);
+    if (ld.exists())
+        return result;
+
+    return QString();
+}
+
+void storeLastDir(QString dir)
+{
+    /* XXX - printable? */
+    if (dir.length() > 0)
+        set_last_open_dir(qUtf8Printable(dir));
 }
 

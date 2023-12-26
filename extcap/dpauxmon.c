@@ -19,7 +19,6 @@
 
 #include <wsutil/strtoi.h>
 #include <wsutil/filesystem.h>
-#include <wsutil/netlink.h>
 #include <wsutil/privileges.h>
 #include <wsutil/wslog.h>
 #include <writecap/pcapio.h>
@@ -29,7 +28,6 @@
 #include <netlink/genl/ctrl.h>
 #include <netlink/genl/mngt.h>
 
-#include <signal.h>
 #include <errno.h>
 
 #include <linux/genetlink.h>
@@ -43,7 +41,6 @@
 #define DPAUXMON_VERSION_MINOR "1"
 #define DPAUXMON_VERSION_RELEASE "0"
 
-static gboolean run_loop = TRUE;
 FILE* pcap_fp = NULL;
 
 enum {
@@ -97,14 +94,9 @@ static int list_config(char *interface)
 	return EXIT_SUCCESS;
 }
 
-static void exit_from_loop(int signo _U_)
-{
-	run_loop = FALSE;
-}
-
 static int setup_dumpfile(const char* fifo, FILE** fp)
 {
-	guint64 bytes_written = 0;
+	uint64_t bytes_written = 0;
 	int err;
 
 	if (!g_strcmp0(fifo, "-")) {
@@ -118,17 +110,19 @@ static int setup_dumpfile(const char* fifo, FILE** fp)
 		return EXIT_FAILURE;
 	}
 
-	if (!libpcap_write_file_header(*fp, 275, PCAP_SNAPLEN, FALSE, &bytes_written, &err)) {
+	if (!libpcap_write_file_header(*fp, 275, PCAP_SNAPLEN, false, &bytes_written, &err)) {
 		ws_warning("Can't write pcap file header");
 		return EXIT_FAILURE;
 	}
 
+        fflush(*fp);
+
 	return EXIT_SUCCESS;
 }
 
-static int dump_packet(FILE* fp, const char* buf, const guint32 buflen, guint64 ts_usecs)
+static int dump_packet(FILE* fp, const char* buf, const uint32_t buflen, uint64_t ts_usecs)
 {
-	guint64 bytes_written = 0;
+	uint64_t bytes_written = 0;
 	int err;
 	int ret = EXIT_SUCCESS;
 
@@ -334,9 +328,9 @@ static int handle_data(struct nl_cache_ops *unused _U_, struct genl_cmd *cmd _U_
 			 struct genl_info *info, void *arg _U_)
 {
 	unsigned char *data;
-	guint32 data_size;
-	guint64 ts = 0;
-	guint8 packet[21] = { 0x00 };
+	uint32_t data_size;
+	uint64_t ts = 0;
+	uint8_t packet[21] = { 0x00 };
 
 	if (!info->attrs[DPAUXMON_ATTR_DATA])
 		return NL_SKIP;
@@ -357,7 +351,7 @@ static int handle_data(struct nl_cache_ops *unused _U_, struct genl_cmd *cmd _U_
 	memcpy(&packet[2], data, data_size);
 
 	if (dump_packet(pcap_fp, packet, data_size + 2, ts) == EXIT_FAILURE)
-		run_loop = FALSE;
+		extcap_end_application = true;
 
 	return NL_OK;
 }
@@ -407,13 +401,7 @@ static void run_listener(const char* fifo, unsigned int interface_id)
 {
 	int err;
 	int grp;
-	struct sigaction int_handler = { .sa_handler = exit_from_loop };
 	struct nl_cb *socket_cb;
-
-	if (sigaction(SIGINT, &int_handler, 0)) {
-		ws_warning("Can't set signal handler");
-		return;
-	}
 
 	if (setup_dumpfile(fifo, &pcap_fp) == EXIT_FAILURE) {
 		if (pcap_fp)
@@ -469,7 +457,7 @@ static void run_listener(const char* fifo, unsigned int interface_id)
 
 	ws_debug("DisplayPort AUX monitor running on interface %u", interface_id);
 
-	while(run_loop == TRUE) {
+	while(!extcap_end_application) {
 		if ((err = nl_recvmsgs_default(sock)) < 0)
 			ws_warning("Unable to receive message: %s", nl_geterror(err));
 	}
@@ -577,6 +565,11 @@ int main(int argc, char *argv[])
 	}
 
 	if (extcap_base_handle_interface(extcap_conf)) {
+		ret = EXIT_SUCCESS;
+		goto end;
+	}
+
+	if (!extcap_base_register_graceful_shutdown_cb(extcap_conf, NULL)) {
 		ret = EXIT_SUCCESS;
 		goto end;
 	}

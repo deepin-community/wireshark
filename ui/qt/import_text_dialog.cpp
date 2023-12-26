@@ -17,7 +17,7 @@
 #include <epan/prefs.h>
 
 #include "ui/text_import_scanner.h"
-#include "ui/last_open_dir.h"
+#include "ui/util.h"
 #include "ui/alert_box.h"
 #include "ui/help_url.h"
 #include "ui/capture_globals.h"
@@ -185,7 +185,7 @@ ImportTextDialog::~ImportTextDialog()
 
 void ImportTextDialog::loadSettingsFile()
 {
-    QFileInfo fileInfo(QString(get_profile_dir(get_profile_name(), FALSE)), QString(SETTINGS_FILE));
+    QFileInfo fileInfo(gchar_free_to_qstring(get_profile_dir(get_profile_name(), FALSE)), QString(SETTINGS_FILE));
     QFile loadFile(fileInfo.filePath());
 
     if (!fileInfo.exists() || !fileInfo.isFile()) {
@@ -202,7 +202,7 @@ void ImportTextDialog::loadSettingsFile()
 
 void ImportTextDialog::saveSettingsFile()
 {
-    QFileInfo fileInfo(QString(get_profile_dir(get_profile_name(), FALSE)), QString(SETTINGS_FILE));
+    QFileInfo fileInfo(gchar_free_to_qstring(get_profile_dir(get_profile_name(), FALSE)), QString(SETTINGS_FILE));
     QFile saveFile(fileInfo.filePath());
 
     if (fileInfo.exists() && !fileInfo.isFile()) {
@@ -536,7 +536,8 @@ int ImportTextDialog::exec() {
     }
   cleanup_wtap:
     /* g_free checks for null */
-    g_free(params.idb_inf);
+    wtap_free_idb_info(params.idb_inf);
+    wtap_dump_params_cleanup(&params);
     g_free(tmp);
     g_free((gpointer) import_info_.payload);
     switch (import_info_.mode) {
@@ -614,7 +615,7 @@ void ImportTextDialog::on_textFileBrowseButton_clicked()
                use the "last opened" directory saved in the preferences file if
                there was one. */
             /* This is now the default behaviour in file_selection_new() */
-            open_dir = get_last_open_dir();
+            open_dir = get_open_dialog_initial_dir();
             break;
 
         case FO_STYLE_SPECIFIED:

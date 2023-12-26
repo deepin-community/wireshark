@@ -15,6 +15,8 @@
 
 #include "mate.h"
 #include "mate_util.h"
+
+#include <errno.h>
 #include <wsutil/file_util.h>
 
 
@@ -293,7 +295,7 @@ extern AVP* new_avp_from_finfo(const gchar* name, field_info* finfo) {
 
 	new_avp_val->n = scs_subscribe(avp_strings, name);
 
-	repr = fvalue_to_string_repr(NULL, &finfo->value,FTREPR_DISPLAY,finfo->hfinfo->display);
+	repr = fvalue_to_string_repr(NULL, finfo->value, FTREPR_DISPLAY, finfo->hfinfo->display);
 
 	if (repr) {
 		value = scs_subscribe(avp_strings, repr);

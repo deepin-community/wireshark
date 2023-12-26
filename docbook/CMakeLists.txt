@@ -11,9 +11,6 @@
 # - Make the build targets top-level on Windows, similar to the NSIS,
 #   WiX, and PortableApps targets?
 
-find_package( Asciidoctor 1.5 )
-find_package( XSLTPROC )
-
 function(set_docbook_target_properties _target)
 	set_target_properties(${_target} PROPERTIES
 		FOLDER "Documentation"
@@ -25,8 +22,6 @@ set(COMMON_FILES
 	common_src/gpl_appendix.adoc
 	common_src/typographic_conventions.adoc
 )
-
-set(GUIDE_INSTALL_DIRS)
 
 set(WSUG_TITLE "Wireshark User's Guide")
 
@@ -151,8 +146,6 @@ set(WSUG_GRAPHICS
 	wsug_src/images/ws-follow-stream.png
 	wsug_src/images/ws-go-menu.png
 	wsug_src/images/ws-goto-packet.png
-	wsug_src/images/ws-gui-preferences-advanced.png
-	wsug_src/images/ws-gui-preferences.png
 	wsug_src/images/ws-help-menu.png
 	wsug_src/images/ws-list-pane.png # Outdated
 	wsug_src/images/ws-main-toolbar.png
@@ -178,6 +171,18 @@ set(WSUG_GRAPHICS
 	wsug_src/images/ws-packet-range.png
 	wsug_src/images/ws-packet-selected.png
 	wsug_src/images/ws-packet-sep-win.png
+	wsug_src/images/ws-pref-advanced.png
+	wsug_src/images/ws-pref-appearance-columns.png
+	wsug_src/images/ws-pref-appearance-fonts-and-colors.png
+	wsug_src/images/ws-pref-appearance-layout.png
+	wsug_src/images/ws-pref-appearance.png
+	wsug_src/images/ws-pref-capture.png
+	wsug_src/images/ws-pref-expert.png
+	wsug_src/images/ws-pref-filter-buttons.png
+	wsug_src/images/ws-pref-name-resolution.png
+	wsug_src/images/ws-pref-protocols.png
+	wsug_src/images/ws-pref-rsa-keys.png
+	wsug_src/images/ws-pref-statistics.png
 	wsug_src/images/ws-print.png
 	wsug_src/images/ws-save-as-qt5.png
 	wsug_src/images/ws-save-as-win32.png
@@ -315,7 +320,7 @@ ADD_CUSTOM_COMMAND(
 	OUTPUT
 		wsluarm
 	COMMAND ${CMAKE_COMMAND} -E make_directory wsluarm_src
-	COMMAND ${PYTHON_EXECUTABLE}
+	COMMAND ${Python3_EXECUTABLE}
 		${CMAKE_CURRENT_SOURCE_DIR}/make-wsluarm.py
 		--output-directory wsluarm_src
 		${WSLUA_MODULES}
@@ -381,7 +386,6 @@ if(ASCIIDOCTOR_FOUND AND XSLTPROC_EXECUTABLE)
 	)
 	set_docbook_target_properties(user_guide_html)
 	add_dependencies(user_guides user_guide_html)
-	list(APPEND GUIDE_INSTALL_DIRS ${CMAKE_CURRENT_BINARY_DIR}/wsug_html_chunked)
 endif()
 
 if(ASCIIDOCTOR_FOUND AND ASCIIDOCTOR_PDF_EXECUTABLE)
@@ -433,7 +437,6 @@ if(ASCIIDOCTOR_FOUND AND XSLTPROC_EXECUTABLE)
 	)
 	set_docbook_target_properties(developer_guide_html)
 	add_dependencies(developer_guides developer_guide_html)
-	list(APPEND GUIDE_INSTALL_DIRS ${CMAKE_CURRENT_BINARY_DIR}/wsdg_html_chunked)
 endif()
 
 if(ASCIIDOCTOR_FOUND AND ASCIIDOCTOR_PDF_EXECUTABLE)
@@ -458,50 +461,6 @@ if(ASCIIDOCTOR_FOUND AND ASCIIDOCTOR_EPUB_EXECUTABLE)
 	)
 	set_docbook_target_properties(developer_guide_epub)
 	add_dependencies(developer_guides developer_guide_epub)
-endif()
-
-if (GUIDE_INSTALL_DIRS)
-	# The installation location and DOC_DIR in ui/help_url.c must
-	# match.
-	add_custom_target(install_guides
-		COMMAND ${CMAKE_COMMAND} -P
-			${CMAKE_SOURCE_DIR}/cmake/modules/FileInstall.cmake
-			${GUIDE_INSTALL_DIRS}
-			${CMAKE_INSTALL_FULL_DOCDIR}
-		DEPENDS
-			user_guide_html developer_guide_html
-	)
-	set_docbook_target_properties(install_guides)
-endif()
-
-# release_notes: release-notes.html release-notes.txt
-
-add_custom_target( release_notes_html DEPENDS release-notes.html )
-set_docbook_target_properties(release_notes_html)
-add_custom_target( release_notes_txt DEPENDS release-notes.txt )
-set_docbook_target_properties(release_notes_txt)
-
-# Force serial execution so that separate asciidoctor instances don't
-# trip on each other
-# add_dependencies ( release_notes_txt release_notes_html )
-
-add_custom_target( release_notes )
-set_docbook_target_properties(release_notes)
-add_dependencies ( release_notes release_notes_txt release_notes_html )
-
-add_custom_target(
-	news
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		${CMAKE_CURRENT_BINARY_DIR}/release-notes.txt
-		${CMAKE_SOURCE_DIR}/NEWS
-	DEPENDS
-		${CMAKE_CURRENT_BINARY_DIR}/release-notes.txt
-)
-set_docbook_target_properties(news)
-
-if( ASCIIDOCTOR_FOUND )
-	ASCIIDOCTOR2HTML( release-notes.adoc )
-	ASCIIDOCTOR2TXT( release-notes.adoc )
 endif()
 
 # FAQ

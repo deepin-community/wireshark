@@ -30,10 +30,6 @@
 #include "ui/preference_utils.h"
 #include "ui/simple_dialog.h"
 
-#ifdef HAVE_LIBPCAP
-gboolean auto_scroll_live;
-#endif
-
 /* Fill in capture options with values from the preferences */
 void
 prefs_to_capture_opts(void)
@@ -45,7 +41,7 @@ prefs_to_capture_opts(void)
     global_capture_opts.use_pcapng                   = prefs.capture_pcap_ng;
     global_capture_opts.show_info                    = prefs.capture_show_info;
     global_capture_opts.real_time_mode               = prefs.capture_real_time;
-    auto_scroll_live                                 = prefs.capture_auto_scroll;
+    global_capture_opts.update_interval              = prefs.capture_update_interval;
 #endif /* HAVE_LIBPCAP */
 }
 
@@ -242,9 +238,9 @@ column_prefs_custom_resolve(const gchar* custom_field)
     for (guint i = 0; i < g_strv_length(fields); i++) {
         if (fields[i] && *fields[i]) {
             hfi = proto_registrar_get_byname(fields[i]);
-            if (hfi && ((hfi->type == FT_OID) || (hfi->type == FT_REL_OID) || (hfi->type == FT_BOOLEAN) ||
+            if (hfi && ((hfi->type == FT_OID) || (hfi->type == FT_REL_OID) || (hfi->type == FT_ETHER) || (hfi->type == FT_IPv4) || (hfi->type == FT_IPv6) || (hfi->type == FT_FCWWN) || (hfi->type == FT_BOOLEAN) ||
                     ((hfi->strings != NULL) &&
-                     (IS_FT_INT(hfi->type) || IS_FT_UINT(hfi->type)))))
+                     (FT_IS_INT(hfi->type) || FT_IS_UINT(hfi->type)))))
                 {
                     resolve = TRUE;
                     break;
@@ -270,6 +266,7 @@ column_prefs_remove_link(GList *col_link)
     g_free(cfmt->custom_fields);
     g_free(cfmt);
     prefs.col_list = g_list_remove_link(prefs.col_list, col_link);
+    g_list_free_1(col_link);
 }
 
 void

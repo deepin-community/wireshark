@@ -374,8 +374,8 @@ tap_packet_status rtpstream_packet_cb(void *arg, packet_info *pinfo, epan_dissec
     rtpdump_info_t rtpdump_info;
 
     /* gather infos on the stream this packet is part of.
-     * Addresses and strings are read-only and must be duplicated if copied. */
-    rtpstream_id_copy_pinfo(pinfo,&new_stream_id,FALSE);
+     * Shallow copy addresses as this is just for examination. */
+    rtpstream_id_copy_pinfo_shallow(pinfo,&new_stream_id,FALSE);
     new_stream_id.ssrc = rtpinfo->info_sync_src;
 
     if (tapinfo->mode == TAP_ANALYSE) {
@@ -393,6 +393,7 @@ tap_packet_status rtpstream_packet_cb(void *arg, packet_info *pinfo, epan_dissec
         if (!stream_info) {
             /* init info and collect id */
             stream_info = rtpstream_info_malloc_and_init();
+            /* Deep copy addresses for the new entry. */
             rtpstream_id_copy_pinfo(pinfo,&(stream_info->id),FALSE);
             stream_info->id.ssrc = rtpinfo->info_sync_src;
 
@@ -516,7 +517,7 @@ void rtpstream_info_calc_free(rtpstream_info_calc_t *calc)
 /* Init analyse counters in rtpstream_info_t from pinfo */
 void rtpstream_info_analyse_init(rtpstream_info_t *stream_info, const packet_info *pinfo, const struct _rtp_info *rtpinfo)
 {
-    struct _rtp_conversation_info *p_conv_data = NULL;
+    struct _rtp_packet_info *p_packet_data = NULL;
 
     /* reset stream stats */
     stream_info->first_payload_type = rtpinfo->info_payload_type;
@@ -530,9 +531,9 @@ void rtpstream_info_analyse_init(rtpstream_info_t *stream_info, const packet_inf
     stream_info->rtp_stats.reg_pt = PT_UNDEFINED;
 
     /* Get the Setup frame number who set this RTP stream */
-    p_conv_data = (struct _rtp_conversation_info *)p_get_proto_data(wmem_file_scope(), (packet_info *)pinfo, proto_get_id_by_filter_name("rtp"), 0);
-    if (p_conv_data)
-        stream_info->setup_frame_number = p_conv_data->frame_number;
+    p_packet_data = (struct _rtp_packet_info *)p_get_proto_data(wmem_file_scope(), (packet_info *)pinfo, proto_get_id_by_filter_name("rtp"), RTP_CONVERSATION_PROTO_DATA);
+    if (p_packet_data)
+        stream_info->setup_frame_number = p_packet_data->frame_number;
     else
         stream_info->setup_frame_number = 0xFFFFFFFF;
 }

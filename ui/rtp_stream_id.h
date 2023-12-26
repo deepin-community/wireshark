@@ -49,9 +49,15 @@ guint rtpstream_id_to_hash(const rtpstream_id_t *id);
 void rtpstream_id_copy(const rtpstream_id_t *src, rtpstream_id_t *dest);
 
 /**
- * Copy addresses and ports from pinfo
+ * Deep copy addresses and ports from pinfo
  */
 void rtpstream_id_copy_pinfo(const packet_info *pinfo, rtpstream_id_t *dest, gboolean swap_src_dst);
+
+/**
+ * Shallow copy addresses and ports from pinfo
+ * Do not call rtpstream_id_free if you use this function.
+ */
+void rtpstream_id_copy_pinfo_shallow(const packet_info *pinfo, rtpstream_id_t *dest, gboolean swap_src_dst);
 
 /**
  * Free memory allocated for id
@@ -71,6 +77,13 @@ gboolean rtpstream_id_equal(const rtpstream_id_t *id1, const rtpstream_id_t *id2
 
 /**
  * Check if rtpstream_id_t is equal to pinfo
+ * - compare src_addr, dest_addr, src_port, dest_port with pinfo
+ * - if swap_src_dst is true, compare src to dst and vice versa
+ */
+gboolean rtpstream_id_equal_pinfo(const rtpstream_id_t *id, const packet_info *pinfo, bool swap_src_dst);
+
+/**
+ * Check if rtpstream_id_t is equal to pinfo and rtp_info
  * - compare src_addr, dest_addr, src_port, dest_port with pinfo
  * - compare ssrc with rtp_info
  */

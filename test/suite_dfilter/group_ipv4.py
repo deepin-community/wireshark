@@ -2,18 +2,12 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-import unittest
-import fixtures
+import pytest
 from suite_dfilter.dfiltertest import *
 
 
-@fixtures.uses_fixtures
-class case_ipv4(unittest.TestCase):
+class TestDfilterIpv4:
     trace_file = "nfs.pcap"
-
-    def test_uint64_1(self, checkDFilterCount):
-        dfilter = "nfs.fattr3.size == 264032"
-        checkDFilterCount(dfilter, 1)
 
     def test_eq_1(self, checkDFilterCount):
         dfilter = "ip.src == 172.25.100.14"

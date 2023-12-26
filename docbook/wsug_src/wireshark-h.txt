@@ -1,4 +1,4 @@
-Wireshark 4.0.8 (v4.0.8rc0-7-ge4898e0e1677)
+Wireshark 4.2.0 (v4.2.0rc0-25-gfc4dc545fc45)
 Interactively dump and analyze network traffic.
 See https://www.wireshark.org for more information.
 
@@ -12,9 +12,6 @@ Capture interface:
                            packet snapshot length (def: appropriate maximum)
   -p, --no-promiscuous-mode
                            don't capture in promiscuous mode
-  -k                       start capturing immediately (def: do nothing)
-  -S                       update packet display when new packets are captured
-  -l                       turn on automatic scrolling while -S is in use
   -I, --monitor-mode       capture in monitor mode, if available
   -B <buffer size>, --buffer-size <buffer size>
                            size of kernel buffer (def: 2MB)
@@ -26,6 +23,11 @@ Capture interface:
                            print list of link-layer types of iface and exit
   --list-time-stamp-types  print list of timestamp types for iface and exit
 
+Capture display:
+  -k                       start capturing immediately (def: do nothing)
+  -S                       update packet display when new packets are captured
+  --update-interval        interval between updates with new packets (def: 100ms)
+  -l                       turn on automatic scrolling while -S is in use
 Capture stop conditions:
   -c <packet count>        stop after n packets (def: infinite)
   -a <autostop cond.> ..., --autostop <autostop cond.> ...
@@ -57,6 +59,11 @@ Processing:
                            enable dissection of proto_name
   --disable-protocol <proto_name>
                            disable dissection of proto_name
+  --only-protocols <proto_name>
+                           Only enable dissection of these protocols, comma
+                           separated. Disable everything else
+  --disable-all-protocols
+                           Disable dissection of all protocols
   --enable-heuristic <short_name>
                            enable dissection of heuristic protocol
   --disable-heuristic <short_name>
@@ -71,7 +78,7 @@ User interface:
   -J <jump filter>         jump to the first packet matching the (display)
                            filter
   -j                       search backwards for a matching packet after "-J"
-  -t a|ad|adoy|d|dd|e|r|u|ud|udoy
+  -t (a|ad|adoy|d|dd|e|r|u|ud|udoy)[.[N]]|.[N]
                            format of time stamps (def: r: rel. to first)
   -u s|hms                 output format of seconds (def: s: seconds)
   -X <key>:<value>         eXtension options, see man page for details
@@ -87,9 +94,11 @@ Output:
 Diagnostic output:
   --log-level <level>      sets the active log level ("critical", "warning", etc.)
   --log-fatal <level>      sets level to abort the program ("critical" or "warning")
-  --log-domains <[!]list>  comma separated list of the active log domains
-  --log-debug <[!]list>    comma separated list of domains with "debug" level
-  --log-noisy <[!]list>    comma separated list of domains with "noisy" level
+  --log-domains <[!]list>  comma-separated list of the active log domains
+  --log-fatal-domains <list>
+                           list of domains that cause the program to abort
+  --log-debug <[!]list>    list of domains with "debug" level
+  --log-noisy <[!]list>    list of domains with "noisy" level
   --log-file <path>        file to output messages to (in addition to stderr)
 
 Miscellaneous:

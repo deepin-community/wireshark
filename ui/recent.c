@@ -11,24 +11,28 @@
 
 #include "config.h"
 
+#include <wireshark.h>
+
 #include <stdlib.h>
-#include <string.h>
 #include <errno.h>
 
-#include "capture_opts.h"
+#ifdef HAVE_PCAP_REMOTE
+#include <capture_opts.h>
+#endif
 #include <wsutil/filesystem.h>
 #include <epan/prefs.h>
 #include <epan/prefs-int.h>
 #include <epan/column.h>
 #include <epan/value_string.h>
 
-#include "ui/last_open_dir.h"
+#include "ui/util.h"
 #include "ui/recent.h"
 #include "ui/recent_utils.h"
 #include "ui/packet_list_utils.h"
 #include "ui/simple_dialog.h"
 
 #include <wsutil/file_util.h>
+#include <wsutil/strtoi.h>
 
 #define RECENT_KEY_MAIN_TOOLBAR_SHOW            "gui.toolbar_main_show"
 #define RECENT_KEY_FILTER_TOOLBAR_SHOW          "gui.filter_toolbar_show"
@@ -39,6 +43,7 @@
 #define RECENT_KEY_PACKET_DIAGRAM_SHOW          "gui.packet_diagram_show"
 #define RECENT_KEY_STATUSBAR_SHOW               "gui.statusbar_show"
 #define RECENT_KEY_PACKET_LIST_COLORIZE         "gui.packet_list_colorize"
+#define RECENT_KEY_CAPTURE_AUTO_SCROLL          "capture.auto_scroll"
 #define RECENT_GUI_TIME_FORMAT                  "gui.time_format"
 #define RECENT_GUI_TIME_PRECISION               "gui.time_precision"
 #define RECENT_GUI_SECONDS_FORMAT               "gui.seconds_format"
@@ -55,8 +60,6 @@
 #define RECENT_GUI_GEOMETRY_LEFTALIGN_ACTIONS   "gui.geometry_leftalign_actions"
 #define RECENT_GUI_GEOMETRY_MAIN_UPPER_PANE     "gui.geometry_main_upper_pane"
 #define RECENT_GUI_GEOMETRY_MAIN_LOWER_PANE     "gui.geometry_main_lower_pane"
-#define RECENT_GUI_GEOMETRY_STATUS_PANE_LEFT    "gui.geometry_status_pane"
-#define RECENT_GUI_GEOMETRY_STATUS_PANE_RIGHT   "gui.geometry_status_pane_right"
 #define RECENT_GUI_GEOMETRY_WLAN_STATS_PANE     "gui.geometry_status_wlan_stats_pane"
 #define RECENT_LAST_USED_PROFILE                "gui.last_used_profile"
 #define RECENT_GUI_FILEOPEN_REMEMBERED_DIR      "gui.fileopen_remembered_dir"
@@ -72,6 +75,9 @@
 #define RECENT_GUI_SEARCH_CHAR_SET              "gui.search_char_set"
 #define RECENT_GUI_SEARCH_CASE_SENSITIVE        "gui.search_case_sensitive"
 #define RECENT_GUI_SEARCH_TYPE                  "gui.search_type"
+#define RECENT_GUI_FOLLOW_SHOW                  "gui.follow_show"
+#define RECENT_GUI_SHOW_BYTES_DECODE            "gui.show_bytes_decode"
+#define RECENT_GUI_SHOW_BYTES_SHOW              "gui.show_bytes_show"
 
 #define RECENT_GUI_GEOMETRY                   "gui.geom."
 
@@ -88,22 +94,30 @@ static const value_string ts_type_values[] = {
     { TS_ABSOLUTE,             "ABSOLUTE"           },
     { TS_ABSOLUTE_WITH_YMD,    "ABSOLUTE_WITH_YMD"  },
     { TS_ABSOLUTE_WITH_YDOY,   "ABSOLUTE_WITH_YDOY" },
-    { TS_ABSOLUTE_WITH_YMD,    "ABSOLUTE_WITH_DATE" },  /* Backward compability */
+    { TS_ABSOLUTE_WITH_YMD,    "ABSOLUTE_WITH_DATE" },  /* Backward compatibility */
     { TS_DELTA,                "DELTA"              },
     { TS_DELTA_DIS,            "DELTA_DIS"          },
     { TS_EPOCH,                "EPOCH"              },
     { TS_UTC,                  "UTC"                },
     { TS_UTC_WITH_YMD,         "UTC_WITH_YMD"       },
     { TS_UTC_WITH_YDOY,        "UTC_WITH_YDOY"      },
-    { TS_UTC_WITH_YMD,         "UTC_WITH_DATE"      },  /* Backward compability */
+    { TS_UTC_WITH_YMD,         "UTC_WITH_DATE"      },  /* Backward compatibility */
     { 0, NULL }
 };
 
+/*
+ * NOTE: all values other than TS_PREC_AUTO are the number of digits
+ * of precision.
+ *
+ * We continue to use the old names for values where they may have
+ * been written to the recent file by previous releases.  For other
+ * values, we just write it out numerically.
+ */
 static const value_string ts_precision_values[] = {
     { TS_PREC_AUTO,            "AUTO" },
     { TS_PREC_FIXED_SEC,       "SEC"  },
-    { TS_PREC_FIXED_DSEC,      "DSEC" },
-    { TS_PREC_FIXED_CSEC,      "CSEC" },
+    { TS_PREC_FIXED_100_MSEC,  "DSEC" },
+    { TS_PREC_FIXED_10_MSEC,   "CSEC" },
     { TS_PREC_FIXED_MSEC,      "MSEC" },
     { TS_PREC_FIXED_USEC,      "USEC" },
     { TS_PREC_FIXED_NSEC,      "NSEC" },
@@ -119,6 +133,8 @@ static const value_string ts_seconds_values[] = {
 static const value_string bytes_view_type_values[] = {
     { BYTES_HEX,    "HEX"  },
     { BYTES_BITS,   "BITS" },
+    { BYTES_DEC,    "DEC" },
+    { BYTES_OCT,    "OCT" },
     { 0, NULL }
 };
 
@@ -148,6 +164,34 @@ static const value_string search_type_values[] = {
     { SEARCH_TYPE_HEX_VALUE,      "HEX_VALUE" },
     { SEARCH_TYPE_STRING,         "STRING" },
     { SEARCH_TYPE_REGEX,          "REGEX" },
+    { 0, NULL }
+};
+
+static const value_string bytes_show_values[] = {
+    { SHOW_ASCII,         "ASCII" },
+    { SHOW_ASCII_CONTROL, "ASCII_CONTROL" },
+    { SHOW_CARRAY,        "C_ARRAYS" },
+    { SHOW_EBCDIC,        "EBCDIC" },
+    { SHOW_HEXDUMP,       "HEX_DUMP" },
+    { SHOW_HTML,          "HTML" },
+    { SHOW_IMAGE,         "IMAGE" },
+    { SHOW_JSON,          "JSON" },
+    { SHOW_RAW,           "RAW" },
+    { SHOW_RUSTARRAY,     "RUST_ARRAY" },
+    { SHOW_CODEC,         "UTF-8" },
+    // Other codecs are generated at runtime
+    { SHOW_YAML,          "YAML"},
+    { 0, NULL }
+};
+
+static const value_string show_bytes_decode_values[] = {
+    { DecodeAsNone,            "NONE" },
+    { DecodeAsBASE64,          "BASE64" },
+    { DecodeAsCompressed,      "COMPRESSED" },
+    { DecodeAsHexDigits,       "HEX_DIGITS" },
+    { DecodeAsPercentEncoding, "PERCENT_ENCODING" },
+    { DecodeAsQuotedPrintable, "QUOTED_PRINTABLE" },
+    { DecodeAsROT13,           "ROT13"},
     { 0, NULL }
 };
 
@@ -727,19 +771,6 @@ write_recent(void)
             RECENT_GUI_GEOMETRY_LEFTALIGN_ACTIONS,
             recent.gui_geometry_leftalign_actions);
 
-    fprintf(rf, "\n# Statusbar left pane size.\n");
-    fprintf(rf, "# Decimal number.\n");
-    if (recent.gui_geometry_status_pane_left != 0) {
-        fprintf(rf, RECENT_GUI_GEOMETRY_STATUS_PANE_LEFT ": %d\n",
-                recent.gui_geometry_status_pane_left);
-    }
-    fprintf(rf, "\n# Statusbar middle pane size.\n");
-    fprintf(rf, "# Decimal number.\n");
-    if (recent.gui_geometry_status_pane_right != 0) {
-        fprintf(rf, RECENT_GUI_GEOMETRY_STATUS_PANE_RIGHT ": %d\n",
-                recent.gui_geometry_status_pane_right);
-    }
-
     fprintf(rf, "\n# Last used Configuration Profile.\n");
     fprintf(rf, RECENT_LAST_USED_PROFILE ": %s\n", get_profile_name());
 
@@ -865,13 +896,57 @@ write_profile_recent(void)
             RECENT_KEY_PACKET_LIST_COLORIZE,
             recent.packet_list_colorize);
 
+    write_recent_boolean(rf, "Auto scroll packet list when capturing",
+            RECENT_KEY_CAPTURE_AUTO_SCROLL,
+            recent.capture_auto_scroll);
+
     write_recent_enum(rf, "Timestamp display format",
             RECENT_GUI_TIME_FORMAT, ts_type_values,
             recent.gui_time_format);
 
-    write_recent_enum(rf, "Timestamp display precision",
-            RECENT_GUI_TIME_PRECISION, ts_precision_values,
-            recent.gui_time_precision);
+    /*
+     * The value of this item is either TS_PREC_AUTO, which is a
+     * negative number meaning "pick the display precision based
+     * on the time stamp precision of the packet", or is a numerical
+     * value giving the number of decimal places to display, from 0
+     * to WS_TSPREC_MAX.
+     *
+     * It used to be that not all values between 0 and 9 (the maximum
+     * precision back then) were supported, and that names were
+     * written out to the recent file.
+     *
+     * For backwards compatibility with those older versions of
+     * Wireshark, write out the names for those values, and the
+     * raw number for other values.
+     */
+    {
+        const char *if_invalid = NULL;
+        const value_string *valp;
+        const gchar *str_value;
+
+        fprintf(rf, "\n# %s.\n", "Timestamp display precision");
+        fprintf(rf, "# One of: ");
+        valp = ts_precision_values;
+        while (valp->strptr != NULL) {
+            if (if_invalid == NULL)
+                if_invalid = valp->strptr;
+            fprintf(rf, "%s", valp->strptr);
+            valp++;
+            if (valp->strptr != NULL)
+                fprintf(rf, ", ");
+        }
+        fprintf(rf, ", or a number between 0 and %d\n", WS_TSPREC_MAX);
+
+        str_value = try_val_to_str(recent.gui_time_precision, ts_precision_values);
+        if (str_value != NULL)
+            fprintf(rf, "%s: %s\n", RECENT_GUI_TIME_PRECISION, str_value);
+        else {
+            if (recent.gui_time_precision >= 0 && recent.gui_time_precision < WS_TSPREC_MAX)
+                fprintf(rf, "%s: %d\n", RECENT_GUI_TIME_PRECISION, recent.gui_time_precision);
+            else
+                fprintf(rf, "%s: %s\n", RECENT_GUI_TIME_PRECISION, if_invalid != NULL ? if_invalid : "Unknown");
+        }
+    }
 
     write_recent_enum(rf, "Seconds display format",
             RECENT_GUI_SECONDS_FORMAT, ts_seconds_values,
@@ -897,6 +972,18 @@ write_profile_recent(void)
     write_recent_boolean(rf, "Allow hover selection in byte view",
             RECENT_GUI_ALLOW_HOVER_SELECTION,
             recent.gui_allow_hover_selection);
+
+    write_recent_enum(rf, "Follow stream show as",
+            RECENT_GUI_FOLLOW_SHOW, bytes_show_values,
+            recent.gui_follow_show);
+
+    write_recent_enum(rf, "Show packet bytes decode as",
+            RECENT_GUI_SHOW_BYTES_DECODE, show_bytes_decode_values,
+            recent.gui_show_bytes_decode);
+
+    write_recent_enum(rf, "Show packet bytes show as",
+            RECENT_GUI_SHOW_BYTES_SHOW, bytes_show_values,
+            recent.gui_show_bytes_show);
 
     fprintf(rf, "\n# Main window upper (or leftmost) pane size.\n");
     fprintf(rf, "# Decimal number.\n");
@@ -1006,22 +1093,6 @@ read_set_recent_common_pair_static(gchar *key, const gchar *value,
         if (num <= 0)
             return PREFS_SET_SYNTAX_ERR;      /* number must be positive */
         recent.gui_geometry_main_height = (gint)num;
-    } else if (strcmp(key, RECENT_GUI_GEOMETRY_STATUS_PANE_RIGHT) == 0) {
-        num = strtol(value, &p, 0);
-        if (p == value || *p != '\0')
-            return PREFS_SET_SYNTAX_ERR;      /* number was bad */
-        if (num <= 0)
-            return PREFS_SET_SYNTAX_ERR;      /* number must be positive */
-        recent.gui_geometry_status_pane_right = (gint)num;
-        recent.has_gui_geometry_status_pane = TRUE;
-    } else if (strcmp(key, RECENT_GUI_GEOMETRY_STATUS_PANE_LEFT) == 0) {
-        num = strtol(value, &p, 0);
-        if (p == value || *p != '\0')
-            return PREFS_SET_SYNTAX_ERR;      /* number was bad */
-        if (num <= 0)
-            return PREFS_SET_SYNTAX_ERR;      /* number must be positive */
-        recent.gui_geometry_status_pane_left = (gint)num;
-        recent.has_gui_geometry_status_pane = TRUE;
     } else if (strcmp(key, RECENT_LAST_USED_PROFILE) == 0) {
         if ((strcmp(value, DEFAULT_PROFILE) != 0) && profile_exists (value, FALSE)) {
             set_profile_name (value);
@@ -1068,6 +1139,7 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
                             gboolean return_range_errors _U_)
 {
     long num;
+    gint32 num_int32;
     char *p;
     GList *col_l, *col_l_elt;
     col_width_data *cfmt;
@@ -1093,12 +1165,34 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
         parse_recent_boolean(value, &recent.statusbar_show);
     } else if (strcmp(key, RECENT_KEY_PACKET_LIST_COLORIZE) == 0) {
         parse_recent_boolean(value, &recent.packet_list_colorize);
+    } else if (strcmp(key, RECENT_KEY_CAPTURE_AUTO_SCROLL) == 0) {
+        parse_recent_boolean(value, &recent.capture_auto_scroll);
     } else if (strcmp(key, RECENT_GUI_TIME_FORMAT) == 0) {
         recent.gui_time_format = (ts_type)str_to_val(value, ts_type_values,
             is_packet_configuration_namespace() ? TS_RELATIVE : TS_ABSOLUTE);
     } else if (strcmp(key, RECENT_GUI_TIME_PRECISION) == 0) {
-        recent.gui_time_precision =
-            (ts_precision)str_to_val(value, ts_precision_values, TS_PREC_AUTO);
+        /*
+         * The value of this item is either TS_PREC_AUTO, which is a
+         * negative number meaning "pick the display precision based
+         * on the time stamp precision of the packet", or is a numerical
+         * value giving the number of decimal places to display, from 0
+         * to WS_TSPREC_MAX.
+         *
+         * It used to be that not all values between 0 and 9 (the maximum
+         * precision back then) were supported, and that names were
+         * written out to the recent file.
+         *
+         * If the string value is a valid number in that range, use
+         * that number, otherwise look it up in the table of names,
+         * and, if that fails, set it to TS_PREC_AUTO.
+         */
+        if (ws_strtoi32(value, NULL, &num_int32) && num_int32 >= 0 &&
+            num_int32 <= WS_TSPREC_MAX) {
+            recent.gui_time_precision = num_int32;
+        } else {
+            recent.gui_time_precision =
+                (ts_precision)str_to_val(value, ts_precision_values, TS_PREC_AUTO);
+        }
     } else if (strcmp(key, RECENT_GUI_SECONDS_FORMAT) == 0) {
         recent.gui_seconds_format =
             (ts_seconds_type)str_to_val(value, ts_seconds_values, TS_SECONDS_DEFAULT);
@@ -1117,6 +1211,12 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
         parse_recent_boolean(value, &recent.gui_packet_diagram_field_values);
     } else if (strcmp(key, RECENT_GUI_ALLOW_HOVER_SELECTION) == 0) {
         parse_recent_boolean(value, &recent.gui_allow_hover_selection);
+    } else if (strcmp(key, RECENT_GUI_FOLLOW_SHOW) == 0) {
+        recent.gui_follow_show = (bytes_show_type)str_to_val(value, bytes_show_values, SHOW_ASCII);
+    } else if (strcmp(key, RECENT_GUI_SHOW_BYTES_DECODE) == 0) {
+        recent.gui_show_bytes_decode = (bytes_decode_type)str_to_val(value, show_bytes_decode_values, DecodeAsNone);
+    } else if (strcmp(key, RECENT_GUI_SHOW_BYTES_SHOW) == 0) {
+        recent.gui_show_bytes_show = (bytes_show_type)str_to_val(value, bytes_show_values, SHOW_ASCII);
     } else if (strcmp(key, RECENT_GUI_GEOMETRY_MAIN_MAXIMIZED) == 0) {
         parse_recent_boolean(value, &recent.gui_geometry_main_maximized);
     } else if (strcmp(key, RECENT_GUI_GEOMETRY_MAIN_UPPER_PANE) == 0) {
@@ -1126,7 +1226,6 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
         if (num <= 0)
             return PREFS_SET_SYNTAX_ERR;      /* number must be positive */
         recent.gui_geometry_main_upper_pane = (gint)num;
-        recent.has_gui_geometry_main_upper_pane = TRUE;
     } else if (strcmp(key, RECENT_GUI_GEOMETRY_MAIN_LOWER_PANE) == 0) {
         num = strtol(value, &p, 0);
         if (p == value || *p != '\0')
@@ -1134,7 +1233,6 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
         if (num <= 0)
             return PREFS_SET_SYNTAX_ERR;      /* number must be positive */
         recent.gui_geometry_main_lower_pane = (gint)num;
-        recent.has_gui_geometry_main_lower_pane = TRUE;
     } else if (strcmp(key, RECENT_GUI_CONVERSATION_TABS) == 0) {
         recent.conversation_tabs = prefs_get_string_list(value);
     } else if (strcmp(key, RECENT_GUI_CONVERSATION_TABS_COLUMNS) == 0) {
@@ -1157,6 +1255,8 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
         /* Check to make sure all column formats are valid.  */
         col_l_elt = g_list_first(col_l);
         while (col_l_elt) {
+            fmt_data cfmt_check;
+
             /* Make sure the format isn't empty.  */
             if (strcmp((const char *)col_l_elt->data, "") == 0) {
                 /* It is.  */
@@ -1164,13 +1264,19 @@ read_set_recent_pair_static(gchar *key, const gchar *value,
                 return PREFS_SET_SYNTAX_ERR;
             }
 
+            /* Some predefined columns have been migrated to use custom
+             * columns. We'll convert these silently here */
+            try_convert_to_custom_column((char **)&col_l_elt->data);
+
             /* Check the format.  */
-            if (strncmp((const char *)col_l_elt->data, cust_format, cust_format_len) != 0) {
-                if (get_column_format_from_str((const gchar *)col_l_elt->data) == -1) {
-                    /* It's not a valid column format.  */
-                    prefs_clear_string_list(col_l);
-                    return PREFS_SET_SYNTAX_ERR;
-                }
+            if (!parse_column_format(&cfmt_check, (char *)col_l_elt->data)) {
+                /* It's not a valid column format.  */
+                prefs_clear_string_list(col_l);
+                return PREFS_SET_SYNTAX_ERR;
+            }
+            if (cfmt_check.fmt == COL_CUSTOM) {
+                /* We don't need the custom column field on this pass. */
+                g_free(cfmt_check.custom_fields);
             }
 
             /* Go past the format.  */
@@ -1316,8 +1422,6 @@ recent_read_static(char **rf_path_return, int *rf_errno_return)
 
     recent.gui_geometry_leftalign_actions = FALSE;
 
-    recent.gui_geometry_status_pane_left  = (DEF_WIDTH/3);
-    recent.gui_geometry_status_pane_right = (DEF_WIDTH/3);
     recent.gui_geometry_wlan_stats_pane   = 200;
 
     recent.privs_warn_if_elevated = TRUE;
@@ -1369,6 +1473,7 @@ recent_read_profile_static(char **rf_path_return, int *rf_errno_return)
     recent.packet_diagram_show       = TRUE;
     recent.statusbar_show            = TRUE;
     recent.packet_list_colorize      = TRUE;
+    recent.capture_auto_scroll       = TRUE;
     recent.gui_time_format           = TS_RELATIVE;
     recent.gui_time_precision        = TS_PREC_AUTO;
     recent.gui_seconds_format        = TS_SECONDS_DEFAULT;
@@ -1376,14 +1481,13 @@ recent_read_profile_static(char **rf_path_return, int *rf_errno_return)
     recent.gui_bytes_view            = BYTES_HEX;
     recent.gui_bytes_encoding        = BYTES_ENC_FROM_PACKET;
     recent.gui_allow_hover_selection = TRUE;
+    recent.gui_follow_show           = SHOW_ASCII;
+    recent.gui_show_bytes_decode     = DecodeAsNone;
+    recent.gui_show_bytes_show       = SHOW_ASCII;
 
     /* pane size of zero will autodetect */
     recent.gui_geometry_main_upper_pane   = 0;
     recent.gui_geometry_main_lower_pane   = 0;
-
-    recent.has_gui_geometry_main_upper_pane = TRUE;
-    recent.has_gui_geometry_main_lower_pane = TRUE;
-    recent.has_gui_geometry_status_pane     = TRUE;
 
     if (recent.col_width_list) {
         free_col_width_info(&recent);

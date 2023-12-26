@@ -35,8 +35,8 @@ void add_libssh_info(extcap_parameters * extcap_conf)
 ssh_session create_ssh_connection(const ssh_params_t* ssh_params, char** err_info)
 {
 	ssh_session sshs;
-	gchar* username = NULL;
-	guint port;
+	char* username = NULL;
+	unsigned port;
 
 	/* Open session and set options */
 	sshs = ssh_new();
@@ -124,7 +124,7 @@ ssh_session create_ssh_connection(const ssh_params_t* ssh_params, char** err_inf
 	}
 
 	/* Workaround: it may happen that libssh closes socket in meantime and any next ssh_ call fails so we should detect it in advance */
-	if (ssh_get_fd(sshs) != -1) {
+	if (ssh_get_fd(sshs) != (socket_t)-1) {
 		/* If a password has been provided and all previous attempts failed, try to use it */
 		if (ssh_params->password) {
 			ws_info("Connecting using password...");
@@ -139,7 +139,7 @@ ssh_session create_ssh_connection(const ssh_params_t* ssh_params, char** err_inf
 	}
 
 	/* Workaround: it may happen that libssh closes socket in meantime and any next ssh_ call fails so we should detect it in advance */
-	if (ssh_get_fd(sshs) != -1) {
+	if (ssh_get_fd(sshs) != (socket_t)-1) {
 		/* Try to authenticate using standard public key */
 		ws_info("Connecting using standard public key...");
 		if (ssh_userauth_publickey_auto(sshs, NULL, NULL) == SSH_AUTH_SUCCESS) {
@@ -163,13 +163,14 @@ failure:
 
 int ssh_channel_printf(ssh_channel channel, const char* fmt, ...)
 {
-	gchar* buf;
+	char* buf;
 	va_list arg;
 	int ret = EXIT_SUCCESS;
 
 	va_start(arg, fmt);
 	buf = ws_strdup_vprintf(fmt, arg);
-	if (ssh_channel_write(channel, buf, (guint32)strlen(buf)) == SSH_ERROR)
+	ws_debug("%s", buf);
+	if (ssh_channel_write(channel, buf, (uint32_t)strlen(buf)) == SSH_ERROR)
 		ret = EXIT_FAILURE;
 	va_end(arg);
 	g_free(buf);

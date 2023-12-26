@@ -20,13 +20,7 @@ ManifestDPIAware true
 
 !include "wireshark-config.nsh"
 
-!if ${WIRESHARK_TARGET_PLATFORM} == "win32"
-!define BITS 32
-!else
-!define BITS 64
-!endif
-
-!define DISPLAY_NAME "${PROGRAM_NAME} ${VERSION} ${BITS}-bit"
+!define DISPLAY_NAME "${PROGRAM_NAME} ${VERSION} ${WIRESHARK_TARGET_PLATFORM}"
 Name "${DISPLAY_NAME}"
 
 !define PROGRAM_FULL_NAME "The ${PROGRAM_NAME} Network Protocol Analyzer"
@@ -40,7 +34,7 @@ VIAddVersionKey "CompanyName" "${PROGRAM_NAME} development team"
 ; NSIS handles U+00a9 but not a UTF-8 encoded copyright symbol.
 VIAddVersionKey "LegalCopyright" "${U+00a9} Gerald Combs and many others"
 VIAddVersionKey "LegalTrademarks" "Wireshark and the 'fin' logo are registered trademarks of the Wireshark Foundation"
-VIAddVersionKey "FileDescription" "${PROGRAM_NAME} installer for ${BITS}-bit Windows"
+VIAddVersionKey "FileDescription" "${PROGRAM_NAME} installer for Windows on ${WIRESHARK_TARGET_PLATFORM}"
 VIAddVersionKey "Language" "English"
 VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
 VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
@@ -129,6 +123,7 @@ Exec '"$SYSDIR\ie4uinit.exe" -ClearIconCache'
   Push ".apc"
   Push ".acp"
   Push ".5vw"
+  Push ".rtp"
 !macroend
 
 !macro IsWiresharkRunning

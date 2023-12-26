@@ -84,7 +84,7 @@ void MainWindow::layoutPanes()
 
     // Reparent all widgets and add them back in the proper order below.
     // This hides each widget as well.
-    packet_list_->freeze(); // Clears tree, byte view tabs, and diagram.
+    bool frozen = packet_list_->freeze(); // Clears tree, byte view tabs, and diagram.
     packet_list_->setParent(main_stack_);
     proto_tree_->setParent(main_stack_);
     byte_view_tab_->setParent(main_stack_);
@@ -151,6 +151,12 @@ void MainWindow::layoutPanes()
     parents[1]->addWidget(getLayoutWidget(prefs.gui_layout_content_2));
     parents[2]->addWidget(getLayoutWidget(prefs.gui_layout_content_3));
 
+    if (frozen) {
+        // Show the packet list here to prevent pending resize events changing columns
+        // when the packet list is set as current widget for the first time.
+        packet_list_->show();
+    }
+
     const QList<QWidget *> ms_children = master_split_.findChildren<QWidget *>();
 
     extra_split_.setVisible(ms_children.contains(&extra_split_));
@@ -159,11 +165,9 @@ void MainWindow::layoutPanes()
     byte_view_tab_->setVisible(ms_children.contains(byte_view_tab_) && recent.byte_view_show);
     packet_diagram_->setVisible(ms_children.contains(packet_diagram_) && recent.packet_diagram_show);
 
-    // Show the packet list here to prevent pending resize events changing columns
-    // when the packet list is set as current widget for the first time.
-    packet_list_->show();
-
-    packet_list_->thaw(true);
+    if (frozen) {
+        packet_list_->thaw(true);
+    }
     cur_layout_ = new_layout;
 }
 

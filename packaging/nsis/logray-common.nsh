@@ -20,9 +20,7 @@ ManifestDPIAware true
 
 !include "logray-config.nsh"
 
-!define BITS 64
-
-!define DISPLAY_NAME "${PROGRAM_NAME} ${VERSION} ${BITS}-bit"
+!define DISPLAY_NAME "${PROGRAM_NAME} ${VERSION} ${WIRESHARK_TARGET_PLATFORM}"
 Name "${DISPLAY_NAME}"
 
 !define PROGRAM_FULL_NAME "The ${PROGRAM_NAME} Log Analyzer"
@@ -31,12 +29,12 @@ Name "${DISPLAY_NAME}"
 !define UNINSTALLER_NAME "uninstall-logray.exe"
 
 VIAddVersionKey "ProductName" "${PROGRAM_NAME}"
-VIAddVersionKey "Comments" "It's a great product with a great story to tell. I'm pumped!"
+VIAddVersionKey "Comments" "My manta ray is all right."
 VIAddVersionKey "CompanyName" "${PROGRAM_NAME} development team"
 ; NSIS handles U+00a9 but not a UTF-8 encoded copyright symbol.
 VIAddVersionKey "LegalCopyright" "${U+00a9} Gerald Combs and many others"
 VIAddVersionKey "LegalTrademarks" "Logray and the 'ray' logo are registered trademarks"
-VIAddVersionKey "FileDescription" "${PROGRAM_NAME} installer for ${BITS}-bit Windows"
+VIAddVersionKey "FileDescription" "${PROGRAM_NAME} installer for Windows on ${WIRESHARK_TARGET_PLATFORM}"
 VIAddVersionKey "Language" "English"
 VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
 VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"

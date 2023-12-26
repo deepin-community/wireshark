@@ -294,12 +294,12 @@ Iax2AnalysisDialog::Iax2AnalysisDialog(QWidget &parent, CaptureFile &cf) :
     const gchar filter_text[] = "iax2 && (ip || ipv6)";
 #endif
     dfilter_t *sfcode;
-    gchar *err_msg;
+    df_error_t *df_err;
 
     /* Try to compile the filter. */
-    if (!dfilter_compile(filter_text, &sfcode, &err_msg)) {
-        err_str_ = QString(err_msg);
-        g_free(err_msg);
+    if (!dfilter_compile(filter_text, &sfcode, &df_err)) {
+        err_str_ = QString(df_err->msg);
+        df_error_free(&df_err);
         updateWidgets();
         return;
     }
@@ -552,7 +552,7 @@ void Iax2AnalysisDialog::on_actionSaveGraph_triggered()
     ui->tabWidget->setCurrentWidget(ui->graphTab);
 
     QString file_name, extension;
-    QDir path(mainApp->lastOpenDir());
+    QDir path(mainApp->openDialogInitialDir());
     QString pdf_filter = tr("Portable Document Format (*.pdf)");
     QString png_filter = tr("Portable Network Graphics (*.png)");
     QString bmp_filter = tr("Windows Bitmap (*.bmp)");
@@ -878,7 +878,7 @@ void Iax2AnalysisDialog::saveAudio(Iax2AnalysisDialog::StreamDirection direction
     }
     QString sel_filter;
     QString file_path = WiresharkFileDialog::getSaveFileName(
-                this, caption, mainApp->lastOpenDir().absoluteFilePath("Saved RTP Audio.au"),
+                this, caption, mainApp->openDialogInitialDir().absoluteFilePath("Saved RTP Audio.au"),
                 ext_filter, &sel_filter);
 
     if (file_path.isEmpty()) return;
@@ -1148,7 +1148,7 @@ void Iax2AnalysisDialog::saveCsv(Iax2AnalysisDialog::StreamDirection direction)
     }
 
     QString file_path = WiresharkFileDialog::getSaveFileName(
-                this, caption, mainApp->lastOpenDir().absoluteFilePath("RTP Packet Data.csv"),
+                this, caption, mainApp->openDialogInitialDir().absoluteFilePath("RTP Packet Data.csv"),
                 tr("Comma-separated values (*.csv)"));
 
     if (file_path.isEmpty()) return;

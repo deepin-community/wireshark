@@ -40,6 +40,7 @@ class PacketList : public QTreeView
     Q_OBJECT
 public:
     explicit PacketList(QWidget *parent = 0);
+    ~PacketList();
 
     enum SummaryCopyType {
         CopyAsText,
@@ -54,10 +55,11 @@ public:
 
     /** Disable and clear the packet list.
      *
+     * @param keep_current_frame If true, keep the selected frame.
      * Disable packet list widget updates, clear the detail and byte views,
      * and disconnect the model.
      */
-    void freeze();
+    bool freeze(bool keep_current_frame = false);
     /** Enable and restore the packet list.
      *
      * Enable packet list widget updates and reconnect the model.
@@ -65,7 +67,7 @@ public:
      * @param restore_selection If true, redissect the previously selected
      * packet. This includes filling in the detail and byte views.
      */
-    void thaw(bool restore_selection = false);
+    bool thaw(bool restore_selection = false);
     void clear();
     void writeRecent(FILE *rf);
     bool contextMenuActive();
@@ -78,7 +80,7 @@ public:
     void deleteCommentsFromPackets();
     void deleteAllPacketComments();
     void setVerticalAutoScroll(bool enabled = true);
-    void setCaptureInProgress(bool in_progress = false) { capture_in_progress_ = in_progress; tail_at_end_ = in_progress; }
+    void setCaptureInProgress(bool in_progress = false, bool auto_scroll = true) { capture_in_progress_ = in_progress; tail_at_end_ = in_progress && auto_scroll; }
     void captureFileReadFinished();
     void resetColumns();
     bool haveNextHistory(bool update_cur = false);
@@ -86,6 +88,7 @@ public:
 
     frame_data * getFDataForRow(int row) const;
 
+    bool uniqueSelectActive();
     bool multiSelectActive();
     QList<int> selectedRows(bool useFrameNum = false);
 
@@ -126,6 +129,7 @@ private:
     bool create_near_overlay_;
     bool create_far_overlay_;
     QVector<QRgb> overlay_colors_;
+    bool changing_profile_;
 
     QModelIndex mouse_pressed_at_;
 
@@ -133,9 +137,7 @@ private:
     QAction *show_hide_separator_;
     QList<QAction *>show_hide_actions_;
     bool capture_in_progress_;
-    int tail_timer_id_;
     bool tail_at_end_;
-    bool rows_inserted_;
     bool columns_changed_;
     bool set_column_visibility_;
     QModelIndex frozen_current_row_;
@@ -143,6 +145,7 @@ private:
     QVector<int> selection_history_;
     int cur_history_;
     bool in_history_;
+    GPtrArray *finfo_array; // Packet data from the last selected packet entry
 
     void setFrameReftime(gboolean set, frame_data *fdata);
     void setColumnVisibility();
@@ -170,7 +173,7 @@ public slots:
     void setMonospaceFont(const QFont &mono_font);
     void goNextPacket();
     void goPreviousPacket();
-    void goFirstPacket(bool user_selected = true);
+    void goFirstPacket();
     void goLastPacket();
     void goToPacket(int packet, int hf_id = -1);
     void goNextHistoryPacket();
@@ -188,6 +191,7 @@ public slots:
     void columnsChanged();
     void fieldsChanged(capture_file *cf);
     void preferencesChanged();
+    void freezePacketList(bool changing_profile);
 
 private slots:
     void columnVisibilityTriggered();

@@ -19,11 +19,17 @@ function print_usage() {
 	printf "Usage: $0 [--install-optional] [...other options...]\n"
 	printf "\t--install-optional: install optional software as well\n"
 	printf "\t--install-rpm-deps: install packages required to build the .rpm file\n"
-	printf "\t[other]: other options are passed as-is to the packet manager\n"
+	printf "\\t--install-qt5-deps: force installation of packages required to use Qt5\\n"
+	printf "\\t--install-qt6-deps: force installation of packages required to use Qt6\\n"
+	printf "\\t--install-all: install everything\\n"
+	printf "\t[other]: other options are passed as-is to the package manager\n"
 }
 
 ADDITIONAL=0
 RPMDEPS=0
+ADD_QT5=0
+ADD_QT6=0
+HAVE_ADD_QT=0
 OPTIONS=
 for arg; do
 	case $arg in
@@ -36,6 +42,21 @@ for arg; do
 			;;
 		--install-rpm-deps)
 			RPMDEPS=1
+			;;
+		--install-qt5-deps)
+			ADD_QT5=1
+			HAVE_ADD_QT=1
+			;;
+		--install-qt6-deps)
+			ADD_QT6=1
+			HAVE_ADD_QT=1
+			;;
+		--install-all)
+			ADDITIONAL=1
+			RPMDEPS=1
+			ADD_QT5=1
+			ADD_QT6=1
+			HAVE_ADD_QT=1
 			;;
 		*)
 			OPTIONS="$OPTIONS $arg"
@@ -73,7 +94,9 @@ ADDITIONAL_LIST="libcap-devel \
 	libxml2-devel \
 	perl \
 	spandsp-devel \
-	systemd-devel"
+	systemd-devel \
+	python3-pytest \
+	python3-pytest-xdist"
 
 # Uncomment to add PNG compression utilities used by compress-pngs:
 # ADDITIONAL_LIST="$ADDITIONAL_LIST \
@@ -159,26 +182,72 @@ echo "Required package zlib|libz1 is unavailable" >&2
 add_package BASIC_LIST c-ares-devel || add_package BASIC_LIST libcares-devel ||
 echo "Required package c-ares-devel|libcares-devel is unavailable" >&2
 
-# qt5-linguist: CentOS, Fedora
-# libqt5-linguist-devel: OpenSUSE
-add_package BASIC_LIST qt5-linguist ||
-add_package BASIC_LIST libqt5-linguist-devel ||
-echo "Required package qt5-linguist|libqt5-linguist-devel is unavailable" >&2
+add_package BASIC_LIST speexdsp-devel || add_package BASIC_LIST speex-devel ||
+echo "Required package speexdsp-devel|speex-devel is unavailable" >&2
 
-# qt5-qtmultimedia: CentOS, Fedora, pulls in qt5-qtbase-devel (big dependency list!)
-# libqt5-qtmultimedia-devel: OpenSUSE, pulls in Core, Gui, Multimedia, Network, Widgets
-# OpenSUSE additionally has a separate Qt5PrintSupport package.
-add_package BASIC_LIST qt5-qtmultimedia-devel ||
-add_packages BASIC_LIST libqt5-qtmultimedia-devel libQt5PrintSupport-devel ||
-echo "Required Qt5 Mutlimedia and/or Qt5 Print Support is unavailable" >&2
+if [ $HAVE_ADD_QT -eq 0 ]
+then
+	# Try to select Qt version from distro
+	test -e /etc/os-release && os_release='/etc/os-release' || os_release='/usr/lib/os-release'
+	# shellcheck disable=SC1090
+	. "${os_release}"
 
-# This in only required on OpenSUSE
-add_package BASIC_LIST libqt5-qtsvg-devel ||
-echo "Required OpenSUSE package libqt5-qtsvg-devel is unavailable. Not required for other distributions." >&2
+	# Fedora 35 or later
+	if [ "${ID:-linux}" = "fedora" ] && [ "${VERSION_ID:-0}" -ge "35" ]; then
+		echo "Installing Qt6."
+		ADD_QT6=1
+	else
+		echo "Installing Qt5."
+		ADD_QT5=1
+	fi
+fi
 
-# This in only required on OpenSUSE
-add_package BASIC_LIST libQt5Concurrent-devel ||
-echo "Required OpenSUSE package libQt5Concurrent-devel is unavailable. Not required for other distributions." >&2
+if [ $ADD_QT5 -ne 0 ]
+then
+	# qt5-linguist: CentOS, Fedora
+	# libqt5-linguist-devel: OpenSUSE
+	add_package BASIC_LIST qt5-linguist ||
+	add_package BASIC_LIST libqt5-linguist-devel ||
+	echo "Required package qt5-linguist|libqt5-linguist-devel is unavailable" >&2
+
+	# qt5-qtmultimedia: CentOS, Fedora, pulls in qt5-qtbase-devel (big dependency list!)
+	# libqt5-qtmultimedia-devel: OpenSUSE, pulls in Core, Gui, Multimedia, Network, Widgets
+	# OpenSUSE additionally has a separate Qt5PrintSupport package.
+	add_package BASIC_LIST qt5-qtmultimedia-devel ||
+	add_packages BASIC_LIST libqt5-qtmultimedia-devel libQt5PrintSupport-devel ||
+	echo "Required Qt5 Mutlimedia and/or Qt5 Print Support is unavailable" >&2
+
+	# This in only required on OpenSUSE
+	add_package BASIC_LIST libqt5-qtsvg-devel ||
+	echo "Required OpenSUSE package libqt5-qtsvg-devel is unavailable. Not required for other distributions." >&2
+
+	# This in only required on OpenSUSE
+	add_package BASIC_LIST libQt5Concurrent-devel ||
+	echo "Required OpenSUSE package libQt5Concurrent-devel is unavailable. Not required for other distributions." >&2
+
+	add_package ADDITIONAL_LIST qt5-qtimageformats ||
+	add_package ADDITIONAL_LIST libqt5-qtimageformats ||
+	echo "Optional Qt5 Image Formats is unavailable" >&2
+fi
+
+if [ $ADD_QT6 -ne 0 ]
+then
+	# Fedora Qt6 packages required from a minimal installation
+	QT6_LIST=(qt6-qtbase-devel
+			qt6-qttools-devel
+			qt6-qt5compat-devel
+			qt6-qtmultimedia-devel
+			libxkbcommon-devel)
+
+	for pkg in ${QT6_LIST[@]}
+	do
+		add_package BASIC_LIST "$pkg" ||
+		echo "Qt6 dependency $pkg is unavailable" >&2
+	done
+
+	add_package ADDITIONAL_LIST qt6-qtimageformats ||
+	echo "Optional Qt6 Image Formats is unavailable" >&2
+fi
 
 # This in only required on OpenSUSE
 add_packages BASIC_LIST hicolor-icon-theme xdg-utils ||
@@ -227,11 +296,11 @@ echo "Optional package ninja|ninja-build is unavailable" >&2
 add_package ADDITIONAL_LIST libxslt || add_package ADDITIONAL_LIST libxslt1 ||
 echo "Optional package libxslt|libxslt1 is unavailable" >&2
 
+add_package ADDITIONAL_LIST docbook-style-xsl || add_package ADDITIONAL_LIST docbook-xsl-stylesheets ||
+echo "Optional package docbook-style-xsl|docbook-xsl-stylesheets is unavailable" >&2
+
 add_package ADDITIONAL_LIST brotli-devel || add_packages ADDITIONAL_LIST libbrotli-devel libbrotlidec1 ||
 echo "Optional packages brotli-devel|libbrotli-devel is unavailable" >&2
-
-add_package ADDITIONAL_LIST speexdsp-devel || add_package ADDITIONAL_LIST speex-devel ||
-echo "Optional package speexdsp-devel|speex-devel is unavailable" >&2
 
 add_package ADDITIONAL_LIST libnl3-devel || add_package ADDITIONAL_LIST libnl-devel ||
 echo "Optional package libnl3-devel|libnl-devel are unavailable" >&2
@@ -259,6 +328,9 @@ echo "Optional package sbc-devel is unavailable"
 
 add_package ADDITIONAL_LIST libsmi-devel ||
 echo "Optional package libsmi-devel is unavailable"
+
+add_package ADDITIONAL_LIST opencore-amr-devel ||
+echo "Optional package opencore-amr-devel is unavailable" >&2
 
 ACTUAL_LIST=$BASIC_LIST
 

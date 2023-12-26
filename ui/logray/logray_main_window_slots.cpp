@@ -161,7 +161,7 @@ bool LograyMainWindow::openCaptureFile(QString cf_path, QString read_filter, uns
 {
     QString file_name = "";
     dfilter_t *rfcode = NULL;
-    gchar *err_msg;
+    df_error_t *df_err = NULL;
     int err;
     gboolean name_param;
     gboolean ret = true;
@@ -194,7 +194,7 @@ bool LograyMainWindow::openCaptureFile(QString cf_path, QString read_filter, uns
             goto finish;
         }
 
-        if (dfilter_compile(qUtf8Printable(read_filter), &rfcode, &err_msg)) {
+        if (dfilter_compile(qUtf8Printable(read_filter), &rfcode, &df_err)) {
             cf_set_rfcode(CaptureFile::globalCapFile(), rfcode);
         } else {
             /* Not valid.  Tell the user, and go back and run the file
@@ -204,8 +204,9 @@ bool LograyMainWindow::openCaptureFile(QString cf_path, QString read_filter, uns
                     QString("The filter expression ") +
                     read_filter +
                     QString(" isn't a valid display filter. (") +
-                    err_msg + QString(")."),
+                    df_err->msg + QString(")."),
                     QMessageBox::Ok);
+            df_error_free(&df_err);
 
             if (!name_param) {
                 // go back to the selection dialogue only if the file
@@ -231,7 +232,7 @@ bool LograyMainWindow::openCaptureFile(QString cf_path, QString read_filter, uns
             continue;
         }
 
-        switch (cf_read(CaptureFile::globalCapFile(), FALSE)) {
+        switch (cf_read(CaptureFile::globalCapFile(), /*reloading=*/FALSE)) {
         case CF_READ_OK:
         case CF_READ_ERROR:
             /* Just because we got an error, that doesn't mean we were unable
@@ -287,9 +288,6 @@ void LograyMainWindow::filterPackets(QString new_filter, bool force)
     } else {
         emit displayFilterSuccess(false);
     }
-    if (packet_list_) {
-        packet_list_->resetColumns();
-    }
 }
 
 void LograyMainWindow::layoutToolbars()
@@ -343,9 +341,6 @@ void LograyMainWindow::updatePreferenceActions()
     main_ui_->actionViewNameResolutionPhysical->setChecked(gbl_resolv_flags.mac_name);
     main_ui_->actionViewNameResolutionNetwork->setChecked(gbl_resolv_flags.network_name);
     main_ui_->actionViewNameResolutionTransport->setChecked(gbl_resolv_flags.transport_name);
-
-    // Should this be a "recent" setting?
-    main_ui_->actionGoAutoScroll->setChecked(prefs.capture_auto_scroll);
 }
 
 void LograyMainWindow::updateRecentActions()
@@ -389,6 +384,8 @@ void LograyMainWindow::updateRecentActions()
     main_ui_->actionViewTimeDisplaySecondsWithHoursAndMinutes->setChecked(recent.gui_seconds_format == TS_SECONDS_HOUR_MIN_SEC);
 
     main_ui_->actionViewColorizePacketList->setChecked(recent.packet_list_colorize);
+
+    main_ui_->actionGoAutoScroll->setChecked(recent.capture_auto_scroll);
 }
 
 // Don't connect to this directly. Connect to or emit fiterAction(...) instead.
@@ -825,7 +822,7 @@ void LograyMainWindow::startCapture(QStringList interfaces _U_) {
             /* device is EXTCAP and is selected. Check if all mandatory
              * settings are set.
              */
-            if (extcap_has_configuration(device->name, TRUE))
+            if (extcap_requires_configuration(device->name))
             {
                 /* Request openning of extcap options dialog */
                 QString device_name(device->name);
@@ -857,6 +854,7 @@ void LograyMainWindow::startCapture(QStringList interfaces _U_) {
     showCapture();
 
     /* XXX - we might need to init other pref data as well... */
+    main_ui_->actionGoAutoScroll->setChecked(recent.capture_auto_scroll);
 
     /* XXX - can this ever happen? */
     if (cap_session_.state != CAPTURE_STOPPED)
@@ -1232,7 +1230,6 @@ void LograyMainWindow::setMenusForSelectedTreeRow(FieldInformation *finfo) {
 
     bool can_match_selected = false;
     bool is_framenum = false;
-    bool have_field_info = false;
     bool have_subtree = false;
     bool can_open_url = false;
     bool have_packet_bytes = false;
@@ -1259,11 +1256,10 @@ void LograyMainWindow::setMenusForSelectedTreeRow(FieldInformation *finfo) {
         header_field_info *hfinfo = fi->hfinfo;
         int linked_frame = -1;
 
-        have_field_info = true;
         can_match_selected = proto_can_match_selected(capture_file_.capFile()->finfo_selected, capture_file_.capFile()->edt);
         if (hfinfo && hfinfo->type == FT_FRAMENUM) {
             is_framenum = true;
-            linked_frame = fvalue_get_uinteger(&fi->value);
+            linked_frame = fvalue_get_uinteger(fi->value);
         }
 
         char *tmp_field = proto_construct_match_selected_string(fi, capture_file_.capFile()->edt);
@@ -1294,8 +1290,6 @@ void LograyMainWindow::setMenusForSelectedTreeRow(FieldInformation *finfo) {
     }
 
     // Always enable / disable the following items.
-    main_ui_->actionFileExportPacketBytes->setEnabled(have_field_info);
-
     main_ui_->actionCopyAllVisibleItems->setEnabled(capture_file_.capFile() != NULL && ! packet_list_->multiSelectActive());
     main_ui_->actionCopyAllVisibleSelectedTreeItems->setEnabled(can_match_selected);
     main_ui_->actionEditCopyDescription->setEnabled(can_match_selected);
@@ -1311,7 +1305,7 @@ void LograyMainWindow::setMenusForSelectedTreeRow(FieldInformation *finfo) {
 
     main_ui_->actionGoGoToLinkedPacket->setEnabled(is_framenum);
 
-    main_ui_->actionAnalyzeCreateAColumn->setEnabled(can_match_selected);
+    main_ui_->actionAnalyzeApplyAsColumn->setEnabled(can_match_selected);
 
     main_ui_->actionContextShowLinkedPacketInNewWindow->setEnabled(is_framenum);
 
@@ -1368,8 +1362,26 @@ void LograyMainWindow::applyGlobalCommandLineOptions()
         foreach(QAction* tda, td_actions.keys()) {
             if (global_dissect_options.time_format == td_actions[tda]) {
                 tda->setChecked(true);
+                // XXX - this means that if the user sets the
+                // time stamp format with the -t flag, that
+                // setting will persist and will be used as
+                // the default the next time Logray is run.
                 recent.gui_time_format = global_dissect_options.time_format;
                 timestamp_set_type(global_dissect_options.time_format);
+                break;
+            }
+        }
+    }
+    if (global_dissect_options.time_precision != TS_PREC_NOT_SET) {
+        foreach(QAction* tpa, tp_actions.keys()) {
+            if (global_dissect_options.time_precision == tp_actions[tpa]) {
+                tpa->setChecked(true);
+                // XXX - this means that if the user sets the
+                // time stamp precision with the -t flag, that
+                // setting will persist and will be used as
+                // the default the next time Logray is run.
+                recent.gui_time_precision = global_dissect_options.time_precision;
+                timestamp_set_precision(global_dissect_options.time_precision);
                 break;
             }
         }
@@ -1490,8 +1502,7 @@ void LograyMainWindow::showAccordionFrame(AccordionFrame *show_frame, bool toggl
 
 void LograyMainWindow::showColumnEditor(int column)
 {
-    previous_focus_ = mainApp->focusWidget();
-    connect(previous_focus_, SIGNAL(destroyed()), this, SLOT(resetPreviousFocus()));
+    setPreviousFocus();
     main_ui_->columnEditorFrame->editColumn(column);
     showAccordionFrame(main_ui_->columnEditorFrame);
 }
@@ -1564,7 +1575,7 @@ void LograyMainWindow::addStatsPluginsToMenu() {
             }
 
             stats_tree_action = new QAction(stat_name, this);
-            stats_tree_action->setData(cfg->abbr);
+            stats_tree_action->setData(QString::fromUtf8(cfg->abbr));
             parent_menu->addAction(stats_tree_action);
             connect(stats_tree_action, &QAction::triggered, this, [this]() {
                 QAction* action = qobject_cast<QAction*>(sender());
@@ -1586,7 +1597,7 @@ void LograyMainWindow::setFeaturesEnabled(bool enabled)
     {
         main_ui_->statusBar->clearMessage();
 #ifdef HAVE_LIBPCAP
-        main_ui_->actionGoAutoScroll->setChecked(auto_scroll_live);
+        main_ui_->actionGoAutoScroll->setChecked(recent.capture_auto_scroll);
 #endif
     }
     else
@@ -1596,16 +1607,6 @@ void LograyMainWindow::setFeaturesEnabled(bool enabled)
 }
 
 // Display Filter Toolbar
-
-void LograyMainWindow::on_actionDisplayFilterExpression_triggered()
-{
-    DisplayFilterExpressionDialog *dfe_dialog = new DisplayFilterExpressionDialog(this);
-
-    connect(dfe_dialog, SIGNAL(insertDisplayFilter(QString)),
-            df_combo_box_->lineEdit(), SLOT(insertFilter(const QString &)));
-
-    dfe_dialog->show();
-}
 
 void LograyMainWindow::on_actionNewDisplayFilterExpression_triggered()
 {
@@ -1662,9 +1663,10 @@ void LograyMainWindow::openTapParameterDialog()
 
 #if defined(HAVE_SOFTWARE_UPDATE) && defined(Q_OS_WIN)
 void LograyMainWindow::softwareUpdateRequested() {
-    // We could call testCaptureFileClose here, but that would give us yet
-    // another dialog. Just try again later.
-    if (capture_file_.capFile() && capture_file_.capFile()->state != FILE_CLOSED) {
+    // testCaptureFileClose doesn't use this string because we aren't
+    // going to launch another dialog, but maybe we'll change that.
+    QString before_what(tr(" before updating"));
+    if (!testCaptureFileClose(before_what, Update)) {
         mainApp->rejectSoftwareUpdate();
     }
 }
@@ -1739,7 +1741,7 @@ void LograyMainWindow::connectFileMenuActions()
         [this]() { exportDissections(export_type_json); });
 
     connect(main_ui_->actionFileExportPacketBytes, &QAction::triggered, this,
-        [this]() { exportPacketBytes(); });
+        [this]() { exportPacketBytes(); }, Qt::QueuedConnection);
 
     connect(main_ui_->actionFileExportPDU, &QAction::triggered, this,
         [this]() { exportPDU(); });
@@ -1756,7 +1758,7 @@ void LograyMainWindow::exportPacketBytes()
 
     file_name = WiresharkFileDialog::getSaveFileName(this,
                                             mainApp->windowTitleString(tr("Export Selected Packet Bytes")),
-                                            mainApp->lastOpenDir().canonicalPath(),
+                                            mainApp->openDialogInitialDir().canonicalPath(),
                                             tr("Raw data (*.bin *.dat *.raw);;All Files (" ALL_FILES_WILDCARD ")")
                                             );
 
@@ -2039,8 +2041,7 @@ void LograyMainWindow::findPacket()
     if (! packet_list_->model() || packet_list_->model()->rowCount() < 1) {
         return;
     }
-    previous_focus_ = mainApp->focusWidget();
-    connect(previous_focus_, SIGNAL(destroyed()), this, SLOT(resetPreviousFocus()));
+    setPreviousFocus();
     if (!main_ui_->searchFrame->isVisible()) {
         showAccordionFrame(main_ui_->searchFrame, true);
     } else {
@@ -2429,8 +2430,10 @@ void LograyMainWindow::editResolvedName()
     //int column = packet_list_->selectedColumn();
     int column = -1;
 
-    if (packet_list_->currentIndex().isValid()) {
-        column = packet_list_->currentIndex().column();
+    if (packet_list_->contextMenuActive() || packet_list_->hasFocus()) {
+        if (packet_list_->currentIndex().isValid()) {
+            column = packet_list_->currentIndex().column();
+        }
     }
 
     main_ui_->addressEditorFrame->editAddresses(capture_file_, column);
@@ -2551,7 +2554,7 @@ void LograyMainWindow::openPacketDialog(bool from_reference)
 
     /* Find the frame for which we're popping up a dialog */
     if (from_reference) {
-        guint32 framenum = fvalue_get_uinteger(&(capture_file_.capFile()->finfo_selected->value));
+        guint32 framenum = fvalue_get_uinteger(capture_file_.capFile()->finfo_selected->value);
         if (framenum == 0)
             return;
 
@@ -2619,8 +2622,7 @@ void LograyMainWindow::connectGoMenuActions()
         if (! packet_list_->model() || packet_list_->model()->rowCount() < 1) {
             return;
         }
-        previous_focus_ = mainApp->focusWidget();
-        connect(previous_focus_, SIGNAL(destroyed()), this, SLOT(resetPreviousFocus()));
+        setPreviousFocus();
 
         showAccordionFrame(main_ui_->goToFrame, true);
         if (main_ui_->goToFrame->isVisible()) {
@@ -2664,6 +2666,15 @@ void LograyMainWindow::connectGoMenuActions()
     connect(main_ui_->actionGoPreviousHistoryPacket, &QAction::triggered,
             packet_list_, &PacketList::goPreviousHistoryPacket);
 
+    // triggered is whenever the user clicks the button; save that as
+    // the new recent value
+    connect(main_ui_->actionGoAutoScroll, &QAction::triggered, this,
+            [](bool checked) { recent.capture_auto_scroll = checked; });
+
+    // toggled is whenever the value changes; if it changes programmatically
+    // (e.g., the user scrolls upwards so we stop auto scrolling) change
+    // whether the button is checked but don't save value to recent (it's
+    // a temporary change)
     connect(main_ui_->actionGoAutoScroll, &QAction::toggled, this,
             [this](bool checked) { packet_list_->setVerticalAutoScroll(checked); });
 }
@@ -2734,12 +2745,10 @@ void LograyMainWindow::connectCaptureMenuActions()
     });
 
     connect(main_ui_->actionCaptureCaptureFilters, &QAction::triggered, this, [this]() {
-        if (!capture_filter_dlg_) {
-            capture_filter_dlg_ = new FilterDialog(this, FilterDialog::CaptureFilter);
-        }
-        capture_filter_dlg_->show();
-        capture_filter_dlg_->raise();
-        capture_filter_dlg_->activateWindow();
+        FilterDialog *capture_filter_dlg = new FilterDialog(window(), FilterDialog::CaptureFilter);
+        capture_filter_dlg->setWindowModality(Qt::ApplicationModal);
+        capture_filter_dlg->setAttribute(Qt::WA_DeleteOnClose);
+        capture_filter_dlg->show();
     });
 
 #ifdef HAVE_LIBPCAP
@@ -2840,6 +2849,72 @@ void LograyMainWindow::startCaptureTriggered()
 
 // Analyze Menu
 
+void LograyMainWindow::connectAnalyzeMenuActions()
+{
+    connect(main_ui_->actionAnalyzeDisplayFilters, &QAction::triggered, this, [=]() {
+        FilterDialog *display_filter_dlg = new FilterDialog(window(), FilterDialog::DisplayFilter);
+        display_filter_dlg->setWindowModality(Qt::ApplicationModal);
+        display_filter_dlg->setAttribute(Qt::WA_DeleteOnClose);
+        display_filter_dlg->show();
+    });
+
+    connect(main_ui_->actionAnalyzeDisplayFilterMacros, &QAction::triggered, this, [=]() {
+        struct epan_uat* dfm_uat;
+        dfilter_macro_get_uat(&dfm_uat);
+        UatDialog *uat_dlg = new UatDialog(parentWidget(), dfm_uat);
+        connect(uat_dlg, SIGNAL(destroyed(QObject*)), mainApp, SLOT(flushAppSignals()));
+
+        uat_dlg->setWindowModality(Qt::ApplicationModal);
+        uat_dlg->setAttribute(Qt::WA_DeleteOnClose);
+        uat_dlg->show();
+    });
+
+    connect(main_ui_->actionDisplayFilterExpression, &QAction::triggered, this, [=]() {
+        DisplayFilterExpressionDialog *dfe_dialog = new DisplayFilterExpressionDialog(this);
+
+        connect(dfe_dialog, &DisplayFilterExpressionDialog::insertDisplayFilter,
+                qobject_cast<SyntaxLineEdit *>(df_combo_box_->lineEdit()), &SyntaxLineEdit::insertFilter);
+
+        dfe_dialog->show();
+    });
+
+    connect(main_ui_->actionAnalyzeApplyAsColumn, &QAction::triggered, this, &LograyMainWindow::applyFieldAsColumn);
+
+    connect(main_ui_->actionAnalyzeEnabledProtocols, &QAction::triggered, this, [=]() {
+        EnabledProtocolsDialog *enable_proto_dialog = new EnabledProtocolsDialog(this);
+        connect(enable_proto_dialog, SIGNAL(destroyed(QObject*)), mainApp, SLOT(flushAppSignals()));
+
+        enable_proto_dialog->setWindowModality(Qt::ApplicationModal);
+        enable_proto_dialog->setAttribute(Qt::WA_DeleteOnClose);
+        enable_proto_dialog->show();
+    });
+
+    connect(main_ui_->actionAnalyzeDecodeAs, &QAction::triggered, this, [=]() {
+        QAction *da_action = qobject_cast<QAction*>(sender());
+        bool create_new = da_action && da_action->property("create_new").toBool();
+
+        DecodeAsDialog *da_dialog = new DecodeAsDialog(this, capture_file_.capFile(), create_new);
+        connect(da_dialog, SIGNAL(destroyed(QObject*)), mainApp, SLOT(flushAppSignals()));
+
+        da_dialog->setWindowModality(Qt::ApplicationModal);
+        da_dialog->setAttribute(Qt::WA_DeleteOnClose);
+        da_dialog->show();
+    });
+
+    connect(main_ui_->actionAnalyzeReloadLuaPlugins, &QAction::triggered, this, &LograyMainWindow::reloadLuaPlugins);
+
+    connect(main_ui_->actionAnalyzeShowPacketBytes, &QAction::triggered, this, [=]() {
+        ShowPacketBytesDialog *spbd = new ShowPacketBytesDialog(*this, capture_file_);
+        spbd->addCodecs(text_codec_map_);
+        spbd->show();
+    });
+
+    connect(main_ui_->actionAnalyzeExpertInfo, &QAction::triggered, this, [=]() {
+        statCommandExpertInfo(NULL, NULL);
+    });
+}
+
+
 void LograyMainWindow::filterMenuAboutToShow()
 {
     QMenu * menu = qobject_cast<QMenu *>(sender());
@@ -2881,30 +2956,7 @@ void LograyMainWindow::matchFieldFilter(FilterAction::Action action, FilterActio
     setDisplayFilter(field_filter, action, filter_type);
 }
 
-void LograyMainWindow::on_actionAnalyzeDisplayFilters_triggered()
-{
-    if (!display_filter_dlg_) {
-        display_filter_dlg_ = new FilterDialog(this, FilterDialog::DisplayFilter);
-    }
-    display_filter_dlg_->show();
-    display_filter_dlg_->raise();
-    display_filter_dlg_->activateWindow();
-}
-
-struct epan_uat;
-void LograyMainWindow::on_actionAnalyzeDisplayFilterMacros_triggered()
-{
-    struct epan_uat* dfm_uat;
-    dfilter_macro_get_uat(&dfm_uat);
-    UatDialog *uat_dlg = new UatDialog(parentWidget(), dfm_uat);
-    connect(uat_dlg, SIGNAL(destroyed(QObject*)), mainApp, SLOT(flushAppSignals()));
-
-    uat_dlg->setWindowModality(Qt::ApplicationModal);
-    uat_dlg->setAttribute(Qt::WA_DeleteOnClose);
-    uat_dlg->show();
-}
-
-void LograyMainWindow::on_actionAnalyzeCreateAColumn_triggered()
+void LograyMainWindow::applyFieldAsColumn()
 {
     if (capture_file_.capFile() != 0 && capture_file_.capFile()->finfo_selected != 0) {
         header_field_info *hfinfo = capture_file_.capFile()->finfo_selected->hfinfo;
@@ -2959,53 +3011,6 @@ void LograyMainWindow::applyExportObject()
     export_dialog->show();
 }
 
-void LograyMainWindow::on_actionAnalyzeEnabledProtocols_triggered()
-{
-    EnabledProtocolsDialog *enable_proto_dialog = new EnabledProtocolsDialog(this);
-    connect(enable_proto_dialog, SIGNAL(destroyed(QObject*)), mainApp, SLOT(flushAppSignals()));
-
-    enable_proto_dialog->setWindowModality(Qt::ApplicationModal);
-    enable_proto_dialog->setAttribute(Qt::WA_DeleteOnClose);
-    enable_proto_dialog->show();
-}
-
-void LograyMainWindow::on_actionAnalyzeDecodeAs_triggered()
-{
-    QAction *da_action = qobject_cast<QAction*>(sender());
-    bool create_new = da_action && da_action->property("create_new").toBool();
-
-    DecodeAsDialog *da_dialog = new DecodeAsDialog(this, capture_file_.capFile(), create_new);
-    connect(da_dialog, SIGNAL(destroyed(QObject*)), mainApp, SLOT(flushAppSignals()));
-
-    da_dialog->setWindowModality(Qt::ApplicationModal);
-    da_dialog->setAttribute(Qt::WA_DeleteOnClose);
-    da_dialog->show();
-}
-
-void LograyMainWindow::on_actionAnalyzeReloadLuaPlugins_triggered()
-{
-    reloadLuaPlugins();
-}
-
-void LograyMainWindow::openFollowStreamDialog(follow_type_t type, guint stream_num, guint sub_stream_num, bool use_stream_index) {
-    FollowStreamDialog *fsd = new FollowStreamDialog(*this, capture_file_, type);
-    connect(fsd, SIGNAL(updateFilter(QString, bool)), this, SLOT(filterPackets(QString, bool)));
-    connect(fsd, SIGNAL(goToPacket(int)), packet_list_, SLOT(goToPacket(int)));
-    fsd->addCodecs(text_codec_map_);
-    fsd->show();
-    if (use_stream_index) {
-        // If a specific conversation was requested, then ignore any previous
-        // display filters and display all related packets.
-        fsd->follow("", true, stream_num, sub_stream_num);
-    } else {
-        fsd->follow(getFilter());
-    }
-}
-
-void LograyMainWindow::openFollowStreamDialogForType(follow_type_t type) {
-    openFollowStreamDialog(type, 0, 0, false);
-}
-
 // -z expert
 void LograyMainWindow::statCommandExpertInfo(const char *, void *)
 {
@@ -3020,28 +3025,41 @@ void LograyMainWindow::statCommandExpertInfo(const char *, void *)
     expert_dialog->show();
 }
 
-void LograyMainWindow::on_actionAnalyzeShowPacketBytes_triggered()
-{
-    ShowPacketBytesDialog *spbd = new ShowPacketBytesDialog(*this, capture_file_);
-    spbd->addCodecs(text_codec_map_);
-    spbd->show();
-}
-
-void LograyMainWindow::on_actionAnalyzeExpertInfo_triggered()
-{
-    statCommandExpertInfo(NULL, NULL);
-}
-
 
 // Next / previous / first / last slots in packet_list
 
 // Statistics Menu
 
-void LograyMainWindow::on_actionStatisticsFlowGraph_triggered()
+void LograyMainWindow::connectStatisticsMenuActions()
 {
-    QMessageBox::warning(this, "Oops", "SequenceDialog depends on RTPStreamDialog");
-//    SequenceDialog *sequence_dialog = new SequenceDialog(*this, capture_file_);
-//    sequence_dialog->show();
+    connect(main_ui_->actionStatisticsCaptureFileProperties, &QAction::triggered, this, [=]() {
+        CaptureFilePropertiesDialog *capture_file_properties_dialog = new CaptureFilePropertiesDialog(*this, capture_file_);
+        connect(capture_file_properties_dialog, SIGNAL(captureCommentChanged()),
+                this, SLOT(updateForUnsavedChanges()));
+        capture_file_properties_dialog->show();
+    });
+
+    connect(main_ui_->actionStatisticsResolvedAddresses, &QAction::triggered, this, &LograyMainWindow::showResolvedAddressesDialog);
+
+    connect(main_ui_->actionStatisticsProtocolHierarchy, &QAction::triggered, this, [=]() {
+        ProtocolHierarchyDialog *phd = new ProtocolHierarchyDialog(*this, capture_file_);
+        connect(phd, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)),
+                this, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)));
+        phd->show();
+    });
+
+    connect(main_ui_->actionStatisticsConversations, &QAction::triggered, this, &LograyMainWindow::showConversationsDialog);
+    connect(main_ui_->actionStatisticsEndpoints, &QAction::triggered, this, &LograyMainWindow::showEndpointsDialog);
+
+    connect(main_ui_->actionStatisticsPacketLengths, &QAction::triggered, this, [=]() { openStatisticsTreeDialog("plen"); });
+
+    connect(main_ui_->actionStatisticsIOGraph, &QAction::triggered, this, [=]() { statCommandIOGraph(NULL, NULL); });
+
+    connect(main_ui_->actionStatisticsFlowGraph, &QAction::triggered, this, [=]() {
+        QMessageBox::warning(this, "Oops", "SequenceDialog depends on RTPStreamDialog");
+        //    SequenceDialog *sequence_dialog = new SequenceDialog(*this, capture_file_);
+        //    sequence_dialog->show();
+    });
 }
 
 void LograyMainWindow::openStatisticsTreeDialog(const gchar *abbr)
@@ -3050,31 +3068,6 @@ void LograyMainWindow::openStatisticsTreeDialog(const gchar *abbr)
 //    connect(st_dialog, SIGNAL(goToPacket(int)),
 //            packet_list_, SLOT(goToPacket(int)));
     st_dialog->show();
-}
-
-void LograyMainWindow::on_actionStatisticsConversations_triggered()
-{
-    ConversationDialog *conv_dialog = new ConversationDialog(*this, capture_file_);
-    connect(conv_dialog, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)),
-        this, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)));
-    connect(conv_dialog, SIGNAL(openFollowStreamDialog(follow_type_t, guint, guint)),
-        this, SLOT(openFollowStreamDialog(follow_type_t, guint, guint)));
-    conv_dialog->show();
-}
-
-void LograyMainWindow::on_actionStatisticsEndpoints_triggered()
-{
-    EndpointDialog *endp_dialog = new EndpointDialog(*this, capture_file_);
-    connect(endp_dialog, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)),
-            this, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)));
-    connect(endp_dialog, SIGNAL(openFollowStreamDialog(follow_type_t)),
-            this, SLOT(openFollowStreamDialogForType(follow_type_t)));
-    endp_dialog->show();
-}
-
-void LograyMainWindow::on_actionStatisticsPacketLengths_triggered()
-{
-    openStatisticsTreeDialog("plen");
 }
 
 // -z io,stat
@@ -3091,90 +3084,46 @@ void LograyMainWindow::statCommandIOGraph(const char *, void *)
     iog_dialog->show();
 }
 
-void LograyMainWindow::on_actionStatisticsIOGraph_triggered()
-{
-    statCommandIOGraph(NULL, NULL);
-}
-
 // Tools Menu
 
 // XXX No log tools yet
 
 // Help Menu
-void LograyMainWindow::on_actionHelpContents_triggered() {
+void LograyMainWindow::connectHelpMenuActions()
+{
+    connect(main_ui_->actionHelpAbout, &QAction::triggered, this, [=]() {
+        AboutDialog *about_dialog = new AboutDialog(this);
 
-    mainApp->helpTopicAction(HELP_CONTENT);
-}
+        if (about_dialog->isMinimized() == true)
+        {
+            about_dialog->showNormal();
+        }
+        else
+        {
+            about_dialog->show();
+        }
 
-void LograyMainWindow::on_actionHelpMPWireshark_triggered() {
+        about_dialog->raise();
+        about_dialog->activateWindow();
+    });
 
-    mainApp->helpTopicAction(LOCALPAGE_MAN_WIRESHARK);
-}
-
-void LograyMainWindow::on_actionHelpMPWireshark_Filter_triggered() {
-    mainApp->helpTopicAction(LOCALPAGE_MAN_WIRESHARK_FILTER);
-}
-
-void LograyMainWindow::on_actionHelpMPCapinfos_triggered() {
-    mainApp->helpTopicAction(LOCALPAGE_MAN_CAPINFOS);
-}
-
-void LograyMainWindow::on_actionHelpMPDumpcap_triggered() {
-    mainApp->helpTopicAction(LOCALPAGE_MAN_DUMPCAP);
-}
-
-void LograyMainWindow::on_actionHelpMPEditcap_triggered() {
-    mainApp->helpTopicAction(LOCALPAGE_MAN_EDITCAP);
-}
-
-void LograyMainWindow::on_actionHelpMPMergecap_triggered() {
-    mainApp->helpTopicAction(LOCALPAGE_MAN_MERGECAP);
-}
-
-void LograyMainWindow::on_actionHelpMPRawshark_triggered() {
-    mainApp->helpTopicAction(LOCALPAGE_MAN_RAWSHARK);
-}
-
-void LograyMainWindow::on_actionHelpMPReordercap_triggered() {
-    mainApp->helpTopicAction(LOCALPAGE_MAN_REORDERCAP);
-}
-
-void LograyMainWindow::on_actionHelpMPText2pcap_triggered() {
-    mainApp->helpTopicAction(LOCALPAGE_MAN_TEXT2PCAP);
-}
-
-void LograyMainWindow::on_actionHelpMPTShark_triggered() {
-    mainApp->helpTopicAction(LOCALPAGE_MAN_TSHARK);
-}
-
-void LograyMainWindow::on_actionHelpWebsite_triggered() {
-
-    mainApp->helpTopicAction(ONLINEPAGE_HOME);
-}
-
-void LograyMainWindow::on_actionHelpFAQ_triggered() {
-
-    mainApp->helpTopicAction(ONLINEPAGE_FAQ);
-}
-
-void LograyMainWindow::on_actionHelpAsk_triggered() {
-
-    mainApp->helpTopicAction(ONLINEPAGE_ASK);
-}
-
-void LograyMainWindow::on_actionHelpDownloads_triggered() {
-
-    mainApp->helpTopicAction(ONLINEPAGE_DOWNLOAD);
-}
-
-void LograyMainWindow::on_actionHelpWiki_triggered() {
-
-    mainApp->helpTopicAction(ONLINEPAGE_WIKI);
-}
-
-void LograyMainWindow::on_actionHelpSampleCaptures_triggered() {
-
-    mainApp->helpTopicAction(ONLINEPAGE_SAMPLE_FILES);
+    connect(main_ui_->actionHelpContents, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(HELP_CONTENT); });
+    connect(main_ui_->actionHelpMPWireshark, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_WIRESHARK); });
+    connect(main_ui_->actionHelpMPWireshark_Filter, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_WIRESHARK_FILTER); });
+    connect(main_ui_->actionHelpMPCapinfos, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_CAPINFOS); });
+    connect(main_ui_->actionHelpMPDumpcap, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_DUMPCAP); });
+    connect(main_ui_->actionHelpMPEditcap, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_EDITCAP); });
+    connect(main_ui_->actionHelpMPMergecap, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_MERGECAP); });
+    connect(main_ui_->actionHelpMPRawshark, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_RAWSHARK); });
+    connect(main_ui_->actionHelpMPReordercap, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_REORDERCAP); });
+    connect(main_ui_->actionHelpMPText2pcap, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_TEXT2PCAP); });
+    connect(main_ui_->actionHelpMPTShark, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(LOCALPAGE_MAN_TSHARK); });
+    connect(main_ui_->actionHelpWebsite, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(ONLINEPAGE_HOME); });
+    connect(main_ui_->actionHelpFAQ, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(ONLINEPAGE_FAQ); });
+    connect(main_ui_->actionHelpAsk, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(ONLINEPAGE_ASK); });
+    connect(main_ui_->actionHelpDownloads, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(ONLINEPAGE_DOWNLOAD); });
+    connect(main_ui_->actionHelpWiki, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(ONLINEPAGE_WIKI); });
+    connect(main_ui_->actionHelpSampleCaptures, &QAction::triggered, this, [=]() { mainApp->helpTopicAction(ONLINEPAGE_SAMPLE_FILES); });
 }
 
 #ifdef HAVE_SOFTWARE_UPDATE
@@ -3184,28 +3133,18 @@ void LograyMainWindow::checkForUpdates()
 }
 #endif
 
-void LograyMainWindow::on_actionHelpAbout_triggered()
-{
-    AboutDialog *about_dialog = new AboutDialog(this);
-
-    if (about_dialog->isMinimized() == true)
-    {
-        about_dialog->showNormal();
+void LograyMainWindow::setPreviousFocus() {
+    previous_focus_ = mainApp->focusWidget();
+    if (previous_focus_ != nullptr) {
+        connect(previous_focus_, SIGNAL(destroyed()), this, SLOT(resetPreviousFocus()));
     }
-    else
-    {
-        about_dialog->show();
-    }
-
-    about_dialog->raise();
-    about_dialog->activateWindow();
 }
 
 void LograyMainWindow::resetPreviousFocus() {
-    previous_focus_ = NULL;
+    previous_focus_ = nullptr;
 }
 
-void LograyMainWindow::on_goToCancel_clicked()
+void LograyMainWindow::goToCancelClicked()
 {
     main_ui_->goToFrame->animatedHide();
     if (previous_focus_) {
@@ -3215,27 +3154,19 @@ void LograyMainWindow::on_goToCancel_clicked()
     }
 }
 
-void LograyMainWindow::on_goToGo_clicked()
+void LograyMainWindow::goToGoClicked()
 {
     gotoFrame(main_ui_->goToLineEdit->text().toInt());
 
-    on_goToCancel_clicked();
+    goToCancelClicked();
 }
 
-void LograyMainWindow::on_goToLineEdit_returnPressed()
+void LograyMainWindow::goToLineEditReturnPressed()
 {
-    on_goToGo_clicked();
+    goToGoClicked();
 }
 
-void LograyMainWindow::on_actionStatisticsCaptureFileProperties_triggered()
-{
-    CaptureFilePropertiesDialog *capture_file_properties_dialog = new CaptureFilePropertiesDialog(*this, capture_file_);
-    connect(capture_file_properties_dialog, SIGNAL(captureCommentChanged()),
-            this, SLOT(updateForUnsavedChanges()));
-    capture_file_properties_dialog->show();
-}
-
-void LograyMainWindow::on_actionStatisticsResolvedAddresses_triggered()
+void LograyMainWindow::showResolvedAddressesDialog()
 {
     QString capFileName;
     wtap* wth = Q_NULLPTR;
@@ -3249,15 +3180,27 @@ void LograyMainWindow::on_actionStatisticsResolvedAddresses_triggered()
     resolved_addresses_dialog->show();
 }
 
-void LograyMainWindow::on_actionStatisticsProtocolHierarchy_triggered()
+void LograyMainWindow::showConversationsDialog()
 {
-    ProtocolHierarchyDialog *phd = new ProtocolHierarchyDialog(*this, capture_file_);
-    connect(phd, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)),
-            this, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)));
-    phd->show();
+    ConversationDialog *conv_dialog = new ConversationDialog(*this, capture_file_);
+    connect(conv_dialog, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)),
+        this, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)));
+    connect(conv_dialog, SIGNAL(openFollowStreamDialog(int, guint, guint)),
+        this, SLOT(openFollowStreamDialog(int, guint, guint)));
+    conv_dialog->show();
 }
 
-void LograyMainWindow::externalMenuItem_triggered()
+void LograyMainWindow::showEndpointsDialog()
+{
+    EndpointDialog *endp_dialog = new EndpointDialog(*this, capture_file_);
+    connect(endp_dialog, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)),
+            this, SIGNAL(filterAction(QString, FilterAction::Action, FilterAction::ActionType)));
+    connect(endp_dialog, SIGNAL(openFollowStreamDialog(int)),
+            this, SLOT(openFollowStreamDialog(int)));
+    endp_dialog->show();
+}
+
+void LograyMainWindow::externalMenuItemTriggered()
 {
     QAction * triggerAction = NULL;
     QVariant v;

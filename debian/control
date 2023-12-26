@@ -2,11 +2,11 @@ Source: wireshark
 Maintainer: Balint Reczey <balint@balintreczey.hu>
 Section: net
 Priority: optional
-Build-Depends: qtbase5-dev,
-               qtbase5-dev-tools,
-               qttools5-dev,
-               qttools5-dev-tools,
-               qtmultimedia5-dev,
+Build-Depends: qt6-5compat-dev,
+               qt6-base-dev,
+               qt6-base-dev-tools,
+               qt6-multimedia-dev,
+               qt6-tools-dev,
                libpcap0.8-dev,
                flex,
                libz-dev,
@@ -14,6 +14,8 @@ Build-Depends: qtbase5-dev,
                po-debconf,
                python3,
                python3-ply,
+               python3-pytest,
+               python3-pytest-xdist,
                libc-ares-dev,
                xsltproc,
                dh-python,
@@ -31,6 +33,8 @@ Build-Depends: qtbase5-dev,
                liblua5.2-dev,
                libsmi2-dev,
                libmaxminddb-dev,
+               libopencore-amrnb-dev,
+               libopus-dev,
                libsystemd-dev,
                libnl-genl-3-dev [linux-any],
                libnl-route-3-dev [linux-any],
@@ -38,6 +42,7 @@ Build-Depends: qtbase5-dev,
                cmake (>= 3.5),
                libsbc-dev,
                libnghttp2-dev,
+               libnghttp3-dev,
                libssh-gcrypt-dev,
                liblz4-dev,
                libsnappy-dev,
@@ -47,7 +52,8 @@ Build-Depends: qtbase5-dev,
                libbrotli-dev,
                libspeexdsp-dev,
                libminizip-dev,
-               libbcg729-dev
+               libbcg729-dev,
+               libxkbcommon-dev
 Build-Conflicts: libsnmp4.2-dev,
                  libsnmp-dev
 Standards-Version: 4.6.0.1
@@ -60,8 +66,8 @@ Package: wireshark-common
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
-         libwireshark16 (>= ${binary:Version}),
-         libwiretap13 (>= ${binary:Version}),
+         libwireshark17 (>= ${binary:Version}),
+         libwiretap14 (>= ${binary:Version}),
          debconf,
          libcap2-bin [linux-any]
 Recommends: wireshark (>= ${binary:Version}) | tshark (>= ${binary:Version})
@@ -80,32 +86,19 @@ Description: network traffic analyzer - common files
 
 Package: wireshark
 Architecture: any
-Depends: wireshark-qt (= ${binary:Version}),
-         ${misc:Depends}
-Description: network traffic analyzer - meta-package
- Wireshark is a network "sniffer" - a tool that captures and analyzes
- packets off the wire. Wireshark can decode too many protocols to list
- here.
- .
- This is a meta-package for Wireshark.
-
-Package: wireshark-qt
-Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
          wireshark-common (= ${binary:Version}),
          libqt5svg5
 Recommends: libqt5multimedia5-plugins
-Breaks: wireshark (<< 2.0.0~),
+Breaks: wireshark-qt,
         wireshark-gtk (<< 3.0.0~)
-Replaces: wireshark (<< 2.0.0~),
+Replaces: wireshark-qt,
           wireshark-gtk (<< 3.0.0~)
-Description: network traffic analyzer - Qt version
+Description: network traffic analyzer - graphical interface
  Wireshark is a network "sniffer" - a tool that captures and analyzes
  packets off the wire. Wireshark can decode too many protocols to list
  here.
- .
- This package provides the Qt version of Wireshark.
 
 Package: tshark
 Architecture: any
@@ -124,6 +117,7 @@ Package: wireshark-dev
 Architecture: any
 Section: devel
 Depends: ${misc:Depends},
+         ${shlibs:Depends},
          omniidl,
          libpcap0.8-dev,
          libglib2.0-dev,
@@ -153,21 +147,21 @@ Description: network traffic analyzer - documentation
  This package contains Wireshark User's guide, Wireshark Developer's Guide
  and the Lua Reference.
 
-Package: libwireshark16
+Package: libwireshark17
 Architecture: any
 Multi-Arch: same
 Section: libs
 Depends: ${shlibs:Depends},
          ${misc:Depends},
          libwireshark-data (>= ${source:Version}),
-         libwsutil14 (>= ${source:Version})
+         libwsutil15 (>= ${source:Version})
 Suggests: wireshark-doc (>= ${source:Version})
 Pre-Depends: ${misc:Pre-Depends}
 Description: network packet dissection library -- shared library
  The libwireshark library provides the network packet dissection services
  developed by the Wireshark project.
 
-Package: libwsutil14
+Package: libwsutil15
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -175,17 +169,19 @@ Depends: ${shlibs:Depends},
          ${misc:Depends}
 Pre-Depends: ${misc:Pre-Depends}
 Description: network packet dissection utilities library -- shared library
- The libwsutil library provides utility functions for libwireshark15.
+ The libwsutil library provides utility functions for Wireshark and related
+ binaries and shared libraries.
 
 Package: libwsutil-dev
 Architecture: any
 Section: libdevel
 Depends: ${misc:Depends},
-         libwsutil14 (= ${binary:Version})
+         libwsutil15 (= ${binary:Version})
 Breaks: libwireshark-dev (<< 3.7.0~)
 Replaces: libwireshark-dev (<< 3.7.0~)
 Description: network packet dissection utilities library -- development files
- The libwsutil library provides utility functions for libwireshark6.
+ The libwsutil library provides utility functions for Wireshark and related
+ binaries and shared libraries.
  .
  This package contains the static library and the C header files that are
  needed for applications to use the libwsutil library.
@@ -213,7 +209,7 @@ Section: libdevel
 Depends: ${misc:Depends},
          libwsutil-dev,
          libwiretap-dev,
-         libwireshark16 (= ${binary:Version})
+         libwireshark17 (= ${binary:Version})
 Description: network packet dissection library -- development files
  The "libwireshark" library provides the network packet dissection services
  developed by the Wireshark project.
@@ -221,7 +217,7 @@ Description: network packet dissection library -- development files
  This package contains the static library and the C header files that are
  needed for applications to use libwireshark services.
 
-Package: libwiretap13
+Package: libwiretap14
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -258,7 +254,7 @@ Package: libwiretap-dev
 Architecture: any
 Section: libdevel
 Depends: ${misc:Depends},
-         libwiretap13 (= ${binary:Version})
+         libwiretap14 (= ${binary:Version})
 Description: network packet capture library -- development files
  Wiretap, part of the Wireshark project, is a library that allows one to
  read and write several packet capture file formats.

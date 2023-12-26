@@ -13,8 +13,8 @@ import argparse
 
 import urllib.request
 import json
-from copy import copy
-from itertools import chain, repeat
+from copy import copy, deepcopy
+from itertools import chain, repeat, takewhile
 from functools import reduce
 import os
 import sys
@@ -50,7 +50,6 @@ class Context(object):
     def __init__(self):
         self.buffer = {}
         self.offset = Offset()
-        self.inside_extended = None
         self.inside_repetitive = False
 
     def __enter__(self):
@@ -368,7 +367,7 @@ def ungroup(item):
 
 def part1(ctx, get_ref, catalogue):
     """Generate components in order
-    - static gint hf_...
+    - static int hf_...
     - FiledPart
     - FieldPart[]
     - AsterixField
@@ -378,7 +377,6 @@ def part1(ctx, get_ref, catalogue):
     tell_pr = lambda s: ctx.tell('insert2', s)
 
     ctx.reset_offset()
-    ctx.inside_extended = None
 
     def handle_item(path, item):
         """Handle 'spare' or regular 'item'.
@@ -399,7 +397,7 @@ def part1(ctx, get_ref, catalogue):
                 return '&I{}_{}'.format(ref, item['name'])
 
             if t == 'Element':
-                tell('static gint hf_{} = -1;'.format(ref))
+                tell('static int hf_{} = -1;'.format(ref))
                 n = variation['size']
                 content = get_content(variation['rule'])
                 scaling = get_scaling(content)
@@ -421,23 +419,13 @@ def part1(ctx, get_ref, catalogue):
 
                 ctx.offset += n
 
-                if ctx.inside_extended is not None:
-                    n, rest = ctx.inside_extended
-                    if ctx.offset.get + 1 > n:
-                        raise Exception("unexpected offset")
-                    # FX bit
-                    if ctx.offset.get + 1 == n:
-                        ctx.offset += 1
-                        m = next(rest)
-                        ctx.inside_extended = (m, rest)
-
             elif t == 'Group':
                 ctx.reset_offset()
 
                 description = get_description(item)
                 tell_pr('        {} &hf_{}, {} "{}", "asterix.{}", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL {} {},'.format('{', ref, '{', description, ref, '}', '}'))
 
-                tell('static gint hf_{} = -1;'.format(ref))
+                tell('static int hf_{} = -1;'.format(ref))
                 for i in variation['items']:
                     handle_item(path, i)
 
@@ -458,56 +446,45 @@ def part1(ctx, get_ref, catalogue):
                         (ref, '{', byte_size, ref, parts, comp, '}'))
 
             elif t == 'Extended':
-                n1 = variation['first']
-                n2 = variation['extents']
                 ctx.reset_offset()
-                ctx.inside_extended = (n1, chain(repeat(n1,1), repeat(n2)))
 
                 description = get_description(item)
                 tell_pr('        {} &hf_{}, {} "{}", "asterix.{}", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL {} {},'.format('{', ref, '{', description, ref, '}', '}'))
-                tell('static gint hf_{} = -1;'.format(ref))
+                tell('static int hf_{} = -1;'.format(ref))
 
                 items = []
                 for i in variation['items']:
+                    if i is None:
+                        items.append(i)
+                        continue
                     if i.get('variation') is not None:
                         if i['variation']['type'] == 'Group':
                             i = ungroup(i)
                     items.append(i)
 
                 for i in items:
-                    handle_item(path, i)
+                    if i is None:
+                        ctx.offset += 1
+                    else:
+                        handle_item(path, i)
 
                 tell('static const FieldPart *I{}_PARTS[] = {}'.format(ref,'{'))
-                chunks = chain(repeat(n1,1), repeat(n2))
-                # iterate over items, reinsert FX bits
-                while True:
-                    bit_size = next(chunks)
-                    assert (bit_size % 8) == 0, "bit alignment error"
-                    byte_size = bit_size // 8
-                    bits_from = bit_size
-                    while True:
-                        i = items[0]
-                        items = items[1:]
-                        n = get_bit_size(i)
+                for i in items:
+                    if i is None:
+                        tell('    &IXXX_FX,')
+                    else:
                         tell('    {},'.format(part_of(i)))
-                        bits_from -= n
-                        if bits_from <= 1:
-                            break
-                    tell('    &IXXX_FX,')
-                    if not items:
-                        break
+
                 tell('    NULL')
                 tell('};')
 
                 # AsterixField
-                n1 = variation['first'] // 8
-                n2 = variation['extents'] // 8
+                first_part = list(takewhile(lambda x: x is not None, items))
+                n = (sum([get_bit_size(i) for i in first_part]) + 1) // 8
                 parts = 'I{}_PARTS'.format(ref)
                 comp = '{ NULL }'
                 tell('static const AsterixField I{} = {} FX, {}, 0, {}, &hf_{}, {}, {} {};'.format
-                    (ref, '{', n2, n1 - 1, ref, parts, comp, '}'))
-
-                ctx.inside_extended = None
+                    (ref, '{', n, 0, ref, parts, comp, '}'))
 
             elif t == 'Repetitive':
                 ctx.reset_offset()
@@ -523,7 +500,7 @@ def part1(ctx, get_ref, catalogue):
                 # AsterixField
                 bit_size = sum([get_bit_size(i) for i in subvar['items']])
                 byte_size = bit_size // 8
-                rep = variation['rep'] // 8
+                rep = variation['rep']['size'] // 8
                 parts = 'I{}_PARTS'.format(ref)
                 comp = '{ NULL }'
                 tell('static const AsterixField I{} = {} REPETITIVE, {}, {}, 0, &hf_{}, {}, {} {};'.format
@@ -532,14 +509,14 @@ def part1(ctx, get_ref, catalogue):
 
             elif t == 'Explicit':
                 ctx.reset_offset()
-                tell('static gint hf_{} = -1;'.format(ref))
+                tell('static int hf_{} = -1;'.format(ref))
                 description = get_description(item)
                 tell_pr('        {} &hf_{}, {} "{}", "asterix.{}", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL {} {},'.format('{', ref, '{', description, ref, '}', '}'))
                 tell('static const AsterixField I{} = {} EXP, 0, 0, 1, &hf_{}, NULL, {} NULL {} {};'.format(ref, '{', ref, '{', '}', '}'))
 
             elif t == 'Compound':
                 ctx.reset_offset()
-                tell('static gint hf_{} = -1;'.format(ref))
+                tell('static int hf_{} = -1;'.format(ref))
                 description = get_description(item)
                 tell_pr('        {} &hf_{}, {} "{}", "asterix.{}", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL {} {},'.format('{', ref, '{', description, ref, '}', '}'))
                 comp = '{'
@@ -574,8 +551,26 @@ def part1(ctx, get_ref, catalogue):
             variation = item['variation']
         handle_variation(path + [item['name']], variation)
 
-    for i in catalogue:
-        handle_item([], i)
+    for item in catalogue:
+        # adjust 'repetitive fx' item
+        if item['variation']['type'] == 'Repetitive' and item['variation']['rep']['type'] == 'Fx':
+            var = item['variation']['variation'].copy()
+            if var['type'] != 'Element':
+                raise Exception("Expecting 'Element'")
+            item = item.copy()
+            item['variation'] = {
+                'type': 'Extended',
+                'items': [{
+                    'definition': None,
+                    'description': None,
+                    'name': 'Subitem',
+                    'remark': None,
+                    'spare': False,
+                    'title': 'Subitem',
+                    'variation': var,
+                    }, None]
+            }
+        handle_item([], item)
     tell('')
 
 def part2(ctx, ref, uap):
@@ -659,7 +654,7 @@ def part4(ctx, cats):
     tell('};')
 
     for cat in sorted(cats):
-        tell_pr('    prefs_register_enum_preference (asterix_prefs_module, "i{:03d}_version", "I{:03d} version", "Select the CAT{:03d} version", &global_categories_version[{}], I{:03d}_versions, FALSE);'.format(cat, cat, cat, cat, cat))
+        tell_pr('    prefs_register_enum_preference (asterix_prefs_module, "i{:03d}_version", "I{:03d} version", "Select the CAT{:03d} version", &global_categories_version[{}], I{:03d}_versions, false);'.format(cat, cat, cat, cat, cat))
 
 class Output(object):
     """Output context manager. Write either to stdout or to a dissector
@@ -683,6 +678,67 @@ class Output(object):
         else:
             self.f.write(line+'\n')
 
+def remove_rfs(spec):
+    """Remove RFS item. It's present in specs, but not used."""
+    catalogue = []  # create new catalogue without RFS
+    rfs_items = []
+    for i in spec['catalogue']:
+        if i['variation']['type'] == 'Rfs':
+            rfs_items.append(i['name'])
+        else:
+            catalogue.append(i)
+    if not rfs_items:
+        return spec
+    spec2 = copy(spec)
+    spec2['catalogue'] = catalogue
+    # remove RFS from UAP(s)
+    uap = deepcopy(spec['uap'])
+    ut = uap['type']
+    if ut == 'uap':
+        items = [None if i in rfs_items else i for i in uap['items']]
+        if items[-1] is None: items = items[:-1]
+        uap['items'] = items
+    elif ut == 'uaps':
+        variations = []
+        for var in uap['variations']:
+            items = [None if i in rfs_items else i for i in var['items']]
+            if items[-1] is None: items = items[:-1]
+            var['items'] = items
+            variations.append(var)
+        uap['variations'] = variations
+    else:
+        raise Exception('unexpected uap type {}'.format(ut))
+    spec2['uap'] = uap
+    return spec2
+
+def is_valid(spec):
+    """Check spec"""
+    def check_item(item):
+        if item['spare']:
+            return True
+        return check_variation(item['variation'])
+    def check_variation(variation):
+        t = variation['type']
+        if t == 'Element':
+            return True
+        elif t == 'Group':
+            return all([check_item(i) for i in variation['items']])
+        elif t == 'Extended':
+            trailing_fx = variation['items'][-1] == None
+            if not trailing_fx:
+                return False
+            return all([check_item(i) for i in variation['items'] if i is not None])
+        elif t == 'Repetitive':
+            return check_variation(variation['variation'])
+        elif t == 'Explicit':
+            return True
+        elif t == 'Compound':
+            items = [i for i in variation['items'] if i is not None]
+            return all([check_item(i) for i in items])
+        else:
+            raise Exception('unexpected variation type {}'.format(t))
+    return all([check_item(i) for i in spec['catalogue']])
+
 def main():
     parser = argparse.ArgumentParser(description='Process asterix specs files.')
     parser.add_argument('paths', metavar='PATH', nargs='*',
@@ -703,6 +759,8 @@ def main():
     jsons = [json.loads(i) for i in jsons]
     jsons = sorted(jsons, key = lambda x: (x['number'], x['edition']['major'], x['edition']['minor']))
     jsons = [spec for spec in jsons if spec['type'] == 'Basic']
+    jsons = [remove_rfs(spec) for spec in jsons]
+    jsons = [spec for spec in jsons if is_valid(spec)]
 
     cats = list(set([x['number'] for x in jsons]))
     latest_editions = {cat: sorted(

@@ -52,10 +52,10 @@
 #include <capture/iface_monitor.h>
 #endif
 
-#include "ui/filter_files.h"
+#include "wsutil/filter_files.h"
 #include "ui/capture_globals.h"
 #include "ui/software_update.h"
-#include "ui/last_open_dir.h"
+#include "ui/file_dialog.h"
 #include "ui/recent_utils.h"
 
 #ifdef HAVE_LIBPCAP
@@ -65,7 +65,6 @@
 #include "wsutil/utf8_entities.h"
 
 #ifdef _WIN32
-#  include "ui/win32/console_win32.h"
 #  include "wsutil/file_util.h"
 #  include <QMessageBox>
 #  include <QSettings>
@@ -103,6 +102,10 @@
 #include <QStyleHints>
 #endif
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0) && defined(Q_OS_WIN)
+#include <QStyleFactory>
+#endif
+
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -111,8 +114,6 @@ MainApplication *mainApp = NULL;
 
 // XXX - Copied from ui/gtk/file_dlg.c
 
-// MUST be UTF-8
-static char *last_open_dir = NULL;
 static QList<recent_item_status *> recent_captures_;
 static QHash<int, QList<QAction *> > dynamic_menu_groups_;
 static QHash<int, QList<QAction *> > added_menu_groups_;
@@ -149,18 +150,6 @@ void
 topic_action(topic_action_e action)
 {
     if (mainApp) mainApp->helpTopicAction(action);
-}
-
-extern "C" char *
-get_last_open_dir(void)
-{
-    return last_open_dir;
-}
-
-void
-set_last_open_dir(const char *dirname)
-{
-    if (mainApp) mainApp->setLastOpenDir(dirname);
 }
 
 /*
@@ -278,19 +267,30 @@ void MainApplication::refreshPacketData()
     }
 }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0) && defined(Q_OS_WIN)
+void MainApplication::colorSchemeChanged() {
+    if (ColorUtils::themeIsDark()) {
+        setStyle(QStyleFactory::create("fusion"));
+    } else {
+        setStyle(QStyleFactory::create("windowsvista"));
+    }
+}
+#endif
+
 void MainApplication::updateTaps()
 {
     draw_tap_listeners(FALSE);
 }
 
-QDir MainApplication::lastOpenDir() {
-    return QDir(last_open_dir);
+QDir MainApplication::openDialogInitialDir() {
+    return QDir(get_open_dialog_initial_dir());
 }
 
 void MainApplication::setLastOpenDirFromFilename(const QString file_name)
 {
     QString directory = QFileInfo(file_name).absolutePath();
-    setLastOpenDir(qUtf8Printable(directory));
+    /* XXX - printable? */
+    set_last_open_dir(qUtf8Printable(directory));
 }
 
 void MainApplication::helpTopicAction(topic_action_e action)
@@ -383,16 +383,15 @@ void MainApplication::setMonospaceFont(const char *font_string) {
     substitutes << x11_alt_fonts << win_default_font << win_alt_font << osx_default_font << osx_alt_fonts << fallback_fonts;
 #endif // Q_OS
 
-    mono_font_.setFamily(default_font);
+    mono_font_ = QFont(default_font, mainApp->font().pointSize() + font_size_adjust);
     mono_font_.insertSubstitutions(default_font, substitutes);
-    mono_font_.setPointSize(mainApp->font().pointSize() + font_size_adjust);
     mono_font_.setBold(false);
 
     // Retrieve the effective font and apply it.
     mono_font_.setFamily(QFontInfo(mono_font_).family());
 
-    g_free(prefs.gui_qt_font_name);
-    prefs.gui_qt_font_name = qstring_strdup(mono_font_.toString());
+    g_free(prefs.gui_font_name);
+    prefs.gui_font_name = qstring_strdup(mono_font_.toString());
 }
 
 int MainApplication::monospaceTextSize(const char *str)
@@ -487,7 +486,11 @@ void MainApplication::setConfigurationProfile(const gchar *profile_name, bool wr
     update_local_interfaces();
 #endif
 
-    setMonospaceFont(prefs.gui_qt_font_name);
+    setMonospaceFont(prefs.gui_font_name);
+
+    // Freeze the packet list early to avoid updating column data before doing a
+    // full redissection. The packet list will be thawed when redissection is done.
+    emit freezePacketList(true);
 
     emit columnsChanged();
     emit preferencesChanged();
@@ -585,28 +588,6 @@ void MainApplication::storeCustomColorsInRecent()
     }
 }
 
-void MainApplication::setLastOpenDir(const char *dir_name)
-{
-    qint64 len;
-    gchar *new_last_open_dir;
-
-    if (dir_name && dir_name[0]) {
-        len = strlen(dir_name);
-        if (dir_name[len-1] == G_DIR_SEPARATOR) {
-            new_last_open_dir = g_strconcat(dir_name, (char *)NULL);
-        }
-        else {
-            new_last_open_dir = g_strconcat(dir_name,
-                                            G_DIR_SEPARATOR_S, (char *)NULL);
-        }
-    } else {
-        new_last_open_dir = NULL;
-    }
-
-    g_free(last_open_dir);
-    last_open_dir = new_last_open_dir;
-}
-
 bool MainApplication::event(QEvent *event)
 {
     QString display_filter = NULL;
@@ -679,7 +660,6 @@ MainApplication::MainApplication(int &argc,  char **argv) :
     Q_INIT_RESOURCE(i18n);
     Q_INIT_RESOURCE(layout);
     Q_INIT_RESOURCE(stock_icons);
-    Q_INIT_RESOURCE(wsicon);
     Q_INIT_RESOURCE(languages);
 
 #ifdef Q_OS_WIN
@@ -812,11 +792,15 @@ MainApplication::MainApplication(int &argc,  char **argv) :
     qApp->setStyleSheet(app_style_sheet);
 
     // If our window text is lighter than the window background, assume the theme is dark.
-    QPalette gui_pal = qApp->palette();
-    prefs_set_gui_theme_is_dark(gui_pal.windowText().color().value() > gui_pal.window().color().value());
+    prefs_set_gui_theme_is_dark(ColorUtils::themeIsDark());
 
 #if defined(HAVE_SOFTWARE_UPDATE) && defined(Q_OS_WIN)
     connect(this, SIGNAL(softwareUpdateQuit()), this, SLOT(quit()), Qt::QueuedConnection);
+#endif
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0) && defined(Q_OS_WIN)
+    colorSchemeChanged();
+    connect(styleHints(), &QStyleHints::colorSchemeChanged, this, &MainApplication::colorSchemeChanged);
 #endif
 
     connect(qApp, SIGNAL(aboutToQuit()), this, SLOT(cleanup()));
@@ -872,6 +856,9 @@ void MainApplication::emitAppSignal(AppSignal signal)
         break;
     case FieldsChanged:
         emit fieldsChanged();
+        break;
+    case FreezePacketList:
+        emit freezePacketList(false);
         break;
     default:
         break;
@@ -939,19 +926,6 @@ void MainApplication::clearDynamicMenuGroupItems()
 {
     foreach (int group, dynamic_menu_groups_.keys()) {
         dynamic_menu_groups_[group].clear();
-    }
-}
-
-void MainApplication::initializeIcons()
-{
-    // Do this as late as possible in order to allow time for
-    // MimeDatabaseInitThread to do its work.
-    QList<int> icon_sizes = QList<int>() << 16 << 24 << 32 << 48 << 64 << 128 << 256 << 512 << 1024;
-    foreach (int icon_size, icon_sizes) {
-        QString icon_path = QString(":/wsicon/wsicon%1.png").arg(icon_size);
-        normal_icon_.addFile(icon_path);
-        icon_path = QString(":/wsicon/wsiconcap%1.png").arg(icon_size);
-        capture_icon_.addFile(icon_path);
     }
 }
 
@@ -1125,13 +1099,6 @@ _e_prefs *MainApplication::readConfigurationFiles(bool reset)
     /* Load libwireshark settings from the current profile. */
     prefs_p = epan_load_settings();
 
-#ifdef _WIN32
-    /* if the user wants a console to be always there, well, we should open one for him */
-    if (prefs_p->gui_console_open == console_open_always) {
-        create_console();
-    }
-#endif
-
     /* Read the capture filter file. */
     read_filter_list(CFILTER_LIST);
 
@@ -1196,12 +1163,13 @@ void MainApplication::loadLanguage(const QString newLanguage)
     QString localeLanguage;
 
     if (newLanguage.isEmpty() || newLanguage == USE_SYSTEM_LANGUAGE) {
-        localeLanguage = QLocale::system().name();
+        locale = QLocale::system();
+        localeLanguage = locale.name();
     } else {
         localeLanguage = newLanguage;
+        locale = QLocale(localeLanguage);
     }
 
-    locale = QLocale(localeLanguage);
     QLocale::setDefault(locale);
     switchTranslator(mainApp->translator,
             QString("wireshark_%1.qm").arg(localeLanguage), QString(":/i18n/"));

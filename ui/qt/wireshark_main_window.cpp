@@ -24,7 +24,7 @@ DIAG_ON(frame-larger-than=)
 #include <wsutil/filesystem.h>
 #include <wsutil/wslog.h>
 #include <wsutil/ws_assert.h>
-#include <ui/version_info.h>
+#include <wsutil/version_info.h>
 #include <epan/prefs.h>
 #include <epan/stats_tree_priv.h>
 #include <epan/plugin_if.h>
@@ -58,6 +58,7 @@ DIAG_ON(frame-larger-than=)
 #include "export_object_action.h"
 #include "file_set_dialog.h"
 #include "filter_dialog.h"
+#include "follow_stream_action.h"
 #include "funnel_statistics.h"
 #include "import_text_dialog.h"
 #include "interface_toolbar.h"
@@ -329,8 +330,6 @@ WiresharkMainWindow::WiresharkMainWindow(QWidget *parent) :
     , capture_options_dialog_(NULL)
     , info_data_()
 #endif
-    , display_filter_dlg_(NULL)
-    , capture_filter_dlg_(NULL)
 #if defined(Q_OS_MAC)
     , dock_menu_(NULL)
 #endif
@@ -409,6 +408,7 @@ WiresharkMainWindow::WiresharkMainWindow(QWidget *parent) :
     connect(mainApp, SIGNAL(appInitialized()), this, SLOT(addPluginIFStructures()));
     connect(mainApp, SIGNAL(appInitialized()), this, SLOT(initConversationMenus()));
     connect(mainApp, SIGNAL(appInitialized()), this, SLOT(initExportObjectsMenus()));
+    connect(mainApp, SIGNAL(appInitialized()), this, SLOT(initFollowStreamMenus()));
 
     connect(mainApp, SIGNAL(profileChanging()), this, SLOT(saveWindowGeometry()));
     connect(mainApp, SIGNAL(preferencesChanged()), this, SLOT(layoutPanes()));
@@ -496,6 +496,9 @@ WiresharkMainWindow::WiresharkMainWindow(QWidget *parent) :
 
 #endif // Q_OS_MAC
 
+    connect(main_ui_->goToGo, &QPushButton::pressed, this, &WiresharkMainWindow::goToGoClicked);
+    connect(main_ui_->goToCancel, &QPushButton::pressed, this, &WiresharkMainWindow::goToCancelClicked);
+
 // A billion-1 is equivalent to the inputMask 900000000 previously used
 // Avoid QValidator::Intermediate values by using a top value of all 9's
 #define MAX_GOTO_LINE 999999999
@@ -522,6 +525,9 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     connect(packet_list_, SIGNAL(framesSelected(QList<int>)), this, SLOT(setMenusForSelectedPacket()));
     connect(packet_list_, SIGNAL(framesSelected(QList<int>)), this, SIGNAL(framesSelected(QList<int>)));
 
+    QAction *action = main_ui_->menuPacketComment->addAction(tr("Add New Comment…"));
+    connect(action, &QAction::triggered, this, &WiresharkMainWindow::addPacketComment);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C));
     connect(main_ui_->menuPacketComment, SIGNAL(aboutToShow()), this, SLOT(setEditCommentsMenu()));
 
     proto_tree_ = new ProtoTree(&master_split_);
@@ -574,6 +580,8 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     connect(&capture_file_, SIGNAL(captureEvent(CaptureEvent)),
             main_ui_->statusBar, SLOT(captureEventHandler(CaptureEvent)));
 
+    connect(mainApp, SIGNAL(freezePacketList(bool)),
+            packet_list_, SLOT(freezePacketList(bool)));
     connect(mainApp, SIGNAL(columnsChanged()),
             packet_list_, SLOT(columnsChanged()));
     connect(mainApp, SIGNAL(preferencesChanged()),
@@ -631,31 +639,12 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     connectViewMenuActions();
     connectGoMenuActions();
     connectCaptureMenuActions();
-
-    connect(main_ui_->actionAnalyzeFollowTCPStream, &QAction::triggered, this,
-            [this]() { this->openFollowStreamDialogForType(FOLLOW_TCP); },
-            Qt::QueuedConnection);
-    connect(main_ui_->actionAnalyzeFollowUDPStream, &QAction::triggered, this,
-            [this]() { this->openFollowStreamDialogForType(FOLLOW_UDP); },
-            Qt::QueuedConnection);
-    connect(main_ui_->actionAnalyzeFollowDCCPStream, &QAction::triggered, this,
-            [this]() { this->openFollowStreamDialogForType(FOLLOW_DCCP); },
-            Qt::QueuedConnection);
-    connect(main_ui_->actionAnalyzeFollowTLSStream, &QAction::triggered, this,
-            [this]() { this->openFollowStreamDialogForType(FOLLOW_TLS); },
-            Qt::QueuedConnection);
-    connect(main_ui_->actionAnalyzeFollowHTTPStream, &QAction::triggered, this,
-            [this]() { this->openFollowStreamDialogForType(FOLLOW_HTTP); },
-            Qt::QueuedConnection);
-    connect(main_ui_->actionAnalyzeFollowHTTP2Stream, &QAction::triggered, this,
-            [this]() { this->openFollowStreamDialogForType(FOLLOW_HTTP2); },
-            Qt::QueuedConnection);
-    connect(main_ui_->actionAnalyzeFollowQUICStream, &QAction::triggered, this,
-            [this]() { this->openFollowStreamDialogForType(FOLLOW_QUIC); },
-            Qt::QueuedConnection);
-    connect(main_ui_->actionAnalyzeFollowSIPCall, &QAction::triggered, this,
-            [this]() { this->openFollowStreamDialogForType(FOLLOW_SIP); },
-            Qt::QueuedConnection);
+    connectAnalyzeMenuActions();
+    connectStatisticsMenuActions();
+    connectTelephonyMenuActions();
+    connectWirelessMenuActions();
+    connectToolsMenuActions();
+    connectHelpMenuActions();
 
     connect(packet_list_, SIGNAL(packetDissectionChanged()),
             this, SLOT(redissectPackets()));
@@ -680,14 +669,15 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     connect(proto_tree_, SIGNAL(editProtocolPreference(preference*, pref_module*)),
             main_ui_->preferenceEditorFrame, SLOT(editPreference(preference*, pref_module*)));
 
-    connect(main_ui_->statusBar, &MainStatusBar::showExpertInfo,
-            this, &WiresharkMainWindow::on_actionAnalyzeExpertInfo_triggered);
+    connect(main_ui_->statusBar, &MainStatusBar::showExpertInfo, this, [=]() {
+        statCommandExpertInfo(NULL, NULL);
+    });
 
     connect(main_ui_->statusBar, &MainStatusBar::stopLoading,
             &capture_file_, &CaptureFile::stopLoading);
 
     connect(main_ui_->statusBar, &MainStatusBar::editCaptureComment,
-            this, &WiresharkMainWindow::on_actionStatisticsCaptureFileProperties_triggered);
+            main_ui_->actionStatisticsCaptureFileProperties, &QAction::trigger);
 
     connect(main_ui_->menuApplyAsFilter, &QMenu::aboutToShow,
             this, &WiresharkMainWindow::filterMenuAboutToShow);
@@ -759,8 +749,6 @@ WiresharkMainWindow::~WiresharkMainWindow()
     // freed by its parent. Free then here explicitly to avoid leak and numerous
     // Valgrind complaints.
     delete file_set_dialog_;
-    delete capture_filter_dlg_;
-    delete display_filter_dlg_;
 #ifdef HAVE_LIBPCAP
     delete capture_options_dialog_;
 #endif
@@ -874,6 +862,23 @@ void WiresharkMainWindow::removeInterfaceToolbar(const gchar *menu_title)
     menu->menuAction()->setVisible(!menu->actions().isEmpty());
 }
 
+void WiresharkMainWindow::updateStyleSheet()
+{
+#ifdef Q_OS_MAC
+    // TODO: The event type QEvent::ApplicationPaletteChange is not sent to all child widgets.
+    // Workaround this by doing it manually for all AccordionFrame.
+    main_ui_->addressEditorFrame->updateStyleSheet();
+    main_ui_->columnEditorFrame->updateStyleSheet();
+    main_ui_->filterExpressionFrame->updateStyleSheet();
+    main_ui_->goToFrame->updateStyleSheet();
+    main_ui_->preferenceEditorFrame->updateStyleSheet();
+    main_ui_->searchFrame->updateStyleSheet();
+
+    df_combo_box_->updateStyleSheet();
+    welcome_page_->updateStyleSheets();
+#endif
+}
+
 bool WiresharkMainWindow::eventFilter(QObject *obj, QEvent *event) {
 
     // The user typed some text. Start filling in a filter.
@@ -897,6 +902,7 @@ bool WiresharkMainWindow::event(QEvent *event)
     switch (event->type()) {
     case QEvent::ApplicationPaletteChange:
         initMainToolbarIcons();
+        updateStyleSheet();
         break;
     default:
         break;
@@ -916,9 +922,9 @@ void WiresharkMainWindow::keyPressEvent(QKeyEvent *event) {
     if (mainApp->focusWidget() == main_ui_->goToLineEdit) {
         if (event->modifiers() == Qt::NoModifier) {
             if (event->key() == Qt::Key_Escape) {
-                on_goToCancel_clicked();
+                goToCancelClicked();
             } else if (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
-                on_goToGo_clicked();
+                goToGoClicked();
             }
         }
         return; // goToLineEdit didn't want it and we don't either.
@@ -936,6 +942,13 @@ void WiresharkMainWindow::keyPressEvent(QKeyEvent *event) {
 }
 
 void WiresharkMainWindow::closeEvent(QCloseEvent *event) {
+    if (main_ui_->actionCaptureStop->isEnabled()) {
+        // Capture is running, we should stop it before close and ignore the event
+        stopCapture();
+        event->ignore();
+        return;
+    }
+
     saveWindowGeometry();
 
     /* If we're in the middle of stopping a capture, don't do anything;
@@ -1224,16 +1237,16 @@ void WiresharkMainWindow::mergeCaptureFile()
         char        *tmpname;
 
         if (merge_dlg.merge(file_name, read_filter)) {
-            gchar *err_msg;
+            df_error_t *df_err = NULL;
 
-            if (!dfilter_compile(qUtf8Printable(read_filter), &rfcode, &err_msg)) {
+            if (!dfilter_compile(qUtf8Printable(read_filter), &rfcode, &df_err)) {
                 /* Not valid. Tell the user, and go back and run the file
                    selection box again once they dismiss the alert. */
                 // Similar to commandline_info.jfilter section in main().
                 QMessageBox::warning(this, tr("Invalid Read Filter"),
-                                     QString(tr("The filter expression %1 isn't a valid read filter. (%2).").arg(read_filter, err_msg)),
+                                     QString(tr("The filter expression %1 isn't a valid read filter. (%2).").arg(read_filter, df_err->msg)),
                                      QMessageBox::Ok);
-                g_free(err_msg);
+                df_error_free(&df_err);
                 continue;
             }
         } else {
@@ -1286,7 +1299,7 @@ void WiresharkMainWindow::mergeCaptureFile()
            previous read filter attached to "cf"). */
         cf_set_rfcode(CaptureFile::globalCapFile(), rfcode);
 
-        switch (cf_read(CaptureFile::globalCapFile(), FALSE)) {
+        switch (cf_read(CaptureFile::globalCapFile(), /*reloading=*/FALSE)) {
 
         case CF_READ_OK:
         case CF_READ_ERROR:
@@ -1402,9 +1415,21 @@ bool WiresharkMainWindow::saveCaptureFile(capture_file *cf, bool dont_reopen) {
             case CF_WRITE_OK:
                 /* The save succeeded; we're done.
                    If we discarded comments, redraw the packet list to reflect
-                   any packets that no longer have comments. */
-                if (discard_comments)
-                    packet_list_->redrawVisiblePackets();
+                   any packets that no longer have comments. If we had unsaved
+                   changes, redraw the packet list, because saving a time
+                   shift zeroes out the frame.offset_shift field.
+                   If we had a color filter based on frame data, recolor. */
+                /* XXX: If there is a filter based on those, we want to force
+                   a rescan with the current filter (we don't actually
+                   need to redissect.)
+                   */
+                if (discard_comments || cf->unsaved_changes) {
+                    if (color_filters_use_proto(proto_get_id_by_filter_name("frame"))) {
+                        packet_list_->recolorPackets();
+                    } else {
+                        packet_list_->redrawVisiblePackets();
+                    }
+                }
 
                 cf->unsaved_changes = false; //we just saved so we signal that we have no unsaved changes
                 updateForUnsavedChanges(); // we update the title bar to remove the *
@@ -1515,10 +1540,23 @@ bool WiresharkMainWindow::saveAsCaptureFile(capture_file *cf, bool must_support_
             dirname = qstring_strdup(file_name);  /* Overwrites cf_name */
             set_last_open_dir(get_dirname(dirname));
             g_free(dirname);
-            /* If we discarded comments, redraw the packet list to reflect
-               any packets that no longer have comments. */
-            if (discard_comments)
-                packet_list_->redrawVisiblePackets();
+            /* The save succeeded; we're done.
+               If we discarded comments, redraw the packet list to reflect
+               any packets that no longer have comments. If we had unsaved
+               changes, redraw the packet list, because saving a time
+               shift zeroes out the frame.offset_shift field.
+               If we had a color filter based on frame data, recolor. */
+            /* XXX: If there is a filter based on those, we want to force
+               a rescan with the current filter (we don't actually
+               need to redissect.)
+               */
+            if (discard_comments || cf->unsaved_changes) {
+                if (color_filters_use_proto(proto_get_id_by_filter_name("frame"))) {
+                    packet_list_->recolorPackets();
+                } else {
+                    packet_list_->redrawVisiblePackets();
+                }
+            }
 
             cf->unsaved_changes = false; //we just saved so we signal that we have no unsaved changes
             updateForUnsavedChanges(); // we update the title bar to remove the *
@@ -1659,6 +1697,9 @@ void WiresharkMainWindow::exportSelectedPackets() {
             g_free(dirname);
             /* If we discarded comments, redraw the packet list to reflect
                any packets that no longer have comments. */
+            /* XXX: Why? We're exporting some packets to a new file but not
+               changing our current capture file, that shouldn't change the
+               current packet list. */
             if (discard_comments)
                 packet_list_->redrawVisiblePackets();
             /* Add this filename to the list of recent files in the "Recent Files" submenu */
@@ -1819,11 +1860,14 @@ bool WiresharkMainWindow::testCaptureFileClose(QString before_what, FileCloseCon
     }
 
 #ifdef HAVE_LIBPCAP
-    if (capture_file_.capFile()->state == FILE_READ_IN_PROGRESS) {
+    if (capture_file_.capFile()->state == FILE_READ_IN_PROGRESS ||
+        capture_file_.capFile()->state == FILE_READ_PENDING) {
         /*
-         * This (FILE_READ_IN_PROGRESS) is true if we're reading a capture file
+         * FILE_READ_IN_PROGRESS is true if we're reading a capture file
          * *or* if we're doing a live capture. From the capture file itself we
          * cannot differentiate the cases, so check the current capture session.
+         * FILE_READ_PENDING is only used for a live capture, but it doesn't
+         * hurt to check it here.
          */
         capture_in_progress = captureSession()->state != CAPTURE_STOPPED;
     }
@@ -1831,6 +1875,19 @@ bool WiresharkMainWindow::testCaptureFileClose(QString before_what, FileCloseCon
 
     if (prefs.gui_ask_unsaved) {
         if (cf_has_unsaved_data(capture_file_.capFile())) {
+            if (context == Update) {
+                // We're being called from the software update window;
+                // don't spawn yet another dialog. Just try again later.
+                // XXX: The WinSparkle dialogs *aren't* modal, and a user
+                // can bring Wireshark to the foreground, close/save the
+                // file, and then click "Install Update" again, but it
+                // seems like many users don't expect that (and also don't
+                // know that Help->Check for Updates... exist, only knowing
+                // about the automatic check.) See #17658 and duplicates.
+                // Maybe we *should* spawn the dialog?
+                return false;
+            }
+
             QMessageBox msg_dialog;
             QString question;
             QString infotext;
@@ -2016,7 +2073,8 @@ bool WiresharkMainWindow::testCaptureFileClose(QString before_what, FileCloseCon
 void WiresharkMainWindow::captureStop() {
     stopCapture();
 
-    while (capture_file_.capFile() && capture_file_.capFile()->state == FILE_READ_IN_PROGRESS) {
+    while (capture_file_.capFile() && (capture_file_.capFile()->state == FILE_READ_IN_PROGRESS ||
+                                       capture_file_.capFile()->state == FILE_READ_PENDING)) {
         WiresharkApplication::processEvents();
     }
 }
@@ -2198,10 +2256,14 @@ void WiresharkMainWindow::initTimePrecisionFormatMenu()
 
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionAutomatic] = TS_PREC_AUTO;
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionSeconds] = TS_PREC_FIXED_SEC;
-    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionDeciseconds] = TS_PREC_FIXED_DSEC;
-    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionCentiseconds] = TS_PREC_FIXED_CSEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision100Milliseconds] = TS_PREC_FIXED_100_MSEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision10Milliseconds] = TS_PREC_FIXED_10_MSEC;
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionMilliseconds] = TS_PREC_FIXED_MSEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision100Microseconds] = TS_PREC_FIXED_100_USEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision10Microseconds] = TS_PREC_FIXED_10_USEC;
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionMicroseconds] = TS_PREC_FIXED_USEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision100Nanoseconds] = TS_PREC_FIXED_100_NSEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision10Nanoseconds] = TS_PREC_FIXED_10_NSEC;
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionNanoseconds] = TS_PREC_FIXED_NSEC;
 
     foreach(QAction* tpa, tp_actions.keys()) {
@@ -2299,7 +2361,7 @@ void WiresharkMainWindow::initConversationMenus()
     connect(colorize_action, SIGNAL(triggered()), this, SLOT(colorizeActionTriggered()));
 }
 
-gboolean WiresharkMainWindow::addExportObjectsMenuItem(const void *, void *value, void *userdata)
+bool WiresharkMainWindow::addExportObjectsMenuItem(const void *, void *value, void *userdata)
 {
     register_eo_t *eo = (register_eo_t*)value;
     WiresharkMainWindow *window = (WiresharkMainWindow*)userdata;
@@ -2318,6 +2380,52 @@ gboolean WiresharkMainWindow::addExportObjectsMenuItem(const void *, void *value
 void WiresharkMainWindow::initExportObjectsMenus()
 {
     eo_iterate_tables(addExportObjectsMenuItem, this);
+}
+
+bool WiresharkMainWindow::addFollowStreamMenuItem(const void *key, void *value, void *userdata)
+{
+    const char *short_name = (const char*)key;
+    register_follow_t *follow = (register_follow_t*)value;
+    WiresharkMainWindow *window = (WiresharkMainWindow*)userdata;
+
+    FollowStreamAction *follow_action = new FollowStreamAction(window->main_ui_->menuFollow, follow);
+    window->main_ui_->menuFollow->addAction(follow_action);
+
+    follow_action->setEnabled(false);
+
+    /* Special features for some of the built in follow types, like
+     * shortcuts and overriding the name. XXX: Should these go in
+     * FollowStreamAction, or should some of these (e.g. TCP and UDP)
+     * be registered in initFollowStreamMenus so that they can be
+     * on the top of the menu list too?
+     */
+    if (g_strcmp0(short_name, "TCP") == 0) {
+        follow_action->setShortcut(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_T);
+    } else if (g_strcmp0(short_name, "UDP") == 0) {
+        follow_action->setShortcut(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_U);
+    } else if (g_strcmp0(short_name, "DCCP") == 0) {
+        /* XXX: Not sure this one is widely enough used to need a shortcut. */
+        follow_action->setShortcut(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_E);
+    } else if (g_strcmp0(short_name, "TLS") == 0) {
+        follow_action->setShortcut(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_S);
+    } else if (g_strcmp0(short_name, "HTTP") == 0) {
+        follow_action->setShortcut(Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_H);
+    } else if (g_strcmp0(short_name, "HTTP2") == 0) {
+        follow_action->setText(tr("HTTP/2 Stream"));
+    } else if (g_strcmp0(short_name, "SIP") == 0) {
+        follow_action->setText(tr("SIP Call"));
+    }
+
+    connect(follow_action, &QAction::triggered, window,
+            [window, follow]() { window->openFollowStreamDialog(get_follow_proto_id(follow)); },
+            Qt::QueuedConnection);
+    return FALSE;
+}
+
+void WiresharkMainWindow::initFollowStreamMenus()
+{
+    /* This puts them all in the menus in alphabetical order.  */
+    follow_iterate_followers(addFollowStreamMenuItem, this);
 }
 
 // Titlebar
@@ -2437,7 +2545,7 @@ void WiresharkMainWindow::setMenusForCaptureFile(bool force_disable)
     bool can_save = false;
     bool can_save_as = false;
 
-    if (force_disable || capture_file_.capFile() == NULL || capture_file_.capFile()->state == FILE_READ_IN_PROGRESS) {
+    if (force_disable || capture_file_.capFile() == NULL || capture_file_.capFile()->state == FILE_READ_IN_PROGRESS || capture_file_.capFile()->state == FILE_READ_PENDING) {
         /* We have no capture file or we're currently reading a file */
         enable = false;
     } else {
@@ -2453,6 +2561,11 @@ void WiresharkMainWindow::setMenusForCaptureFile(bool force_disable)
     main_ui_->actionFileSave->setEnabled(can_save);
     main_ui_->actionFileSaveAs->setEnabled(can_save_as);
     main_ui_->actionStatisticsCaptureFileProperties->setEnabled(enable);
+    /* The Protocol Hierarchy statistics run on all the packets that
+     * pass the current filter, don't enable if a read or rescan is
+     * still in progress.
+     */
+    main_ui_->actionStatisticsProtocolHierarchy->setEnabled(enable);
     /*
      * "Export Specified Packets..." should be available only if
      * we can write the file out in at least one format.
@@ -2468,6 +2581,9 @@ void WiresharkMainWindow::setMenusForCaptureFile(bool force_disable)
 
     main_ui_->actionFileExportPDU->setEnabled(enable);
     main_ui_->actionFileStripHeaders->setEnabled(enable);
+    /* XXX: "Export TLS Session Keys..." should be enabled only if
+     * ssl_session_key_count() > 0.
+     */
     main_ui_->actionFileExportTLSSessionKeys->setEnabled(enable);
 
     foreach(QAction *eo_action, main_ui_->menuFileExportObjects->actions()) {
@@ -2631,8 +2747,7 @@ void WiresharkMainWindow::setForCaptureInProgress(bool capture_in_progress, bool
 #endif
 
 #ifdef HAVE_LIBPCAP
-    packet_list_->setCaptureInProgress(capture_in_progress);
-    packet_list_->setVerticalAutoScroll(capture_in_progress && main_ui_->actionGoAutoScroll->isChecked());
+    packet_list_->setCaptureInProgress(capture_in_progress, main_ui_->actionGoAutoScroll->isChecked());
 
 //    set_capture_if_dialog_for_capture_in_progress(capture_in_progress);
 #endif
@@ -2758,6 +2873,12 @@ void WiresharkMainWindow::removeMenuActions(QList<QAction *> &actions, int menu_
                 cur_menu = submenu;
             }
             cur_menu->removeAction(action);
+            // Remove empty submenus.
+            while (cur_menu != main_ui_->menuTools) {
+                QMenu *empty_menu = (cur_menu->isEmpty() ? cur_menu : NULL);
+                cur_menu = dynamic_cast<QMenu *>(cur_menu->parent());
+                delete empty_menu;
+            }
             break;
         }
         default:
@@ -2840,8 +2961,7 @@ void WiresharkMainWindow::externalMenuHelper(ext_menu_t * menu, QMenu  * subMenu
             itemAction = subMenu->addAction(item->name);
             itemAction->setData(QVariant::fromValue(static_cast<void *>(item)));
             itemAction->setText(item->label);
-            connect(itemAction, SIGNAL(triggered()),
-                    this, SLOT(externalMenuItem_triggered()));
+            connect(itemAction, &QAction::triggered, this, &WiresharkMainWindow::externalMenuItemTriggered);
         }
 
         /* Iterate Loop */
@@ -2994,27 +3114,19 @@ void WiresharkMainWindow::setMwFileName(QString fileName)
     return;
 }
 
-frame_data * WiresharkMainWindow::frameDataForRow(int row) const
-{
-    if (packet_list_)
-        return packet_list_->getFDataForRow(row);
-
-    return Q_NULLPTR;
-}
-
 // Finds rtp id for selected stream and adds it to stream_ids
-// If reverse is set, tries to find reverse stream too
+// If reverse is set, tries to find reverse stream and other streams
+// bundled on the same RTP session too
 // Return error string if error happens
 //
 // Note: Caller must free each returned rtpstream_info_t
 QString WiresharkMainWindow::findRtpStreams(QVector<rtpstream_id_t *> *stream_ids, bool reverse)
 {
     rtpstream_tapinfo_t tapinfo;
-    rtpstream_id_t *fwd_id, *rev_id;
-    bool fwd_id_used, rev_id_used;
+    rtpstream_id_t *new_id;
     const gchar filter_text[] = "rtp && rtp.version == 2 && rtp.ssrc && (ip || ipv6)";
     dfilter_t *sfcode;
-    gchar *err_msg;
+    df_error_t *df_err = NULL;
 
     /* Try to get the hfid for "rtp.ssrc". */
     int hfid_rtp_ssrc = proto_registrar_get_id_byname("rtp.ssrc");
@@ -3023,9 +3135,9 @@ QString WiresharkMainWindow::findRtpStreams(QVector<rtpstream_id_t *> *stream_id
     }
 
     /* Try to compile the filter. */
-    if (!dfilter_compile(filter_text, &sfcode, &err_msg)) {
-        QString err = QString(err_msg);
-        g_free(err_msg);
+    if (!dfilter_compile(filter_text, &sfcode, &df_err)) {
+        QString err = QString(df_err->msg);
+        df_error_free(&df_err);
         return err;
     }
 
@@ -3059,72 +3171,77 @@ QString WiresharkMainWindow::findRtpStreams(QVector<rtpstream_id_t *> *stream_id
 
     dfilter_free(sfcode);
 
-    /* We need the SSRC value of the current frame; try to get it. */
-    GPtrArray *gp = proto_get_finfo_ptr_array(edt.tree, hfid_rtp_ssrc);
-    if (gp == NULL || gp->len == 0) {
-        /* XXX - should not happen, as the filter includes rtp.ssrc */
-        epan_dissect_cleanup(&edt);
-        return tr("SSRC value not found.");
+    if (!reverse) {
+        // If we only want streams that match the SSRC in this frame, we
+        // can just allocate an RTP stream ID directly instead of having
+        // to redissect all the other packets.
+
+        /* We need the SSRC value of the current frame; try to get it. */
+        GPtrArray *gp = proto_get_finfo_ptr_array(edt.tree, hfid_rtp_ssrc);
+        if (gp == NULL || gp->len == 0) {
+            /* XXX - should not happen, as the filter includes rtp.ssrc */
+            epan_dissect_cleanup(&edt);
+            return tr("SSRC value not found.");
+        }
+
+        /*
+         * OK, we have the SSRC value(s), so we can proceed.
+         * (Try to handle the unlikely case of a frame with more than one
+         * SSRC; perhaps a DVD-S2 Baseband frame? Does that even work
+         * properly?)
+         */
+        for (unsigned i = 0; i < gp->len; i++) {
+            new_id = g_new0(rtpstream_id_t, 1);
+            rtpstream_id_copy_pinfo(&(edt.pi), new_id, false);
+            new_id->ssrc = fvalue_get_uinteger(((field_info *)gp->pdata[i])->value);
+            *stream_ids << new_id;
+        }
+    } else {
+        // If we want to find all SSRCs with the same RTP session as this
+        // frame, then we have to redissect all packets.
+
+        /* Register the tap listener */
+        memset(&tapinfo, 0, sizeof(rtpstream_tapinfo_t));
+        tapinfo.tap_data = this;
+        tapinfo.mode = TAP_ANALYSE;
+
+        /* Scan for RTP streams (redissect all packets) */
+        rtpstream_scan(&tapinfo, capture_file_.capFile(), Q_NULLPTR);
+
+        for (GList *strinfo_list = g_list_first(tapinfo.strinfo_list); strinfo_list; strinfo_list = gxx_list_next(strinfo_list)) {
+            rtpstream_info_t * strinfo = gxx_list_data(rtpstream_info_t*, strinfo_list);
+            // We want any RTP stream ID that matches the address and ports.
+            // This could mean more than one in the forward direction, if
+            // e.g., BUNDLE is used (RFC 9143).
+            if (rtpstream_id_equal_pinfo(&(strinfo->id), &(edt.pi), false) ||
+                rtpstream_id_equal_pinfo(&(strinfo->id), &(edt.pi), true)) {
+                    new_id = g_new0(rtpstream_id_t, 1);
+                    rtpstream_id_copy(&(strinfo->id), new_id);
+                    *stream_ids << new_id;
+            }
+        }
+        rtpstream_reset_cb(&tapinfo);
     }
-
-    /*
-     * OK, we have the SSRC value, so we can proceed.
-     * Allocate RTP stream ID structures.
-     */
-    fwd_id = g_new0(rtpstream_id_t, 1);
-    fwd_id_used = false;
-    rev_id = g_new0(rtpstream_id_t, 1);
-    rev_id_used = false;
-
-    /* Get the IP and port values for the forward direction. */
-    rtpstream_id_copy_pinfo(&(edt.pi), fwd_id, false);
-
-    /* assume the inverse ip/port combination for the reverse direction */
-    rtpstream_id_copy_pinfo(&(edt.pi), rev_id, true);
-
-    /* Save the SSRC value for the forward direction. */
-    fwd_id->ssrc = fvalue_get_uinteger(&((field_info *)gp->pdata[0])->value);
 
     epan_dissect_cleanup(&edt);
 
-    /* Register the tap listener */
-    memset(&tapinfo, 0, sizeof(rtpstream_tapinfo_t));
-    tapinfo.tap_data = this;
-    tapinfo.mode = TAP_ANALYSE;
-
-    /* Scan for RTP streams (redissect all packets) */
-    rtpstream_scan(&tapinfo, capture_file_.capFile(), Q_NULLPTR);
-
-    for (GList *strinfo_list = g_list_first(tapinfo.strinfo_list); strinfo_list; strinfo_list = gxx_list_next(strinfo_list)) {
-        rtpstream_info_t * strinfo = gxx_list_data(rtpstream_info_t*, strinfo_list);
-        if (rtpstream_id_equal(&(strinfo->id), fwd_id,RTPSTREAM_ID_EQUAL_NONE))
-        {
-            *stream_ids << fwd_id;
-            fwd_id_used = true;
-        }
-
-        if (rtpstream_id_equal(&(strinfo->id), rev_id,RTPSTREAM_ID_EQUAL_NONE))
-        {
-            if (rev_id->ssrc == 0) {
-                rev_id->ssrc = strinfo->id.ssrc;
-            }
-            if (reverse) {
-                *stream_ids << rev_id;
-                rev_id_used = true;
-            }
-        }
-    }
-
-    //
-    // XXX - is it guaranteed that fwd_id and rev_id were both added to
-    // *stream_ids?  If so, this isn't necessary.
-    //
-    if (!fwd_id_used) {
-        rtpstream_id_free(fwd_id);
-    }
-    if (!rev_id_used) {
-        rtpstream_id_free(rev_id);
-    }
     return NULL;
 }
 
+void WiresharkMainWindow::openTLSKeylogDialog()
+{
+    // Have a single instance of the dialog at any one time.
+    if (!tlskeylog_dialog_) {
+        tlskeylog_dialog_ = new TLSKeylogDialog(*this);
+        tlskeylog_dialog_->setAttribute(Qt::WA_DeleteOnClose);
+    }
+
+    if (tlskeylog_dialog_->isMinimized()) {
+        tlskeylog_dialog_->showNormal();
+    }
+    else {
+        tlskeylog_dialog_->show();
+    }
+    tlskeylog_dialog_->raise();
+    tlskeylog_dialog_->activateWindow();
+}

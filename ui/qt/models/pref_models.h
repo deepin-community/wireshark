@@ -29,7 +29,6 @@ public:
     QString getName() const {return name_;}
     pref_t* getPref() const {return pref_;}
     int getPrefType() const;
-    int getPrefGUIType() const;
     bool isPrefDefault() const;
     QString getPrefTypeName() const;
     module_t* getModule() const {return module_;}
@@ -109,6 +108,7 @@ public:
     virtual bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const;
 
     void setFilter(const QString& filter);
+    void setShowChangedValues(bool show_changed_values);
 
     QVariant headerData(int section, Qt::Orientation orientation,
                         int role = Qt::DisplayRole) const;
@@ -127,6 +127,7 @@ protected:
 private:
 
     QString filter_;
+    bool show_changed_values_;
     const QChar passwordChar_;
 };
 

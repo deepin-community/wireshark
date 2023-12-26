@@ -76,14 +76,6 @@ int PrefsItem::getPrefType() const
     return prefs_get_type(pref_);
 }
 
-int PrefsItem::getPrefGUIType() const
-{
-    if (pref_ == NULL)
-        return GUI_ALL;
-
-    return prefs_get_gui_type(pref_);
-}
-
 bool PrefsItem::isPrefDefault() const
 {
     if (pref_ == NULL)
@@ -219,7 +211,7 @@ QVariant PrefsModel::data(const QModelIndex &index, int role) const
         return item->getName();
 
     case colStatus:
-        if ((item->getPrefType() == PREF_UAT && (item->getPrefGUIType() == GUI_ALL || item->getPrefGUIType() == GUI_QT)) || item->getPrefType() == PREF_CUSTOM)
+        if (item->getPrefType() == PREF_UAT || item->getPrefType() == PREF_CUSTOM)
             return QObject::tr("Unknown");
 
         if (item->isPrefDefault())
@@ -335,6 +327,7 @@ QString PrefsModel::typeToString(int type)
 AdvancedPrefsModel::AdvancedPrefsModel(QObject * parent)
 : QSortFilterProxyModel(parent),
 filter_(),
+show_changed_values_(false),
 passwordChar_(QApplication::style()->styleHint(QStyle::SH_LineEdit_PasswordCharacter))
 {
 }
@@ -530,8 +523,9 @@ bool AdvancedPrefsModel::setData(const QModelIndex &dataindex, const QVariant &v
     roles << role;
 
     // The status field may change as well as the value, so mark them for update
-    emit dataChanged(index(dataindex.row(), AdvancedPrefsModel::colStatus),
-                     index(dataindex.row(), AdvancedPrefsModel::colValue), roles);
+    emit dataChanged(index(dataindex.row(), 0, dataindex.parent()),
+                     index(dataindex.row(), columnCount() - 1, dataindex.parent()),
+                     roles);
 
     return true;
 }
@@ -588,7 +582,7 @@ void AdvancedPrefsModel::setFirstColumnSpanned(QTreeView* tree, const QModelInde
 
 bool AdvancedPrefsModel::filterAcceptItem(PrefsItem& item) const
 {
-    if (filter_.isEmpty())
+    if (filter_.isEmpty() && !show_changed_values_)
         return true;
 
     QString name, tooltip;
@@ -601,7 +595,18 @@ bool AdvancedPrefsModel::filterAcceptItem(PrefsItem& item) const
         tooltip = prefs_get_description(item.getPref());
     }
 
-    if (name.contains(filter_, Qt::CaseInsensitive) || tooltip.contains(filter_, Qt::CaseInsensitive))
+    if (show_changed_values_ && item.getPref()) {
+        // UATs and custom preferences are "unknown", do not show when show_changed_only.
+        if (item.isPrefDefault() || item.getPrefType() == PREF_UAT || item.getPrefType() == PREF_CUSTOM) {
+            return false;
+        } else if (filter_.isEmpty()) {
+            return true;
+        }
+    }
+
+    // Do not match module title or description when having show_changed_only.
+    if (!(filter_.isEmpty() || (show_changed_values_ && !item.getPref())) &&
+        (name.contains(filter_, Qt::CaseInsensitive) || tooltip.contains(filter_, Qt::CaseInsensitive)))
         return true;
 
     PrefsItem *child_item;
@@ -638,7 +643,11 @@ void AdvancedPrefsModel::setFilter(const QString& filter)
     invalidateFilter();
 }
 
-
+void AdvancedPrefsModel::setShowChangedValues(bool show_changed_values)
+{
+    show_changed_values_ = show_changed_values;
+    invalidateFilter();
+}
 
 
 

@@ -1,4 +1,4 @@
-TShark (Wireshark) 4.0.8 (v4.0.8rc0-7-ge4898e0e1677)
+TShark (Wireshark) 4.2.0 (v4.2.0rc0-25-gfc4dc545fc45)
 Dump and analyze network traffic.
 See https://www.wireshark.org for more information.
 
@@ -22,6 +22,7 @@ Capture interface:
   -L, --list-data-link-types
                            print list of link-layer types of iface and exit
   --list-time-stamp-types  print list of timestamp types for iface and exit
+  --update-interval        interval between updates with new packets (def: 100ms)
 
 Capture stop conditions:
   -c <packet count>        stop after n packets (def: infinite)
@@ -63,6 +64,11 @@ Processing:
                            enable dissection of proto_name
   --disable-protocol <proto_name>
                            disable dissection of proto_name
+  --only-protocols <protocols>
+                           Only enable dissection of these protocols, comma
+                           separated. Disable everything else
+  --disable-all-protocols
+                           Disable dissection of all protocols
   --enable-heuristic <short_name>
                            enable dissection of heuristic protocol
   --disable-heuristic <short_name>
@@ -96,7 +102,7 @@ Output:
   -J <protocolfilter>      top level protocol filter if -T ek|pdml|json selected
                            (e.g. "http tcp", filter which expands all child nodes)
   -e <field>               field to print if -Tfields selected (e.g. tcp.port,
-                           _ws.col.Info)
+                           _ws.col.info)
                            this option can be repeated to print multiple fields
   -E<fieldsoption>=<value> set options for output when -Tfields selected:
      bom=y|n               print a UTF-8 BOM
@@ -106,7 +112,7 @@ Output:
      aggregator=,|/s|<char> select comma, space, printable character as
                            aggregator
      quote=d|s|n           select double, single, no quotes for values
-  -t a|ad|adoy|d|dd|e|r|u|ud|udoy
+  -t (a|ad|adoy|d|dd|e|r|u|ud|udoy)[.[N]]|.[N]
                            output format of time stamps (def: r: rel. to first)
   -u s|hms                 output format of seconds (def: s: seconds)
   -l                       flush standard output after each packet
@@ -138,9 +144,11 @@ Output:
 Diagnostic output:
   --log-level <level>      sets the active log level ("critical", "warning", etc.)
   --log-fatal <level>      sets level to abort the program ("critical" or "warning")
-  --log-domains <[!]list>  comma separated list of the active log domains
-  --log-debug <[!]list>    comma separated list of domains with "debug" level
-  --log-noisy <[!]list>    comma separated list of domains with "noisy" level
+  --log-domains <[!]list>  comma-separated list of the active log domains
+  --log-fatal-domains <list>
+                           list of domains that cause the program to abort
+  --log-debug <[!]list>    list of domains with "debug" level
+  --log-noisy <[!]list>    list of domains with "noisy" level
   --log-file <path>        file to output messages to (in addition to stderr)
 
 Miscellaneous:

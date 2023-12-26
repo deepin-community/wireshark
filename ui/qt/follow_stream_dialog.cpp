@@ -15,11 +15,6 @@
 
 #include "frame_tvbuff.h"
 #include "epan/follow.h"
-#include "epan/dissectors/packet-tcp.h"
-#include "epan/dissectors/packet-udp.h"
-#include "epan/dissectors/packet-dccp.h"
-#include "epan/dissectors/packet-http2.h"
-#include "epan/dissectors/packet-quic.h"
 #include "epan/prefs.h"
 #include "epan/addr_resolv.h"
 #include "epan/charsets.h"
@@ -28,12 +23,12 @@
 
 #include "ui/alert_box.h"
 #include "ui/simple_dialog.h"
+#include <ui/recent.h>
 #include <wsutil/utf8_entities.h>
 #include <wsutil/ws_assert.h>
 
 #include "wsutil/file_util.h"
 #include "wsutil/str_util.h"
-#include "ui/version_info.h"
 
 #include "ws_symbol_export.h"
 
@@ -70,13 +65,13 @@ static QMutex loop_break_mutex;
 // Indicates that a Follow Stream is currently running
 static gboolean isReadRunning;
 
-FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_type_t type) :
+Q_DECLARE_METATYPE(bytes_show_type)
+
+FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, int proto_id) :
     WiresharkDialog(parent, cf),
     ui(new Ui::FollowStreamDialog),
     b_find_(NULL),
-    follow_type_(type),
     follower_(NULL),
-    show_type_(SHOW_ASCII),
     truncated_(false),
     client_buffer_count_(0),
     server_buffer_count_(0),
@@ -92,33 +87,13 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
     ui->setupUi(this);
     loadGeometry(parent.width() * 2 / 3, parent.height());
 
-    switch(type)
-    {
-    case FOLLOW_TCP:
-        follower_ = get_follow_by_name("TCP");
-        break;
-    case FOLLOW_TLS:
-        follower_ = get_follow_by_name("TLS");
-        break;
-    case FOLLOW_UDP:
-        follower_ = get_follow_by_name("UDP");
-        break;
-    case FOLLOW_DCCP:
-        follower_ = get_follow_by_name("DCCP");
-        break;
-    case FOLLOW_HTTP:
-        follower_ = get_follow_by_name("HTTP");
-        break;
-    case FOLLOW_HTTP2:
-        follower_ = get_follow_by_name("HTTP2");
-        break;
-    case FOLLOW_QUIC:
-        follower_ = get_follow_by_name("QUIC");
-        break;
-    case FOLLOW_SIP:
-        follower_ = get_follow_by_name("SIP");
-        break;
-    default :
+    ui->streamNumberSpinBox->setStyleSheet("QSpinBox { min-width: 2em; }");
+    ui->subStreamNumberSpinBox->setStyleSheet("QSpinBox { min-width: 2em; }");
+    ui->streamNumberSpinBox->setKeyboardTracking(false);
+    ui->subStreamNumberSpinBox->setKeyboardTracking(false);
+
+    follower_ = get_follow_by_proto_id(proto_id);
+    if (follower_ == NULL) {
         ws_assert_not_reached();
     }
 
@@ -140,6 +115,7 @@ FollowStreamDialog::FollowStreamDialog(QWidget &parent, CaptureFile &cf, follow_
     // UTF-8 is guaranteed to exist as a QTextCodec
     cbcs->addItem(tr("UTF-8"), SHOW_CODEC);
     cbcs->addItem(tr("YAML"), SHOW_YAML);
+    cbcs->setCurrentIndex(cbcs->findData(recent.gui_follow_show));
     cbcs->blockSignals(false);
 
     b_filter_out_ = ui->buttonBox->addButton(tr("Filter Out This Stream"), QDialogButtonBox::ActionRole);
@@ -176,7 +152,7 @@ void FollowStreamDialog::addCodecs(const QMap<QString, QTextCodec *> &codecMap)
     // Make the combobox respect max visible items?
     //ui->cbCharset->setStyleSheet("QComboBox { combobox-popup: 0;}");
     ui->cbCharset->insertSeparator(ui->cbCharset->count());
-    for (const auto &codec : qAsConst(codecMap)) {
+    for (const auto &codec : codecMap) {
         // This is already in the menu and handled separately
         if (codec->name() != "US-ASCII" && codec->name() != "UTF-8")
             ui->cbCharset->addItem(tr(codec->name()), SHOW_CODEC);
@@ -247,6 +223,8 @@ void FollowStreamDialog::goToPacketForTextPos(int text_pos)
 
 void FollowStreamDialog::updateWidgets(bool follow_in_progress)
 {
+    // XXX: If follow_in_progress set cursor to Qt::BusyCursor or WaitCursor,
+    // otherwise unset cursor?
     bool enable = !follow_in_progress;
     if (file_closed_) {
         ui->teStreamContent->setEnabled(true);
@@ -255,9 +233,9 @@ void FollowStreamDialog::updateWidgets(bool follow_in_progress)
 
     ui->cbDirections->setEnabled(enable);
     ui->cbCharset->setEnabled(enable);
-    ui->streamNumberSpinBox->setEnabled(enable);
-    if (follow_type_ == FOLLOW_HTTP2 || follow_type_ == FOLLOW_QUIC) {
-        ui->subStreamNumberSpinBox->setEnabled(enable);
+    ui->streamNumberSpinBox->setReadOnly(!enable);
+    if (get_follow_sub_stream_id_func(follower_) != NULL) {
+        ui->subStreamNumberSpinBox->setReadOnly(!enable);
     }
     ui->leFind->setEnabled(enable);
     ui->bFind->setEnabled(enable);
@@ -316,7 +294,7 @@ void FollowStreamDialog::saveAs()
 
     // Unconditionally save data as UTF-8 (even if data is decoded otherwise).
     QByteArray bytes = ui->teStreamContent->toPlainText().toUtf8();
-    if (show_type_ == SHOW_RAW) {
+    if (recent.gui_follow_show == SHOW_RAW) {
         // The "Raw" format is currently displayed as hex data and needs to be
         // converted to binary data.
         bytes = QByteArray::fromHex(bytes);
@@ -387,7 +365,7 @@ void FollowStreamDialog::on_cbDirections_currentIndexChanged(int idx)
 void FollowStreamDialog::on_cbCharset_currentIndexChanged(int idx)
 {
     if (idx < 0) return;
-    show_type_ = static_cast<show_type_t>(ui->cbCharset->itemData(idx).toInt());
+    recent.gui_follow_show = ui->cbCharset->currentData().value<bytes_show_type>();
     readStream();
 }
 
@@ -413,27 +391,39 @@ void FollowStreamDialog::on_streamNumberSpinBox_valueChanged(int stream_num)
     gboolean ok;
     if (ui->subStreamNumberSpinBox->isVisible()) {
         /* We need to find a suitable sub stream for the new stream */
-        guint sub_stream_num_new = static_cast<guint>(sub_stream_num);
-        if (sub_stream_num < 0) {
-            // Stream ID 0 should always exist as it is used for control messages.
-            sub_stream_num_new = 0;
-            ok = TRUE;
-        } else if (follow_type_ == FOLLOW_HTTP2) {
-            ok = http2_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
-            if (!ok) {
-                ok = http2_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
-            }
-        } else if (follow_type_ == FOLLOW_QUIC) {
-            ok = quic_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
-            if (!ok) {
-                ok = quic_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
-            }
-        } else {
+        follow_sub_stream_id_func sub_stream_func;
+        sub_stream_func = get_follow_sub_stream_id_func(follower_);
+
+        if (sub_stream_func == NULL) {
             // Should not happen, this field is only visible for suitable protocols.
             return;
         }
+
+        guint sub_stream_num_new = static_cast<guint>(sub_stream_num);
+        if (sub_stream_num < 0) {
+            // Stream ID 0 should always exist as it is used for control messages.
+            // XXX: That is only guaranteed for HTTP2. For example, in QUIC,
+            // stream ID 0 is a normal stream used by the first standard client-
+            // initiated bidirectional stream (if it exists, and it might not)
+            // and we might have a stream (connection) but only the CRYPTO
+            // stream, which does not have a (sub) stream ID.
+            // What should we do if there is a stream with no substream to
+            // follow? Right now the substream spinbox is left active and
+            // the user can change the value to no effect.
+            sub_stream_num_new = 0;
+            ok = TRUE;
+        } else {
+            ok = sub_stream_func(static_cast<guint>(stream_num), sub_stream_num_new, FALSE, &sub_stream_num_new);
+            if (!ok) {
+                ok = sub_stream_func(static_cast<guint>(stream_num), sub_stream_num_new, TRUE, &sub_stream_num_new);
+            }
+        }
         sub_stream_num = static_cast<gint>(sub_stream_num_new);
     } else {
+        /* XXX: For HTTP and TLS, we use the TCP stream index, and really should
+         * return false if the TCP stream doesn't have HTTP or TLS. (Or we could
+         * switch to having separate HTTP and TLS stream numbers.)
+         */
         ok = true;
     }
 
@@ -453,28 +443,26 @@ void FollowStreamDialog::on_subStreamNumberSpinBox_valueChanged(int sub_stream_n
     stream_num = ui->streamNumberSpinBox->value();
     ui->streamNumberSpinBox->blockSignals(false);
 
+    follow_sub_stream_id_func sub_stream_func;
+    sub_stream_func = get_follow_sub_stream_id_func(follower_);
+
+    if (sub_stream_func == NULL) {
+        // Should not happen, this field is only visible for suitable protocols.
+        return;
+    }
+
     guint sub_stream_num_new = static_cast<guint>(sub_stream_num);
     gboolean ok;
     /* previous_sub_stream_num_ is a hack to track which buttons was pressed without event handling */
     if (sub_stream_num < 0) {
         // Stream ID 0 should always exist as it is used for control messages.
+        // XXX: That is only guaranteed for HTTP2, see above.
         sub_stream_num_new = 0;
         ok = TRUE;
-    } else if (follow_type_ == FOLLOW_HTTP2) {
-        if (previous_sub_stream_num_ < sub_stream_num) {
-            ok = http2_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
-        } else {
-            ok = http2_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
-        }
-    } else if (follow_type_ == FOLLOW_QUIC) {
-        if (previous_sub_stream_num_ < sub_stream_num) {
-            ok = quic_get_stream_id_ge(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
-        } else {
-            ok = quic_get_stream_id_le(static_cast<guint>(stream_num), sub_stream_num_new, &sub_stream_num_new);
-        }
+    } else if (previous_sub_stream_num_ < sub_stream_num) {
+        ok = sub_stream_func(static_cast<guint>(stream_num), sub_stream_num_new, FALSE, &sub_stream_num_new);
     } else {
-        // Should not happen, this field is only visible for suitable protocols.
-        return;
+        ok = sub_stream_func(static_cast<guint>(stream_num), sub_stream_num_new, TRUE, &sub_stream_num_new);
     }
     sub_stream_num = static_cast<gint>(sub_stream_num_new);
 
@@ -522,24 +510,22 @@ void FollowStreamDialog::resetStream()
     g_list_free(follow_info_.payload);
 
     //Only TCP stream uses fragments
-    if (follow_type_ == FOLLOW_TCP) {
-        for (cur = follow_info_.fragments[0]; cur; cur = gxx_list_next(cur)) {
-            follow_record = gxx_list_data(follow_record_t *, cur);
-            if (follow_record->data) {
-                g_byte_array_free(follow_record->data, TRUE);
-            }
-            g_free(follow_record);
+    for (cur = follow_info_.fragments[0]; cur; cur = gxx_list_next(cur)) {
+        follow_record = gxx_list_data(follow_record_t *, cur);
+        if (follow_record->data) {
+            g_byte_array_free(follow_record->data, TRUE);
         }
-        follow_info_.fragments[0] = Q_NULLPTR;
-        for (cur = follow_info_.fragments[1]; cur; cur = gxx_list_next(cur)) {
-            follow_record = gxx_list_data(follow_record_t *, cur);
-            if (follow_record->data) {
-                g_byte_array_free(follow_record->data, TRUE);
-            }
-            g_free(follow_record);
-        }
-        follow_info_.fragments[1] = Q_NULLPTR;
+        g_free(follow_record);
     }
+    follow_info_.fragments[0] = Q_NULLPTR;
+    for (cur = follow_info_.fragments[1]; cur; cur = gxx_list_next(cur)) {
+        follow_record = gxx_list_data(follow_record_t *, cur);
+        if (follow_record->data) {
+            g_byte_array_free(follow_record->data, TRUE);
+        }
+        g_free(follow_record);
+    }
+    follow_info_.fragments[1] = Q_NULLPTR;
 
     free_address(&follow_info_.client_ip);
     free_address(&follow_info_.server_ip);
@@ -558,7 +544,7 @@ FollowStreamDialog::readStream()
 
     ui->teStreamContent->clear();
     text_pos_to_packet_.clear();
-    switch (show_type_) {
+    switch (recent.gui_follow_show) {
 
     case SHOW_CARRAY:
     case SHOW_HEXDUMP:
@@ -585,23 +571,11 @@ FollowStreamDialog::readStream()
     last_packet_ = 0;
     turns_ = 0;
 
-    switch(follow_type_) {
-
-    case FOLLOW_TCP :
-    case FOLLOW_UDP :
-    case FOLLOW_DCCP :
-    case FOLLOW_HTTP :
-    case FOLLOW_HTTP2:
-    case FOLLOW_QUIC:
-    case FOLLOW_TLS :
-    case FOLLOW_SIP :
+    if (follower_) {
         ret = readFollowStream();
-        break;
-
-    default :
+    } else {
         ret = (frs_return_t)0;
         ws_assert_not_reached();
-        break;
     }
 
     ui->teStreamContent->moveCursor(QTextCursor::Start);
@@ -726,7 +700,7 @@ FollowStreamDialog::showBuffer(char *buffer, size_t nchars, gboolean is_from_ser
     guint32 current_pos;
     static const gchar hexchars[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
 
-    switch (show_type_) {
+    switch (recent.gui_follow_show) {
 
     case SHOW_EBCDIC:
     {
@@ -933,6 +907,12 @@ DIAG_ON(stringop-overread)
         addText(ba, is_from_server, packet_num);
         break;
     }
+
+    default:
+        /* The other Show types are supported in Show Packet Bytes but
+         * not here in Follow. (XXX: Maybe some could be added?)
+         */
+        ws_assert_not_reached();
     }
 
     if (last_packet_ == 0) {
@@ -964,6 +944,8 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
     QString             client_to_server_string;
     QString             both_directions_string;
     gboolean            is_follower = FALSE;
+    int                 stream_count;
+    follow_stream_count_func stream_count_func = NULL;
 
     resetStream();
 
@@ -987,12 +969,6 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
         }
     }
 
-    if (follow_type_ == FOLLOW_TLS || follow_type_ == FOLLOW_HTTP)
-    {
-        /* we got tls/http so we can follow */
-        removeStreamControls();
-    }
-
     follow_reset_stream(&follow_info_);
 
     /* Create a new filter that matches all packets in the TCP stream,
@@ -1003,19 +979,13 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
         follow_filter = gchar_free_to_qstring(get_follow_conv_func(follower_)(cap_file_.capFile()->edt, &cap_file_.capFile()->edt->pi, &stream_num, &sub_stream_num));
     }
     if (follow_filter.isEmpty()) {
-        if (follow_type_ == FOLLOW_QUIC) {
-            QMessageBox::warning(this,
-                                 tr("Error creating filter for this stream."),
-                                 tr("QUIC streams not found on the selected packet."));
-        } else {
-            // XXX: This error probably has to do with tunneling, where
-            // the addresses or ports changed after the TCP or UDP layer.
-            // (The appropriate layer must be present, or else the GUI
-            // doesn't allow the option to be selected.)
-            QMessageBox::warning(this,
-                                 tr("Error creating filter for this stream."),
-                                 tr("A transport or network layer header is needed."));
-        }
+        // XXX: This error probably has to do with tunneling (#18231), where
+        // the addresses or ports changed after the TCP or UDP layer.
+        // (The appropriate layer must be present, or else the GUI
+        // doesn't allow the option to be selected.)
+        QMessageBox::warning(this,
+                             tr("Error creating filter for this stream."),
+                             tr("%1 stream not found on the selected packet.").arg(proto_get_protocol_short_name(find_protocol_by_id(get_follow_proto_id(follower_)))));
         return false;
     }
 
@@ -1039,120 +1009,44 @@ bool FollowStreamDialog::follow(QString previous_filter, bool use_stream_index, 
         return false;
     }
 
-    /* disable substream spin box for all protocols except HTTP2 and QUIC */
-    ui->subStreamNumberSpinBox->blockSignals(true);
-    ui->subStreamNumberSpinBox->setEnabled(false);
-    ui->subStreamNumberSpinBox->setValue(0);
-    ui->subStreamNumberSpinBox->setKeyboardTracking(false);
-    ui->subStreamNumberSpinBox->blockSignals(false);
-    ui->subStreamNumberSpinBox->setVisible(false);
-    ui->subStreamNumberLabel->setVisible(false);
+    stream_count_func = get_follow_stream_count_func(follower_);
 
-    switch (follow_type_)
-    {
-    case FOLLOW_TCP:
-    {
-        int stream_count = get_tcp_stream_count();
+    if (stream_count_func == NULL) {
+        removeStreamControls();
+    } else {
+        stream_count = stream_count_func();
         ui->streamNumberSpinBox->blockSignals(true);
         ui->streamNumberSpinBox->setMaximum(stream_count-1);
         ui->streamNumberSpinBox->setValue(stream_num);
         ui->streamNumberSpinBox->blockSignals(false);
         ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
         ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
-
-        break;
     }
-    case FOLLOW_UDP:
-    {
-        int stream_count = get_udp_stream_count();
-        ui->streamNumberSpinBox->blockSignals(true);
-        ui->streamNumberSpinBox->setMaximum(stream_count-1);
-        ui->streamNumberSpinBox->setValue(stream_num);
-        ui->streamNumberSpinBox->blockSignals(false);
-        ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
-        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
 
-        break;
-    }
-    case FOLLOW_DCCP:
-    {
-        int stream_count = get_dccp_stream_count();
-        ui->streamNumberSpinBox->blockSignals(true);
-        ui->streamNumberSpinBox->setMaximum(stream_count-1);
-        ui->streamNumberSpinBox->setValue(stream_num);
-        ui->streamNumberSpinBox->blockSignals(false);
-        ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
-        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
-
-        break;
-    }
-    case FOLLOW_HTTP2:
-    {
-        int stream_count = get_tcp_stream_count();
-        ui->streamNumberSpinBox->blockSignals(true);
-        ui->streamNumberSpinBox->setMaximum(stream_count-1);
-        ui->streamNumberSpinBox->setValue(stream_num);
-        ui->streamNumberSpinBox->blockSignals(false);
-        ui->streamNumberSpinBox->setToolTip(tr("%Ln total stream(s).", "", stream_count));
-        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
-
+    follow_sub_stream_id_func sub_stream_func;
+    sub_stream_func = get_follow_sub_stream_id_func(follower_);
+    if (sub_stream_func != NULL) {
         guint substream_max_id = 0;
-        http2_get_stream_id_le(static_cast<guint>(stream_num), G_MAXINT32, &substream_max_id);
+        sub_stream_func(static_cast<guint>(stream_num), G_MAXINT32, TRUE, &substream_max_id);
         stream_count = static_cast<gint>(substream_max_id);
         ui->subStreamNumberSpinBox->blockSignals(true);
         ui->subStreamNumberSpinBox->setEnabled(true);
         ui->subStreamNumberSpinBox->setMaximum(stream_count);
         ui->subStreamNumberSpinBox->setValue(sub_stream_num);
         ui->subStreamNumberSpinBox->blockSignals(false);
-        ui->subStreamNumberSpinBox->setToolTip(tr("%Ln total sub stream(s).", "", stream_count));
+        ui->subStreamNumberSpinBox->setToolTip(tr("Max sub stream ID for the selected stream: %Ln", "", stream_count));
         ui->subStreamNumberSpinBox->setToolTip(ui->subStreamNumberSpinBox->toolTip());
         ui->subStreamNumberSpinBox->setVisible(true);
         ui->subStreamNumberLabel->setVisible(true);
-
-        break;
-    }
-    case FOLLOW_QUIC:
-    {
-        int stream_count = get_quic_connections_count();
-        ui->streamNumberSpinBox->blockSignals(true);
-        ui->streamNumberSpinBox->setMaximum(stream_count-1);
-        ui->streamNumberSpinBox->setValue(stream_num);
-        ui->streamNumberSpinBox->blockSignals(false);
-        ui->streamNumberSpinBox->setToolTip(tr("Total number of QUIC connections: %Ln", "", stream_count));
-        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
-
-        guint substream_max_id = 0;
-        quic_get_stream_id_le(static_cast<guint>(stream_num), G_MAXINT32, &substream_max_id);
-        stream_count = static_cast<gint>(substream_max_id);
+    } else {
+        /* disable substream spin box for protocols without substreams */
         ui->subStreamNumberSpinBox->blockSignals(true);
-        ui->subStreamNumberSpinBox->setEnabled(true);
-        ui->subStreamNumberSpinBox->setMaximum(stream_count);
-        ui->subStreamNumberSpinBox->setValue(sub_stream_num);
+        ui->subStreamNumberSpinBox->setEnabled(false);
+        ui->subStreamNumberSpinBox->setValue(0);
+        ui->subStreamNumberSpinBox->setKeyboardTracking(false);
         ui->subStreamNumberSpinBox->blockSignals(false);
-        ui->subStreamNumberSpinBox->setToolTip(tr("Max QUIC Stream ID for the selected connection: %Ln", "", stream_count));
-        ui->subStreamNumberSpinBox->setToolTip(ui->subStreamNumberSpinBox->toolTip());
-        ui->subStreamNumberSpinBox->setVisible(true);
-        ui->subStreamNumberLabel->setVisible(true);
-
-        break;
-    }
-    case FOLLOW_TLS:
-    case FOLLOW_HTTP:
-        /* No extra handling */
-        break;
-    case FOLLOW_SIP:
-    {
-        /* There are no more streams */
-        ui->streamNumberSpinBox->setEnabled(false);
-        ui->streamNumberSpinBox->blockSignals(true);
-        ui->streamNumberSpinBox->setMaximum(0);
-        ui->streamNumberSpinBox->setValue(0);
-        ui->streamNumberSpinBox->blockSignals(false);
-        ui->streamNumberSpinBox->setToolTip(tr("No streams"));
-        ui->streamNumberLabel->setToolTip(ui->streamNumberSpinBox->toolTip());
-
-        break;
-    }
+        ui->subStreamNumberSpinBox->setVisible(false);
+        ui->subStreamNumberLabel->setVisible(false);
     }
 
     beginRetapPackets();

@@ -13,7 +13,10 @@
 #include "compiled_filter_output.h"
 
 #ifdef HAVE_LIBPCAP
-#include "wspcap.h"
+#ifdef __MINGW32__
+#include <_bsd_types.h>
+#endif
+#include <pcap.h>
 #endif
 
 #include "capture_opts.h"

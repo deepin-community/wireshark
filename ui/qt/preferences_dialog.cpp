@@ -12,6 +12,7 @@
 
 #include "module_preferences_scroll_area.h"
 
+#include <epan/prefs.h>
 #include <epan/prefs-int.h>
 #include <epan/decode_as.h>
 #include <ui/language.h>
@@ -224,7 +225,16 @@ void PreferencesDialog::on_advancedSearchLineEdit_textEdited(const QString &text
      * the countdown.
      */
     searchLineEditText = text;
-    searchLineEditTimer->start(200);
+    guint gui_debounce_timer = prefs_get_uint_value("gui", "debounce.timer");
+    searchLineEditTimer->start(gui_debounce_timer);
+}
+
+void PreferencesDialog::on_showChangedValuesCheckBox_toggled(bool checked)
+{
+    advancedPrefsModel_.setShowChangedValues(checked);
+    /* If items are filtered out, then filtered back in, the tree remains collapsed
+       Force an expansion */
+    pd_ui_->advancedView->expandAll();
 }
 
 void PreferencesDialog::on_buttonBox_accepted()
@@ -287,13 +297,17 @@ void PreferencesDialog::on_buttonBox_accepted()
 //    prefs_airpcap_update();
 #endif
 
-    mainApp->setMonospaceFont(prefs.gui_qt_font_name);
+    mainApp->setMonospaceFont(prefs.gui_font_name);
 
     if (redissect_flags & PREF_EFFECT_FIELDS) {
         mainApp->queueAppSignal(MainApplication::FieldsChanged);
     }
 
     if (redissect_flags & PREF_EFFECT_DISSECTION) {
+        // Freeze the packet list early to avoid updating column data before doing a
+        // full redissection. The packet list will be thawed when redissection is done.
+        mainApp->queueAppSignal(MainApplication::FreezePacketList);
+
         /* Redissect all the packets, and re-evaluate the display filter. */
         mainApp->queueAppSignal(MainApplication::PacketDissectionChanged);
     }

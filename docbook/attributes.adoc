@@ -1,6 +1,6 @@
 // Common attributes
 
-:wireshark-version: 4.0.8
+:wireshark-version: 4.2.0
 :logray-version: 0.9.0
 
 // Required for btn, kbd:, and menu: macros.
@@ -19,6 +19,9 @@ endif::[]
 // (216 × 279mm).
 :pdf-page-size: 210mm x 280mm
 
+// Include glyphs for up/down arrows
+:pdf-theme: default-with-fallback-font
+
 //
 // URLs
 //
@@ -27,6 +30,8 @@ endif::[]
 :wireshark-main-url: https://www.wireshark.org/
 :wireshark-gitlab-project-url: https://gitlab.com/wireshark/wireshark
 :wireshark-qa-url: https://ask.wireshark.org/
+:wireshark-foundation-url: https://wiresharkfoundation.org/
+:sharkfest-url: https://sharkfest.wireshark.org/
 
 // Wireshark secondary URLs (pages)
 :wireshark-bugs-url: {wireshark-gitlab-project-url}/-/issues
@@ -96,6 +101,7 @@ endif::[]
 :statusbar-attrs: scaledwidth="85%",height=22
 
 :multiplication: ×
+:underscore: _
 :cmd: ⌘
 
 :missing: Not yet written. If you would like to fix this, see https://gitlab.com/wireshark/wireshark/-/wikis/Development/SubmittingPatches.

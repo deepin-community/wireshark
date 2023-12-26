@@ -17,7 +17,7 @@
 
 #include "wsutil/str_util.h"
 #include "wsutil/utf8_entities.h"
-#include "ui/version_info.h"
+#include "wsutil/version_info.h"
 
 #include <ui/qt/utils/qt_ui_utils.h>
 #include "main_application.h"
@@ -173,11 +173,6 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
     out << table_row_begin
         << table_vheader_tmpl.arg(tr("Hash (SHA256)"))
         << table_data_tmpl.arg(summary.file_sha256)
-        << table_row_end;
-
-    out << table_row_begin
-        << table_vheader_tmpl.arg(tr("Hash (RIPEMD160)"))
-        << table_data_tmpl.arg(summary.file_rmd160)
         << table_row_end;
 
     out << table_row_begin

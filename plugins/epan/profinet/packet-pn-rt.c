@@ -512,7 +512,7 @@ dissect_FRAG_PDU_heur(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void 
         bMoreFollows = (u8FragStatus & 0x80) != 0;
         proto_item_append_text(status_item, ": Number: %u, %s",
             uFragNumber,
-            val_to_str( (u8FragStatus & 0x80) >> 7, pn_rt_frag_status_more_follows, "Unknown"));
+            val_to_str_const( (u8FragStatus & 0x80) >> 7, pn_rt_frag_status_more_follows, "Unknown"));
 
         /* Is this a string or a bunch of bytes? Should it be FT_BYTES? */
         proto_tree_add_string_format(sub_tree, hf_pn_rt_frag_data, tvb, offset, tvb_captured_length_remaining(tvb, offset), "data",
@@ -1014,7 +1014,7 @@ proto_register_pn_rt(void)
             NULL, HFILL }},
 
         { &hf_pn_rt_data_status_res3,
-          { "Reserved_1 (should be zero)", "pn_rt.ds_res3",
+          { "Reserved_3 (should be zero)", "pn_rt.ds_res3",
             FT_UINT8, BASE_HEX, 0, 0x08,
             NULL, HFILL }},
 
@@ -1123,7 +1123,7 @@ proto_register_pn_rt(void)
         /* Is this a string or a bunch of bytes? Should it be FT_BYTES? */
         { &hf_pn_rt_frag_data,
           { "FragData", "pn_rt.frag_data",
-            FT_STRING, BASE_NONE, NULL, 0x00,
+            FT_STRING, BASE_NONE, NULL, 0x0,
             NULL, HFILL }},
 
     };

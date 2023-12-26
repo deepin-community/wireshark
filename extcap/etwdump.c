@@ -22,7 +22,7 @@
 #include <wsutil/wslog.h>
 
 #include <cli_main.h>
-#include <ui/cmdarg_err.h>
+#include <wsutil/cmdarg_err.h>
 #include "etl.h"
 
 #include <signal.h>
@@ -52,7 +52,7 @@ static struct ws_option longopts[] = {
     { 0, 0, 0, 0 }
 };
 
-int g_include_undecidable_event = FALSE;
+int g_include_undecidable_event = false;
 
 void SignalHandler(_U_ int signal)
 {
@@ -95,7 +95,7 @@ static int list_config(char* interface)
     printf("arg {number=%u}{call=--etlfile}{display=etl file}"
         "{type=fileselect}{tooltip=Select etl file to display in Wireshark}{required=false}{group=Capture}\n",
         inc++);
-    printf("arg {number=%u}{call=--params}{display=filter parmeters}"
+    printf("arg {number=%u}{call=--params}{display=filter parameters}"
         "{type=string}{tooltip=Input providers, keyword and level filters for the etl file and live session}{group=Capture}\n",
         inc++);
     /*
@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
             break;
 
         case OPT_INCLUDE_UNDECIDABLE_EVENT:
-            g_include_undecidable_event = TRUE;
+            g_include_undecidable_event = true;
             break;
 
         case ':':
@@ -233,7 +233,7 @@ int main(int argc, char* argv[])
             goto end;
         }
 
-        wtap_init(FALSE);
+        wtap_init(false);
 
         signal(SIGINT, SignalHandler);
 

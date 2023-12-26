@@ -18,12 +18,12 @@ FieldInformation::FieldInformation(field_info *fi, QObject * parent)
     parent_fi_ = NULL;
 }
 
-FieldInformation::FieldInformation(proto_node *node, QObject * parent)
+FieldInformation::FieldInformation(const ProtoNode *node, QObject * parent)
 :QObject(parent)
 {
     fi_ = NULL;
-    if (node) {
-        fi_ = node->finfo;
+    if (node && node->isValid()) {
+        fi_ = node->protoNode()->finfo;
     }
     parent_fi_ = NULL;
 }
@@ -48,7 +48,7 @@ bool FieldInformation::isLink() const
 {
     if (fi_ && fi_->hfinfo) {
         if ((fi_->hfinfo->type == FT_FRAMENUM) ||
-                (FI_GET_FLAG(fi_, FI_URL) && IS_FT_STRING(fi_->hfinfo->type))) {
+                (FI_GET_FLAG(fi_, FI_URL) && FT_IS_STRING(fi_->hfinfo->type))) {
             return true;
         }
     }
@@ -153,7 +153,7 @@ QString FieldInformation::toString()
 QString FieldInformation::url()
 {
     QString url;
-    if (flag(FI_URL) && headerInfo().isValid && IS_FT_STRING(fi_->hfinfo->type)) {
+    if (flag(FI_URL) && headerInfo().isValid && FT_IS_STRING(fi_->hfinfo->type)) {
         url = toString();
     }
     return url;

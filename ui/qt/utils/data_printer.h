@@ -30,9 +30,9 @@ public:
         DP_HexDump,
         DP_HexOnly,
         DP_HexStream,
-        DP_PrintableText,
-        DP_EscapedString,
-        DP_Binary
+        DP_CString,
+        DP_MimeData,
+        DP_Base64
     };
 
     void toClipboard(DataPrinter::DumpType type, IDataPrintable * printable);

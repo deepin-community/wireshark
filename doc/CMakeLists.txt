@@ -9,17 +9,6 @@
 
 find_package( Asciidoctor 1.5 )
 
-add_custom_command(
-	OUTPUT AUTHORS-SHORT
-	COMMAND ${PYTHON_EXECUTABLE}
-		${CMAKE_CURRENT_SOURCE_DIR}/make-authors-short.py
-		< ${CMAKE_SOURCE_DIR}/AUTHORS
-		> ${CMAKE_CURRENT_BINARY_DIR}/AUTHORS-SHORT
-	DEPENDS
-		${CMAKE_CURRENT_SOURCE_DIR}/make-authors-short.py
-		${CMAKE_SOURCE_DIR}/AUTHORS
-)
-
 set(MAN1_SOURCE_FILES)
 set(MAN4_SOURCE_FILES)
 set(MAN1_INSTALL_FILES)
@@ -47,7 +36,6 @@ ADD_MAN_PAGE(androiddump 1)
 ADD_MAN_PAGE(capinfos    1)
 ADD_MAN_PAGE(captype     1)
 ADD_MAN_PAGE(ciscodump   1)
-ADD_MAN_PAGE(dftest      1)
 ADD_MAN_PAGE(dumpcap     1)
 ADD_MAN_PAGE(editcap     1)
 ADD_MAN_PAGE(mergecap    1)
@@ -59,6 +47,7 @@ ADD_MAN_PAGE(reordercap  1)
 ADD_MAN_PAGE(sshdump     1)
 ADD_MAN_PAGE(text2pcap   1)
 ADD_MAN_PAGE(tshark      1)
+ADD_MAN_PAGE(falcodump   1)
 ADD_MAN_PAGE(udpdump     1)
 ADD_MAN_PAGE(wifidump    1)
 
@@ -86,10 +75,14 @@ if (BUILD_xxx2deb)
 	ADD_MAN_PAGE(idl2deb     1)
 endif()
 
-set(BUNDLE_RESOURCE_SHARE_MAN1_FILES ${MAN1_INSTALL_FILES} PARENT_SCOPE)
-set(BUNDLE_RESOURCE_SHARE_MAN4_FILES ${MAN4_INSTALL_FILES} PARENT_SCOPE)
+set(WIRESHARK_BUNDLE_RESOURCE_SHARE_MAN1_FILES ${MAN1_INSTALL_FILES} PARENT_SCOPE)
+set(WIRESHARK_BUNDLE_RESOURCE_SHARE_MAN4_FILES ${MAN4_INSTALL_FILES} PARENT_SCOPE)
+# XXX We need a Logray-specific man page list, which might overlap with Wireshark's.
+# Just install everything for now.
+set(LOGRAY_BUNDLE_RESOURCE_SHARE_MAN1_FILES ${WIRESHARK_BUNDLE_RESOURCE_SHARE_MAN1_FILES} PARENT_SCOPE)
+set(LOGRAY_BUNDLE_RESOURCE_SHARE_MAN4_FILES ${WIRESHARK_BUNDLE_RESOURCE_SHARE_MAN4_FILES} PARENT_SCOPE)
 
-set(MAN_INCLUDES diagnostic-options.adoc)
+set(MAN_INCLUDES diagnostic-options.adoc dissection-options.adoc)
 
 if(ASCIIDOCTOR_FOUND)
 	ASCIIDOCTOR2ROFFMAN(1 ${MAN1_SOURCE_FILES})
@@ -103,10 +96,42 @@ if(ASCIIDOCTOR_FOUND)
 	set_target_properties(manpages PROPERTIES FOLDER "Documentation")
 endif()
 
+if(ASCIIDOCTOR_FOUND)
+	ASCIIDOCTOR2HTML(release-notes.adoc)
+	ASCIIDOCTOR2TXT(release-notes.adoc)
+
+	list(APPEND HTML_INSTALL_FILES "${CMAKE_CURRENT_BINARY_DIR}/release-notes.html")
+
+	add_custom_target(release_notes_html
+		DEPENDS
+			${CMAKE_CURRENT_BINARY_DIR}/release-notes.html
+	)
+	set_target_properties(release_notes_html PROPERTIES FOLDER "Documentation")
+	add_custom_target(release_notes_txt
+		DEPENDS
+			${CMAKE_CURRENT_BINARY_DIR}/release-notes.txt
+	)
+	set_target_properties(release_notes_txt PROPERTIES FOLDER "Documentation")
+	add_custom_target(release_notes
+		DEPENDS
+			release_notes_html
+			release_notes_txt
+	)
+	set_target_properties(release_notes PROPERTIES FOLDER "Documentation")
+
+	add_custom_target(news
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			${CMAKE_CURRENT_BINARY_DIR}/release-notes.txt
+			${CMAKE_SOURCE_DIR}/NEWS
+		DEPENDS
+			release_notes_txt
+	)
+	set_target_properties(news PROPERTIES FOLDER "Documentation")
+endif()
+
 add_custom_target(
 	docs ALL
 	DEPENDS
-		${CMAKE_CURRENT_BINARY_DIR}/AUTHORS-SHORT
 		${MAN1_INSTALL_FILES}
 		${MAN4_INSTALL_FILES}
 		${HTML_INSTALL_FILES}
@@ -129,10 +154,12 @@ if(ASCIIDOCTOR_FOUND)
 	)
 endif()
 
-#
-# Installation of HTML manuals is done
-# elsewhere to CMAKE_INSTALL_DATADIR.
-#
+install(
+	FILES
+		${HTML_INSTALL_FILES}
+	DESTINATION
+		${CMAKE_INSTALL_DOCDIR}
+)
 
 #
 # Editor modelines  -  https://www.wireshark.org/tools/modelines.html

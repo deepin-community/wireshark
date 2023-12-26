@@ -36,9 +36,9 @@ SetCompressorDictSize 64 ; MB
 ; ============================================================================
 
 ; The file to write
-OutFile "${OUTFILE_DIR}\${PROGRAM_NAME}-${WIRESHARK_TARGET_PLATFORM}-${VERSION}.exe"
+OutFile "${OUTFILE_DIR}\${PROGRAM_NAME}-${VERSION}-${WIRESHARK_TARGET_PLATFORM}.exe"
 ; Installer icon
-Icon "${TOP_SRC_DIR}\resources\icons\wiresharkinst.ico"
+Icon "${TOP_SRC_DIR}\resources\icons\lograyinst.ico"
 
 ; ============================================================================
 ; Modern UI
@@ -53,7 +53,7 @@ Icon "${TOP_SRC_DIR}\resources\icons\wiresharkinst.ico"
 !include "InstallOptions.nsh"
 ;!addplugindir ".\Plugins"
 
-!define MUI_ICON "${TOP_SRC_DIR}\resources\icons\wiresharkinst.ico"
+!define MUI_ICON "${TOP_SRC_DIR}\resources\icons\lograyinst.ico"
 BrandingText "Logray${U+00ae} Installer"
 
 !define MUI_COMPONENTSPAGE_SMALLDESC
@@ -191,14 +191,10 @@ ComponentText "The following components are available for installation."
 DirText "Choose a directory in which to install ${PROGRAM_NAME}."
 
 ; The default installation directory
-!if ${WIRESHARK_TARGET_PLATFORM} == "win64"
-  InstallDir $PROGRAMFILES64\${PROGRAM_NAME}
-!else
-  InstallDir $PROGRAMFILES\${PROGRAM_NAME}
-!endif
+InstallDir $PROGRAMFILES64\${PROGRAM_NAME}
 
 ; See if this is an upgrade; if so, use the old InstallDir as default
-InstallDirRegKey HKEY_LOCAL_MACHINE SOFTWARE\${PROGRAM_NAME} "InstallDir"
+InstallDirRegKey HKEY_LOCAL_MACHINE SOFTWARE\${PROGRAM_NAME} InstallDir
 
 
 ; ============================================================================
@@ -262,7 +258,7 @@ Var WIX_UNINSTALLSTRING
 !include WinMessages.nsh
 
 Function .onInit
-  !if ${WIRESHARK_TARGET_PLATFORM} == "win64"
+  !if ${WIRESHARK_TARGET_PLATFORM} == "x64"
     ; http://forums.winamp.com/printthread.php?s=16ffcdd04a8c8d52bee90c0cae273ac5&threadid=262873
     ${IfNot} ${RunningX64}
       MessageBox MB_OK "Logray only runs on 64-bit machines." /SD IDOK
@@ -455,10 +451,7 @@ File "${STAGING_DIR}\COPYING.txt"
 File "${STAGING_DIR}\NEWS.txt"
 File "${STAGING_DIR}\README.txt"
 File "${STAGING_DIR}\README.windows.txt"
-File "${STAGING_DIR}\AUTHORS-SHORT"
-File "${STAGING_DIR}\manuf"
 File "${STAGING_DIR}\wka"
-File "${STAGING_DIR}\services"
 File "${STAGING_DIR}\pdml2html.xsl"
 File "${STAGING_DIR}\ws.css"
 ;File "${STAGING_DIR}\logray.html"
@@ -467,8 +460,6 @@ File "${STAGING_DIR}\dumpcap.exe"
 File "${STAGING_DIR}\dumpcap.html"
 File "${STAGING_DIR}\extcap.html"
 File "${STAGING_DIR}\ipmap.html"
-File "${STAGING_DIR}\gpl-2.0-standalone.html"
-File "${STAGING_DIR}\Acknowledgements.md"
 
 ; C-runtime redistributable
 ; vc_redist.x64.exe or vc_redist.x86.exe - copy and execute the redistributable installer
@@ -513,9 +504,6 @@ File "${STAGING_DIR}\colorfilters"
 ;dont_overwrite_colorfilters:
 ;IfFileExists dfilters dont_overwrite_dfilters
 File "${STAGING_DIR}\dfilters"
-;dont_overwrite_dfilters:
-;IfFileExists enterprises.tsv dont_overwrite_enterprises_tsv
-File "${STAGING_DIR}\enterprises.tsv"
 ;dont_overwrite_dfilters:
 ;IfFileExists smi_modules dont_overwrite_smi_modules
 File "${STAGING_DIR}\smi_modules"
@@ -572,6 +560,7 @@ File "${STAGING_DIR}\radius\dictionary"
 File "${STAGING_DIR}\radius\dictionary.3com"
 File "${STAGING_DIR}\radius\dictionary.3gpp"
 File "${STAGING_DIR}\radius\dictionary.3gpp2"
+File "${STAGING_DIR}\radius\dictionary.5x9"
 File "${STAGING_DIR}\radius\dictionary.acc"
 File "${STAGING_DIR}\radius\dictionary.acme"
 File "${STAGING_DIR}\radius\dictionary.actelis"
@@ -810,6 +799,9 @@ File "${STAGING_DIR}\protobuf\*.proto"
 SetOutPath $INSTDIR\tpncp
 File "${STAGING_DIR}\tpncp\tpncp.dat"
 
+; Write the installation path into the registry for InstallDirRegKey
+WriteRegStr HKEY_LOCAL_MACHINE SOFTWARE\${PROGRAM_NAME} InstallDir "$INSTDIR"
+
 ; Write the uninstall keys for Windows
 ; https://nsis.sourceforge.io/Add_uninstall_information_to_Add/Remove_Programs
 ; https://docs.microsoft.com/en-us/previous-versions/ms954376(v=msdn.10)
@@ -976,13 +968,6 @@ File "${STAGING_DIR}\reordercap.exe"
 File "${STAGING_DIR}\reordercap.html"
 SectionEnd
 
-Section "DFTest" SecDFTest
-;-------------------------------------------
-SetOutPath $INSTDIR
-File "${STAGING_DIR}\dftest.exe"
-File "${STAGING_DIR}\dftest.html"
-SectionEnd
-
 Section "Capinfos" SecCapinfos
 ;-------------------------------------------
 SetOutPath $INSTDIR
@@ -1069,7 +1054,6 @@ SectionEnd
   !insertmacro MUI_DESCRIPTION_TEXT ${SecText2Pcap} "Read an ASCII hex dump and write the data into a libpcap-style capture file."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecMergecap} "Combine multiple saved capture files into a single output file"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecReordercap} "Copy packets to a new file, sorted by time."
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecDFTest} "Shows display filter byte-code, for debugging dfilter routines"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecCapinfos} "Print information about capture files."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecCaptype} "Print the types capture files."
   !insertmacro MUI_DESCRIPTION_TEXT ${SecRandpkt} "Random packet generator."

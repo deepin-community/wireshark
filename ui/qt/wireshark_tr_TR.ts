@@ -109,8 +109,8 @@
     </message>
     <message numerus="yes">
         <source>Copy Row(s)</source>
-        <translation>
-            <numerusform>Satırları Kopyala</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
 </context>
@@ -729,6 +729,14 @@
         <translation>Baytları onaltılık olarak göster</translation>
     </message>
     <message>
+        <source>…as decimal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>…as octal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>…as bits</source>
         <translation>…bit olarak</translation>
     </message>
@@ -801,26 +809,6 @@
     <message>
         <source>Automatically detect file type</source>
         <translation>Dosya türünü otomatik olarak algıla</translation>
-    </message>
-    <message numerus="yes">
-        <source>%1, error after %Ln packet(s)</source>
-        <oldsource>%1, error after %2 packets</oldsource>
-        <translation type="vanished">
-            <numerusform>%1, %Ln paketinden sonra hata</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%1, timed out at %Ln packet(s)</source>
-        <oldsource>%1, timed out at %2 packets</oldsource>
-        <translation type="vanished">
-            <numerusform>%1, %Ln paketi zaman aşımına uğradı</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%1, %Ln packet(s)</source>
-        <translation type="vanished">
-            <numerusform>%1, %Ln paketi</numerusform>
-        </translation>
     </message>
     <message>
         <source>Prepend packets</source>
@@ -905,20 +893,20 @@
     <message numerus="yes">
         <source>%1, error after %Ln data record(s)</source>
         <oldsource>%1, error after %Ln record(s)</oldsource>
-        <translation>
-            <numerusform>%1, %Ln veri kaydından sonra hata</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message numerus="yes">
         <source>%1, timed out at %Ln data record(s)</source>
-        <translation>
-            <numerusform>%1, %Ln veri kaydı zaman aşımına uğradı</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message numerus="yes">
         <source>%1, %Ln data record(s)</source>
-        <translation>
-            <numerusform>%1, %Ln veri kaydı</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -971,10 +959,6 @@
     <message>
         <source>Hash (SHA256)</source>
         <translation>Karma (SHA256)</translation>
-    </message>
-    <message>
-        <source>Hash (RIPEMD160)</source>
-        <translation>Karma (RIPEMD160)</translation>
     </message>
     <message>
         <source>Hash (SHA1)</source>
@@ -1562,12 +1546,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Paket listesini gerçek zamanlı olarak güncelleyin</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Keep the packet list scrolled to the bottom while capturing.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Yakalarken paket listesini aşağıya kaydırılmış halde tutun.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>Interval between updates (ms)</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Automatic scrolling in live capture</source>
-        <translation>Canlı yakalamada otomatik kaydırma</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How often the capture notifies the GUI of new packets. Affects how often the GUI updates and the granularity of timers.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The interval between new packet updates. Affects how often the GUI updates and the granularity of timers.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Don&apos;t load interfaces on startup</source>
@@ -1674,14 +1662,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Export %1 Coloring Rules</source>
         <translation>%1 Renklendirme Kuralını Dışa Aktar</translation>
-    </message>
-    <message>
-        <source>Your coloring rules file contains unknown rules</source>
-        <translation>Boyama kuralları dosyanız bilinmeyen kurallar içeriyor</translation>
-    </message>
-    <message>
-        <source>Wireshark doesn&apos;t recognize one or more of your coloring rules. They have been disabled.</source>
-        <translation>Wireshark, renklendirme kurallarınızdan birini veya daha fazlasını tanımıyor. Devre dışı bırakıldılar.</translation>
     </message>
 </context>
 <context>
@@ -2004,12 +1984,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Paket baytlarını hex dökümü olarak kopyalayın.</translation>
     </message>
     <message>
-        <source>…as Printable Text</source>
-        <translation>…Yazdırılabilir Metin Olarak</translation>
+        <source>…as MIME Data</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy only the printable text in the packet.</source>
-        <translation>Yalnızca paketteki yazdırılabilir metni kopyalayın.</translation>
+        <source>…as C String</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as printable ASCII characters and escape sequences.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>…as a Hex Stream</source>
@@ -2020,20 +2004,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Paket baytlarını bir hex akışı olarak kopyalayın.</translation>
     </message>
     <message>
-        <source>…as Raw Binary</source>
-        <translation>…Ham İkili olarak</translation>
+        <source>…as a Base64 String</source>
+        <translation>…Base64 Dizesi olarak</translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as a base64 encoded string.</source>
+        <translation>Paket baytlarını base64 kodlu bir dize olarak kopyalayın.</translation>
     </message>
     <message>
         <source>Copy packet bytes as application/octet-stream MIME data.</source>
         <translation>Paket baytlarını uygulama/sekizli akış MIME verileri olarak kopyalayın.</translation>
-    </message>
-    <message>
-        <source>…as Escaped String</source>
-        <translation>…Kaçan Dize olarak</translation>
-    </message>
-    <message>
-        <source>Copy packet bytes as an escaped string.</source>
-        <translation>Paket baytlarını çıkış karakterli bir dize olarak kopyalayın.</translation>
     </message>
 </context>
 <context>
@@ -2296,6 +2276,17 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>DissectorSyntaxLineEdit</name>
+    <message>
+        <source>Dissector entry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a dissector %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>DissectorTablesDialog</name>
     <message>
         <source>Dialog</source>
@@ -2464,6 +2455,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>City</source>
         <translation>Şehir</translation>
+    </message>
+    <message>
+        <source>Latitude</source>
+        <translation>Enlem</translation>
+    </message>
+    <message>
+        <source>Longitude</source>
+        <translation>Boylam</translation>
     </message>
     <message>
         <source>AS Number</source>
@@ -2895,8 +2894,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message numerus="yes">
         <source>%Ln File(s) in Set</source>
         <oldsource>%1 File%2 in Set</oldsource>
-        <translation>
-            <numerusform>Kümedeki %Ln Dosyalar</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
 </context>
@@ -3215,20 +3214,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Kişisel Lua Eklentileri</translation>
     </message>
     <message>
-        <source>lua scripts</source>
-        <translation>lua betikleri</translation>
-    </message>
-    <message>
         <source>Global Lua Plugins</source>
         <translation>Genel Lua Eklentileri</translation>
     </message>
     <message>
-        <source>Extcap Plugins search path</source>
-        <translation>Extcap Eklentileri arama yolu</translation>
+        <source>Lua scripts</source>
+        <translation>Lua betikleri</translation>
     </message>
     <message>
         <source>Personal Extcap path</source>
         <translation>Kişisel Excap yolu</translation>
+    </message>
+    <message>
+        <source>external capture (extcap) plugins</source>
+        <translation>harici yakalama (extcap) eklentileri</translation>
     </message>
     <message>
         <source>Global Extcap path</source>
@@ -3272,6 +3271,13 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>FollowStreamAction</name>
+    <message>
+        <source>%1 Stream</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>FollowStreamDialog</name>
     <message>
         <source>Filter Out This Stream</source>
@@ -3281,18 +3287,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Print</source>
         <translation>Yazdır</translation>
-    </message>
-    <message numerus="yes">
-        <source>%Ln client pkt(s), </source>
-        <translation type="vanished">
-            <numerusform>%Ln istemci pkt,</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%Ln server pkt(s), </source>
-        <translation type="vanished">
-            <numerusform>%Ln sunucu pkt,</numerusform>
-        </translation>
     </message>
     <message>
         <source>ASCII</source>
@@ -3336,20 +3330,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message numerus="yes">
         <source>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;client&lt;/span&gt; pkt(s), </source>
-        <translation>
-            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;istemci&lt;/span&gt; pkt,</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message numerus="yes">
         <source>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;server&lt;/span&gt; pkt(s), </source>
-        <translation>
-            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;sunucu&lt;/span&gt; pkt,</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message numerus="yes">
         <source>%Ln turn(s).</source>
-        <translation>
-            <numerusform>%Ln dönüşü.</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -3381,30 +3375,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Lütfen %1 paketinin seçili olduğundan emin olun.</translation>
     </message>
     <message>
-        <source>QUIC streams not found on the selected packet.</source>
-        <translation>QUIC akışları seçilen pakette bulunamadı.</translation>
-    </message>
-    <message numerus="yes">
-        <source>%Ln total sub stream(s).</source>
-        <translation>
-            <numerusform>%Ln toplam alt akış(lar).</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>Total number of QUIC connections: %Ln</source>
-        <translation>
-            <numerusform>Toplam QUIC bağlantı sayısı: %Ln</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>Max QUIC Stream ID for the selected connection: %Ln</source>
-        <translation>
-            <numerusform>Seçilen bağlantı için Azami. QUIC Akış Kimliği: %Ln</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>No streams</source>
-        <translation>Akış yok</translation>
+        <source>%1 stream not found on the selected packet.</source>
+        <translation>Seçili pakette %1 akışı bulunamadı.</translation>
     </message>
     <message>
         <source>Entire conversation (%1)</source>
@@ -3426,14 +3398,16 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>[Stream output truncated]</source>
         <translation>[Akış çıkışı kesildi]</translation>
     </message>
-    <message>
-        <source>A transport or network layer header is needed.</source>
-        <translation>Bir aktarım veya ağ katmanı başlığı gereklidir.</translation>
-    </message>
     <message numerus="yes">
         <source>%Ln total stream(s).</source>
-        <translation>
-            <numerusform>%Ln akışı.</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Max sub stream ID for the selected stream: %Ln</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -3689,6 +3663,29 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>IOConsoleDialog</name>
+    <message>
+        <source>Dialog</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter code</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Evaluate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation type="unfinished">Temiz</translation>
+    </message>
+    <message>
+        <source>Use %1 to evaluate.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>IOGraphDialog</name>
     <message>
         <source>Dialog</source>
@@ -3800,6 +3797,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Tüm grafikleri temizle.</translation>
     </message>
     <message>
+        <source>Move this graph upwards.</source>
+        <translation>Bu grafiği yukarı doğru götür.</translation>
+    </message>
+    <message>
+        <source>Move this graph downwards.</source>
+        <translation>Bu grafiği aşağı doğru götür.</translation>
+    </message>
+    <message>
         <source>Mouse</source>
         <translation>Fare</translation>
     </message>
@@ -3832,8 +3837,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Günlük ölçeği</translation>
     </message>
     <message>
-        <source>Automatic Update</source>
-        <translation>Otomatik Güncelleme</translation>
+        <source>Automatic update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable legend</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Reset</source>
@@ -4105,12 +4114,24 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Filtrelenmiş paketler</translation>
     </message>
     <message>
+        <source>Filtered events</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>All Packets</source>
         <translation>Tüm Paketler</translation>
     </message>
     <message>
         <source>TCP Errors</source>
         <translation>TCP Hataları</translation>
+    </message>
+    <message>
+        <source>All Events</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Access Denied</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Hover over the graph for details.</source>
@@ -4121,12 +4142,24 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Aralıkta paket yok</translation>
     </message>
     <message>
+        <source>No events in interval</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Click to select packet</source>
         <translation>Paket seçmek için tıklayın</translation>
     </message>
     <message>
         <source>Packet</source>
         <translation>Paket</translation>
+    </message>
+    <message>
+        <source>Click to select event</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Event</source>
+        <translation type="unfinished">Olay</translation>
     </message>
     <message>
         <source>%1 (%2s%3).</source>
@@ -5844,6 +5877,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Listenin sıralanmasına izin ver</translation>
     </message>
     <message>
+        <source>Maximum number of cached rows (affects sorting)</source>
+        <translation>Azami önbelleğe alınmış satır sayısı (sıralamayı etkiler)</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If more than this many rows are displayed, then sorting by columns that require packet dissection will be disabled. Increasing this number increases memory consumption by caching column values.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Bu sayıdan daha fazla satır görüntülenirse, paket incelemesi gerektiren sütunlara göre sıralama devre dışı bırakılır. Bu sayıyı artırmak, sütun değerlerini önbelleğe alarak bellek tüketimini artırır.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
         <source>Enable mouse-over colorization</source>
         <translation>Fareyle üzerine gelindiğinde renklendirmeyi etkinleştir</translation>
     </message>
@@ -6330,14 +6371,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>İçe Aktar</translation>
     </message>
     <message>
-        <source>from zip file</source>
-        <translation>zip dosyasından</translation>
-    </message>
-    <message>
-        <source>from directory</source>
-        <translation>dizinden</translation>
-    </message>
-    <message>
         <source>Export</source>
         <translation>Dışarı aktar</translation>
     </message>
@@ -6378,8 +6411,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message numerus="yes">
         <source>%Ln byte(s)</source>
         <oldsource>, %1 bytes</oldsource>
-        <translation>
-            <numerusform>%Ln bayt</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -6429,12 +6462,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Paket Yok</translation>
     </message>
     <message>
-        <source>selected personal profile</source>
-        <translation>seçilen kişisel profil</translation>
+        <source>From Zip File...</source>
+        <translation>Zip Dosyasından...</translation>
     </message>
     <message>
-        <source>all personal profiles</source>
-        <translation>tüm kişisel profiller</translation>
+        <source>From Directory...</source>
+        <translation>Dizinden...</translation>
+    </message>
+    <message>
+        <source>Selected Personal Profile...</source>
+        <translation>Seçilen Kişisel Profil...</translation>
+    </message>
+    <message>
+        <source>All Personal Profiles...</source>
+        <translation>Tüm Kişisel Profiller...</translation>
     </message>
     <message>
         <source>Packets: %1</source>
@@ -6620,6 +6661,68 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>New Pipe</source>
         <translation>Yeni Boru</translation>
+    </message>
+</context>
+<context>
+    <name>ManufDialog</name>
+    <message>
+        <source>MAC Address Blocks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Search MAC address or address prefix. Special purpose bits are masked.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>MAC Address</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Search vendor name using a case-insentitive regular expression.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Vendor Name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show short name column.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Short name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select all</source>
+        <translation type="unfinished">Tümünü seç</translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation type="unfinished">Kopyala</translation>
+    </message>
+    <message>
+        <source>Find</source>
+        <translation type="unfinished">Bul</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation type="unfinished">Temiz</translation>
+    </message>
+</context>
+<context>
+    <name>ManufTableModel</name>
+    <message>
+        <source>Address Block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Short Name</source>
+        <translation type="unfinished">Kısa İsim</translation>
+    </message>
+    <message>
+        <source>Vendor Name</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -6913,6 +7016,12 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>Bytes %1-%2</source>
         <translation>Bayt %1-%2</translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln byte(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>PacketFormatGroupBox</name>
@@ -7070,8 +7179,20 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 <context>
     <name>PacketListModel</name>
     <message>
+        <source>Column</source>
+        <translation>Sütun</translation>
+    </message>
+    <message>
+        <source>%1 can only be sorted with %2 or fewer visible rows; increase cache size in Layout preferences</source>
+        <translation>%1 yalnızca %2 veya daha az görünür satırla sıralanabilir; Düzen tercihlerinde önbellek boyutunu artırın</translation>
+    </message>
+    <message>
         <source>Sorting &quot;%1&quot;…</source>
         <translation>&quot;%1&quot; sıralanıyor…</translation>
+    </message>
+    <message>
+        <source>Sorting …</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -7103,6 +7224,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Remove &amp;ignored packets</source>
         <translation>Yok &amp;sayılan paketleri kaldır</translation>
+    </message>
+    <message>
+        <source>Include &amp;depended upon packets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Also include packets depended upon, such as those used to reassemble displayed packets</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>First &amp;to last marked</source>
@@ -7358,6 +7487,24 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Dışarı aktar</translation>
     </message>
     <message>
+        <source>From Zip File...</source>
+        <translation>Zip Dosyasından...</translation>
+    </message>
+    <message>
+        <source>From Directory...</source>
+        <translation>Dizinden...</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln Selected Personal Profile(s)...</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>All Personal Profiles...</source>
+        <translation>Tüm Kişisel Profiller...</translation>
+    </message>
+    <message>
         <source>New profile</source>
         <translation>Yeni profil</translation>
     </message>
@@ -7377,18 +7524,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>Select zip file for export</source>
         <translation>Dışa aktarmak için zip dosyasını seçin</translation>
     </message>
-    <message numerus="yes">
-        <source>… %Ln selected personal profile(s)</source>
-        <translation type="vanished">
-            <numerusform>… %Ln seçilmiş kişisel profil</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>%Ln selected personal profile(s)</source>
-        <translation>
-            <numerusform>%Ln seçilmiş kişisel profil</numerusform>
-        </translation>
-    </message>
     <message>
         <source>An import of profiles is not allowed, while changes are pending</source>
         <translation>Değişiklikler beklemedeyken profillerin içe aktarılmasına izin verilmez</translation>
@@ -7407,8 +7542,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message numerus="yes">
         <source>%Ln profile(s) exported</source>
-        <translation>
-            <numerusform>%Ln profili dışa aktarıldı</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -7424,18 +7559,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Zip Dosyası (*.zip)</translation>
     </message>
     <message>
-        <source>from zip file</source>
-        <translation>zip dosyasından</translation>
-    </message>
-    <message>
-        <source>from directory</source>
-        <translation>dizinden</translation>
-    </message>
-    <message>
-        <source>all personal profiles</source>
-        <translation>tüm kişisel profiller</translation>
-    </message>
-    <message>
         <source>Error</source>
         <translation>Hata</translation>
     </message>
@@ -7449,14 +7572,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message numerus="yes">
         <source>%Ln profile(s) imported</source>
-        <translation>
-            <numerusform>%Ln profili içe aktarıldı</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message numerus="yes">
         <source>, %Ln profile(s) skipped</source>
-        <translation>
-            <numerusform>, %Ln profili atlandı</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -7754,6 +7877,30 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Akış listesini YAML olarak kopyalayın.</translation>
     </message>
     <message>
+        <source>Copy short names</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy short protocol names in use.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable unused protocols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable all protocols but those listed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Re-enable unused protocols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Re-enable protocols that were disabled in this dialog.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Protocol Hierarchy Statistics</source>
         <translation>Protokol Hiyerarşi İstatistikleri</translation>
     </message>
@@ -7770,12 +7917,36 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>YAML olarak</translation>
     </message>
     <message>
+        <source>protocol short names</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Protocols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable unused</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Revert changes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>No display filter.</source>
         <translation>Görüntüleme filtresi yok.</translation>
     </message>
     <message>
         <source>Display filter: %1</source>
         <translation>Görüntüleme filtresi: %1</translation>
+    </message>
+    <message>
+        <source>Unused protocols have been disabled.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Protocol changes have been reverted.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -9714,254 +9885,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>Analyze</source>
         <translation>Analiz</translation>
     </message>
-    <message>
-        <source>Reset Graph</source>
-        <translation>Grafiği Sıfırla</translation>
-    </message>
-    <message>
-        <source>Reset the graph to its initial state.</source>
-        <translation>Grafiği ilk durumuna sıfırlayın.</translation>
-    </message>
-    <message>
-        <source>0</source>
-        <translation>0</translation>
-    </message>
-    <message>
-        <source>Zoom In</source>
-        <translation>Yakınlaş</translation>
-    </message>
-    <message>
-        <source>+</source>
-        <translation>+</translation>
-    </message>
-    <message>
-        <source>Zoom Out</source>
-        <translation>Uzaklaş</translation>
-    </message>
-    <message>
-        <source>-</source>
-        <translation>-</translation>
-    </message>
-    <message>
-        <source>Move Up 10 Pixels</source>
-        <translation>10 Piksel Yukarı Taşı</translation>
-    </message>
-    <message>
-        <source>Up</source>
-        <translation>Üst</translation>
-    </message>
-    <message>
-        <source>Move Left 10 Pixels</source>
-        <translation>10 Piksel Sola Taşı</translation>
-    </message>
-    <message>
-        <source>Left</source>
-        <translation>Sol</translation>
-    </message>
-    <message>
-        <source>Move Right 10 Pixels</source>
-        <translation>10 Piksel Sağa Taşı</translation>
-    </message>
-    <message>
-        <source>Right</source>
-        <translation>Sağa</translation>
-    </message>
-    <message>
-        <source>Move Down 10 Pixels</source>
-        <translation>10 Piksel Aşağı Taşı</translation>
-    </message>
-    <message>
-        <source>Down</source>
-        <translation>Aşağı</translation>
-    </message>
-    <message>
-        <source>Move Up 1 Pixel</source>
-        <translation>1 Piksel Yukarı Taşı</translation>
-    </message>
-    <message>
-        <source>Shift+Up</source>
-        <translation>Shift+Yukarı</translation>
-    </message>
-    <message>
-        <source>Move Left 1 Pixel</source>
-        <translation>Sola 1 Piksel Taşı</translation>
-    </message>
-    <message>
-        <source>Shift+Left</source>
-        <translation>Shift+Sol</translation>
-    </message>
-    <message>
-        <source>Move Right 1 Pixel</source>
-        <translation>1 Piksel Sağa Taşı</translation>
-    </message>
-    <message>
-        <source>Shift+Right</source>
-        <translation>Shift+Sağ</translation>
-    </message>
-    <message>
-        <source>Move Down 1 Pixel</source>
-        <translation>1 Piksel Aşağı Taşı</translation>
-    </message>
-    <message>
-        <source>Shift+Down</source>
-        <translation>Shift+Aşağı</translation>
-    </message>
-    <message>
-        <source>Next Stream</source>
-        <translation>Sonraki Akış</translation>
-    </message>
-    <message>
-        <source>Go to the next stream in the capture</source>
-        <translation>Yakalamadaki sonraki akışa git</translation>
-    </message>
-    <message>
-        <source>PgUp</source>
-        <translation>Sayfa yukarı</translation>
-    </message>
-    <message>
-        <source>Previous Stream</source>
-        <translation>Önceki Akış</translation>
-    </message>
-    <message>
-        <source>Go to the previous stream in the capture</source>
-        <translation>Yakalamada önceki akışa git</translation>
-    </message>
-    <message>
-        <source>PgDown</source>
-        <translation>Sayfa aşağı</translation>
-    </message>
-    <message>
-        <source>Switch Direction</source>
-        <translation>Yön Değiştir</translation>
-    </message>
-    <message>
-        <source>Switch direction (swap TCP endpoints)</source>
-        <translation>Yön değiştir (TCP uç noktalarını değiştir)</translation>
-    </message>
-    <message>
-        <source>D</source>
-        <translation>D</translation>
-    </message>
-    <message>
-        <source>Go To Packet Under Cursor</source>
-        <translation>İmleç Altındaki Pakete Git</translation>
-    </message>
-    <message>
-        <source>Go to packet currently under the cursor</source>
-        <translation>İmlecin altındaki pakete git</translation>
-    </message>
-    <message>
-        <source>G</source>
-        <translation>G</translation>
-    </message>
-    <message>
-        <source>Drag / Zoom</source>
-        <translation>Sürükle / Yakınlaştır</translation>
-    </message>
-    <message>
-        <source>Toggle mouse drag / zoom behavior</source>
-        <translation>Fare sürükle / yakınlaştırma davranışını değiştir</translation>
-    </message>
-    <message>
-        <source>Z</source>
-        <translation>Z</translation>
-    </message>
-    <message>
-        <source>Relative / Absolute Sequence Numbers</source>
-        <translation>Bağıl / Mutlak Sıra Numaraları</translation>
-    </message>
-    <message>
-        <source>Toggle relative / absolute sequence numbers</source>
-        <translation>Göreceli / mutlak sıra numaralarını değiştir</translation>
-    </message>
-    <message>
-        <source>S</source>
-        <translation>S</translation>
-    </message>
-    <message>
-        <source>Capture / Session Time Origin</source>
-        <translation>Yakalama / Oturum Süresi Menşei</translation>
-    </message>
-    <message>
-        <source>Toggle capture / session time origin</source>
-        <translation>Yakalama / oturum zamanı kaynağını aç/kapat</translation>
-    </message>
-    <message>
-        <source>T</source>
-        <translation>T</translation>
-    </message>
-    <message>
-        <source>Crosshairs</source>
-        <translation>Artılar</translation>
-    </message>
-    <message>
-        <source>Toggle crosshairs</source>
-        <translation>Artı işaretlerini aç/kapat</translation>
-    </message>
-    <message>
-        <source>Space</source>
-        <translation>Boşluk</translation>
-    </message>
-    <message>
-        <source>Round Trip Time</source>
-        <translation>Gidiş-dönüş süresi</translation>
-    </message>
-    <message>
-        <source>Switch to the Round Trip Time graph</source>
-        <translation>Gidiş-Dönüş Süresi grafiğine geçin</translation>
-    </message>
-    <message>
-        <source>1</source>
-        <translation>1</translation>
-    </message>
-    <message>
-        <source>Throughput</source>
-        <translation>Verim</translation>
-    </message>
-    <message>
-        <source>Switch to the Throughput graph</source>
-        <translation>Verim grafiğine geç</translation>
-    </message>
-    <message>
-        <source>2</source>
-        <translation>2</translation>
-    </message>
-    <message>
-        <source>Time / Sequence (Stevens)</source>
-        <translation>Zaman / Sıra (Stevens)</translation>
-    </message>
-    <message>
-        <source>Switch to the Stevens-style Time / Sequence graph</source>
-        <translation>Stevens tarzı Zaman / Sıra grafiğine geçin</translation>
-    </message>
-    <message>
-        <source>3</source>
-        <translation>3</translation>
-    </message>
-    <message>
-        <source>Window Scaling</source>
-        <translation>Pencere Ölçekleme</translation>
-    </message>
-    <message>
-        <source>Switch to the Window Scaling graph</source>
-        <translation>Pencere Ölçekleme grafiğine geç</translation>
-    </message>
-    <message>
-        <source>5</source>
-        <translation>5</translation>
-    </message>
-    <message>
-        <source>Time / Sequence (tcptrace)</source>
-        <translation>Zaman / Sıra (tcpizi)</translation>
-    </message>
-    <message>
-        <source>Switch to the tcptrace-style Time / Sequence graph</source>
-        <translation>TCP izleme stili Zaman / Sıra grafiğine geçin</translation>
-    </message>
-    <message>
-        <source>4</source>
-        <translation>4</translation>
-    </message>
 </context>
 <context>
     <name>SCTPAssocAnalyseDialog</name>
@@ -9986,10 +9909,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Filtre İlişkilendirme</translation>
     </message>
     <message>
-        <source>Close</source>
-        <translation>Kapat</translation>
-    </message>
-    <message>
         <source>Number of Data Chunks from EP2 to EP1: </source>
         <translation>EP2&apos;den EP1&apos;e Veri Parçası Sayısı: </translation>
     </message>
@@ -10008,10 +9927,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Number of Data Bytes from EP2 to EP1: </source>
         <translation>EP2&apos;den EP1&apos;e Veri Baytları Sayısı: </translation>
-    </message>
-    <message>
-        <source>TextLabel</source>
-        <translation>Metin Etiketi</translation>
     </message>
     <message>
         <source>Endpoint 1</source>
@@ -10040,6 +9955,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Minimum Number of Inbound Streams:</source>
         <translation>Minimum Gelen Akış Sayısı:</translation>
+    </message>
+    <message>
+        <source>-</source>
+        <translation type="unfinished">-</translation>
+    </message>
+    <message>
+        <source>&lt;small&gt;&lt;i&gt;For complete analysis check SCTP preference Enable Association indexing&lt;/i&gt;&lt;/small&gt;</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Complete List of IP addresses from INIT Chunk:</source>
@@ -10164,10 +10087,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Tam boyuta sıfırla</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
-    </message>
-    <message>
         <source>Save Graph</source>
         <translation>Grafiği Kaydet</translation>
     </message>
@@ -10213,10 +10132,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Reset to full size</source>
         <translation>Tam boyuta sıfırla</translation>
-    </message>
-    <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Save Graph</source>
@@ -10513,14 +10428,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message numerus="yes">
         <source>%Ln node(s)</source>
-        <translation>
-            <numerusform>%Ln düğümü</numerusform>
+        <translation type="unfinished">
+            <numerusform>%Ln node</numerusform>
         </translation>
     </message>
     <message numerus="yes">
         <source>%Ln item(s)</source>
-        <translation>
-            <numerusform>%Ln öğesi</numerusform>
+        <translation type="unfinished">
+            <numerusform>%Ln item</numerusform>
         </translation>
     </message>
     <message>
@@ -10895,8 +10810,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message numerus="yes">
         <source>Frame %1, %2, %Ln byte(s).</source>
-        <translation>
-            <numerusform>Çerçeve %1, %2, %Ln bayt.</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -10914,6 +10829,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Hex Digits</source>
         <translation>Onaltılı Rakamlar</translation>
+    </message>
+    <message>
+        <source>Percent-Encoding</source>
+        <translation>Yüzde-Kodlama</translation>
     </message>
     <message>
         <source>Quoted-Printable</source>
@@ -10985,8 +10904,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message numerus="yes">
         <source>Displaying %Ln byte(s).</source>
-        <translation>
-            <numerusform>%Ln bayt gösteriliyor.</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -11055,6 +10974,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Finding local interfaces</source>
         <translation>Yerel arayüzleri bulma</translation>
+    </message>
+    <message>
+        <source>Applying changed preferences</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>(Unknown action)</source>
@@ -11131,6 +11054,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 </context>
 <context>
     <name>SyntaxLineEdit</name>
+    <message>
+        <source>Invalid filter: %1</source>
+        <translation>Geçersiz filtre: %1</translation>
+    </message>
     <message>
         <source>&quot;%1&quot; is deprecated in favour of &quot;%2&quot;. See Help section 6.4.8 for details.</source>
         <translation>&quot;%1&quot;, &quot;%2&quot; yerine kullanımdan kaldırıldı. Ayrıntılar için Yardım bölümü 6.4.8&apos;e bakın.</translation>
@@ -11727,6 +11654,57 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>TLSKeylogDialog</name>
+    <message>
+        <source>Dialog</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation type="unfinished">Gözat…</translation>
+    </message>
+    <message>
+        <source>Command line</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Run an application with the SSLKEYLOGFILE environment variable set to the file specified by the TLS key log filename preference. This enables TLS decryption in Wireshark. Set the key log file and start the capture before launching the application to ensure that the initial TLS handshakes are captured.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;span style=&quot; font-size:small;&quot;&gt;Firefox and Chrome are known to work. If your desired browser is currently running, close it first before launching it below. Command line options are supported.&lt;/span&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLS (Pre)-Master-Secret log file path (tls.keylog_file)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;span style=&quot; font-size:small;&quot;&gt;TLS session secrets will be logged to this file. If you change this field, hit the Save button to update the TLS protocol preferences.&lt;/span&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Launch application with SSLKEYLOGFILE</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Launch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation type="unfinished">Kaydet</translation>
+    </message>
+    <message>
+        <source>TLS Keylog file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Program to start with SSLKEYLOGFILE</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>TapParameterDialog</name>
     <message>
         <source>Dialog</source>
@@ -11842,8 +11820,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Geçersiz çerçeve numarası.</translation>
     </message>
     <message>
-        <source>Time shifting is not available capturing packets.</source>
-        <translation>Paketleri yakalarken zaman kaydırma kullanılamaz.</translation>
+        <source>Time shifting is not available while capturing packets.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -12415,8 +12393,8 @@ a:üzerine gelin{
     </message>
     <message numerus="yes">
         <source>%n interface(s) shown, %1 hidden</source>
-        <translation>
-            <numerusform>%n arayüz gösteriliyor, %1 gizli</numerusform>
+        <translation type="unfinished">
+            <numerusform>%n interface shown, %1 hidden</numerusform>
         </translation>
     </message>
     <message>
@@ -12960,6 +12938,10 @@ a:üzerine gelin{
         <translation>BAZI/IP</translation>
     </message>
     <message>
+        <source>&amp;DTN</source>
+        <translation>&amp;DTN</translation>
+    </message>
+    <message>
         <source>Osmux</source>
         <translation>Osmux</translation>
     </message>
@@ -13255,24 +13237,8 @@ a:üzerine gelin{
         <translation>TCP pencere ölçeklendirme</translation>
     </message>
     <message>
-        <source>DCCP Stream</source>
-        <translation>DCCP Akışı</translation>
-    </message>
-    <message>
-        <source>TLS Stream</source>
-        <translation>TLS Akışı</translation>
-    </message>
-    <message>
-        <source>HTTP Stream</source>
-        <translation>HTTP Akışı</translation>
-    </message>
-    <message>
         <source>HTTP/2 Stream</source>
         <translation>HTTP/2 Akışı</translation>
-    </message>
-    <message>
-        <source>QUIC Stream</source>
-        <translation>QUIC Akışı</translation>
     </message>
     <message>
         <source>SIP Call</source>
@@ -13439,6 +13405,14 @@ a:üzerine gelin{
         <translation>BAZI/IP-SD Girdi istatistikleri</translation>
     </message>
     <message>
+        <source>&amp;LTP</source>
+        <translation>&amp;LTP</translation>
+    </message>
+    <message>
+        <source>LTP segment and block statistics</source>
+        <translation>LTP bölümü ve blok istatistikleri</translation>
+    </message>
+    <message>
         <source>&amp;ISUP Messages</source>
         <translation>&amp;ISUP Mesajları</translation>
     </message>
@@ -13591,6 +13565,26 @@ a:üzerine gelin{
         <translation>İlk Yakalanan Paketten Beri Saniye</translation>
     </message>
     <message>
+        <source>Show packet times as the seconds since the first captured packet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tenths of a millisecond</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hundredths of a millisecond</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tenths of a microsecond</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hundredths of a microsecond</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Packet &amp;Diagram</source>
         <translation>Paket &amp;Şeması</translation>
     </message>
@@ -13723,6 +13717,14 @@ a:üzerine gelin{
         <translation>Kimlik bilgileri</translation>
     </message>
     <message>
+        <source>MAC Address Blocks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Release Notes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&amp;Options…</source>
         <translation>&amp;Seçenekler…</translation>
     </message>
@@ -13795,20 +13797,28 @@ a:üzerine gelin{
         <translation>Zaman Kaydırması…</translation>
     </message>
     <message>
+        <source>Inject TLS Secrets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Embed used TLS secrets in the capture file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Discard All Secrets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Discard all decryption secrets in the capture file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&amp;Preferences…</source>
         <translation>&amp;Tercihler…</translation>
     </message>
     <message>
         <source>TCP throughput</source>
         <translation>TCP verimi</translation>
-    </message>
-    <message>
-        <source>TCP Stream</source>
-        <translation>TCP Akışı</translation>
-    </message>
-    <message>
-        <source>UDP Stream</source>
-        <translation>UDP Akışı</translation>
     </message>
     <message>
         <source>Request Sequences</source>
@@ -14135,6 +14145,11 @@ a:üzerine gelin{
     <message>
         <source>Go to the packet referenced by the selected field.</source>
         <translation>Seçili alan tarafından başvurulan pakete gidin.</translation>
+    </message>
+    <message>
+        <source>TLS Keylog Launcher</source>
+        <oldsource>SSL Keylog Launcher</oldsource>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>&amp;VoIP Calls</source>
@@ -14518,13 +14533,6 @@ a:üzerine gelin{
         <source>No Keys</source>
         <translation>Anahtar Yok</translation>
     </message>
-    <message numerus="yes">
-        <source>Export SSL Session Keys (%Ln key(s))</source>
-        <oldsource>Export SSL Session Keys (%1 key%2</oldsource>
-        <translation type="vanished">
-            <numerusform>SSL Oturum Anahtarlarını Dışa Aktar (%Ln anahtarı)</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Raw data (*.bin *.dat *.raw);;All Files (</source>
         <translation>Ham veriler (*.bin *.dat *.raw);;Tüm Dosyalar (</translation>
@@ -14594,8 +14602,8 @@ a:üzerine gelin{
     </message>
     <message numerus="yes">
         <source>Delete comments from %n packet(s)</source>
-        <translation>
-            <numerusform>%n paket(lerinden) yorumları sil</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -14611,18 +14619,34 @@ a:üzerine gelin{
         <translation>Wireshark başlatılırken lütfen bekleyin…</translation>
     </message>
     <message>
+        <source> before updating</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>There are no TLS Session Keys to save.</source>
         <translation>Kaydedilecek TLS Oturum Anahtarı yok.</translation>
     </message>
     <message numerus="yes">
         <source>Export TLS Session Keys (%Ln key(s))</source>
-        <translation>
-            <numerusform>TLS Oturum Anahtarlarını Dışa Aktar (%Ln anahtarı)</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
         <source>TLS Session Keys (*.keys *.txt);;All Files (</source>
         <translation>TLS Oturum Anahtarları (*.keys *.txt);;Tüm Dosyalar (</translation>
+    </message>
+    <message>
+        <source>No TLS Secrets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There are no available secrets used to decrypt TLS traffic in the capture file.  Would you like to view information about how to decrypt TLS traffic on the wiki?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Are you sure you want to discard all decryption secrets?</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>No filter available. Try another %1.</source>

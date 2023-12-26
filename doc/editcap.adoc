@@ -33,6 +33,7 @@ editcap - Edit and/or translate the format of capture files
 [ *--discard-all-secrets* ]
 [ *--capture-comment* <comment> ]
 [ *--discard-capture-comment* ]
+[ *--discard-packet-comments* ]
 __infile__
 __outfile__
 [ __packet#__[-__packet#__] ... ]
@@ -45,6 +46,7 @@ __outfile__
 [ *-V* ]
 [ *-I* <bytes to ignore> ]
 [ *--skip-radiotap-header* ]
+[ *--set-unused* ]
 __infile__
 __outfile__
 
@@ -109,25 +111,51 @@ strings that include spaces.
 -A  <start time>::
 +
 --
-Reads only the packets whose timestamp is on or after start time.
-The time is given in ISO 8601 format, either
-YYYY-MM-DD HH:MM:SS[.nnnnnnnnn][Z|±hh:mm] or
-YYYY-MM-DDTHH:MM:SS[.nnnnnnnnn][Z|±hh:mm] .
+Reads only the packets whose timestamp is on or after <start time>.
+The time may be given either in ISO 8601 format or in Unix epoch
+timestamp format.
+
+ISO 8601 format is either
+
+ YYYY-MM-DD HH:MM:SS[.nnnnnnnnn][Z|±hh:mm]
+
+or
+
+ YYYY-MM-DDTHH:MM:SS[.nnnnnnnnn][Z|±hh:mm]
+
 The fractional seconds are optional, as is the time zone offset from UTC
-(in which case local time is assumed). Unix epoch timestamps
-(floating point format) are also accepted.
+(in which case local time is assumed).
+
+Unix epoch format is in seconds since the Unix epoch and nanoseconds,
+with either a period or a comma separating the seconds and nanoseconds.
+The nanoseconds are optional.
+The Unix epoch is 1970-01-01 00:00:00 UTC, so this format is not local
+time.
 --
 
 -B  <stop time>::
 +
 --
-Reads only the packets whose timestamp is before stop time.
-The time is given in ISO 8601 format, either
-YYYY-MM-DD HH:MM:SS[.nnnnnnnnn][Z|±hh:mm] or
-YYYY-MM-DDTHH:MM:SS[.nnnnnnnnn][Z|±hh:mm] .
+Reads only the packets whose timestamp is before <stop time>.
+The time may be given either in ISO 8601 format or in Unix epoch
+timestamp format.
+
+ISO 8601 format is either
+
+ YYYY-MM-DD HH:MM:SS[.nnnnnnnnn][Z|±hh:mm]
+
+or
+
+ YYYY-MM-DDTHH:MM:SS[.nnnnnnnnn][Z|±hh:mm]
+
 The fractional seconds are optional, as is the time zone offset from UTC
-(in which case local time is assumed). Unix epoch timestamps
-(floating point format) are also accepted.
+(in which case local time is assumed).
+
+Unix epoch format is in seconds since the Unix epoch and nanoseconds,
+with either a period or a comma separating the seconds and nanoseconds.
+The nanoseconds are optional.
+The Unix epoch is 1970-01-01 00:00:00 UTC, so this format is not local
+time.
 --
 
 -c  <packets per file>::
@@ -219,10 +247,7 @@ is the *pcapng* format.
 --
 
 -h|--help::
-+
---
-Prints the version and options and exits.
---
+Print the version number and options and exit.
 
 -i  <seconds per file>::
 +
@@ -382,10 +407,7 @@ packet, you will need od(1)/xref:text2pcap.html[text2pcap](1).
 --
 
 -v|--version::
-+
---
-Print the version and exit.
---
+Print the full version information and exit.
 
 -V::
 +
@@ -430,7 +452,7 @@ additional configuration in protocol preferences.
 
 The file format is described by <secrets type> which can be one of:
 
-__tls__  TLS Key Log as described at https://developer.mozilla.org/NSS_Key_Log_Format
+__tls__  TLS Key Log as described at https://developer.mozilla.org/NSS_Key_Log_Format +
 __wg__   WireGuard Key Log, see https://gitlab.com/wireshark/wireshark/-/wikis/WireGuard#key-log-format
 
 This option may be specified multiple times. The available options for
@@ -461,6 +483,22 @@ currently only displays the first comment of a capture file.
 --
 Discard all capture file comments from the input file when writing the output
 file. Does not discard comments added by *--capture-comment* in the same
+command line.
+--
+
+--set-unused::
++
+--
+Set the unused bytes (if any) to zero in SLL link type. Useful when when checking for duplicates.
+As the unused bytes can be anything. When the packet traverses the device stack
+for bonded interfaces on Linux for example.
+--
+
+--discard-packet-comments::
++
+--
+Discard all packet comments from the input file when writing the output
+file. Does not discard comments added by *-a* in the same
 command line.
 --
 

@@ -44,7 +44,7 @@ TARBALL="${DESTDIR}/wireshark-${PROJECT_VERSION}.tar.xz"
 # A tarball produced by 'git archive' will have the $Format string
 # substituted due to the use of 'export-subst' in .gitattributes.
 # shellcheck disable=SC2016
-COMMIT='81696bb748578d7de05a738b01f08057aa25e62d'
+COMMIT='54eedfc63953c8180b5a9c60015917cce7a2548a'
 
 if [[ $COMMIT != \$F* ]] ; then
     # This file was extracted from a tarball produced by git archive
@@ -72,11 +72,14 @@ if [[ $COMMIT != \$F* ]] ; then
     exit 1
 fi
 
-COMMIT="${CI_COMMIT_SHA:-HEAD}"
-
 STASH_ID=$(git stash create || echo "")
+
 if [[ -n "$STASH_ID" ]] ; then
+    echo "Setting commit from stash $STASH_ID"
     COMMIT="$STASH_ID"
+else
+    echo "Setting commit from HEAD"
+    COMMIT="HEAD"
 fi
 
 if [ -f "$TARBALL" ] ; then

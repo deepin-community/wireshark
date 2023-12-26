@@ -29,7 +29,6 @@
 #include "ui/capture_ui_utils.h"
 #include "ui/capture_globals.h"
 #include "ui/iface_lists.h"
-#include "ui/last_open_dir.h"
 
 #include "ui/ws_ui_util.h"
 #include "ui/util.h"
@@ -448,22 +447,47 @@ bool ExtcapOptionsDialog::saveOptionToCaptureInfo()
     {
         QString call = (*iter)->call();
         QString value = (*iter)->value();
+        QString prefValue = (*iter)->prefValue();
 
         if ((*iter)->argument()->arg_type != EXTCAP_ARG_BOOLFLAG && value.length() == 0)
             continue;
 
-        if (call.length() <= 0)
+        if (call.length() <= 0) {
+            /* BOOLFLAG was cleared, make its value empty */
+            if ((*iter)->argument()->arg_type == EXTCAP_ARG_BOOLFLAG) {
+                *(*iter)->argument()->pref_valptr[0] = 0;
+            }
             continue;
+        }
 
-        if (value.compare((*iter)->defaultValue()) == 0)
+        if (value.compare((*iter)->defaultValue()) == 0) {
+            extcap_arg *arg = (*iter)->argument();
+
+            // If previous value is not default, set it to default value
+            if (arg->default_complex != NULL && arg->default_complex->_val != NULL) {
+                g_free(*arg->pref_valptr);
+                *arg->pref_valptr = g_strdup(arg->default_complex->_val);
+            } else {
+                // Set empty value if there is no default value
+                *arg->pref_valptr[0] = 0;
+            }
             continue;
+        }
 
-        gchar * call_string = g_strdup(call.toStdString().c_str());
+        gchar * call_string = qstring_strdup(call);
         gchar * value_string = NULL;
         if (value.length() > 0)
-            value_string = g_strdup(value.toStdString().c_str());
+            value_string = qstring_strdup(value);
 
         g_hash_table_insert(ret_args, call_string, value_string);
+
+        // For current value we need strdup even it is empty
+        value_string = qstring_strdup(prefValue);
+        // Update current value with new value
+        // We use prefValue because for bool/boolflag it returns value
+        // even it is false
+        g_free(*(*iter)->argument()->pref_valptr);
+        *(*iter)->argument()->pref_valptr = value_string;
     }
 
     if (device->external_cap_args_settings != NULL)
@@ -558,7 +582,9 @@ GHashTable *ExtcapOptionsDialog::getArgumentSettings(bool useCallsAsKey, bool in
         if (dynamic_cast<ExtArgBool *>((*iter)) != NULL)
         {
             value = ((ExtArgBool *)*iter)->prefValue();
-            isBoolflag = true;
+            // For boolflag there should be no value
+            if ((*iter)->argument()->arg_type != EXTCAP_ARG_BOOLFLAG)
+                isBoolflag = true;
         }
         else if (dynamic_cast<ExtArgRadio *>((*iter)) != NULL)
         {
@@ -597,9 +623,9 @@ GHashTable *ExtcapOptionsDialog::getArgumentSettings(bool useCallsAsKey, bool in
 
         if ((key.length() > 0) && (includeEmptyValues || isBoolflag || value.length() > 0) )
         {
-            gchar * val = g_strdup(value.toStdString().c_str());
+            gchar * val = qstring_strdup(value);
 
-            g_hash_table_insert(entries, g_strdup(key.toStdString().c_str()), val);
+            g_hash_table_insert(entries, qstring_strdup(key), val);
         }
     }
 
