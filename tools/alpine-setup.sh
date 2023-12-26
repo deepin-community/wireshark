@@ -16,9 +16,10 @@ set -e -u -o pipefail
 function print_usage() {
 	printf "\\nUtility to setup a alpine system for Wireshark Development.\\n"
 	printf "The basic usage installs the needed software\\n\\n"
-	printf "Usage: %s [--install-optional] [--install-deb-deps] [...other options...]\\n" "$0"
+	printf "Usage: %s [--install-optional] [...other options...]\\n" "$0"
 	printf "\\t--install-optional: install optional software as well\\n"
-	printf "\\t[other]: other options are passed as-is to apt\\n"
+	printf "\\t--install-all: install everything\\n"
+	printf "\\t[other]: other options are passed as-is to apk\\n"
 }
 
 ADDITIONAL=0
@@ -30,6 +31,9 @@ for arg; do
 			exit 0
 			;;
 		--install-optional)
+			ADDITIONAL=1
+			;;
+		--install-all)
 			ADDITIONAL=1
 			;;
 		*)
@@ -45,42 +49,48 @@ then
 	exit 1
 fi
 
-BASIC_LIST="cmake \
-	ninja \
-	gcc \
-	g++ \
-	glib-dev \
-	libgcrypt-dev \
-	flex \
-	tiff-dev \
-	c-ares-dev \
-	pcre2-dev \
-	qt5-qtbase-dev \
-	qt5-qttools-dev \
-	qt5-qtmultimedia-dev \
-	qt5-qtsvg-dev"
+BASIC_LIST="
+	cmake
+	ninja
+	gcc
+	g++
+	glib-dev
+	libgcrypt-dev
+	flex
+	tiff-dev
+	c-ares-dev
+	pcre2-dev
+	qt5-qtbase-dev
+	qt5-qttools-dev
+	qt5-qtmultimedia-dev
+	qt5-qtsvg-dev
+	speexdsp-dev
+	python3
+	"
 
 ADDITIONAL_LIST="
-	git \
-	asciidoctor \
-	libssh-dev \
-	spandsp-dev \
-	libcap-dev \
-	libpcap-dev \
-	libxml2-dev \
-	libmaxminddb-dev \
-	krb5-dev \
-	lz4-dev \
-	gnutls-dev \
-	snappy-dev \
-	nghttp2-dev \
-	lua5.2-dev \
-	libnl3-dev \
-	sbc-dev \
-	minizip-dev \
-	speexdsp-dev \
-	brotli-dev \
-	perl \
+	git
+	asciidoctor
+	libssh-dev
+	spandsp-dev
+	libcap-dev
+	libpcap-dev
+	libxml2-dev
+	libmaxminddb-dev
+	krb5-dev
+	lz4-dev
+	gnutls-dev
+	snappy-dev
+	nghttp2-dev
+	nghttp3-dev
+	lua5.2-dev
+	libnl3-dev
+	sbc-dev
+	minizip-dev
+	brotli-dev
+	perl
+	py3-pytest
+	py3-pytest-xdist
 	"
 
 # Uncomment to add PNG compression utilities used by compress-pngs:

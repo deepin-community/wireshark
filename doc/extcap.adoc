@@ -72,6 +72,7 @@ Argument type for UI filtering for raw, or UI type for selector:
     double
     string (display a textbox)
     selector (display selector table, all values as strings)
+    editselector (selector table which can be overridden, all values as strings)
     boolean (display checkbox)
     booleanflag (display checkbox)
     radio (display group of radio buttons with provided values, all values as strings)

@@ -8,7 +8,15 @@ It requires [libsinsp and libscap](https://github.com/falcosecurity/libs/).
 1. Download and compile [libsinsp and libscap](https://github.com/falcosecurity/libs/).
    You will probably want to pass `-DMINIMAL_BUILD=ON -DCREATE_TEST_TARGETS=OFF` to cmake.
 
-1. Configure Wireshark with `cmake ... -DSINSP_INCLUDEDIR=/path/to/falcosecurity-libs -DSINSP_LIBDIR=/path/to/falcosecurity-libs/ -DSINSP_PLUGINDIR=/path/to/falcosecurity-plugins/ build ...`
+1. Configure Wireshark with
+
+```
+cmake \
+    -DSINSP_INCLUDEDIR=/path/to/falcosecurity-libs \
+    -DSINSP_LIBDIR=/path/to/falcosecurity-libs/ \
+    -DFALCO_PLUGINS="/path/to/plugin1;/path/to/plugin2;/path/to/plugin3" \
+    [other cmake args]
+```
 
 ## Quick Start
 
@@ -16,6 +24,11 @@ It requires [libsinsp and libscap](https://github.com/falcosecurity/libs/).
 You can find the global and per-user plugin folder locations on your system in About → Folders or in the [User's Guide](https://www.wireshark.org/docs/wsug_html_chunked/ChPluginFolders.html).
 
 1. Build your desired [Falco plugin](https://github.com/falcosecurity/plugins/) and place it in the "falco" plugin directory.
+
+## Conversations
+
+Falco plugins can mark individual fields with a conversation flag (EPF_CONVERSATION).
+The Falco Bridge dissector treats each of these as separate conversations, and for features such as navigation and packet list marking, the _first_ conversation field is used for matching packets.
 
 ## Licensing
 

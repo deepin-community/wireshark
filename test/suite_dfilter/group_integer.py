@@ -2,13 +2,11 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-import unittest
-import fixtures
+import pytest
 from suite_dfilter.dfiltertest import *
 
 
-@fixtures.uses_fixtures
-class case_integer(unittest.TestCase):
+class TestDfilterInteger:
     trace_file = "ntp.pcap"
 
     def test_eq_1(self, checkDFilterCount):
@@ -110,51 +108,51 @@ class case_integer(unittest.TestCase):
         checkDFilterCount(dfilter, 1)
 
     def test_s_gt_1(self, checkDFilterCount):
-        dfilter = "ntp.precision > 244"
+        dfilter = "ntp.precision > -12"
         checkDFilterCount(dfilter, 1)
 
     def test_s_gt_2(self, checkDFilterCount):
-        dfilter = "ntp.precision > 245"
+        dfilter = "ntp.precision > -11"
         checkDFilterCount(dfilter, 0)
 
     def test_s_gt_3(self, checkDFilterCount):
-        dfilter = "ntp.precision > 246"
+        dfilter = "ntp.precision > -10"
         checkDFilterCount(dfilter, 0)
 
     def test_s_ge_1(self, checkDFilterCount):
-        dfilter = "ntp.precision >= 244"
+        dfilter = "ntp.precision >= -12"
         checkDFilterCount(dfilter, 1)
 
     def test_s_ge_2(self, checkDFilterCount):
-        dfilter = "ntp.precision >= 245"
+        dfilter = "ntp.precision >= -11"
         checkDFilterCount(dfilter, 1)
 
     def test_s_ge_3(self, checkDFilterCount):
-        dfilter = "ntp.precision >= 246"
+        dfilter = "ntp.precision >= -10"
         checkDFilterCount(dfilter, 0)
 
     def test_s_lt_1(self, checkDFilterCount):
-        dfilter = "ntp.precision < 244"
+        dfilter = "ntp.precision < -12"
         checkDFilterCount(dfilter, 0)
 
     def test_s_lt_2(self, checkDFilterCount):
-        dfilter = "ntp.precision < 245"
+        dfilter = "ntp.precision < -11"
         checkDFilterCount(dfilter, 0)
 
     def test_s_lt_3(self, checkDFilterCount):
-        dfilter = "ntp.precision < 246"
+        dfilter = "ntp.precision < -10"
         checkDFilterCount(dfilter, 1)
 
     def test_s_le_1(self, checkDFilterCount):
-        dfilter = "ntp.precision <= 244"
+        dfilter = "ntp.precision <= -12"
         checkDFilterCount(dfilter, 0)
 
     def test_s_le_2(self, checkDFilterCount):
-        dfilter = "ntp.precision <= 245"
+        dfilter = "ntp.precision <= -11"
         checkDFilterCount(dfilter, 1)
 
     def test_s_le_3(self, checkDFilterCount):
-        dfilter = "ntp.precision <= 246"
+        dfilter = "ntp.precision <= -10"
         checkDFilterCount(dfilter, 1)
 
     def test_bool_eq_1(self, checkDFilterCount):
@@ -171,4 +169,27 @@ class case_integer(unittest.TestCase):
 
     def test_bool_ne_2(self, checkDFilterCount):
         dfilter = "ip.flags.df != 0"
+        checkDFilterCount(dfilter, 0)
+
+class TestDfilterInteger1Byte:
+
+    trace_file = "ipx_rip.pcap"
+
+    def test_ipx_1(self, checkDFilterCount):
+        dfilter = "ipx.src.net == 0x28"
+        checkDFilterCount(dfilter, 1)
+
+    def test_ipx_2(self, checkDFilterCount):
+        dfilter = "ipx.src.net == 0x29"
+        checkDFilterCount(dfilter, 0)
+
+class TestDfilterUint64:
+    trace_file = "nfs.pcap"
+
+    def test_uint64_1(self, checkDFilterCount):
+        dfilter = "nfs.fattr3.size == 264032"
+        checkDFilterCount(dfilter, 1)
+
+    def test_uint64_2(self, checkDFilterCount):
+        dfilter = "nfs.fattr3.size == 264000"
         checkDFilterCount(dfilter, 0)

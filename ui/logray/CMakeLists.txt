@@ -26,6 +26,7 @@ set(WIRESHARK_WIDGET_HEADERS
 	../qt/widgets/detachable_tabwidget.h
 	../qt/widgets/display_filter_combo.h
 	../qt/widgets/display_filter_edit.h
+	../qt/widgets/dissector_syntax_line_edit.h
 	../qt/widgets/dissector_tables_view.h
 	../qt/widgets/drag_drop_toolbar.h
 	../qt/widgets/drag_label.h
@@ -36,7 +37,6 @@ set(WIRESHARK_WIDGET_HEADERS
 	../qt/widgets/field_filter_edit.h
 	../qt/widgets/filter_expression_toolbar.h
 	../qt/widgets/find_line_edit.h
-	../qt/widgets/follow_stream_text.h
 	../qt/widgets/interface_toolbar_lineedit.h
 	../qt/widgets/label_stack.h
 	../qt/widgets/overlay_scroll_bar.h
@@ -169,7 +169,7 @@ set(WIRESHARK_QT_HEADERS
 	../qt/filter_dialog.h
 	../qt/filter_dialog.h
 	../qt/filter_expression_frame.h
-	../qt/follow_stream_dialog.h
+	../qt/follow_stream_action.h
 	../qt/font_color_preferences_frame.h
 	../qt/funnel_statistics.h
 	../qt/funnel_string_dialog.h
@@ -180,6 +180,7 @@ set(WIRESHARK_QT_HEADERS
 	../qt/interface_frame.h
 	../qt/interface_toolbar_reader.h
 	../qt/interface_toolbar.h
+	../qt/io_console_dialog.h
 	../qt/io_graph_dialog.h
 	../qt/layout_preferences_frame.h
 	../qt/main_application.h
@@ -255,6 +256,7 @@ set(WIRESHARK_WIDGET_SRCS
 	../qt/widgets/detachable_tabwidget.cpp
 	../qt/widgets/display_filter_combo.cpp
 	../qt/widgets/display_filter_edit.cpp
+	../qt/widgets/dissector_syntax_line_edit.cpp
 	../qt/widgets/dissector_tables_view.cpp
 	../qt/widgets/drag_drop_toolbar.cpp
 	../qt/widgets/drag_label.cpp
@@ -265,7 +267,6 @@ set(WIRESHARK_WIDGET_SRCS
 	../qt/widgets/field_filter_edit.cpp
 	../qt/widgets/filter_expression_toolbar.cpp
 	../qt/widgets/find_line_edit.cpp
-	../qt/widgets/follow_stream_text.cpp
 	../qt/widgets/interface_toolbar_lineedit.cpp
 	../qt/widgets/label_stack.cpp
 	../qt/widgets/overlay_scroll_bar.cpp
@@ -390,7 +391,7 @@ set(WIRESHARK_QT_SRC
 	../qt/filter_action.cpp
 	../qt/filter_dialog.cpp
 	../qt/filter_expression_frame.cpp
-	../qt/follow_stream_dialog.cpp
+	../qt/follow_stream_action.cpp
 	../qt/font_color_preferences_frame.cpp
 	../qt/funnel_string_dialog.cpp
 	../qt/funnel_text_dialog.cpp
@@ -400,6 +401,7 @@ set(WIRESHARK_QT_SRC
 	../qt/interface_frame.cpp
 	../qt/interface_toolbar_reader.cpp
 	../qt/interface_toolbar.cpp
+	../qt/io_console_dialog.cpp
 	../qt/layout_preferences_frame.cpp
 	../qt/main_application.cpp
 	../qt/main_status_bar.cpp
@@ -505,13 +507,13 @@ set(WIRESHARK_QT_UI
 	../qt/file_set_dialog.ui
 	../qt/filter_dialog.ui
 	../qt/filter_expression_frame.ui
-	../qt/follow_stream_dialog.ui
 	../qt/font_color_preferences_frame.ui
 	../qt/funnel_string_dialog.ui
 	../qt/funnel_text_dialog.ui
 	../qt/import_text_dialog.ui
 	../qt/interface_frame.ui
 	../qt/interface_toolbar.ui
+	../qt/io_console_dialog.ui
 	../qt/io_graph_dialog.ui
 	../qt/layout_preferences_frame.ui
 	../qt/main_window_preferences_frame.ui
@@ -587,8 +589,8 @@ set(LOGRAY_QT_QRC
 	../../resources/about.qrc
 	../../resources/languages/languages.qrc
 	../../resources/layout.qrc
+	../../resources/lricon.qrc
 	../../resources/stock_icons.qrc
-	../../resources/wsicon.qrc
 	${CMAKE_CURRENT_BINARY_DIR}/i18n.qrc
 )
 
@@ -597,8 +599,15 @@ if(NOT Qt${qtver}Widgets_VERSION VERSION_LESS "5.9")
 	# to help with reproducible builds. We do not use QFileInfo.lastModified
 	# so this has no unwanted side effects. This mtime started appearing in
 	# Qt 5.8. The option to force the old file format without mtime was
-	# added in Qt 5.9. See https://bugreports.qt.io/browse/QTBUG-58769
+	# added in Qt 5.9. See https://bugreports.qt.io/browse/QTBUG-58769.
+	# Force the compression algorithm to zlib, since zstd requires format
+	# version 3. See https://gitlab.com/wireshark/wireshark/-/issues/18100.
+	# Use the number of dashes for each argument as documented at
+	# https://doc.qt.io/qt-6/rcc.html.
 	set(CMAKE_AUTORCC_OPTIONS --format-version 1)
+	if(Qt${qtver}Widgets_VERSION VERSION_GREATER_EQUAL "5.13")
+		list(APPEND CMAKE_AUTORCC_OPTIONS -compress-algo zlib)
+	endif()
 endif()
 
 if (USE_qt6)
@@ -673,10 +682,10 @@ add_library(ui_logray OBJECT
 target_include_directories(ui_logray
 	SYSTEM PRIVATE
 		# Include Qt before anything else, see the comment about
-		# QT_INCLUDE_DIRS in the top-level CMakeLists.txt
+		# QT5_INCLUDE_DIRS in the top-level CMakeLists.txt
 		# Basically, qt@5 headers should be prioritized over qt@6 which
 		# would be found due to GCRYPT_INCLUDE_DIRS=/usr/local/include
-		${QT_INCLUDE_DIRS}
+		${QT5_INCLUDE_DIRS}
 		${GCRYPT_INCLUDE_DIRS}
 		${MINIZIP_INCLUDE_DIRS}
 		${PCAP_INCLUDE_DIRS}
@@ -688,9 +697,21 @@ target_include_directories(ui_logray
 		${CMAKE_CURRENT_SOURCE_DIR}/../qt
 )
 
+if(USE_qt6)
+	target_link_libraries(ui_logray PUBLIC
+		Qt6::Widgets
+		Qt6::Core5Compat
+		Qt6::Concurrent
+		Qt6::PrintSupport
+	)
+	if(Qt6Multimedia_FOUND)
+		target_link_libraries(ui_logray PUBLIC Qt6::Multimedia)
+	endif()
+endif()
+
 target_compile_definitions(ui_logray
 	PUBLIC
-		${QT_COMPILE_DEFINITIONS}
+		${QT5_COMPILE_DEFINITIONS}
 )
 
 set_target_properties(ui_logray PROPERTIES

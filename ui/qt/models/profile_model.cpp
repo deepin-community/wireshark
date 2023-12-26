@@ -504,7 +504,7 @@ QVariant ProfileModel::dataPath(const QModelIndex &index) const
                 profile_path = gchar_free_to_qstring(get_profiles_dir());
             }
             profile_path.append("/").append(prof->name);
-            return profile_path;
+            return QDir::toNativeSeparators(profile_path);
         }
     case PROF_STAT_NEW:
         {
@@ -1139,7 +1139,6 @@ int ProfileModel::importProfilesFromDir(QString dirname, int * skippedCnt, bool 
     {
         QFileInfoList entries = uniquePaths(filterProfilePath(dirname, QFileInfoList(), fromZip));
 
-        int entryCount = 0;
         foreach (QFileInfo fentry, entries)
         {
             if (fentry.fileName().length() <= 0)
@@ -1147,8 +1146,6 @@ int ProfileModel::importProfilesFromDir(QString dirname, int * skippedCnt, bool 
 
             bool wasEmpty = true;
             bool success = false;
-
-            entryCount++;
 
             QString profilePath = profileDir.absolutePath() + "/" + fentry.fileName();
             QString tempPath = fentry.absoluteFilePath();

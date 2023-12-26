@@ -16,7 +16,8 @@ Build-Depends:
  libgcrypt-dev, libkrb5-dev, liblua5.2-dev, libsmi2-dev,
  libmaxminddb-dev, dpkg-dev (>= 1.16.1~), libsystemd-dev | libsystemd-journal-dev,
  libnl-genl-3-dev [linux-any], libnl-route-3-dev [linux-any], asciidoctor,
- cmake (>= 3.5) | cmake3, libsbc-dev, libnghttp2-dev, libssh-gcrypt-dev,
+ cmake (>= 3.5) | cmake3, libsbc-dev, libnghttp2-dev, libnghttp3-dev,
+ libssh-gcrypt-dev,
  liblz4-dev, libsnappy-dev, libzstd-dev, libspandsp-dev, libxml2-dev, libbrotli-dev,
  libspeexdsp-dev
 Build-Conflicts: libsnmp4.2-dev, libsnmp-dev
@@ -26,8 +27,8 @@ Homepage: https://www.wireshark.org/
 
 Package: wireshark-common
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libwireshark16 (>= ${binary:Version}),
- libwiretap13 (>= ${binary:Version}), debconf, libcap2-bin [linux-any]
+Depends: ${shlibs:Depends}, ${misc:Depends}, libwireshark17 (>= ${binary:Version}),
+ libwiretap14 (>= ${binary:Version}), debconf, libcap2-bin [linux-any]
 Recommends: wireshark (>= ${binary:Version}) | tshark (>= ${binary:Version})
 Breaks: wireshark (<< 2.0.0~),
         wireshark-gtk (<< 3.0.0),
@@ -116,31 +117,31 @@ Description: network traffic analyzer - documentation
  This package contains Wireshark User's guide, Wireshark Developer's Guide
  and the Lua Reference.
 
-Package: libwireshark16
+Package: libwireshark17
 Section: libs
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${shlibs:Depends}, ${misc:Depends}, libwireshark-data (>= ${source:Version}),
- libwsutil14 (>= ${source:Version})
+ libwsutil15 (>= ${source:Version})
 Suggests: wireshark-doc (>= ${source:Version})
 Description: network packet dissection library -- shared library
  The libwireshark library provides the network packet dissection services
  developed by the Wireshark project.
 
-Package: libwsutil14
+Package: libwsutil15
 Section: libs
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: network packet dissection utilities library -- shared library
- The libwsutil library provides utility functions for libwireshark16.
+ The libwsutil library provides utility functions for libwireshark17.
 
 Package: libwsutil-dev
 Section: libdevel
 Architecture: any
-Depends: ${misc:Depends} , libwsutil14 (= ${binary:Version})
+Depends: ${misc:Depends} , libwsutil15 (= ${binary:Version})
 Breaks: libwireshark-dev (<< 3.7.0~)
 Replaces: libwireshark-dev (<< 3.7.0~)
 Description: network packet dissection utilities library -- development files
@@ -165,7 +166,7 @@ Description: network packet dissection library -- data files
 Package: libwireshark-dev
 Section: libdevel
 Depends: ${misc:Depends}, libwsutil-dev, libwiretap-dev,
- libwireshark16 (= ${binary:Version})
+ libwireshark17 (= ${binary:Version})
 Architecture: any
 Description: network packet dissection library -- development files
  The "libwireshark" library provides the network packet dissection services
@@ -174,7 +175,7 @@ Description: network packet dissection library -- development files
  This package contains the static library and the C header files that are
  needed for applications to use libwireshark services.
 
-Package: libwiretap13
+Package: libwiretap14
 Section: libs
 Architecture: any
 Multi-Arch: same
@@ -208,7 +209,7 @@ Description: network packet capture library -- shared library
 
 Package: libwiretap-dev
 Section: libdevel
-Depends: ${misc:Depends}, libwsutil-dev, libwiretap13 (= ${binary:Version})
+Depends: ${misc:Depends}, libwsutil-dev, libwiretap14 (= ${binary:Version})
 Architecture: any
 Description: network packet capture library -- development files
  Wiretap, part of the Wireshark project, is a library that allows one to

@@ -19,7 +19,7 @@
 #include <epan/rtd_table.h>
 #include <epan/timestamp.h>
 #include <epan/stat_tap_ui.h>
-#include <ui/cmdarg_err.h>
+#include <wsutil/cmdarg_err.h>
 #include <ui/cli/tshark-tap.h>
 
 typedef struct _rtd_t {
@@ -130,7 +130,7 @@ dissector_rtd_init(const char *opt_arg, void* userdata)
 }
 
 /* Set GUI fields for register_rtd list */
-gboolean
+bool
 register_rtd_tables(const void *key _U_, void *value, void *userdata _U_)
 {
 	register_rtd_t *rtd = (register_rtd_t*)value;

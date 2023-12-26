@@ -24,7 +24,7 @@ DIAG_ON(frame-larger-than=)
 #include <wsutil/filesystem.h>
 #include <wsutil/wslog.h>
 #include <wsutil/ws_assert.h>
-#include <ui/version_info.h>
+#include <wsutil/version_info.h>
 #include <epan/prefs.h>
 #include <epan/stats_tree_priv.h>
 #include <epan/plugin_if.h>
@@ -327,8 +327,6 @@ LograyMainWindow::LograyMainWindow(QWidget *parent) :
     , capture_options_dialog_(NULL)
     , info_data_()
 #endif
-    , display_filter_dlg_(NULL)
-    , capture_filter_dlg_(NULL)
 #if defined(Q_OS_MAC)
     , dock_menu_(NULL)
 #endif
@@ -469,6 +467,9 @@ LograyMainWindow::LograyMainWindow(QWidget *parent) :
 
 #endif // Q_OS_MAC
 
+    connect(main_ui_->goToGo, &QPushButton::pressed, this, &LograyMainWindow::goToGoClicked);
+    connect(main_ui_->goToCancel, &QPushButton::pressed, this, &LograyMainWindow::goToCancelClicked);
+
 // A billion-1 is equivalent to the inputMask 900000000 previously used
 // Avoid QValidator::Intermediate values by using a top value of all 9's
 #define MAX_GOTO_LINE 999999999
@@ -494,6 +495,9 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     connect(packet_list_, SIGNAL(framesSelected(QList<int>)), this, SLOT(setMenusForSelectedPacket()));
     connect(packet_list_, SIGNAL(framesSelected(QList<int>)), this, SIGNAL(framesSelected(QList<int>)));
 
+    QAction *action = main_ui_->menuPacketComment->addAction(tr("Add New Comment…"));
+    connect(action, &QAction::triggered, this, &LograyMainWindow::addPacketComment);
+    action->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C));
     connect(main_ui_->menuPacketComment, SIGNAL(aboutToShow()), this, SLOT(setEditCommentsMenu()));
 
     proto_tree_ = new ProtoTree(&master_split_);
@@ -546,6 +550,8 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     connect(&capture_file_, SIGNAL(captureEvent(CaptureEvent)),
             main_ui_->statusBar, SLOT(captureEventHandler(CaptureEvent)));
 
+    connect(mainApp, SIGNAL(freezePacketList(bool)),
+            packet_list_, SLOT(freezePacketList(bool)));
     connect(mainApp, SIGNAL(columnsChanged()),
             packet_list_, SLOT(columnsChanged()));
     connect(mainApp, SIGNAL(preferencesChanged()),
@@ -603,6 +609,9 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     connectViewMenuActions();
     connectGoMenuActions();
     connectCaptureMenuActions();
+    connectAnalyzeMenuActions();
+    connectStatisticsMenuActions();
+    connectHelpMenuActions();
 
     connect(packet_list_, SIGNAL(packetDissectionChanged()),
             this, SLOT(redissectPackets()));
@@ -627,14 +636,15 @@ main_ui_->goToLineEdit->setValidator(goToLineQiv);
     connect(proto_tree_, SIGNAL(editProtocolPreference(preference*, pref_module*)),
             main_ui_->preferenceEditorFrame, SLOT(editPreference(preference*, pref_module*)));
 
-    connect(main_ui_->statusBar, &MainStatusBar::showExpertInfo,
-            this, &LograyMainWindow::on_actionAnalyzeExpertInfo_triggered);
+    connect(main_ui_->statusBar, &MainStatusBar::showExpertInfo, this, [=]() {
+        statCommandExpertInfo(NULL, NULL);
+    });
 
     connect(main_ui_->statusBar, &MainStatusBar::stopLoading,
             &capture_file_, &CaptureFile::stopLoading);
 
     connect(main_ui_->statusBar, &MainStatusBar::editCaptureComment,
-            this, &LograyMainWindow::on_actionStatisticsCaptureFileProperties_triggered);
+            main_ui_->actionStatisticsCaptureFileProperties, &QAction::trigger);
 
     connect(main_ui_->menuApplyAsFilter, &QMenu::aboutToShow,
             this, &LograyMainWindow::filterMenuAboutToShow);
@@ -706,8 +716,6 @@ LograyMainWindow::~LograyMainWindow()
     // freed by its parent. Free then here explicitly to avoid leak and numerous
     // Valgrind complaints.
     delete file_set_dialog_;
-    delete capture_filter_dlg_;
-    delete display_filter_dlg_;
 #ifdef HAVE_LIBPCAP
     delete capture_options_dialog_;
 #endif
@@ -860,9 +868,9 @@ void LograyMainWindow::keyPressEvent(QKeyEvent *event) {
     if (mainApp->focusWidget() == main_ui_->goToLineEdit) {
         if (event->modifiers() == Qt::NoModifier) {
             if (event->key() == Qt::Key_Escape) {
-                on_goToCancel_clicked();
+                goToCancelClicked();
             } else if (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
-                on_goToGo_clicked();
+                goToGoClicked();
             }
         }
         return; // goToLineEdit didn't want it and we don't either.
@@ -1168,16 +1176,16 @@ void LograyMainWindow::mergeCaptureFile()
         char        *tmpname;
 
         if (merge_dlg.merge(file_name, read_filter)) {
-            gchar *err_msg;
+            df_error_t *df_err = NULL;
 
-            if (!dfilter_compile(qUtf8Printable(read_filter), &rfcode, &err_msg)) {
+            if (!dfilter_compile(qUtf8Printable(read_filter), &rfcode, &df_err)) {
                 /* Not valid. Tell the user, and go back and run the file
                    selection box again once they dismiss the alert. */
                 // Similar to commandline_info.jfilter section in main().
                 QMessageBox::warning(this, tr("Invalid Read Filter"),
-                                     QString(tr("The filter expression %1 isn't a valid read filter. (%2).").arg(read_filter, err_msg)),
+                                     QString(tr("The filter expression %1 isn't a valid read filter. (%2).").arg(read_filter, df_err->msg)),
                                      QMessageBox::Ok);
-                g_free(err_msg);
+                df_error_free(&df_err);
                 continue;
             }
         } else {
@@ -1230,7 +1238,7 @@ void LograyMainWindow::mergeCaptureFile()
            previous read filter attached to "cf"). */
         cf_set_rfcode(CaptureFile::globalCapFile(), rfcode);
 
-        switch (cf_read(CaptureFile::globalCapFile(), FALSE)) {
+        switch (cf_read(CaptureFile::globalCapFile(), /*reloading=*/FALSE)) {
 
         case CF_READ_OK:
         case CF_READ_ERROR:
@@ -1346,9 +1354,21 @@ bool LograyMainWindow::saveCaptureFile(capture_file *cf, bool dont_reopen) {
             case CF_WRITE_OK:
                 /* The save succeeded; we're done.
                    If we discarded comments, redraw the packet list to reflect
-                   any packets that no longer have comments. */
-                if (discard_comments)
-                    packet_list_->redrawVisiblePackets();
+                   any packets that no longer have comments. If we had unsaved
+                   changes, redraw the packet list, because saving a time
+                   shift zeroes out the frame.offset_shift field.
+                   If we had a color filter based on frame data, recolor. */
+                /* XXX: If there is a filter based on those, we want to force
+                   a rescan with the current filter (we don't actually
+                   need to redissect.)
+                   */
+                if (discard_comments || cf->unsaved_changes) {
+                    if (color_filters_use_proto(proto_get_id_by_filter_name("frame"))) {
+                        packet_list_->recolorPackets();
+                    } else {
+                        packet_list_->redrawVisiblePackets();
+                    }
+                }
 
                 cf->unsaved_changes = false; //we just saved so we signal that we have no unsaved changes
                 updateForUnsavedChanges(); // we update the title bar to remove the *
@@ -1460,9 +1480,21 @@ bool LograyMainWindow::saveAsCaptureFile(capture_file *cf, bool must_support_com
             set_last_open_dir(get_dirname(dirname));
             g_free(dirname);
             /* If we discarded comments, redraw the packet list to reflect
-               any packets that no longer have comments. */
-            if (discard_comments)
-                packet_list_->redrawVisiblePackets();
+               any packets that no longer have comments. If we had unsaved
+               changes, redraw the packet list, because saving a time
+               shift zeroes out the frame.offset_shift field.
+               If we had a color filter based on frame data, recolor. */
+            /* XXX: If there is a filter based on those, we want to force
+               a rescan with the current filter (we don't actually
+               need to redissect.)
+               */
+            if (discard_comments || cf->unsaved_changes) {
+                if (color_filters_use_proto(proto_get_id_by_filter_name("frame"))) {
+                    packet_list_->recolorPackets();
+                } else {
+                    packet_list_->redrawVisiblePackets();
+                }
+            }
 
             cf->unsaved_changes = false; //we just saved so we signal that we have no unsaved changes
             updateForUnsavedChanges(); // we update the title bar to remove the *
@@ -1603,6 +1635,9 @@ void LograyMainWindow::exportSelectedPackets() {
             g_free(dirname);
             /* If we discarded comments, redraw the packet list to reflect
                any packets that no longer have comments. */
+            /* XXX: Why? We're exporting some packets to a new file but not
+               changing our current capture file, that shouldn't change the
+               current packet list. */
             if (discard_comments)
                 packet_list_->redrawVisiblePackets();
             /* Add this filename to the list of recent files in the "Recent Files" submenu */
@@ -1763,11 +1798,14 @@ bool LograyMainWindow::testCaptureFileClose(QString before_what, FileCloseContex
     }
 
 #ifdef HAVE_LIBPCAP
-    if (capture_file_.capFile()->state == FILE_READ_IN_PROGRESS) {
+    if (capture_file_.capFile()->state == FILE_READ_IN_PROGRESS ||
+        capture_file_.capFile()->state == FILE_READ_PENDING) {
         /*
-         * This (FILE_READ_IN_PROGRESS) is true if we're reading a capture file
+         * FILE_READ_IN_PROGRESS is true if we're reading a capture file
          * *or* if we're doing a live capture. From the capture file itself we
          * cannot differentiate the cases, so check the current capture session.
+         * FILE_READ_PENDING is only used for a live capture, but it doesn't
+         * hurt to check it here.
          */
         capture_in_progress = captureSession()->state != CAPTURE_STOPPED;
     }
@@ -1775,6 +1813,19 @@ bool LograyMainWindow::testCaptureFileClose(QString before_what, FileCloseContex
 
     if (prefs.gui_ask_unsaved) {
         if (cf_has_unsaved_data(capture_file_.capFile())) {
+            if (context == Update) {
+                // We're being called from the software update window;
+                // don't spawn yet another dialog. Just try again later.
+                // XXX: The WinSparkle dialogs *aren't* modal, and a user
+                // can bring Wireshark to the foreground, close/save the
+                // file, and then click "Install Update" again, but it
+                // seems like many users don't expect that (and also don't
+                // know that Help->Check for Updates... exist, only knowing
+                // about the automatic check.) See #17658 and duplicates.
+                // Maybe we *should* spawn the dialog?
+                return false;
+            }
+
             QMessageBox msg_dialog;
             QString question;
             QString infotext;
@@ -1960,7 +2011,8 @@ bool LograyMainWindow::testCaptureFileClose(QString before_what, FileCloseContex
 void LograyMainWindow::captureStop() {
     stopCapture();
 
-    while (capture_file_.capFile() && capture_file_.capFile()->state == FILE_READ_IN_PROGRESS) {
+    while (capture_file_.capFile() && (capture_file_.capFile()->state == FILE_READ_IN_PROGRESS ||
+                                       capture_file_.capFile()->state == FILE_READ_PENDING)) {
         WiresharkApplication::processEvents();
     }
 }
@@ -2030,9 +2082,9 @@ void LograyMainWindow::initMainToolbarIcons()
     // Toolbar actions. The GNOME HIG says that we should have a menu icon for each
     // toolbar item but that clutters up our menu. Set menu icons sparingly.
 
-    main_ui_->actionCaptureStart->setIcon(StockIcon("x-capture-start"));
+    main_ui_->actionCaptureStart->setIcon(StockIcon("x-capture-start-circle"));
     main_ui_->actionCaptureStop->setIcon(StockIcon("x-capture-stop"));
-    main_ui_->actionCaptureRestart->setIcon(StockIcon("x-capture-restart"));
+    main_ui_->actionCaptureRestart->setIcon(StockIcon("x-capture-restart-circle"));
     main_ui_->actionCaptureOptions->setIcon(StockIcon("x-capture-options"));
 
     // Menu icons are disabled in main_window.ui for these items.
@@ -2139,10 +2191,14 @@ void LograyMainWindow::initTimePrecisionFormatMenu()
 
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionAutomatic] = TS_PREC_AUTO;
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionSeconds] = TS_PREC_FIXED_SEC;
-    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionDeciseconds] = TS_PREC_FIXED_DSEC;
-    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionCentiseconds] = TS_PREC_FIXED_CSEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision100Milliseconds] = TS_PREC_FIXED_100_MSEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision10Milliseconds] = TS_PREC_FIXED_10_MSEC;
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionMilliseconds] = TS_PREC_FIXED_MSEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision100Microseconds] = TS_PREC_FIXED_100_USEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision10Microseconds] = TS_PREC_FIXED_10_USEC;
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionMicroseconds] = TS_PREC_FIXED_USEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision100Nanoseconds] = TS_PREC_FIXED_100_NSEC;
+    tp_actions[main_ui_->actionViewTimeDisplayFormatPrecision10Nanoseconds] = TS_PREC_FIXED_10_NSEC;
     tp_actions[main_ui_->actionViewTimeDisplayFormatPrecisionNanoseconds] = TS_PREC_FIXED_NSEC;
 
     foreach(QAction* tpa, tp_actions.keys()) {
@@ -2192,7 +2248,7 @@ void LograyMainWindow::initConversationMenus()
         main_ui_->menuConversationFilter->addAction(conv_action);
 
         connect(this, SIGNAL(packetInfoChanged(_packet_info*)), conv_action, SLOT(setPacketInfo(_packet_info*)));
-        connect(conv_action, SIGNAL(triggered()), this, SLOT(applyConversationFilter()));
+        connect(conv_action, SIGNAL(triggered()), this, SLOT(applyConversationFilter()), Qt::QueuedConnection);
 
         // Packet list context menu items
         packet_list_->conversationMenu()->addAction(conv_action);
@@ -2240,7 +2296,7 @@ void LograyMainWindow::initConversationMenus()
     connect(colorize_action, SIGNAL(triggered()), this, SLOT(colorizeActionTriggered()));
 }
 
-gboolean LograyMainWindow::addExportObjectsMenuItem(const void *, void *value, void *userdata)
+bool LograyMainWindow::addExportObjectsMenuItem(const void *, void *value, void *userdata)
 {
     register_eo_t *eo = (register_eo_t*)value;
     LograyMainWindow *window = (LograyMainWindow*)userdata;
@@ -2378,7 +2434,7 @@ void LograyMainWindow::setMenusForCaptureFile(bool force_disable)
     bool can_save = false;
     bool can_save_as = false;
 
-    if (force_disable || capture_file_.capFile() == NULL || capture_file_.capFile()->state == FILE_READ_IN_PROGRESS) {
+    if (force_disable || capture_file_.capFile() == NULL || capture_file_.capFile()->state == FILE_READ_IN_PROGRESS || capture_file_.capFile()->state == FILE_READ_PENDING) {
         /* We have no capture file or we're currently reading a file */
         enable = false;
     } else {
@@ -2563,8 +2619,7 @@ void LograyMainWindow::setForCaptureInProgress(bool capture_in_progress, bool ha
     setMenusForCaptureInProgress(capture_in_progress);
 
 #ifdef HAVE_LIBPCAP
-    packet_list_->setCaptureInProgress(capture_in_progress);
-    packet_list_->setVerticalAutoScroll(capture_in_progress && main_ui_->actionGoAutoScroll->isChecked());
+    packet_list_->setCaptureInProgress(capture_in_progress, main_ui_->actionGoAutoScroll->isChecked());
 
 //    set_capture_if_dialog_for_capture_in_progress(capture_in_progress);
 #endif
@@ -2707,8 +2762,7 @@ void LograyMainWindow::externalMenuHelper(ext_menu_t * menu, QMenu  * subMenu, g
             itemAction = subMenu->addAction(item->name);
             itemAction->setData(QVariant::fromValue(static_cast<void *>(item)));
             itemAction->setText(item->label);
-            connect(itemAction, SIGNAL(triggered()),
-                    this, SLOT(externalMenuItem_triggered()));
+            connect(itemAction, &QAction::triggered, this, &LograyMainWindow::externalMenuItemTriggered);
         }
 
         /* Iterate Loop */
@@ -2859,12 +2913,4 @@ void LograyMainWindow::setMwFileName(QString fileName)
 {
     mwFileName_ = fileName;
     return;
-}
-
-frame_data * LograyMainWindow::frameDataForRow(int row) const
-{
-    if (packet_list_)
-        return packet_list_->getFDataForRow(row);
-
-    return Q_NULLPTR;
 }

@@ -9,7 +9,7 @@
 
 #include "config.h"
 
-#include <glib.h>
+#include <wireshark.h>
 
 #include "capture_options_dialog.h"
 #include <ui/qt/widgets/capture_filter_combo.h>
@@ -31,12 +31,13 @@
 #include "ui/capture_ui_utils.h"
 #include "ui/capture_globals.h"
 #include "ui/iface_lists.h"
-#include "ui/last_open_dir.h"
+#include "ui/file_dialog.h"
 
 #include "ui/ws_ui_util.h"
 #include "ui/util.h"
 #include <wsutil/utf8_entities.h>
 #include "ui/preference_utils.h"
+#include "ui/recent.h"
 
 #include <cstdio>
 #include <epan/prefs.h>
@@ -365,12 +366,12 @@ void CaptureOptionsDialog::on_capturePromModeCheckBox_toggled(bool checked)
 
 void CaptureOptionsDialog::browseButtonClicked()
 {
-    char *open_dir = NULL;
+    const char *open_dir = NULL;
 
     switch (prefs.gui_fileopen_style) {
 
     case FO_STYLE_LAST_OPENED:
-        open_dir = get_last_open_dir();
+        open_dir = get_open_dialog_initial_dir();
         break;
 
     case FO_STYLE_SPECIFIED:
@@ -504,7 +505,7 @@ void CaptureOptionsDialog::itemClicked(QTreeWidgetItem *item, int column)
         if (device->if_info.type == IF_EXTCAP) {
             /* this checks if configuration is required and not yet provided or saved via prefs */
             QString device_name = ti->data(col_extcap_, Qt::UserRole).value<QString>();
-            if (extcap_has_configuration((const char *)(device_name.toStdString().c_str()), FALSE))
+            if (extcap_has_configuration((const char *)(device_name.toStdString().c_str())))
             {
                 emit showExtcapOptions(device_name, false);
                 return;
@@ -538,7 +539,7 @@ void CaptureOptionsDialog::itemDoubleClicked(QTreeWidgetItem *item, int column)
         if (device->if_info.type == IF_EXTCAP) {
             /* this checks if configuration is required and not yet provided or saved via prefs */
             QString device_name = ti->data(col_extcap_, Qt::UserRole).value<QString>();
-            if (extcap_has_configuration((const char *)(device_name.toStdString().c_str()), TRUE))
+            if (extcap_requires_configuration((const char *)(device_name.toStdString().c_str())))
             {
                 emit showExtcapOptions(device_name, true);
                 return;
@@ -582,7 +583,7 @@ void CaptureOptionsDialog::on_cbUpdatePacketsRT_toggled(bool checked)
 
 void CaptureOptionsDialog::on_cbAutoScroll_toggled(bool checked)
 {
-    auto_scroll_live = checked;
+    recent.capture_auto_scroll = checked;
 }
 
 void CaptureOptionsDialog::on_cbExtraCaptureInfo_toggled(bool checked)
@@ -619,7 +620,7 @@ void CaptureOptionsDialog::on_buttonBox_accepted()
             if (device && device->if_info.type == IF_EXTCAP) {
                 /* this checks if configuration is required and not yet provided or saved via prefs */
                 QString device_name = ti->data(col_extcap_, Qt::UserRole).value<QString>();
-                if (extcap_has_configuration((const char *)(device_name.toStdString().c_str()), TRUE))
+                if (extcap_requires_configuration((const char *)(device_name.toStdString().c_str())))
                 {
                     emit showExtcapOptions(device_name, true);
                     return;
@@ -759,7 +760,7 @@ void CaptureOptionsDialog::updateInterfaces()
     }
 
     ui->cbUpdatePacketsRT->setChecked(global_capture_opts.real_time_mode);
-    ui->cbAutoScroll->setChecked(true);
+    ui->cbAutoScroll->setChecked(recent.capture_auto_scroll);
     ui->cbExtraCaptureInfo->setChecked(global_capture_opts.show_info);
 
     ui->cbResolveMacAddresses->setChecked(gbl_resolv_flags.mac_name);
@@ -1402,7 +1403,7 @@ QWidget* InterfaceTreeDelegate::createEditor(QWidget *parent, const QStyleOption
             QComboBox *cb = new QComboBox(parent);
             cb->addItems(valid_link_types);
 
-            connect(cb, SIGNAL(currentIndexChanged(QString)), this, SLOT(linkTypeChanged(QString)));
+            connect(cb, &QComboBox::currentTextChanged, this, &InterfaceTreeDelegate::linkTypeChanged);
             w = (QWidget*) cb;
             break;
         }
@@ -1457,7 +1458,7 @@ bool InterfaceTreeDelegate::eventFilter(QObject *object, QEvent *event)
     return false;
 }
 
-void InterfaceTreeDelegate::linkTypeChanged(QString selected_link_type)
+void InterfaceTreeDelegate::linkTypeChanged(const QString selected_link_type)
 {
     GList *list;
     link_row *temp;

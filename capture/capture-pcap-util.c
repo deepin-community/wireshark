@@ -13,7 +13,7 @@
 
 #ifdef HAVE_LIBPCAP
 
-#include <glib.h>
+#include <wireshark.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -68,6 +68,11 @@
 #include "capture/capture_ifinfo.h"
 #include "capture/capture-pcap-util.h"
 #include "capture/capture-pcap-util-int.h"
+#ifdef _WIN32
+#include "capture/capture-wpcap.h"
+#else
+#define ws_pcap_findalldevs_ex pcap_findalldevs_ex
+#endif
 
 #include <wsutil/file_util.h>
 #include <wsutil/please_report_bug.h>
@@ -75,6 +80,8 @@
 
 #ifndef _WIN32
 #include <netinet/in.h>
+#else
+#include <ws2tcpip.h>
 #endif
 
 #ifdef _WIN32
@@ -253,7 +260,7 @@ add_unix_interface_ifinfo(if_info_t *if_info, const char *name,
 			if_info->type = IF_USB;
 	}
 }
-#else
+#elif !defined(_WIN32)
 /*
  * On other UN*Xes, if there is a description, it's a friendly
  * name, and there is no vendor description.  ("Other UN*Xes"
@@ -395,7 +402,7 @@ if_info_get(const char *name)
 	}
 #endif /* __FreeBSD__ */
 #endif /* SIOCGIFDESCR */
-	if_info = if_info_new(name, description, FALSE);
+	if_info = if_info_new(name, description, false);
 	g_free(description);
 	return if_info;
 }
@@ -412,7 +419,7 @@ if_info_free(if_info_t *if_info)
 }
 
 if_info_t *
-if_info_new(const char *name, const char *description, gboolean loopback)
+if_info_new(const char *name, const char *description, bool loopback)
 {
 	if_info_t *if_info;
 #ifdef _WIN32
@@ -450,8 +457,8 @@ if_info_new(const char *name, const char *description, gboolean loopback)
 	} else if (description && (strstr(description, "Wireless") != NULL ||
 	    strstr(description,"802.11") != NULL)) {
 		if_info->type = IF_WIRELESS;
-	} else if (description && strstr(description, "AirPcap") != NULL ||
-	    strstr(name, "airpcap") != NULL) {
+	} else if (description && (strstr(description, "AirPcap") != NULL ||
+	    strstr(name, "airpcap") != NULL)) {
 		if_info->type = IF_AIRPCAP;
 	} else if (description && strstr(description, "Bluetooth") != NULL ) {
 		if_info->type = IF_BLUETOOTH;
@@ -558,8 +565,7 @@ if_info_add_address(if_info_t *if_info, struct sockaddr *addr)
 		ai = (struct sockaddr_in *)(void *)addr;
 		if_addr = (if_addr_t *)g_malloc(sizeof(*if_addr));
 		if_addr->ifat_type = IF_AT_IPv4;
-		if_addr->addr.ip4_addr =
-		    *((guint32 *)&(ai->sin_addr.s_addr));
+		if_addr->addr.ip4_addr = ai->sin_addr.s_addr;
 		if_info->addrs = g_slist_prepend(if_info->addrs, if_addr);
 		break;
 
@@ -614,6 +620,19 @@ get_interface_list_findalldevs_ex(const char *hostname, const char *port,
 	if (pcap_createsrcstr(source, PCAP_SRC_IFREMOTE, hostname, port,
 			      NULL, errbuf) == -1) {
 		*err = CANT_GET_INTERFACE_LIST;
+		if (strcmp(errbuf, "not supported") == 0) {
+			/*
+			 * macOS 14's pcap_createsrcstr(), which is a
+			 * stub that always returns -1 with an error
+			 * message of "not supported".
+			 *
+			 * In this case, as we passed it an rpcap://
+			 * URL, treat that as meaning "remote capture
+			 * not supported".
+			 */
+			g_strlcpy(errbuf, "Remote capture not supported",
+			    PCAP_ERRBUF_SIZE);
+		}
 		if (err_str != NULL)
 			*err_str = cant_get_if_list_error_message(errbuf);
 		return NULL;
@@ -623,8 +642,21 @@ get_interface_list_findalldevs_ex(const char *hostname, const char *port,
 	auth.username = g_strdup(username);
 	auth.password = g_strdup(passwd);
 
-	if (pcap_findalldevs_ex(source, &auth, &alldevs, errbuf) == -1) {
+	if (ws_pcap_findalldevs_ex(source, &auth, &alldevs, errbuf) == -1) {
 		*err = CANT_GET_INTERFACE_LIST;
+		if (strcmp(errbuf, "not supported") == 0) {
+			/*
+			 * macOS 14's pcap_findalldevs_ex(), which is a
+			 * stub that always returns -1 with an error
+			 * message of "not supported".
+			 *
+			 * In this case, as we passed it an rpcap://
+			 * URL, treat that as meaning "remote capture
+			 * not supported".
+			 */
+			g_strlcpy(errbuf, "Remote capture not supported",
+			    PCAP_ERRBUF_SIZE);
+		}
 		if (err_str != NULL)
 			*err_str = cant_get_if_list_error_message(errbuf);
 		g_free(auth.username);
@@ -646,7 +678,7 @@ get_interface_list_findalldevs_ex(const char *hostname, const char *port,
 
 	for (dev = alldevs; dev != NULL; dev = dev->next) {
 		if_info = if_info_new(dev->name, dev->description,
-		    (dev->flags & PCAP_IF_LOOPBACK) ? TRUE : FALSE);
+		    (dev->flags & PCAP_IF_LOOPBACK) ? true : false);
 		il = g_list_append(il, if_info);
 		if_info_ip(if_info, dev);
 	}
@@ -685,7 +717,7 @@ get_interface_list_findalldevs(int *err, char **err_str)
 
 	for (dev = alldevs; dev != NULL; dev = dev->next) {
 		if_info = if_info_new(dev->name, dev->description,
-		    (dev->flags & PCAP_IF_LOOPBACK) ? TRUE : FALSE);
+		    (dev->flags & PCAP_IF_LOOPBACK) ? true : false);
 		il = g_list_append(il, if_info);
 		if_info_ip(if_info, dev);
 	}
@@ -695,7 +727,7 @@ get_interface_list_findalldevs(int *err, char **err_str)
 }
 
 static void
-free_if_cb(gpointer data, gpointer user_data _U_)
+free_if_cb(void * data, void * user_data _U_)
 {
 	if_info_free((if_info_t *)data);
 }
@@ -708,7 +740,7 @@ free_interface_list(GList *if_list)
 }
 
 static void
-free_linktype_cb(gpointer data, gpointer user_data _U_)
+free_linktype_cb(void * data, void * user_data _U_)
 {
 	data_link_info_t *linktype_info = (data_link_info_t *)data;
 
@@ -718,7 +750,7 @@ free_linktype_cb(gpointer data, gpointer user_data _U_)
 }
 
 static void
-free_timestamp_cb(gpointer data, gpointer user_data _U_)
+free_timestamp_cb(void * data, void * user_data _U_)
 {
 	timestamp_info_t *timestamp_info = (timestamp_info_t *)data;
 
@@ -878,7 +910,7 @@ get_pcap_datalink(pcap_t *pch,
 }
 
 /* Set the data link type on a pcap. */
-gboolean
+bool
 set_pcap_datalink(pcap_t *pcap_h, int datalink, char *name,
     char *errmsg, size_t errmsg_len,
     char *secondary_errmsg, size_t secondary_errmsg_len)
@@ -886,22 +918,22 @@ set_pcap_datalink(pcap_t *pcap_h, int datalink, char *name,
 	char *set_datalink_err_str;
 
 	if (datalink == -1)
-		return TRUE; /* just use the default */
+		return true; /* just use the default */
 	if (pcap_set_datalink(pcap_h, datalink) == 0)
-		return TRUE; /* no error */
+		return true; /* no error */
 	set_datalink_err_str = pcap_geterr(pcap_h);
-	snprintf(errmsg, (gulong) errmsg_len, "Unable to set data link type on interface '%s' (%s).",
+	snprintf(errmsg, errmsg_len, "Unable to set data link type on interface '%s' (%s).",
 	    name, set_datalink_err_str);
 	/*
 	 * If the error isn't "XXX is not one of the DLTs supported by this device",
 	 * tell the user to tell the Wireshark developers about it.
 	 */
 	if (strstr(set_datalink_err_str, "is not one of the DLTs supported by this device") == NULL)
-		snprintf(secondary_errmsg, (gulong) secondary_errmsg_len,
+		snprintf(secondary_errmsg, secondary_errmsg_len,
 		           "%s", please_report_bug());
 	else
 		secondary_errmsg[0] = '\0';
-	return FALSE;
+	return false;
 }
 
 static data_link_info_t *
@@ -1074,14 +1106,14 @@ request_high_resolution_timestamp(pcap_t *pcap_h)
 	 * libpcap, and dlsym() to find a pointer to pcap_set_tstamp_precision(),
 	 * and if we find the pointer, call it.
 	 */
-	static gboolean initialized = FALSE;
+	static bool initialized = false;
 	static int (*p_pcap_set_tstamp_precision)(pcap_t *, int);
 
 	if (!initialized) {
 		p_pcap_set_tstamp_precision =
 		    (int (*)(pcap_t *, int))
 		      dlsym(RTLD_NEXT, "pcap_set_tstamp_precision");
-		initialized = TRUE;
+		initialized = true;
 	}
 	if (p_pcap_set_tstamp_precision != NULL)
 		(*p_pcap_set_tstamp_precision)(pcap_h, PCAP_TSTAMP_PRECISION_NANO);
@@ -1096,29 +1128,29 @@ request_high_resolution_timestamp(pcap_t *pcap_h)
 }
 
 /*
- * Return TRUE if the pcap_t in question is set up for high-precision
- * time stamps, FALSE otherwise.
+ * Return true if the pcap_t in question is set up for high-precision
+ * time stamps, false otherwise.
  */
-gboolean
+bool
 have_high_resolution_timestamp(pcap_t *pcap_h)
 {
 #ifdef __APPLE__
 	/*
 	 * See above.
 	 */
-	static gboolean initialized = FALSE;
+	static bool initialized = false;
 	static int (*p_pcap_get_tstamp_precision)(pcap_t *);
 
 	if (!initialized) {
 		p_pcap_get_tstamp_precision =
 		    (int (*)(pcap_t *))
 		      dlsym(RTLD_NEXT, "pcap_get_tstamp_precision");
-		initialized = TRUE;
+		initialized = true;
 	}
 	if (p_pcap_get_tstamp_precision != NULL)
 		return (*p_pcap_get_tstamp_precision)(pcap_h) == PCAP_TSTAMP_PRECISION_NANO;
 	else
-		return FALSE;	/* Can't get implies couldn't set */
+		return false;	/* Can't get implies couldn't set */
 #else /* __APPLE__ */
 	/*
 	 * On other UN*Xes we require that we be run on an OS version
@@ -1133,7 +1165,7 @@ have_high_resolution_timestamp(pcap_t *pcap_h)
 
 #ifdef HAVE_PCAP_CREATE
 #ifdef HAVE_BONDING
-static gboolean
+static bool
 is_linux_bonding_device(const char *ifname)
 {
 	int fd;
@@ -1142,7 +1174,7 @@ is_linux_bonding_device(const char *ifname)
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);
 	if (fd == -1)
-		return FALSE;
+		return false;
 
 	memset(&ifr, 0, sizeof ifr);
 	(void) g_strlcpy(ifr.ifr_name, ifname, sizeof ifr.ifr_name);
@@ -1151,23 +1183,23 @@ is_linux_bonding_device(const char *ifname)
 #if defined(SIOCBONDINFOQUERY)
 	if (ioctl(fd, SIOCBONDINFOQUERY, &ifr) == 0) {
 		close(fd);
-		return TRUE;
+		return true;
 	}
 #else
 	if (ioctl(fd, BOND_INFO_QUERY_OLD, &ifr) == 0) {
 		close(fd);
-		return TRUE;
+		return true;
 	}
 #endif
 
 	close(fd);
-	return FALSE;
+	return false;
 }
 #else
-static gboolean
+static bool
 is_linux_bonding_device(const char *ifname _U_)
 {
-	return FALSE;
+	return false;
 }
 #endif
 
@@ -1233,9 +1265,9 @@ get_if_capabilities_pcap_create(interface_options *interface_opts,
 	}
 	caps = (if_capabilities_t *)g_malloc(sizeof *caps);
 	if (status == 0)
-		caps->can_set_rfmon = FALSE;
+		caps->can_set_rfmon = false;
 	else if (status == 1) {
-		caps->can_set_rfmon = TRUE;
+		caps->can_set_rfmon = true;
 		if (interface_opts->monitor_mode)
 			pcap_set_rfmon(pch, 1);
 	} else {
@@ -1404,11 +1436,13 @@ open_capture_device_pcap_create(
 			    sizeof *open_status_str);
 			break;
 
+#ifdef HAVE_PCAP_ERROR_PROMISC_PERM_DENIED
 		case PCAP_ERROR_PROMISC_PERM_DENIED:
 			*open_status = CAP_DEVICE_OPEN_ERROR_PROMISC_PERM_DENIED;
 			(void) g_strlcpy(*open_status_str, pcap_geterr(pcap_h),
 			    sizeof *open_status_str);
 			break;
+#endif
 
 		case PCAP_ERROR_RFMON_NOTSUP:
 			*open_status = CAP_DEVICE_OPEN_ERROR_RFMON_NOTSUP;
@@ -1450,11 +1484,13 @@ open_capture_device_pcap_create(
 			    sizeof *open_status_str);
 			break;
 
+#ifdef HAVE_PCAP_WARNING_TSTAMP_TYPE_NOTSUP
 		case PCAP_WARNING_TSTAMP_TYPE_NOTSUP:
 			*open_status = CAP_DEVICE_OPEN_WARNING_TSTAMP_TYPE_NOTSUP;
 			(void) g_strlcpy(*open_status_str, pcap_geterr(pcap_h),
 			    sizeof *open_status_str);
 			break;
+#endif
 
 		case PCAP_WARNING:
 			*open_status = CAP_DEVICE_OPEN_WARNING_OTHER;
@@ -1495,7 +1531,7 @@ get_if_capabilities_pcap_open_live(interface_options *interface_opts,
 	}
 
 	caps = (if_capabilities_t *)g_malloc(sizeof *caps);
-	caps->can_set_rfmon = FALSE;
+	caps->can_set_rfmon = false;
 	caps->data_link_types = get_data_link_types(pch, interface_opts,
 	    open_status, open_status_str);
 	if (caps->data_link_types == NULL) {
@@ -1627,12 +1663,25 @@ get_if_capabilities(interface_options *interface_opts,
 		 * to use an account that *does* have permissions.
 		 */
 		*status = CAP_DEVICE_OPEN_ERROR_GENERIC;
+		if (strcmp(errbuf, "not supported") == 0) {
+			/*
+			 * macOS 14's pcap_open(), which is a stub that
+			 * always returns NULL with an error message of
+			 * "not supported".
+			 *
+			 * In this case, as we passed it an rpcap://
+			 * URL, treat that as meaning "remote capture
+			 * not supported".
+			 */
+			g_strlcpy(errbuf, "Remote capture not supported",
+			    PCAP_ERRBUF_SIZE);
+		}
 		*status_str = g_strdup(errbuf[0] == '\0' ? "Unknown error (pcap bug; actual error cause not reported)" : errbuf);
 		return NULL;
 	}
 
         caps = (if_capabilities_t *)g_malloc(sizeof *caps);
-        caps->can_set_rfmon = FALSE;
+        caps->can_set_rfmon = false;
         caps->data_link_types = NULL;
         deflt = get_pcap_datalink(pch, interface_opts->name);
         data_link_info = create_data_link_info(deflt);
@@ -1717,6 +1766,21 @@ open_capture_device(capture_options *capture_opts,
 			 * permission.)
 			 */
 			*open_status = CAP_DEVICE_OPEN_ERROR_GENERIC;
+			if (strcmp(*open_status_str, "not supported") == 0) {
+				/*
+				 * macOS 14's pcap_open(), which is a stub
+				 * that always returns NULL with an error
+				 * message of "not supported".
+				 *
+				 * In this case, as we passed it an rpcap://
+				 * URL, treat that as meaning "remote capture
+				 * not supported".
+				 */
+				g_strlcpy(*open_status_str,
+				    "Remote capture not supported",
+				    PCAP_ERRBUF_SIZE);
+			}
+
 			/* Did pcap actually supply an error message? */
 			if ((*open_status_str)[0] == '\0') {
 				/*

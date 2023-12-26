@@ -67,15 +67,13 @@
 
 #include "capture_file.h"
 #include "capture_file_dialog.h"
-#include "print_dialog.h"
 #include "capture_file_properties_dialog.h"
 #include <ui/qt/utils/field_information.h>
 #include <ui/qt/widgets/display_filter_combo.h>
-#include "follow_stream_dialog.h"
 #include "main_window.h"
 #include "rtp_stream_dialog.h"
-#include "voip_calls_dialog.h"
 #include "rtp_analysis_dialog.h"
+#include "tlskeylog_launcher_dialog.h"
 
 class AccordionFrame;
 class ByteViewTab;
@@ -130,8 +128,6 @@ public:
     QString getMwFileName();
     void setMwFileName(QString fileName);
 
-    frame_data * frameDataForRow(int row) const;
-
 protected:
     virtual bool eventFilter(QObject *obj, QEvent *event);
     virtual bool event(QEvent *event);
@@ -156,7 +152,8 @@ private:
         Default,
         Quit,
         Restart,
-        Reload
+        Reload,
+        Update
     };
 
     Ui::WiresharkMainWindow *main_ui_;
@@ -189,8 +186,6 @@ private:
     CaptureOptionsDialog *capture_options_dialog_;
     info_data_t info_data_;
 #endif
-    FilterDialog *display_filter_dlg_;
-    FilterDialog *capture_filter_dlg_;
 
 #if defined(Q_OS_MAC)
     QMenu *dock_menu_;
@@ -201,6 +196,8 @@ private:
 #endif
 
     QPoint dragStartPosition;
+
+    QPointer<TLSKeylogDialog> tlskeylog_dialog_;
 
     void freeze();
     void thaw();
@@ -234,6 +231,7 @@ private:
     void setMenusForFileSet(bool enable_list_files);
     void setWindowIcon(const QIcon &icon);
     QString replaceWindowTitleVariables(QString title);
+    void updateStyleSheet();
 
     void externalMenuHelper(ext_menu_t * menu, QMenu  * subMenu, gint depth);
 
@@ -249,7 +247,6 @@ private:
 
 signals:
     void setDissectedCaptureFile(capture_file *cf);
-    void displayFilterSuccess(bool success);
     void closePacketDialogs();
     void reloadFields();
     void packetInfoChanged(struct _packet_info *pinfo);
@@ -322,8 +319,10 @@ private slots:
 
     void initViewColorizeMenu();
     void initConversationMenus();
-    static gboolean addExportObjectsMenuItem(const void *key, void *value, void *userdata);
+    static bool addExportObjectsMenuItem(const void *key, void *value, void *userdata);
     void initExportObjectsMenus();
+    static bool addFollowStreamMenuItem(const void *key, void *value, void *userdata);
+    void initFollowStreamMenus();
 
     // in main_window_slots.cpp
     /**
@@ -370,7 +369,6 @@ private slots:
     void applyGlobalCommandLineOptions();
     void setFeaturesEnabled(bool enabled = true);
 
-    void on_actionDisplayFilterExpression_triggered();
     void on_actionNewDisplayFilterExpression_triggered();
     void onFilterSelected(QString, bool);
     void onFilterPreferences();
@@ -428,6 +426,9 @@ private slots:
     void editPacketCommentFinished(PacketCommentDialog* pc_dialog, int result, guint nComment);
     void deleteAllPacketComments();
     void deleteAllPacketCommentsFinished(int result);
+    void injectSecrets();
+    void discardAllSecrets();
+    void discardAllSecretsFinished(int result);
     void showPreferencesDialog(QString module_name);
 
     void connectViewMenuActions();
@@ -447,152 +448,70 @@ private slots:
 
     void connectGoMenuActions();
 
+    void setPreviousFocus();
     void resetPreviousFocus();
 
     void connectCaptureMenuActions();
     void startCaptureTriggered();
 
-    void on_actionAnalyzeDisplayFilters_triggered();
-    void on_actionAnalyzeDisplayFilterMacros_triggered();
+    void connectAnalyzeMenuActions();
+
     void matchFieldFilter(FilterAction::Action action, FilterAction::ActionType filter_type);
-    void on_actionAnalyzeCreateAColumn_triggered();
+    void applyFieldAsColumn();
 
     void filterMenuAboutToShow();
 
     void applyConversationFilter();
     void applyExportObject();
 
-    void on_actionAnalyzeEnabledProtocols_triggered();
-    void on_actionAnalyzeDecodeAs_triggered();
-    void on_actionAnalyzeReloadLuaPlugins_triggered();
-
-    void openFollowStreamDialog(follow_type_t type, guint stream_num, guint sub_stream_num, bool use_stream_index = true);
-    void openFollowStreamDialogForType(follow_type_t type);
+    void openFollowStreamDialog(int proto_id, guint stream_num, guint sub_stream_num, bool use_stream_index = true);
+    void openFollowStreamDialog(int proto_id);
 
     void statCommandExpertInfo(const char *, void *);
-    void on_actionAnalyzeExpertInfo_triggered();
 
-    void on_actionHelpContents_triggered();
-    void on_actionHelpMPWireshark_triggered();
-    void on_actionHelpMPWireshark_Filter_triggered();
-    void on_actionHelpMPCapinfos_triggered();
-    void on_actionHelpMPDumpcap_triggered();
-    void on_actionHelpMPEditcap_triggered();
-    void on_actionHelpMPMergecap_triggered();
-    void on_actionHelpMPRawshark_triggered();
-    void on_actionHelpMPReordercap_triggered();
-    void on_actionHelpMPText2pcap_triggered();
-    void on_actionHelpMPTShark_triggered();
-    void on_actionHelpWebsite_triggered();
-    void on_actionHelpFAQ_triggered();
-    void on_actionHelpAsk_triggered();
-    void on_actionHelpDownloads_triggered();
-    void on_actionHelpWiki_triggered();
-    void on_actionHelpSampleCaptures_triggered();
-    void on_actionHelpAbout_triggered();
+    void connectHelpMenuActions();
 
 #ifdef HAVE_SOFTWARE_UPDATE
     void checkForUpdates();
 #endif
 
-    void on_goToCancel_clicked();
-    void on_goToGo_clicked();
-    void on_goToLineEdit_returnPressed();
+    void goToCancelClicked();
+    void goToGoClicked();
+    void goToLineEditReturnPressed();
 
-    void on_actionStatisticsCaptureFileProperties_triggered();
-    void on_actionStatisticsResolvedAddresses_triggered();
-    void on_actionStatisticsProtocolHierarchy_triggered();
-    void on_actionStatisticsFlowGraph_triggered();
+    void connectStatisticsMenuActions();
+
+    void showResolvedAddressesDialog();
+    void showConversationsDialog();
+    void showEndpointsDialog();
+
     void openTcpStreamDialog(int graph_type);
-    void on_actionStatisticsTcpStreamStevens_triggered();
-    void on_actionStatisticsTcpStreamTcptrace_triggered();
-    void on_actionStatisticsTcpStreamThroughput_triggered();
-    void on_actionStatisticsTcpStreamRoundTripTime_triggered();
-    void on_actionStatisticsTcpStreamWindowScaling_triggered();
     void openSCTPAllAssocsDialog();
     void on_actionSCTPShowAllAssociations_triggered();
     void on_actionSCTPAnalyseThisAssociation_triggered();
     void on_actionSCTPFilterThisAssociation_triggered();
     void statCommandMulticastStatistics(const char *arg, void *);
-    void on_actionStatisticsUdpMulticastStreams_triggered();
 
     void statCommandWlanStatistics(const char *arg, void *);
-    void on_actionWirelessWlanStatistics_triggered();
 
     void openStatisticsTreeDialog(const gchar *abbr);
-    void on_actionStatistics29WestTopics_Advertisements_by_Topic_triggered();
-    void on_actionStatistics29WestTopics_Advertisements_by_Source_triggered();
-    void on_actionStatistics29WestTopics_Advertisements_by_Transport_triggered();
-    void on_actionStatistics29WestTopics_Queries_by_Topic_triggered();
-    void on_actionStatistics29WestTopics_Queries_by_Receiver_triggered();
-    void on_actionStatistics29WestTopics_Wildcard_Queries_by_Pattern_triggered();
-    void on_actionStatistics29WestTopics_Wildcard_Queries_by_Receiver_triggered();
-    void on_actionStatistics29WestQueues_Advertisements_by_Queue_triggered();
-    void on_actionStatistics29WestQueues_Advertisements_by_Source_triggered();
-    void on_actionStatistics29WestQueues_Queries_by_Queue_triggered();
-    void on_actionStatistics29WestQueues_Queries_by_Receiver_triggered();
-    void on_actionStatistics29WestUIM_Streams_triggered();
-    void on_actionStatistics29WestLBTRM_triggered();
-    void on_actionStatistics29WestLBTRU_triggered();
-    void on_actionStatisticsANCP_triggered();
-    void on_actionStatisticsBACappInstanceId_triggered();
-    void on_actionStatisticsBACappIP_triggered();
-    void on_actionStatisticsBACappObjectId_triggered();
-    void on_actionStatisticsBACappService_triggered();
-    void on_actionStatisticsCollectd_triggered();
-    void on_actionStatisticsConversations_triggered();
-    void on_actionStatisticsEndpoints_triggered();
-    void on_actionStatisticsHART_IP_triggered();
-    void on_actionStatisticsHTTPPacketCounter_triggered();
-    void on_actionStatisticsHTTPRequests_triggered();
-    void on_actionStatisticsHTTPLoadDistribution_triggered();
-    void on_actionStatisticsHTTPRequestSequences_triggered();
-    void on_actionStatisticsPacketLengths_triggered();
     void statCommandIOGraph(const char *, void *);
-    void on_actionStatisticsIOGraph_triggered();
-    void on_actionStatisticsSametime_triggered();
-    void on_actionStatisticsDNS_triggered();
-    void on_actionStatisticsHpfeeds_triggered();
-    void on_actionStatisticsHTTP2_triggered();
-    void on_actionStatisticsSOMEIPmessages_triggered();
-    void on_actionStatisticsSOMEIPSDentries_triggered();
+
+    void connectTelephonyMenuActions();
 
     RtpStreamDialog *openTelephonyRtpStreamsDialog();
     RtpPlayerDialog *openTelephonyRtpPlayerDialog();
-    VoipCallsDialog *openTelephonyVoipCallsDialogVoip();
-    VoipCallsDialog *openTelephonyVoipCallsDialogSip();
     RtpAnalysisDialog *openTelephonyRtpAnalysisDialog();
-    void on_actionTelephonyVoipCalls_triggered();
-    void on_actionTelephonyGsmMapSummary_triggered();
     void statCommandLteMacStatistics(const char *arg, void *);
-    void on_actionTelephonyLteRlcStatistics_triggered();
     void statCommandLteRlcStatistics(const char *arg, void *);
-    void on_actionTelephonyLteMacStatistics_triggered();
-    void on_actionTelephonyLteRlcGraph_triggered();
-    void on_actionTelephonyIax2StreamAnalysis_triggered();
-    void on_actionTelephonyISUPMessages_triggered();
-    void on_actionTelephonyMtp3Summary_triggered();
-    void on_actionTelephonyOsmuxPacketCounter_triggered();
-    void on_actionTelephonyRtpStreams_triggered();
-    void on_actionTelephonyRtpStreamAnalysis_triggered();
-    void on_actionTelephonyRtpPlayer_triggered();
-    void on_actionTelephonyRTSPPacketCounter_triggered();
-    void on_actionTelephonySMPPOperations_triggered();
-    void on_actionTelephonyUCPMessages_triggered();
-    void on_actionTelephonyF1APMessages_triggered();
-    void on_actionTelephonyNGAPMessages_triggered();
-    void on_actionTelephonySipFlows_triggered();
+    void openRtpStreamAnalysisDialog();
+    void openRtpPlayerDialog();
 
-    void on_actionBluetoothATT_Server_Attributes_triggered();
-    void on_actionBluetoothDevices_triggered();
-    void on_actionBluetoothHCI_Summary_triggered();
+    void connectWirelessMenuActions();
 
-    void on_actionToolsFirewallAclRules_triggered();
-    void on_actionToolsCredentials_triggered();
+    void connectToolsMenuActions();
 
-    void externalMenuItem_triggered();
-
-    void on_actionAnalyzeShowPacketBytes_triggered();
+    void externalMenuItemTriggered();
 
     void on_actionContextWikiProtocolPage_triggered();
     void on_actionContextFilterFieldReference_triggered();
@@ -601,6 +520,8 @@ private slots:
     void showExtcapOptionsDialog(QString & device_name, bool startCaptureOnClose);
 
     QString findRtpStreams(QVector<rtpstream_id_t *> *stream_ids, bool reverse);
+
+    void openTLSKeylogDialog();
 
     friend class MainApplication;
 };

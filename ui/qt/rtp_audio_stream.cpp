@@ -11,11 +11,7 @@
 
 #ifdef QT_MULTIMEDIA_LIB
 
-#ifdef HAVE_SPEEXDSP
 #include <speex/speex_resampler.h>
-#else
-#include "../../speexdsp/speex_resampler.h"
-#endif /* HAVE_SPEEXDSP */
 
 #include <epan/rtp_pt.h>
 #include <epan/to_str.h>
@@ -307,6 +303,8 @@ void RtpAudioStream::decodeAudio(QAudioDeviceInfo out_device)
         }
 
         size_t decoded_bytes = decode_rtp_packet(rtp_packet, &decode_buff, decoders_hash_, &channels, &sample_rate);
+        // XXX: We don't actually *do* anything with channels, and just treat
+        // everything as if it were mono
 
         unsigned rtp_clock_rate = sample_rate;
         if (rtp_packet->info->info_payload_type == PT_G722) {

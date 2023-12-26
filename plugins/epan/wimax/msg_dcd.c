@@ -31,6 +31,8 @@ extern gboolean include_cor2_changes;
 void proto_register_mac_mgmt_msg_dcd(void);
 void proto_reg_handoff_mac_mgmt_msg_dcd(void);
 
+static dissector_handle_t dcd_handle;
+
 static gint proto_mac_mgmt_msg_dcd_decoder = -1;
 static gint ett_mac_mgmt_msg_dcd_decoder = -1;
 
@@ -57,8 +59,10 @@ static gint hf_dcd_frame_duration_code = -1;
 static gint hf_dcd_frame_nr = -1;
 #ifdef  WIMAX_16D_2004
 static gint hf_dcd_size_cqich_id = -1;
+static gint hf_dcd_h_arq_ack_delay_dl = -1;
+#else
+static gint hf_dcd_h_arq_ack_delay_ul = -1;
 #endif
-static gint hf_dcd_h_arq_ack_delay = -1;
 static gint hf_dcd_mac_version = -1;
 static gint hf_dcd_restart_count = -1;
 
@@ -521,7 +525,11 @@ static int dissect_mac_mgmt_msg_dcd_decoder(tvbuff_t *tvb, packet_info *pinfo, p
 #endif
 				case DCD_H_ARQ_ACK_DELAY:
 				{
-					add_tlv_subtree(&tlv_info, dcd_tree, hf_dcd_h_arq_ack_delay, tvb, offset-tlv_value_offset, ENC_BIG_ENDIAN);
+#ifdef WIMAX_16D_2004
+					add_tlv_subtree(&tlv_info, dcd_tree, hf_dcd_h_arq_ack_delay_dl, tvb, offset-tlv_value_offset, ENC_BIG_ENDIAN);
+#else
+					add_tlv_subtree(&tlv_info, dcd_tree, hf_dcd_h_arq_ack_delay_ul, tvb, offset-tlv_value_offset, ENC_BIG_ENDIAN);
+#endif
 					break;
 				}
 				case DCD_MAC_VERSION:
@@ -968,7 +976,7 @@ void proto_register_mac_mgmt_msg_dcd(void)
 		},
 #ifdef WIMAX_16D_2004
 		{
-			&hf_dcd_h_arq_ack_delay,
+			&hf_dcd_h_arq_ack_delay_dl,
 			{
 				"H-ARQ ACK Delay for DL Burst", "wmx.dcd.h_arq_ack_delay_dl_burst",
 				FT_UINT8, BASE_DEC|BASE_UNIT_STRING, &wimax_units_frame_offset, 0x00, "", HFILL
@@ -976,7 +984,7 @@ void proto_register_mac_mgmt_msg_dcd(void)
 		},
 #else
 			{
-			&hf_dcd_h_arq_ack_delay,
+			&hf_dcd_h_arq_ack_delay_ul,
 			{
 				"H-ARQ ACK Delay for UL Burst", "wmx.dcd.h_arq_ack_delay_ul_burst",
 				FT_UINT8, BASE_DEC|BASE_UNIT_STRING, &wimax_units_frame_offset, 0x00, NULL, HFILL
@@ -1227,13 +1235,11 @@ void proto_register_mac_mgmt_msg_dcd(void)
 
 	proto_register_field_array(proto_mac_mgmt_msg_dcd_decoder, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
+	dcd_handle = register_dissector("mac_mgmt_msg_dcd_handler", dissect_mac_mgmt_msg_dcd_decoder, proto_mac_mgmt_msg_dcd_decoder);
 }
 
 void proto_reg_handoff_mac_mgmt_msg_dcd(void)
 {
-	dissector_handle_t dcd_handle;
-
-	dcd_handle = create_dissector_handle(dissect_mac_mgmt_msg_dcd_decoder, proto_mac_mgmt_msg_dcd_decoder);
 	dissector_add_uint("wmx.mgmtmsg", MAC_MGMT_MSG_DCD, dcd_handle);
 }
 

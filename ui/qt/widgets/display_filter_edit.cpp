@@ -71,7 +71,9 @@ DisplayFilterEdit::DisplayFilterEdit(QWidget *parent, DisplayFilterEditType type
     clear_button_(NULL),
     apply_button_(NULL),
     leftAlignActions_(false),
-    last_applied_(QString())
+    last_applied_(QString()),
+    filter_word_preamble_(QString()),
+    autocomplete_accepts_field_(true)
 {
     setAccessibleName(tr("Display filter entry"));
 
@@ -124,18 +126,19 @@ DisplayFilterEdit::DisplayFilterEdit(QWidget *parent, DisplayFilterEditType type
 
     connect(mainApp, &MainApplication::appInitialized, this, &DisplayFilterEdit::updateBookmarkMenu);
     connect(mainApp, &MainApplication::displayFilterListChanged, this, &DisplayFilterEdit::updateBookmarkMenu);
-    connect(mainApp, SIGNAL(preferencesChanged()), this, SLOT(checkFilter()));
+    connect(mainApp, &MainApplication::preferencesChanged, this, [=](){ checkFilter(); });
 
-    connect(mainApp, SIGNAL(appInitialized()), this, SLOT(connectToMainWindow()));
+    connect(mainApp, &MainApplication::appInitialized, this, &DisplayFilterEdit::connectToMainWindow);
 }
 
 void DisplayFilterEdit::connectToMainWindow()
 {
-    connect(this, SIGNAL(filterPackets(QString, bool)), mainApp->mainWindow(), SLOT(filterPackets(QString, bool)));
-    connect(this, SIGNAL(showPreferencesDialog(QString)),
-            mainApp->mainWindow(), SLOT(showPreferencesDialog(QString)));
-    connect(mainApp->mainWindow(), SIGNAL(displayFilterSuccess(bool)),
-            this, SLOT(displayFilterSuccess(bool)));
+    connect(this, &DisplayFilterEdit::filterPackets, qobject_cast<MainWindow *>(mainApp->mainWindow()),
+            &MainWindow::filterPackets);
+    connect(this, &DisplayFilterEdit::showPreferencesDialog,
+            qobject_cast<MainWindow *>(mainApp->mainWindow()), &MainWindow::showPreferencesDialog);
+    connect(qobject_cast<MainWindow *>(mainApp->mainWindow()), &MainWindow::displayFilterSuccess,
+            this, &DisplayFilterEdit::displayFilterSuccess);
 }
 
 void DisplayFilterEdit::contextMenuEvent(QContextMenuEvent *event) {
@@ -147,20 +150,21 @@ void DisplayFilterEdit::contextMenuEvent(QContextMenuEvent *event) {
         return;
     }
 
-    QAction * first = menu->actions().at(0);
+    QAction *first = menu->actions().at(0);
 
-    QAction * na = new QAction(tr("Left align buttons"), this);
-    na->setCheckable(true);
-    na->setChecked(leftAlignActions_);
-    connect(na, &QAction::triggered, this, &DisplayFilterEdit::triggerAlignementAction);
-    menu->addSeparator();
-    menu->addAction(na);
-
-    na = new QAction(tr("Display Filter Expression…"), this);
+    QAction *na = new QAction(tr("Display Filter Expression…"), this);
     connect(na, &QAction::triggered, this, &DisplayFilterEdit::displayFilterExpression);
     menu->insertAction(first, na);
-
     menu->insertSeparator(first);
+
+    if (type_ == DisplayFilterToApply) {
+        na = new QAction(tr("Left align buttons"), this);
+        na->setCheckable(true);
+        na->setChecked(leftAlignActions_);
+        connect(na, &QAction::triggered, this, &DisplayFilterEdit::triggerAlignementAction);
+        menu->addSeparator();
+        menu->addAction(na);
+    }
 
     menu->popup(event->globalPos());
 }
@@ -181,7 +185,7 @@ void DisplayFilterEdit::alignActionButtons()
 {
     int frameWidth = style()->pixelMetric(QStyle::PM_DefaultFrameWidth);
     QSize bksz, cbsz, apsz;
-    bksz = apsz = cbsz = QSize(0,0);
+    bksz = apsz = cbsz = QSize(0, 0);
 
     if (type_ == DisplayFilterToApply) {
         bookmark_button_->setMinimumHeight(contentsRect().height());
@@ -202,15 +206,15 @@ void DisplayFilterEdit::alignActionButtons()
 
     int leftPadding = frameWidth + 1;
     int leftMargin = bksz.width();
-    int rightMargin = cbsz.width() + apsz.width() + frameWidth + 1;
+    int rightMargin = cbsz.width() + apsz.width() + frameWidth + 2;
     if (leftAlignActions_)
     {
-        leftMargin = rightMargin + bksz.width() + 2;
+        leftMargin = rightMargin + bksz.width() - 2;
         rightMargin = 0;
     }
 
-    setStyleSheet(QString(
-            "DisplayFilterEdit {"
+    SyntaxLineEdit::setStyleSheet(style_sheet_ + QString(
+            "SyntaxLineEdit {"
             "  padding-left: %1px;"
             "  margin-left: %2px;"
             "  margin-right: %3px;"
@@ -279,7 +283,7 @@ void DisplayFilterEdit::paintEvent(QPaintEvent *evt) {
             return;
         }
 
-        // Draw the right border by hand. We could try to do this in the
+        // Draw the borders by hand. We could try to do this in the
         // style sheet but it's a pain.
 #ifdef Q_OS_MAC
         QColor divider_color = Qt::gray;
@@ -289,17 +293,31 @@ void DisplayFilterEdit::paintEvent(QPaintEvent *evt) {
         QPainter painter(this);
         painter.setPen(divider_color);
         QRect cr = contentsRect();
-        int xpos = 0;
+        int left_xpos = 0;
+        int right_xpos = 0;
+
         if (leftAlignActions_)
         {
-            xpos = 1 + bookmark_button_->size().width() + apply_button_->size().width();
+            left_xpos = 1 + bookmark_button_->width();
             if (clear_button_->isVisible())
-                xpos += clear_button_->size().width();
+                left_xpos += clear_button_->width();
+            if (apply_button_->isVisible())
+                left_xpos += apply_button_->width();
+            right_xpos = cr.width() - 1;
         }
         else
-            xpos = bookmark_button_->size().width();
+        {
+            left_xpos = bookmark_button_->width();
+            right_xpos = cr.width() - 4;
+            if (clear_button_->isVisible())
+                right_xpos -= clear_button_->width();
+            if (apply_button_->isVisible())
+                right_xpos -= apply_button_->width();
+        }
 
-        painter.drawLine(xpos, cr.top(), xpos, cr.bottom() + 1);
+        painter.drawLine(left_xpos, cr.top(), left_xpos, cr.bottom() + 1);
+        if (!text().isEmpty())
+            painter.drawLine(right_xpos, cr.top(), right_xpos, cr.bottom() + 1);
     }
 }
 
@@ -341,7 +359,7 @@ void DisplayFilterEdit::checkFilter(const QString& filter_text)
         alignActionButtons();
     }
 
-    if (filter_text.length() <= 0)
+    if ((filter_text.length() <= 0) && mainApp->mainWindow()->isActiveWindow())
         mainApp->popStatus(MainApplication::FilterSyntax);
 
     emit popFilterSyntaxStatus();
@@ -351,14 +369,16 @@ void DisplayFilterEdit::checkFilter(const QString& filter_text)
     switch (syntaxState()) {
     case Deprecated:
     {
-        mainApp->pushStatus(MainApplication::FilterSyntax, syntaxErrorMessage());
+        if (mainApp->mainWindow()->isActiveWindow())
+            mainApp->pushStatus(MainApplication::FilterSyntax, syntaxErrorMessage());
         setToolTip(syntaxErrorMessage());
         break;
     }
     case Invalid:
     {
         QString invalidMsg = tr("Invalid filter: ").append(syntaxErrorMessage());
-        mainApp->pushStatus(MainApplication::FilterSyntax, syntaxErrorMessage());
+        if (mainApp->mainWindow()->isActiveWindow())
+            mainApp->pushStatus(MainApplication::FilterSyntax, syntaxErrorMessage());
         setToolTip(invalidMsg);
         break;
     }
@@ -470,18 +490,20 @@ void DisplayFilterEdit::updateBookmarkMenu()
 // - Recent and saved display filters in popup when editing first word.
 
 // ui/gtk/filter_autocomplete.c:build_autocompletion_list
-void DisplayFilterEdit::buildCompletionList(const QString &field_word)
+void DisplayFilterEdit::buildCompletionList(const QString &field_word, const QString &preamble)
 {
     // Push a hint about the current field.
     if (syntaxState() == Valid) {
-        mainApp->popStatus(MainApplication::FilterSyntax);
+        if (mainApp->mainWindow()->isActiveWindow())
+            mainApp->popStatus(MainApplication::FilterSyntax);
 
         header_field_info *hfinfo = proto_registrar_get_byname(field_word.toUtf8().constData());
         if (hfinfo) {
             QString cursor_field_msg = QString("%1: %2")
                     .arg(hfinfo->name)
                     .arg(ftype_pretty_name(hfinfo->type));
-            mainApp->pushStatus(MainApplication::FilterSyntax, cursor_field_msg);
+            if (mainApp->mainWindow()->isActiveWindow())
+                mainApp->pushStatus(MainApplication::FilterSyntax, cursor_field_msg);
         }
     }
 
@@ -517,36 +539,66 @@ void DisplayFilterEdit::buildCompletionList(const QString &field_word)
     completion_model_->setStringList(complex_list);
     completer()->setCompletionPrefix(field_word);
 
-    void *proto_cookie;
+    // Only add fields to completion if a field is valid at this position.
+    // Try to compile preamble and check error message.
+    if (preamble != filter_word_preamble_) {
+        df_error_t *df_err = NULL;
+        dfilter_t *test_df = NULL;
+        if (preamble.size() > 0) {
+            dfilter_compile_full(qUtf8Printable(preamble), &test_df, &df_err,
+                                            DF_EXPAND_MACROS, __func__);
+        }
+        if (test_df == NULL || (df_err != NULL && df_err->code == DF_ERROR_UNEXPECTED_END)) {
+            // Unexpected end of expression means "expected identifier (field) or literal".
+            autocomplete_accepts_field_ = true;
+        }
+        else {
+            autocomplete_accepts_field_ = false;
+        }
+        dfilter_free(test_df);
+        df_error_free(&df_err);
+        filter_word_preamble_ = preamble;
+    }
+
     QStringList field_list;
-    int field_dots = static_cast<int>(field_word.count('.')); // Some protocol names (_ws.expert) contain periods.
-    for (int proto_id = proto_get_first_protocol(&proto_cookie); proto_id != -1; proto_id = proto_get_next_protocol(&proto_cookie)) {
-        protocol_t *protocol = find_protocol_by_id(proto_id);
-        if (!proto_is_protocol_enabled(protocol)) continue;
+    if (autocomplete_accepts_field_) {
+        void *proto_cookie;
 
-        const QString pfname = proto_get_protocol_filter_name(proto_id);
-        field_list << pfname;
+        int field_dots = static_cast<int>(field_word.count('.')); // Some protocol names (_ws.expert) contain periods.
+        for (int proto_id = proto_get_first_protocol(&proto_cookie); proto_id != -1; proto_id = proto_get_next_protocol(&proto_cookie)) {
+            protocol_t *protocol = find_protocol_by_id(proto_id);
+            if (!proto_is_protocol_enabled(protocol)) continue;
 
-        // Add fields only if we're past the protocol name and only for the
-        // current protocol.
-        if (field_dots > pfname.count('.')) {
-            void *field_cookie;
-            const QByteArray fw_ba = field_word.toUtf8(); // or toLatin1 or toStdString?
-            const char *fw_utf8 = fw_ba.constData();
-            gsize fw_len = (gsize) strlen(fw_utf8);
-            for (header_field_info *hfinfo = proto_get_first_protocol_field(proto_id, &field_cookie); hfinfo; hfinfo = proto_get_next_protocol_field(proto_id, &field_cookie)) {
-                if (hfinfo->same_name_prev_id != -1) continue; // Ignore duplicate names.
+            const QString pfname = proto_get_protocol_filter_name(proto_id);
+            field_list << pfname;
 
-                if (!g_ascii_strncasecmp(fw_utf8, hfinfo->abbrev, fw_len)) {
-                    if ((gsize) strlen(hfinfo->abbrev) != fw_len) field_list << hfinfo->abbrev;
+            // Add fields only if we're past the protocol name and only for the
+            // current protocol.
+            if (field_dots > pfname.count('.')) {
+                void *field_cookie;
+                const QByteArray fw_ba = field_word.toUtf8(); // or toLatin1 or toStdString?
+                const char *fw_utf8 = fw_ba.constData();
+                gsize fw_len = (gsize) strlen(fw_utf8);
+                for (header_field_info *hfinfo = proto_get_first_protocol_field(proto_id, &field_cookie); hfinfo; hfinfo = proto_get_next_protocol_field(proto_id, &field_cookie)) {
+                    if (hfinfo->same_name_prev_id != -1) continue; // Ignore duplicate names.
+
+                    if (!g_ascii_strncasecmp(fw_utf8, hfinfo->abbrev, fw_len)) {
+                        if ((gsize) strlen(hfinfo->abbrev) != fw_len) field_list << hfinfo->abbrev;
+                    }
                 }
             }
         }
+        field_list.sort();
     }
-    field_list.sort();
 
     completion_model_->setStringList(complex_list + field_list);
     completer()->setCompletionPrefix(field_word);
+}
+
+void DisplayFilterEdit::setStyleSheet(const QString &style_sheet)
+{
+    style_sheet_ = style_sheet;
+    SyntaxLineEdit::setStyleSheet(style_sheet_);
 }
 
 void DisplayFilterEdit::clearFilter()
@@ -561,6 +613,15 @@ void DisplayFilterEdit::clearFilter()
 
 void DisplayFilterEdit::applyDisplayFilter()
 {
+    if (completer()->popup()->currentIndex().isValid()) {
+        // If the popup (not the QCompleter itself) has a currently
+        // valid QModelIndex, that means that the popup's
+        // QAbstractItemView::activated() signal has not yet
+        // been handled, which means that text() has the old value,
+        // not the one from the completer.
+        return;
+    }
+
     if (syntaxState() == Invalid)
         return;
 

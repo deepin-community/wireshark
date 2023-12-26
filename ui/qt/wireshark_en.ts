@@ -730,6 +730,14 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>…as decimal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>…as octal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>…as bits</source>
         <translation type="unfinished"></translation>
     </message>
@@ -977,10 +985,6 @@
     </message>
     <message>
         <source>Hash (SHA256)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Hash (RIPEMD160)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1566,11 +1570,15 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Keep the packet list scrolled to the bottom while capturing.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <source>Interval between updates (ms)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Automatic scrolling in live capture</source>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How often the capture notifies the GUI of new packets. Affects how often the GUI updates and the granularity of timers.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The interval between new packet updates. Affects how often the GUI updates and the granularity of timers.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1677,14 +1685,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Export %1 Coloring Rules</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Your coloring rules file contains unknown rules</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Wireshark doesn&apos;t recognize one or more of your coloring rules. They have been disabled.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2008,11 +2008,15 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>…as Printable Text</source>
+        <source>…as MIME Data</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Copy only the printable text in the packet.</source>
+        <source>…as C String</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as printable ASCII characters and escape sequences.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2024,19 +2028,15 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>…as Raw Binary</source>
+        <source>…as a Base64 String</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as a base64 encoded string.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Copy packet bytes as application/octet-stream MIME data.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>…as Escaped String</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Copy packet bytes as an escaped string.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2298,6 +2298,17 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>DissectorSyntaxLineEdit</name>
+    <message>
+        <source>Dissector entry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a dissector %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>DissectorTablesDialog</name>
     <message>
         <source>Dialog</source>
@@ -2465,6 +2476,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>City</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Latitude</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Longitude</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3218,19 +3237,19 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>lua scripts</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Global Lua Plugins</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Extcap Plugins search path</source>
+        <source>Lua scripts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Personal Extcap path</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>external capture (extcap) plugins</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3271,6 +3290,13 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Typical Files</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>FollowStreamAction</name>
+    <message>
+        <source>%1 Stream</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3389,32 +3415,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>QUIC streams not found on the selected packet.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message numerus="yes">
-        <source>%Ln total sub stream(s).</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>Total number of QUIC connections: %Ln</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
-        <source>Max QUIC Stream ID for the selected connection: %Ln</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>No streams</source>
+        <source>%1 stream not found on the selected packet.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3437,15 +3438,18 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>[Stream output truncated]</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <source>A transport or network layer header is needed.</source>
-        <translation type="unfinished"></translation>
-    </message>
     <message numerus="yes">
         <source>%Ln total stream(s).</source>
         <translation type="unfinished">
             <numerusform>%Ln stream.</numerusform>
             <numerusform>%Ln total streams.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Max sub stream ID for the selected stream: %Ln</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -3701,6 +3705,29 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>IOConsoleDialog</name>
+    <message>
+        <source>Dialog</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter code</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Evaluate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use %1 to evaluate.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>IOGraphDialog</name>
     <message>
         <source>Dialog</source>
@@ -3783,6 +3810,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Move this graph upwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move this graph downwards.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Mouse</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3815,7 +3850,11 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Automatic Update</source>
+        <source>Automatic update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable legend</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4088,11 +4127,23 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Filtered events</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>All Packets</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>TCP Errors</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>All Events</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Access Denied</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4104,11 +4155,23 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>No events in interval</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Click to select packet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Packet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Click to select event</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Event</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5829,6 +5892,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Maximum number of cached rows (affects sorting)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;If more than this many rows are displayed, then sorting by columns that require packet dissection will be disabled. Increasing this number increases memory consumption by caching column values.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Enable mouse-over colorization</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6290,14 +6361,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>from zip file</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>from directory</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Export</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6390,11 +6453,19 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>selected personal profile</source>
+        <source>From Zip File...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>all personal profiles</source>
+        <source>From Directory...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Selected Personal Profile...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>All Personal Profiles...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6581,6 +6652,68 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>New Pipe</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ManufDialog</name>
+    <message>
+        <source>MAC Address Blocks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Search MAC address or address prefix. Special purpose bits are masked.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>MAC Address</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Search vendor name using a case-insentitive regular expression.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Vendor Name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show short name column.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Short name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select all</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Find</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ManufTableModel</name>
+    <message>
+        <source>Address Block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Short Name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Vendor Name</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -6875,6 +7008,13 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>Bytes %1-%2</source>
         <translation type="unfinished"></translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln byte(s)</source>
+        <translation type="unfinished">
+            <numerusform>%Ln byte</numerusform>
+            <numerusform>%Ln bytes</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>PacketFormatGroupBox</name>
@@ -7030,7 +7170,19 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 <context>
     <name>PacketListModel</name>
     <message>
+        <source>Column</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 can only be sorted with %2 or fewer visible rows; increase cache size in Layout preferences</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Sorting &quot;%1&quot;…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Sorting …</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -7062,6 +7214,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Remove &amp;ignored packets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Include &amp;depended upon packets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Also include packets depended upon, such as those used to reassemble displayed packets</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -7318,6 +7478,25 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>From Zip File...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>From Directory...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln Selected Personal Profile(s)...</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>All Personal Profiles...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>New profile</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7346,7 +7525,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message numerus="yes">
         <source>%Ln selected personal profile(s)</source>
-        <translation>
+        <translation type="vanished">
             <numerusform>%Ln selected personal profile</numerusform>
             <numerusform>%Ln selected personal profiles</numerusform>
         </translation>
@@ -7384,18 +7563,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Zip File (*.zip)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>from zip file</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>from directory</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>all personal profiles</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -7720,6 +7887,30 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Copy short names</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy short protocol names in use.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable unused protocols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable all protocols but those listed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Re-enable unused protocols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Re-enable protocols that were disabled in this dialog.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Protocol Hierarchy Statistics</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7736,11 +7927,35 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>protocol short names</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Protocols</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable unused</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Revert changes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>No display filter.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Display filter: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unused protocols have been disabled.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Protocol changes have been reverted.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -9674,254 +9889,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <source>Analyze</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <source>Reset Graph</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Reset the graph to its initial state.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>0</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Zoom In</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>+</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Zoom Out</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>-</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Move Up 10 Pixels</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Up</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Move Left 10 Pixels</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Left</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Move Right 10 Pixels</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Right</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Move Down 10 Pixels</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Down</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Move Up 1 Pixel</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Shift+Up</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Move Left 1 Pixel</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Shift+Left</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Move Right 1 Pixel</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Shift+Right</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Move Down 1 Pixel</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Shift+Down</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Next Stream</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Go to the next stream in the capture</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>PgUp</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Previous Stream</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Go to the previous stream in the capture</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>PgDown</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Switch Direction</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Switch direction (swap TCP endpoints)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>D</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Go To Packet Under Cursor</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Go to packet currently under the cursor</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>G</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Drag / Zoom</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Toggle mouse drag / zoom behavior</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Z</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Relative / Absolute Sequence Numbers</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Toggle relative / absolute sequence numbers</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>S</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Capture / Session Time Origin</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Toggle capture / session time origin</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>T</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Crosshairs</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Toggle crosshairs</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Space</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Round Trip Time</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Switch to the Round Trip Time graph</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Throughput</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Switch to the Throughput graph</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>2</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Time / Sequence (Stevens)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Switch to the Stevens-style Time / Sequence graph</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>3</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Window Scaling</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Switch to the Window Scaling graph</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>5</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Time / Sequence (tcptrace)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Switch to the tcptrace-style Time / Sequence graph</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>4</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>SCTPAssocAnalyseDialog</name>
@@ -9946,10 +9913,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Close</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Number of Data Chunks from EP2 to EP1: </source>
         <translation type="unfinished"></translation>
     </message>
@@ -9967,10 +9930,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Number of Data Bytes from EP2 to EP1: </source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>TextLabel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -9999,6 +9958,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Minimum Number of Inbound Streams:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>-</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;small&gt;&lt;i&gt;For complete analysis check SCTP preference Enable Association indexing&lt;/i&gt;&lt;/small&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -10124,10 +10091,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Save Graph</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10172,10 +10135,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Reset to full size</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -10856,6 +10815,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Percent-Encoding</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Quoted-Printable</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10998,6 +10961,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Applying changed preferences</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>(Unknown action)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -11072,6 +11039,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 </context>
 <context>
     <name>SyntaxLineEdit</name>
+    <message>
+        <source>Invalid filter: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message>
         <source>&quot;%1&quot; is deprecated in favour of &quot;%2&quot;. See Help section 6.4.8 for details.</source>
         <translation type="unfinished"></translation>
@@ -11629,6 +11600,57 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
 </context>
 <context>
+    <name>TLSKeylogDialog</name>
+    <message>
+        <source>Dialog</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Command line</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Run an application with the SSLKEYLOGFILE environment variable set to the file specified by the TLS key log filename preference. This enables TLS decryption in Wireshark. Set the key log file and start the capture before launching the application to ensure that the initial TLS handshakes are captured.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;span style=&quot; font-size:small;&quot;&gt;Firefox and Chrome are known to work. If your desired browser is currently running, close it first before launching it below. Command line options are supported.&lt;/span&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLS (Pre)-Master-Secret log file path (tls.keylog_file)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&lt;span style=&quot; font-size:small;&quot;&gt;TLS session secrets will be logged to this file. If you change this field, hit the Save button to update the TLS protocol preferences.&lt;/span&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Launch application with SSLKEYLOGFILE</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Launch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLS Keylog file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Program to start with SSLKEYLOGFILE</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>TapParameterDialog</name>
     <message>
         <source>Dialog</source>
@@ -11744,7 +11766,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Time shifting is not available capturing packets.</source>
+        <source>Time shifting is not available while capturing packets.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -12821,6 +12843,10 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>&amp;DTN</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Osmux</source>
         <translation type="unfinished"></translation>
     </message>
@@ -13116,23 +13142,7 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>DCCP Stream</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>TLS Stream</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>HTTP Stream</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>HTTP/2 Stream</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>QUIC Stream</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -13300,6 +13310,14 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>&amp;LTP</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>LTP segment and block statistics</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&amp;ISUP Messages</source>
         <translation type="unfinished"></translation>
     </message>
@@ -13452,6 +13470,26 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Show packet times as the seconds since the first captured packet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tenths of a millisecond</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hundredths of a millisecond</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tenths of a microsecond</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Hundredths of a microsecond</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Packet &amp;Diagram</source>
         <translation type="unfinished"></translation>
     </message>
@@ -13584,6 +13622,18 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>MAC Address Blocks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLS Keylog Launcher</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Release Notes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&amp;Options…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -13656,19 +13706,27 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Inject TLS Secrets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Embed used TLS secrets in the capture file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Discard All Secrets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Discard all decryption secrets in the capture file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>&amp;Preferences…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>TCP throughput</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>TCP Stream</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>UDP Stream</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -14474,6 +14532,10 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source> before updating</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>There are no TLS Session Keys to save.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -14486,6 +14548,18 @@ a:hover {
     </message>
     <message>
         <source>TLS Session Keys (*.keys *.txt);;All Files (</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No TLS Secrets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There are no available secrets used to decrypt TLS traffic in the capture file.  Would you like to view information about how to decrypt TLS traffic on the wiki?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Are you sure you want to discard all decryption secrets?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

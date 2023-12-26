@@ -20,12 +20,12 @@ public:
     explicit DisplayFilterCombo(QWidget *parent = 0);
     bool addRecentCapture(const char *filter);
     void writeRecent(FILE *rf);
+    void updateStyleSheet();
 
 protected:
     virtual bool event(QEvent *event);
 
 private:
-    void updateStyleSheet();
 
 public slots:
     bool checkDisplayFilter();
@@ -34,6 +34,7 @@ public slots:
 
 private slots:
     void updateMaxCount();
+    void onActivated(int index);
 };
 
 #endif // DISPLAY_FILTER_COMBO_H

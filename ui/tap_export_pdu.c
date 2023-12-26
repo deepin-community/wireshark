@@ -17,8 +17,7 @@
 #include <wiretap/wtap_opttypes.h>
 #include <wsutil/os_version_info.h>
 #include <wsutil/report_message.h>
-
-#include "ui/version_info.h"
+#include "wsutil/version_info.h"
 
 #include "tap_export_pdu.h"
 
@@ -199,6 +198,20 @@ char *
 exp_pdu_pre_open(const char *tap_name, const char *filter, exp_pdu_t *exp_pdu_tap_data)
 {
     GString        *error_string;
+
+    /* Make sure tap is suitable for exported PDUs */
+    gboolean found = FALSE;
+    for (GSList *export_pdu_tap_name_list = get_export_pdu_tap_list();
+         export_pdu_tap_name_list != NULL;
+         export_pdu_tap_name_list = g_slist_next(export_pdu_tap_name_list)) {
+        if (strcmp((const char*)(export_pdu_tap_name_list->data), tap_name) == 0) {
+            found = TRUE;
+            break;
+        }
+    }
+    if (!found) {
+        return g_strdup("unsuitable for PDU export");
+    }
 
     /* Register this tap listener now */
     error_string = register_tap_listener(tap_name,             /* The name of the tap we want to listen to */

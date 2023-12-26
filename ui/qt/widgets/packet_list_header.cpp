@@ -179,6 +179,7 @@ void PacketListHeader::contextMenuEvent(QContextMenuEvent *event)
     QAction * action = nullptr;
 
     QMenu * contextMenu = new QMenu(this);
+    contextMenu->setAttribute(Qt::WA_DeleteOnClose);
     contextMenu->setProperty("column", QVariant::fromValue(sectionIdx));
 
     QActionGroup * alignmentActions = new QActionGroup(contextMenu);
@@ -228,7 +229,7 @@ void PacketListHeader::contextMenuEvent(QContextMenuEvent *event)
             detail = col_format_desc(get_column_format(cnt));
         }
 
-        if (prefs.gui_qt_packet_header_column_definition)
+        if (prefs.gui_packet_header_column_definition)
             title.append(QString("\t%1").arg(detail));
 
         QAction *action = new QAction(title, this);

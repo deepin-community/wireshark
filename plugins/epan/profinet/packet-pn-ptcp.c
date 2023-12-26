@@ -522,10 +522,10 @@ dissect_PNPTCP_block(tvbuff_t *tvb, int offset,
     offset = dissect_PNPTCP_TLVHeader(tvb, offset, pinfo, tlvheader_tree, sub_item, &type, &length);
 
     proto_item_set_text(sub_item, "%s",
-        val_to_str(type, pn_ptcp_block_type, "Unknown"));
+        val_to_str_const(type, pn_ptcp_block_type, "Unknown"));
 
     proto_item_append_text(tlvheader_item, ": Type=%s (%x), Length=%u",
-        val_to_str(type, pn_ptcp_block_type, "Unknown"), type, length);
+        val_to_str_const(type, pn_ptcp_block_type, "Unknown"), type, length);
 
     switch (type) {
     case 0x00: /* End, no content */
@@ -933,7 +933,7 @@ proto_register_pn_ptcp (void)
 
         { &hf_pn_ptcp_tl_length,
           { "TypeLength.Length", "pn_ptcp.tl_length",
-            FT_UINT16, BASE_DEC, 0x0, 0x1FF,
+            FT_UINT16, BASE_DEC, 0x0, 0x01FF,
             NULL, HFILL }},
 
         { &hf_pn_ptcp_tl_type,

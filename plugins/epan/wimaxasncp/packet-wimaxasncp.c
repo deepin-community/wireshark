@@ -42,7 +42,7 @@ static int hf_wimaxasncp_version                = -1;
 static int hf_wimaxasncp_flags                  = -1;
 static int hf_wimaxasncp_function_type          = -1;
 static int hf_wimaxasncp_op_id                  = -1;
-/* static int hf_wimaxasncp_message_type           = -1; */
+static int hf_wimaxasncp_message_type           = -1;
 /* static int hf_wimaxasncp_qos_msg                = -1; */
 /* static int hf_wimaxasncp_ho_control_msg         = -1; */
 /* static int hf_wimaxasncp_data_path_control_msg  = -1; */
@@ -95,6 +95,7 @@ static gint ett_wimaxasncp_port_range                            = -1;
 static expert_field ei_wimaxasncp_tlv_type = EI_INIT;
 static expert_field ei_wimaxasncp_function_type = EI_INIT;
 static expert_field ei_wimaxasncp_op_id = EI_INIT;
+static expert_field ei_wimaxasncp_message_type = EI_INIT;
 static expert_field ei_wimaxasncp_length_bad = EI_INIT;
 
 /* Header size, up to, but not including, the TLV fields. */
@@ -519,7 +520,7 @@ static const gchar *wimaxasncp_get_enum_name(
 {
     if (tlv_info->enum_vs)
     {
-        return val_to_str(code, tlv_info->enum_vs, "Unknown");
+        return val_to_str_const(code, tlv_info->enum_vs, "Unknown");
     }
     else
     {
@@ -1043,29 +1044,28 @@ static void wimaxasncp_dissect_tlv_value(
     {
         if (tree)
         {
-            const gchar  *format1;
-            const gchar  *format2;
-            const guint8 *p = tvb_get_ptr(tvb, offset, length);
-            const gchar  *s = bytes_to_str_punct(pinfo->pool, p, MIN(length, max_show_bytes), 0);
-
-            if (length <= max_show_bytes)
-            {
-                format1 = "Value: %s";
-                format2 = " - %s";
-            }
-            else
-            {
-                format1 = "Value: %s...";
-                format2 = " - %s...";
-            }
-
-            proto_tree_add_bytes_format(
+            proto_tree_add_item(
                 tree, tlv_info->hf_value,
-                tvb, offset, length, p,
-                format1, s);
+                tvb, offset, length, ENC_NA);
 
-            proto_item_append_text(
-                tlv_item, format2, s);
+            if (length) {
+                const gchar* format;
+                if (length <= max_show_bytes)
+                {
+                    format = " - %s";
+                }
+                else
+                {
+                    format = " - %s...";
+                }
+                const gchar* s = tvb_bytes_to_str_punct(
+                    pinfo->pool, tvb, offset, MIN(length, max_show_bytes), 0);
+
+                proto_item_append_text(
+                    tlv_item, format, s);
+            } else {
+                proto_item_append_text(tlv_item, " - <MISSING>");
+            }
         }
 
         return;
@@ -1224,23 +1224,26 @@ static void wimaxasncp_dissect_tlv_value(
 
         if (tree)
         {
-            const gchar  *format;
-            const guint8 *p = tvb_get_ptr(tvb, offset, length);
-            const gchar  *s = bytes_to_str_punct(pinfo->pool, p, MIN(length, max_show_bytes), 0);
+            if (length) {
+                const char *format;
+                const char *s = tvb_bytes_to_str_punct(
+                    pinfo->pool, tvb, offset, length, 0);
 
-            if (length <= max_show_bytes)
-            {
-                format = "Value: %s %s";
-            }
-            else
-            {
-                format = "Value: %s %s...";
-            }
+                if (length <= max_show_bytes) {
+                    format = "%s %s";
+                } else {
+                    format = "%s %s...";
+                }
 
-            proto_tree_add_bytes_format(
-                tree, tlv_info->hf_value,
-                tvb, offset, length, p,
-                format, hex_note, s);
+                proto_tree_add_bytes_format_value(
+                    tree, tlv_info->hf_value,
+                    tvb, offset, length, NULL, format, hex_note, s);
+
+            } else {
+                proto_tree_add_bytes_format_value(
+                    tree, tlv_info->hf_value,
+                    tvb, offset, length, NULL, "%s", "<MISSING>");
+            }
 
             proto_item_append_text(tlv_item, " - TBD");
         }
@@ -1711,30 +1714,37 @@ static void wimaxasncp_dissect_tlv_value(
     {
         if (tree)
         {
-            const gchar *format1;
-            const gchar *format2;
-            const guint8 *p = tvb_get_ptr(tvb, offset, length);
-            const gchar *s =
-                bytes_to_str_punct(pinfo->pool, p, MIN(length, max_show_bytes), 0);
+            const char* s;
+            if (length) {
+                const char* format1;
+                const char* format2;
+                if (length <= max_show_bytes)
+                {
+                    format1 = "%s %s";
+                    format2 = " - %s %s";
+                }
+                else
+                {
+                    format1 = "%s %s...";
+                    format2 = " - %s %s...";
+                }
+                s = tvb_bytes_to_str_punct(
+                    pinfo->pool, tvb, offset, MIN(length, max_show_bytes), 0);
 
-            if (length <= max_show_bytes)
-            {
-                format1 = "Value: %s %s";
-                format2 = " - %s %s";
+                proto_tree_add_bytes_format_value(
+                    tree, tlv_info->hf_value,
+                    tvb, offset, length, NULL, format1, hex_note, s);
+
+                proto_item_append_text(
+                    tlv_item, format2, hex_note, s);
             }
-            else
-            {
-                format1 = "Value: %s %s...";
-                format2 = " - %s %s...";
+            else {
+                proto_tree_add_bytes_format_value(
+                    tree, tlv_info->hf_value,
+                    tvb, offset, length, NULL, "%s", "<MISSING>");
+
+                proto_item_append_text(tlv_item, " - <MISSING>");
             }
-
-            proto_tree_add_bytes_format(
-                tree, tlv_info->hf_value,
-                tvb, offset, length, p,
-                format1, hex_note, s);
-
-            proto_item_append_text(
-                tlv_item, format2, hex_note, s);
 
         }
 
@@ -1753,23 +1763,27 @@ static void wimaxasncp_dissect_tlv_value(
 
     if (tree)
     {
-        const gchar *format;
-        const guint8 *p = tvb_get_ptr(tvb, offset, length);
-        const gchar *s = bytes_to_str_punct(pinfo->pool, p, MIN(length, max_show_bytes), 0);
+        if (length) {
+            const char* format;
+            const char *s = tvb_bytes_to_str_punct(
+                pinfo->pool, tvb, offset, MIN(length, max_show_bytes), 0);
 
-        if (length <= max_show_bytes)
-        {
-            format = "Value: %s %s";
-        }
-        else
-        {
-            format = "Value: %s %s...";
-        }
+            if (length <= max_show_bytes) {
+                format = "%s %s";
+            } else {
+                format = "%s %s...";
+            }
 
-        proto_tree_add_bytes_format(
-            tree, hf_wimaxasncp_tlv_value_bytes,
-            tvb, offset, length, p,
-            format, hex_note, s);
+            proto_tree_add_bytes_format_value(
+                tree, hf_wimaxasncp_tlv_value_bytes,
+                tvb, offset, length, NULL,
+                format, hex_note, s);
+        } else {
+            proto_tree_add_bytes_format_value(
+                tree, hf_wimaxasncp_tlv_value_bytes,
+                tvb, offset, length, NULL,
+                "%s", "<MISSING>");
+        }
     }
 }
 
@@ -2322,7 +2336,7 @@ dissect_wimaxasncp(
     }
 
     item = proto_tree_add_uint_format(
-        wimaxasncp_tree, hf_wimaxasncp_op_id,
+        wimaxasncp_tree, hf_wimaxasncp_message_type,
         tvb, offset, 1, ui8,
         "Message Type: %s", message_name);
 
@@ -2331,8 +2345,8 @@ dissect_wimaxasncp(
     /* Add expert item if not matched */
     if (strcmp(message_name, unknown) == 0)
     {
-        expert_add_info_format(pinfo, item, &ei_wimaxasncp_op_id,
-                               "Unknown message op (%u)",
+        expert_add_info_format(pinfo, item, &ei_wimaxasncp_message_type,
+                               "Unknown message type (%u)",
                                0x1f & ui8);
     }
 
@@ -2823,7 +2837,6 @@ register_wimaxasncp_fields(const char* unused _U_)
                     HFILL
                 }
             },
-#if 0
             {
                 &hf_wimaxasncp_message_type,
                 {
@@ -2837,7 +2850,6 @@ register_wimaxasncp_fields(const char* unused _U_)
                     HFILL
                 }
             },
-#endif
 #if 0
             {
                 &hf_wimaxasncp_qos_msg,
@@ -3218,6 +3230,7 @@ register_wimaxasncp_fields(const char* unused _U_)
         { &ei_wimaxasncp_tlv_type, { "wimaxasncp.tlv.type.unknown", PI_UNDECODED, PI_WARN, "Unknown tlv", EXPFILL }},
         { &ei_wimaxasncp_function_type, { "wimaxasncp.function_type.unknown", PI_UNDECODED, PI_WARN, "Unknown function type", EXPFILL }},
         { &ei_wimaxasncp_op_id, { "wimaxasncp.opid.unknown", PI_UNDECODED, PI_WARN, "Unknown message op", EXPFILL }},
+        { &ei_wimaxasncp_message_type, { "wimaxasncp.message_type.unknown", PI_UNDECODED, PI_WARN, "Unknown message type", EXPFILL }},
         { &ei_wimaxasncp_length_bad, { "wimaxasncp.length.bad", PI_MALFORMED, PI_ERROR, "Bad length", EXPFILL }},
     };
 

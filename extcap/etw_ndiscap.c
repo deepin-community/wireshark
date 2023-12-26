@@ -21,6 +21,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <evntrace.h>
 #include <evntcons.h>
 #include <tdh.h>
@@ -91,7 +92,7 @@ char AuxFragBuf[MAX_PACKET_SIZE] = {0};
 unsigned long AuxFragBufOffset = 0;
 
 DOT11_EXTSTA_RECV_CONTEXT PacketMetadata;
-BOOLEAN AddWlanMetadata = FALSE;
+BOOLEAN AddWlanMetadata = false;
 
 typedef struct _NDIS_NET_BUFFER_LIST_8021Q_INFO {
     union {
@@ -134,7 +135,7 @@ typedef struct _VMSWITCH_PACKET_FRAGMENT {
     short VlanId;
 } VMSWITCH_PACKET_FRAGMENT, *PVMSWITCH_PACKET_FRAGMENT;
 
-BOOLEAN CurrentPacketIsVMSwitchPacketFragment = FALSE;
+BOOLEAN CurrentPacketIsVMSwitchPacketFragment = false;
 VMSWITCH_PACKET_FRAGMENT VMSwitchPacketFragment;
 
 struct INTERFACE {
@@ -207,16 +208,16 @@ struct INTERFACE* AddInterface(PEVENT_RECORD ev, unsigned long LowerIfIndex, uns
         sprintf_s(g_err_info, sizeof(g_err_info), "malloc failed to allocate memory for NewIface");
         exit(1);
     }
-    
+
     NewIface->LowerIfIndex = LowerIfIndex;
     NewIface->MiniportIfIndex = MiniportIfIndex;
     NewIface->PktEncapType = Type;
     NewIface->VlanId = 0;
-    NewIface->IsVMNic = FALSE;
+    NewIface->IsVMNic = false;
 
     if (CurrentPacketIsVMSwitchPacketFragment) {
 
-        NewIface->IsVMNic = TRUE;
+        NewIface->IsVMNic = true;
 
         wchar_t Buffer[8192];
         PROPERTY_DATA_DESCRIPTOR Desc;
@@ -525,7 +526,7 @@ void etw_dump_write_ndiscap_event(PEVENT_RECORD ev, ULARGE_INTEGER timestamp)
             return;
         }
 
-        AddWlanMetadata = TRUE;
+        AddWlanMetadata = true;
         return;
     }
 
@@ -594,8 +595,9 @@ void etw_dump_write_ndiscap_event(PEVENT_RECORD ev, ULARGE_INTEGER timestamp)
                 PacketMetadata.uPhyId = 0; // Set to unknown if outside known bounds.
             }
 
-            Err = StringCchPrintfA(Comment, COMMENT_MAX_SIZE, "PID=%d Packet Metadata: ReceiveFlags:0x%x, PhyType:%s, CenterCh:%u, NumMPDUsReceived:%u, RSSI:%d, DataRate:%u",
+            Err = StringCchPrintfA(Comment, COMMENT_MAX_SIZE, "PID=%d ProcessorNumber=%d Packet Metadata: ReceiveFlags:0x%x, PhyType:%s, CenterCh:%u, NumMPDUsReceived:%u, RSSI:%d, DataRate:%u",
                 ev->EventHeader.ProcessId,
+                ev->BufferContext.ProcessorNumber,
                 PacketMetadata.uReceiveFlags,
                 DOT11_PHY_TYPE_NAMES[PacketMetadata.uPhyId],
                 PacketMetadata.uChCenterFrequency,
@@ -603,12 +605,13 @@ void etw_dump_write_ndiscap_event(PEVENT_RECORD ev, ULARGE_INTEGER timestamp)
                 PacketMetadata.lRSSI,
                 PacketMetadata.ucDataRate);
 
-            AddWlanMetadata = FALSE;
+            AddWlanMetadata = false;
             memset(&PacketMetadata, 0, sizeof(DOT11_EXTSTA_RECV_CONTEXT));
         } else if (CurrentPacketIsVMSwitchPacketFragment) {
             if (VMSwitchPacketFragment.DestinationCount > 0) {
-                Err = StringCchPrintfA(Comment, COMMENT_MAX_SIZE, "PID=%d VlanId=%d SrcPortId=%d SrcNicType=%s SrcNicName=%s SrcPortName=%s DstNicCount=%d",
+                Err = StringCchPrintfA(Comment, COMMENT_MAX_SIZE, "PID=%d ProcessorNumber=%d VlanId=%d SrcPortId=%d SrcNicType=%s SrcNicName=%s SrcPortName=%s DstNicCount=%d",
                     ev->EventHeader.ProcessId,
+                    ev->BufferContext.ProcessorNumber,
                     Iface->VlanId,
                     Iface->VMNic.SourcePortId,
                     Iface->VMNic.SourceNicType,
@@ -617,8 +620,9 @@ void etw_dump_write_ndiscap_event(PEVENT_RECORD ev, ULARGE_INTEGER timestamp)
                     VMSwitchPacketFragment.DestinationCount
                 );
             } else {
-                Err = StringCchPrintfA(Comment, COMMENT_MAX_SIZE, "PID=%d VlanId=%d SrcPortId=%d SrcNicType=%s SrcNicName=%s SrcPortName=%s",
+                Err = StringCchPrintfA(Comment, COMMENT_MAX_SIZE, "PID=%d ProcessorNumber=%d VlanId=%d SrcPortId=%d SrcNicType=%s SrcNicName=%s SrcPortName=%s",
                     ev->EventHeader.ProcessId,
+                    ev->BufferContext.ProcessorNumber,
                     Iface->VlanId,
                     Iface->VMNic.SourcePortId,
                     Iface->VMNic.SourceNicType,
@@ -627,7 +631,7 @@ void etw_dump_write_ndiscap_event(PEVENT_RECORD ev, ULARGE_INTEGER timestamp)
                     );
             }
         } else {
-            Err = StringCchPrintfA(Comment, COMMENT_MAX_SIZE, "PID=%d", ev->EventHeader.ProcessId);
+            Err = StringCchPrintfA(Comment, COMMENT_MAX_SIZE, "PID=%d ProcessorNumber=%d", ev->EventHeader.ProcessId, ev->BufferContext.ProcessorNumber);
         }
 
         if (Err != NO_ERROR) {

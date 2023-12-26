@@ -2,10 +2,10 @@ usr/share/man/man1/androiddump.1
 usr/share/man/man1/capinfos.1
 usr/share/man/man1/captype.1
 usr/share/man/man1/ciscodump.1
-usr/share/man/man1/dftest.1
 usr/share/man/man1/dpauxmon.1
 usr/share/man/man1/dumpcap.1
 usr/share/man/man1/editcap.1
+usr/share/man/man1/falcodump.1
 usr/share/man/man1/mergecap.1
 usr/share/man/man1/mmdbresolve.1
 usr/share/man/man1/randpkt.1

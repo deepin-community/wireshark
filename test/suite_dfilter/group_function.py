@@ -2,12 +2,10 @@
 #
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-import unittest
-import fixtures
+import pytest
 from suite_dfilter.dfiltertest import *
 
-@fixtures.uses_fixtures
-class case_dfunction_string(unittest.TestCase):
+class TestFunctionString:
     trace_file = "dhcp.pcap"
 
     def test_matches_1(self, checkDFilterCount):
@@ -42,8 +40,7 @@ class case_dfunction_string(unittest.TestCase):
         error = 'String conversion for field "dhcp.option.value" is not supported'
         checkDFilterFail(dfilter, error)
 
-@fixtures.uses_fixtures
-class case_dfunction_maxmin(unittest.TestCase):
+class TestFunctionMaxMin:
     trace_file = "sip.pcapng"
 
     def test_min_1(self, checkDFilterCount):
@@ -66,15 +63,25 @@ class case_dfunction_maxmin(unittest.TestCase):
         dfilter = 'max(udp.srcport, udp.dstport) < 5060'
         checkDFilterCount(dfilter, 1)
 
-    def test_max_4(self, checkDFilterFail):
-        error = 'Argument \'1\' is not valid for max()'
-        dfilter = 'max(1,_ws.ftypes.int8) == 1'
+    def test_max_4(self, checkDFilterCount):
+        dfilter = 'max(5060, udp.dstport) == udp.srcport'
+        checkDFilterCount(dfilter, 2)
+
+    def test_max_5(self, checkDFilterFail):
+        error = 'Constant expression is invalid on the LHS'
+        dfilter = 'max(5060, 5070) == udp.srcport'
         checkDFilterFail(dfilter, error)
 
-@fixtures.uses_fixtures
-class case_dfunction_abs(unittest.TestCase):
+class TestFunctionAbs:
     trace_file = "dhcp.pcapng"
 
     def test_function_abs_1(self, checkDFilterCount):
         dfilter = 'udp.dstport == abs(-67)'
         checkDFilterCount(dfilter, 2)
+
+class TestFunctionNested:
+    trace_file = 'http.pcap'
+
+    def test_function_nested_1(self, checkDFilterCount):
+        dfilter = 'abs(min(tcp.srcport, tcp.dstport)) == 80'
+        checkDFilterCount(dfilter, 1)

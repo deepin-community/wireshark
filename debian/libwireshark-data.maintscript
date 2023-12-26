@@ -1,0 +1,1 @@
+rm_conffile /etc/wireshark/init.lua 4.2.0~

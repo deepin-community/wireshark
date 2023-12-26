@@ -131,6 +131,8 @@ TCPStreamDialog::TCPStreamDialog(QWidget *parent, capture_file *cf, tcp_graph_ty
     if (parent) loadGeometry(parent->width() * 2 / 3, parent->height() * 4 / 5);
     setAttribute(Qt::WA_DeleteOnClose, true);
 
+    ui->streamNumberSpinBox->setStyleSheet("QSpinBox { min-width: 2em; }");
+
     guint32 th_stream = select_tcpip_session(cap_file_);
     if (th_stream == G_MAXUINT32) {
         done(QDialog::Rejected);
@@ -1843,7 +1845,7 @@ void TCPStreamDialog::transformYRange(const QCPRange &y_range1)
 void TCPStreamDialog::on_buttonBox_accepted()
 {
     QString file_name, extension;
-    QDir path(mainApp->lastOpenDir());
+    QDir path(mainApp->openDialogInitialDir());
     QString pdf_filter = tr("Portable Document Format (*.pdf)");
     QString png_filter = tr("Portable Network Graphics (*.png)");
     QString bmp_filter = tr("Windows Bitmap (*.bmp)");

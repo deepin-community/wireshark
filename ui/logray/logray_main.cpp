@@ -8,6 +8,7 @@
  */
 
 #include <config.h>
+#define WS_LOG_DOMAIN  LOG_DOMAIN_MAIN
 
 #include <glib.h>
 
@@ -18,13 +19,14 @@
 #include <tchar.h>
 #include <wchar.h>
 #include <shellapi.h>
-#include "ui/win32/console_win32.h"
+#include <wsutil/console_win32.h>
 #endif
 
-#include <ui/clopts_common.h>
-#include <ui/cmdarg_err.h>
-#include <ui/exit_codes.h>
+#include <ws_exit_codes.h>
+#include <wsutil/clopts_common.h>
+#include <wsutil/cmdarg_err.h>
 #include <ui/urls.h>
+#include <wsutil/time_util.h>
 #include <wsutil/filesystem.h>
 #include <wsutil/privileges.h>
 #include <wsutil/socket.h>
@@ -35,7 +37,7 @@
 #include <wsutil/report_message.h>
 #include <wsutil/please_report_bug.h>
 #include <wsutil/unicode-utils.h>
-#include <ui/version_info.h>
+#include <wsutil/version_info.h>
 
 #include <epan/addr_resolv.h>
 #include <epan/ex-opt.h>
@@ -63,7 +65,6 @@
 #include "epan/srt_table.h"
 
 #include "ui/alert_box.h"
-#include "ui/console.h"
 #include "ui/iface_lists.h"
 #include "ui/language.h"
 #include "ui/persfilepath_opt.h"
@@ -225,11 +226,6 @@ gather_wireshark_qt_compiled_info(feature_list l)
     without_feature(l, "AirPcap");
 #endif
 #endif /* _WIN32 */
-#ifdef HAVE_SPEEXDSP
-    with_feature(l, "SpeexDSP (using system library)");
-#else
-    with_feature(l, "SpeexDSP (using bundled resampler)");
-#endif
 
 #ifdef HAVE_MINIZIP
     with_feature(l, "Minizip");
@@ -404,6 +400,23 @@ macos_enable_layer_backing(void)
 }
 #endif
 
+#ifdef HAVE_LIBPCAP
+static GList *
+capture_opts_get_interface_list(int *err, char **err_str)
+{
+    /*
+     * XXX - should this pass an update callback?
+     * We already have a window up by the time we start parsing
+     * the majority of the command-line arguments, because
+     * we need to do a bunch of initialization work before
+     * parsing those arguments, and we want to let the user
+     * know that we're doing that initialization, given that
+     * it can take a while.
+     */
+    return capture_interface_list(err, err_str, NULL);
+}
+#endif
+
 /* And now our feature presentation... [ fade to music ] */
 int main(int argc, char *qt_argv[])
 {
@@ -428,6 +441,7 @@ int main(int argc, char *qt_argv[])
 #endif
 #endif
     gchar               *err_msg = NULL;
+    df_error_t          *df_err = NULL;
 
     QString              dfilter, read_filter;
 #ifdef HAVE_LIBPCAP
@@ -483,7 +497,7 @@ int main(int argc, char *qt_argv[])
     cmdarg_err_init(logray_cmdarg_err, logray_cmdarg_err_cont);
 
     /* Initialize log handler early so we can have proper logging during startup. */
-    ws_log_init_with_writer("logray", console_log_writer, vcmdarg_err);
+    ws_log_init("logray", vcmdarg_err);
     /* For backward compatibility with GLib logging and Wireshark 3.4. */
     ws_log_console_writer_set_use_stdout(TRUE);
 
@@ -512,6 +526,8 @@ int main(int argc, char *qt_argv[])
     setlocale(LC_ALL, "");
 #endif
 
+    ws_tzset();
+
 #ifdef _WIN32
     //
     // On Windows, QCoreApplication has its own WinMain(), which gets the
@@ -535,7 +551,8 @@ int main(int argc, char *qt_argv[])
 #endif /* _WIN32 */
 
     /* Early logging command-line initialization. */
-    ws_log_parse_args(&argc, argv, vcmdarg_err, INVALID_OPTION);
+    ws_log_parse_args(&argc, argv, vcmdarg_err, WS_EXIT_INVALID_OPTION);
+    ws_noisy("Finished log init and parsing command line log arguments");
 
     /*
      * Get credential information for later use, and drop privileges
@@ -605,6 +622,8 @@ int main(int argc, char *qt_argv[])
     ws_init_version_info("Logray", gather_wireshark_qt_compiled_info,
                          gather_wireshark_runtime_info);
 
+    init_report_message("Logray", &wireshark_report_routines);
+
     /* Create the user profiles directory */
     if (create_profiles_dir(&rf_path) == -1) {
         simple_dialog(ESD_TYPE_WARN, ESD_BTN_OK,
@@ -663,7 +682,7 @@ int main(int argc, char *qt_argv[])
         cmdarg_err("%s", err_msg);
         g_free(err_msg);
         cmdarg_err_cont("%s", please_report_bug());
-        ret_val = INIT_FAILED;
+        ret_val = WS_EXIT_INIT_FAILED;
         goto clean_exit;
     }
 
@@ -697,13 +716,15 @@ int main(int argc, char *qt_argv[])
     main_w->connect(&ls_app, &LograyApplication::openCaptureOptions,
             main_w, &LograyMainWindow::showCaptureOptionsDialog);
 
-    /* Init the "Open file" dialog directory */
-    /* (do this after the path settings are processed) */
+    /*
+     * If we have a saved "last directory in which a file was opened"
+     * in the recent file, set it as the one for the app.
+     *
+     * (do this after the path settings are processed)
+     */
     if (recent.gui_fileopen_remembered_dir &&
         test_for_directory(recent.gui_fileopen_remembered_dir) == EISDIR) {
-      lwApp->setLastOpenDir(recent.gui_fileopen_remembered_dir);
-    } else {
-      lwApp->setLastOpenDir(get_persdatafile_dir());
+      set_last_open_dir(recent.gui_fileopen_remembered_dir);
     }
 
 #ifdef DEBUG_STARTUP_TIME
@@ -713,10 +734,8 @@ int main(int argc, char *qt_argv[])
 #ifdef HAVE_LIBPCAP
     /* Set the initial values in the capture options. This might be overwritten
        by preference settings and then again by the command line parameters. */
-    capture_opts_init(&global_capture_opts);
+    capture_opts_init(&global_capture_opts, capture_opts_get_interface_list);
 #endif
-
-    init_report_message("Logray", &wireshark_report_routines);
 
     /*
      * Libwiretap must be initialized before libwireshark is, so that
@@ -735,7 +754,7 @@ int main(int argc, char *qt_argv[])
        case any dissectors register preferences. */
     if (!epan_init(splash_update, NULL, TRUE)) {
         SimpleDialog::displayQueuedMessages(main_w);
-        ret_val = INIT_FAILED;
+        ret_val = WS_EXIT_INIT_FAILED;
         goto clean_exit;
     }
 #ifdef DEBUG_STARTUP_TIME
@@ -864,7 +883,7 @@ int main(int argc, char *qt_argv[])
                 cmdarg_err("%s%s%s", err_str, err_str_secondary ? "\n" : "", err_str_secondary ? err_str_secondary : "");
                 g_free(err_str);
                 g_free(err_str_secondary);
-                ret_val = INVALID_CAPABILITY;
+                ret_val = WS_EXIT_INVALID_CAPABILITY;
                 break;
             }
             ret_val = capture_opts_print_if_capabilities(caps, interface_opts,
@@ -915,7 +934,7 @@ int main(int argc, char *qt_argv[])
      * command-line options.
      */
     if (!setup_enabled_and_disabled_protocols()) {
-        ret_val = INVALID_OPTION;
+        ret_val = WS_EXIT_INVALID_OPTION;
         goto clean_exit;
     }
 
@@ -923,7 +942,7 @@ int main(int argc, char *qt_argv[])
     lwApp->emitAppSignal(LograyApplication::ColumnsChanged); // We read "recent" widths above.
     lwApp->emitAppSignal(LograyApplication::RecentPreferencesRead); // Must be emitted after PreferencesChanged.
 
-    lwApp->setMonospaceFont(prefs.gui_qt_font_name);
+    lwApp->setMonospaceFont(prefs.gui_font_name);
 
     /* For update of WindowTitle (When use gui.window_title preference) */
     main_w->setWSWindowTitle();
@@ -959,13 +978,13 @@ int main(int argc, char *qt_argv[])
             } else if (global_commandline_info.jfilter != NULL) {
                 dfilter_t *jump_to_filter = NULL;
                 /* try to compile given filter */
-                if (!dfilter_compile(global_commandline_info.jfilter, &jump_to_filter, &err_msg)) {
+                if (!dfilter_compile(global_commandline_info.jfilter, &jump_to_filter, &df_err)) {
                     // Similar code in MainWindow::mergeCaptureFile().
                     QMessageBox::warning(main_w, QObject::tr("Invalid Display Filter"),
                                          QObject::tr("The filter expression %1 isn't a valid display filter. (%2).")
-                                                 .arg(global_commandline_info.jfilter, err_msg),
+                                                 .arg(global_commandline_info.jfilter, df_err->msg),
                                          QMessageBox::Ok);
-                    g_free(err_msg);
+                    df_error_free(&df_err);
                 } else {
                     /* Filter ok, jump to the first packet matching the filter
                        conditions. Default search direction is forward, but if

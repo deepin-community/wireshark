@@ -25,6 +25,14 @@ tshark - Dump and analyze network traffic
 *tshark*
 *-G* [ <report type> ] [ --elastic-mapping-filter <protocols> ]
 
+[manarg]
+*tshark*
+*-h|--help*
+
+[manarg]
+*tshark*
+*-v|--version*
+
 == DESCRIPTION
 
 *TShark* is a network protocol analyzer.  It lets you capture packet
@@ -176,7 +184,7 @@ have elapsed. Floating point values (e.g. 0.5) are allowed.
 were written.
 
 *filesize*:__value__ Stop writing to a capture file after it reaches a size of
-__value__ kB.  If this option is used together with the -b option, *TShark*
+__value__ kB.  If this option is used together with the *-b* option, *TShark*
 will stop writing to the current capture file and switch to the next one if
 filesize is reached.  When reading a capture file, *TShark* will stop reading
 the file after the number of bytes read exceeds this number (the complete
@@ -265,8 +273,9 @@ to 2 MiB by default, and can be told to set it to a larger value, the
 system or interface on which you're capturing might silently limit the
 capture buffer size to a lower value or raise it to a higher value.
 
-This is available on UNIX systems with libpcap 1.0.0 or later and on
-Windows.  It is not available on UNIX systems with earlier versions of
+This is available on UNIX-compatible systems, such as Linux, macOS,
+\*BSD, Solaris, and AIX, with libpcap 1.0.0 or later, and on Windows.
+It is not available on UNIX-compatible systems with earlier versions of
 libpcap.
 
 This option can occur multiple times.  If used before the first
@@ -293,51 +302,16 @@ may differ from *-a packets:*<capture packet count>.
 Run with the given configuration profile.
 --
 
--d  <layer type>==<selector>,<decode-as protocol>::
-+
---
-Like Wireshark's *Decode As...* feature, this lets you specify how a
-layer type should be dissected.  If the layer type in question (for example,
-*tcp.port* or *udp.port* for a TCP or UDP port number) has the specified
-selector value, packets should be dissected as the specified protocol.
-
-Example: *tshark -d tcp.port==8888,http* will decode any traffic running over
-TCP port 8888 as HTTP.
-
-Example: *tshark -d tcp.port==8888:3,http* will decode any traffic running over
-TCP ports 8888, 8889 or 8890 as HTTP.
-
-Example: *tshark -d tcp.port==8888-8890,http* will decode any traffic running
-over TCP ports 8888, 8889 or 8890 as HTTP.
-
-Using an invalid selector or protocol will print out a list of valid selectors
-and protocol names, respectively.
-
-Example: *tshark -d .* is a quick way to get a list of valid selectors.
-
-Example: *tshark -d ethertype==0x0800.* is a quick way to get a list of
-protocols that can be selected with an ethertype.
---
-
 -D|--list-interfaces::
 +
 --
 Print a list of the interfaces on which *TShark* can capture, and
-exit.  For each network interface, a number and an
-interface name, possibly followed by a text description of the
-interface, is printed.  The interface name or the number can be supplied
-to the *-i* option to specify an interface on which to capture.
-
-This can be useful on systems that don't have a command to list them
-(UNIX systems lacking *ifconfig -a* or Linux systems lacking
-*ip link show*). The number can be useful on Windows systems, where
-the interface name might be a long name or a GUID.
-
-Note that "can capture" means that *TShark* was able to open that
-device to do a live capture.  Depending on your system you may need to
-run *TShark* from an account with special privileges (for example, as
-root) to be able to capture network traffic.  If *tshark -D* is not run
-from such an account, it will not list any interfaces.
+exit.  For each network interface, a number and an interface name,
+possibly followed by a text description of the interface, is printed.
+The interface name or the number can be supplied to the *-i* flag to
+specify an interface on which to capture.  The number can be useful on
+Windows systems, where the interfaces have long names that usually
+contain a GUID.
 --
 
 -e  <field>::
@@ -346,9 +320,9 @@ from such an account, it will not list any interfaces.
 Add a field to the list of fields to display if *-T ek|fields|json|pdml*
 is selected.  This option can be used multiple times on the command line.
 At least one field must be provided if the *-T fields* option is
-selected. Column names may be used prefixed with "_ws.col."
+selected. Column types may be used prefixed with "_ws.col."
 
-Example: *tshark -e frame.number -e ip.addr -e udp -e _ws.col.Info*
+Example: *tshark -e frame.number -e ip.addr -e udp -e _ws.col.info*
 
 Fields are separated by tab characters by default.  *-E* controls the
 format of the printed fields.
@@ -392,6 +366,11 @@ option may be used.
 
 *quote=d|s|n* Set the quote character to use to surround fields.  *d*
 uses double-quotes, *s* single-quotes, *n* no quotes (the default).
+
+*escape=y|n* If *y*, the whitespace control characters (tab, line feed,
+carriage return, form feed, and vertical tab) and backspace will be
+replaced in field values by C-style escapes, e.g. "\n" for line feed.
+If *n*, field value strings will be printed as-is.  Defaults to *y*.
 --
 
 -f  <capture filter>::
@@ -412,21 +391,15 @@ Example: *tshark -f "predef:MyPredefinedHostOnlyFilter"*
 --
 
 -F  <file format>::
-+
---
 Set the file format of the output capture file written using the *-w*
 option.  The output written with the *-w* option is raw packet data, not
 text, so there is no *-F* option to request text output.  The option *-F*
 without a value will list the available formats.
---
 
 -g::
-+
---
 This option causes the output file(s) to be created with group-read permission
 (meaning that the output file(s) can be read by other members of the calling
 user's group).
---
 
 -G  [ <report type> ]::
 +
@@ -457,6 +430,13 @@ Field 3:: "decode as" name, e.g. "http"
 
 *defaultprefs*  Dumps a default preferences file to stdout.
 
+*dissectors*  Dumps a list of registered dissectors to stdout.  There is
+one record per line.  The fields are tab-delimited.
+
+[horizontal]
+Field 1:: dissector name
+Field 2:: dissector description
+
 *dissector-tables*  Dumps a list of dissector tables to stdout.  There
 is one record per line.  The fields are tab-delimited.
 
@@ -468,7 +448,10 @@ Field 4:: base for display (for integer types)
 Field 5:: protocol name
 Field 6:: "decode as" support
 
-*elastic-mapping*  Dumps the ElasticSearch mapping file to stdout.
+*elastic-mapping*  Dumps the ElasticSearch mapping file to stdout. Fields
+falling in the default case (string) won't be mapped.
+
+*enterprises* Dumps the IANA Private Enterprise Number (PEN) table.
 
 *fieldcount*  Dumps the number of header fields to stdout.
 
@@ -495,6 +478,15 @@ Field 6:: base for display (for integer types); "parent bitfield width" for FT_B
 Field 7:: bitmask: format: hex: 0x....
 Field 8:: blurb describing field
 
+An optional search prefix argument can be given to
+*fields*, in which case the output is limited to protocols and fields whose
+abbreviation starts with the search prefix.
+
+.Search Output
+[horizontal]
+Field 1:: protocol or field abbreviation
+Field 2:: descriptive protocol or field name
+
 *folders* Dumps various folders used by *TShark*.  This is essentially the
 same data reported in Wireshark's About | Folders tab.
 There is one record per line.  The fields are tab-delimited.
@@ -515,10 +507,15 @@ There is one record per line.  The fields are tab-delimited.
 
 [horizontal]
 Field 1:: underlying dissector (e.g. "tcp")
-Field 2:: name of heuristic decoder (e.g. ucp")
+Field 2:: name of heuristic decoder (e.g. "ucp")
 Field 3:: heuristic enabled (e.g. "T" or "F")
+Field 4:: heuristic enabled by default (e.g. "T" or "F")
+Field 5:: heuristic short name (e.g. "ucp_tcp")
+Field 6:: heuristic display name (e.g. "UCP over TCP")
 
 *help* Displays the available report types.
+
+*manuf* Dumps the MAC address lookup table in `manuf` format.
 
 *plugins* Dumps the plugins currently installed.
 There is one record per line.  The fields are tab-delimited.
@@ -537,6 +534,11 @@ or HTML or whatever.  There is one record per line.  The fields are tab-delimite
 Field 1:: protocol name
 Field 2:: protocol short name
 Field 3:: protocol filter name
+Field 4:: protocol enabled (e.g. "T" or "F")
+Field 5:: protocol enabled by default (e.g. "T" or "F")
+Field 6:: protocol can toggle (e.g. "T" or "F")
+
+*services* Dumps the TCP, UDP, and SCTP transport service (port) table.
 
 *values* Dumps the value_strings, range_strings or true/false strings
 for fields that have them.  There is one record per line.  Fields are
@@ -568,10 +570,7 @@ Field 4:: False String
 --
 
 -h|--help::
-+
---
-Print the version and options and exit.
---
+Print the version number and options and exit.
 
 -H  <input hosts file>::
 +
@@ -589,11 +588,9 @@ https://en.wikipedia.org/wiki/Hosts_(file).
 Set the name of the network interface or pipe to use for live packet
 capture.
 
-Network interface names should match one of the names listed in
-"*tshark -D*" (described above); a number, as reported by
-"*tshark -D*", can also be used.  If you're using UNIX, "*netstat
- -i*", "*ifconfig -a*" or "*ip link*" might also work to list interface names,
-although not all versions of UNIX support the *-a* option to *ifconfig*.
+Network interface names should match one of the names listed in "*tshark
+-D*" (described above); a number, as reported by "*tshark -D*", can also
+be used.
 
 If no interface is specified, *TShark* searches the list of
 interfaces, choosing the first non-loopback interface if there are any
@@ -654,15 +651,6 @@ Lower-level protocols must be explicitly specified in the filter.
 Example: *tshark -J "tcp http"*
 --
 
--K  <keytab>::
-+
---
-Load kerberos crypto keys from the specified keytab file.
-This option can be used multiple times to load keys from several files.
-
-Example: *tshark -K krb5.keytab*
---
-
 -l::
 +
 --
@@ -684,46 +672,8 @@ standard output buffer containing that data fills up.
 --
 
 -L|--list-data-link-types::
-+
---
 List the data link types supported by the interface and exit.  The reported
 link types can be used for the *-y* option.
---
-
--n::
-+
---
-Disable network object name resolution (such as hostname, TCP and UDP port
-names); the *-N* option might override this one.
---
-
--N  <name resolving flags>::
-+
---
-Turn on name resolving only for particular types of addresses and port
-numbers, with name resolving for other types of addresses and port
-numbers turned off.  This option overrides *-n* if both *-N* and *-n*
-are present.  This option and *-n* override the options from the preferences,
-including preferences set via the *-o* option.  If both *-N* and *-n* options
-are not present, the values from the preferences are used, which default to
-*d*, *m*, and *N* turned on and the other options turned off. (NB, *N* does
-not actually do anything without *n* enabled as well.)
-
-The argument is a string that may contain the letters:
-
-*d* to enable resolution from captured DNS packets
-
-*m* to enable MAC address resolution
-
-*n* to enable network address resolution
-
-*N* to enable using external resolvers (e.g., DNS) for network address
-resolution; no effect without *n* also enabled
-
-*t* to enable transport-layer port number resolution
-
-*v* to enable VLAN IDs to names resolution
---
 
 -o  <preference>:<value>::
 +
@@ -798,10 +748,8 @@ done, the continuous count of packets captured shown when saving a
 capture to a file, and the final message giving the count of packets
 captured.  Only true errors are displayed on the standard error.
 
-only display true errors; don't display the
-initial message indicating the.  This outputs less
-than the *-q* option, so the interface name and total packet
-count and the end of a capture are not sent to stderr.
+This outputs less than the *-q* option, so the interface name and total
+packet count and the end of a capture are not sent to stderr.
 
 When reading a capture file, or when capturing and not saving to a file,
 don't print packet information; this is useful if you're using a *-z*
@@ -824,11 +772,11 @@ particular: those that can be read without seeking backwards).
 Cause the specified filter (which uses the syntax of read/display filters,
 rather than that of capture filters) to be applied during the first pass of
 analysis. Packets not matching the filter are not considered for future
-passes. Only makes sense with multiple passes, see -2. For regular filtering
-on single-pass dissect see -Y instead.
+passes. Only makes sense with multiple passes, see *-2*. For regular filtering
+on single-pass dissect see *-Y* instead.
 
 Note that forward-looking fields such as 'response in frame #' cannot be used
-with this filter, since they will not have been calculate when this filter is
+with this filter, since they will not have been calculated when this filter is
 applied.
 --
 
@@ -849,51 +797,7 @@ the default snapshot length is used if provided.
 --
 
 -S  <separator>::
-+
---
 Set the line separator to be printed between packets.
---
-
--t  a|ad|adoy|d|dd|e|r|u|ud|udoy::
-+
---
-Set the format of the packet timestamp printed in summary lines.
-The format can be one of:
-
-*a* absolute: The absolute time, as local time in your time zone,
-is the actual time the packet was captured, with no date displayed
-
-*ad* absolute with date: The absolute date, displayed as YYYY-MM-DD,
-and time, as local time in your time zone, is the actual time and date
-the packet was captured
-
-*adoy* absolute with date using day of year: The absolute date,
-displayed as YYYY/DOY, and time, as local time in your time zone,
-is the actual time and date the packet was captured
-
-*d* delta: The delta time is the time since the previous packet was
-captured
-
-*dd* delta_displayed: The delta_displayed time is the time since the
-previous displayed packet was captured
-
-*e* epoch: The time in seconds since epoch (Jan 1, 1970 00:00:00)
-
-*r* relative: The relative time is the time elapsed between the first packet
-and the current packet
-
-*u* UTC: The absolute time, as UTC, is the actual time the packet was
-captured, with no date displayed
-
-*ud* UTC with date: The absolute date, displayed as YYYY-MM-DD,
-and time, as UTC, is the actual time and date the packet was captured
-
-*udoy* UTC with date using day of year: The absolute date, displayed
-as YYYY/DOY, and time, as UTC, is the actual time and date the packet
-was captured
-
-The default format is relative.
---
 
 -T  ek|fields|json|jsonraw|pdml|ps|psml|tabs|text::
 +
@@ -945,7 +849,7 @@ Example of usage:
 
 *pdml* Packet Details Markup Language, an XML-based format for the
 details of a decoded packet.  This information is equivalent to the
-packet details printed with the *-V* option.  Using the --color option
+packet details printed with the *-V* option.  Using the *--color* option
 will add color attributes to *pdml* output.  These attributes are
 nonstandard.
 
@@ -956,7 +860,7 @@ depending on whether the *-V* option was specified.
 *psml* Packet Summary Markup Language, an XML-based format for the summary
 information of a decoded packet.  This information is equivalent to the
 information shown in the one-line summary printed by default.
-Using the --color option will add color attributes to *pdml* output. These
+Using the *--color* option will add color attributes to *pdml* output. These
 attributes are nonstandard.
 
 *tabs* Similar to the default *text* report except the human-readable one-line
@@ -971,42 +875,29 @@ whether the *-V* option was specified.  This is the default.
 --temp-dir <directory>::
 +
 --
-Specifies the directory into which temporary files (including capture files)
-are to be written. The default behaviour is to use your system's temporary
-directory (typically __/tmp__ on Linux, and __C:\\Temp__ on Windows).
---
-
--u <seconds type>::
-+
---
-Specifies the seconds type.  Valid choices are:
-
-*s* for seconds
-
-*hms* for hours, minutes and seconds
+Specifies the directory into which temporary files (including capture
+files) are to be written.  The default behavior on UNIX-compatible systems,
+such as Linux, macOS, \*BSD, Solaris, and AIX, is to use the environment
+variable __$TMPDIR__ if set, and the system default, typically __/tmp__, if it
+is not.  On Windows, the __%TEMP%__ environment variable is used, which
+typically defaults to __%USERPROFILE%\AppData\Local\Temp__.
 --
 
 -U <tap name>::
 +
 --
 PDUs export, exports PDUs from infile to outfile according to the tap
-name given. Use -Y to filter.
+name given. Use *-Y* to filter.
 
 Enter an empty tap name "" or a tap name of ? to get a list of available
 names.
 --
 
 -v|--version::
-+
---
-Print the version and exit.
---
+Print the full version information and exit.
 
 -V::
-+
---
 Cause *TShark* to print a view of the packet details.
---
 
 -w  <outfile> | -::
 +
@@ -1014,7 +905,7 @@ Cause *TShark* to print a view of the packet details.
 Write raw packet data to __outfile__ or to the standard output if
 __outfile__ is '-'.
 
-NOTE: -w provides raw packet data, not text.  If you want text output
+NOTE: *-w* provides raw packet data, not text.  If you want text output
 you need to redirect stdout (e.g. using '>'), don't use the *-w*
 option for this.
 --
@@ -1038,11 +929,8 @@ The argument is a string that may contain the following letter:
 --
 
 -x::
-+
---
 Cause *TShark* to print a hex and ASCII dump of the packet data
 after printing the summary and/or details, if either are also being displayed.
---
 
 --hexdump <hexoption>::
 +
@@ -1088,7 +976,7 @@ Enable hexdump without printing any ASCII dump text.
 
 *help*::
 
-Display --hexdump specific help then exit.
+Display *--hexdump* specific help then exit.
 
 The use of *--hexdump <hexoption>* is particularly useful to generate output
 that can be used to create a pcap or pcapng file from a capture file type such
@@ -1098,7 +986,7 @@ directly do a "Save as" nor export packets from.
 Examples:
 
 Generate hexdump output, with only the frame data source, with delimited ASCII
-dump text, with each frame hex block preceeded by a human readable timestamp that
+dump text, with each frame hex block preceded by a human readable timestamp that
 is directly usable by the *text2pcap* utility:
 
   tshark ... --hexdump frames --hexdump delimit \
@@ -1106,7 +994,7 @@ is directly usable by the *text2pcap* utility:
       | text2pcap -n -t '%F %T.%f' - MYNEWPCAPNG
 
 Generate hexdump output, with only the frame data source, with no ASCII dump text,
-with each frame hex block preceeded by an epoch timestamp that is directly
+with each frame hex block preceded by an epoch timestamp that is directly
 usable by the *text2pcap* utility:
 
   tshark ... --hexdump frames --hexdump noascii \
@@ -1167,8 +1055,8 @@ depend upon (e.g., fragments), are not printed but are written to file;
 packets not matching the filter nor depended upon are discarded rather
 than being printed or written.
 
-Use this instead of -R for filtering using single-pass analysis. If doing
-two-pass analysis (see -2) then only packets matching the read filter (if there
+Use this instead of *-R* for filtering using single-pass analysis. If doing
+two-pass analysis (see *-2*) then only packets matching the read filter (if there
 is one) will be checked against this filter.
 --
 
@@ -1182,7 +1070,7 @@ For example,
 
 will reset session every 100000 packets.
 
-This feature does not support -2 two-pass analysis
+This feature does not support *-2* two-pass analysis
 --
 
 -z  <statistics>::
@@ -1211,124 +1099,76 @@ Some of the currently implemented statistics are:
 --
 
 *-z help*::
-+
---
 Display all possible values for *-z*.
---
 
 *-z* afp,srt[,__filter__]::
-+
---
 Show Apple Filing Protocol service response time statistics.
---
 
 *-z* ancp,tree[,__filter__]::
-+
---
 Calculate statistics on Access Node Control Protocol message types
 and adjacency packet codes.
---
 
 *-z* ansi_a,bsmap[,__filter__]::
-+
---
 Count the number of ANSI A-I/F BSMAP messages of each type.
---
 
 *-z* ansi_a,dtap[,__filter__]::
-+
---
 Count the number of ANSI A-I/F DTAP messages of each type.
---
 
 *-z* ansi_map[,__filter__]::
-+
---
 Count the number of ANSI MAP messages of each type, and calculate the
 total number of bytes and average bytes of each message type.
---
 
 *-z* asap,stat[,__filter__]::
-+
---
 Calculate statistics on Aggregate Service Access Protocol (ASAP).
 For each ASAP message type, displays the number, rate, and share among
 all ASAP message types of both packets and bytes, and the first and last
 time that it is seen.
---
 
 *-z* bacapp_instanceid,tree[,__filter__]::
-+
---
 Calculate statistics on BACnet APDUs, collated by instance ID.
 Displayed information includes source and destination address and
 service type.
---
 
 *-z* bacapp_ip,tree[,__filter__]::
-+
---
 Calculate statistics on BACnet APDUs, collated by source and destination
 address.  Displayed information includes service type, object ID, and
 instance ID.
---
 
 *-z* bacapp_objectid,tree[,__filter__]::
-+
---
 Calculate statistics on BACnet APDUs, collated by object ID.
 Displayed information includes source and destination address,
 service type, and instance ID.
---
 
 *-z* bacapp_service,tree[,__filter__]::
-+
---
 Calculate statistics on BACnet APDUs, collated by service type.
 Displayed information includes source and destination address,
 object ID, and instance ID.
---
 
 *-z* calcappprotocol,stat[,__filter__]::
-+
---
 Calculate statistics on the Calculation Application Protocol of
 Reliable Server Pooling.  For each message type, displays the number,
 rate, and share among all message types of both packets and bytes,
 and the first and last time that it is seen.
---
 
 *-z* camel,counter[,__filter__]::
-+
---
 Count the number of CAMEL messages for each opcode.
---
 
 *-z* camel,srt[,__filter__]::
-+
---
 Collect requests/response SRT (Service Response Time) data for CAMEL.
 Data collected is number of request messages with corresponding response
 of each CAMEL message type, along with the minimum, maximum, and average
 response time.
---
 
 *-z* collectd,tree[,__filter__]::
-+
---
 Calculate statistics for collectd.  The gathered statistics are the number
 of collectd packets and the total number of value segments, along with the
 host, plugin, and type of the values.
---
 
 *-z* componentstatusprotocol,stat[,__filter__]::
-+
---
 Calculate statistics on the Calculation Status Protocol of Reliable
 Server Pooling.  For each message type, displays the number, rate
 and share among all message types of both packets and bytes, and the
 first and last time that it is seen.
---
 
 *-z* conv,__type__[,__filter__]::
 +
@@ -1360,20 +1200,17 @@ want to generate the statistics; currently the supported ones are:
   "zbee_nwk"  ZigBee Network Layer addresses
 
 The table is presented with one line for each conversation which displays
-the number of frames/bytes in each direction, the total number of 
-frames/bytes, relative start time and duration. 
+the number of frames/bytes in each direction, the total number of
+frames/bytes, relative start time and duration.
 The table is sorted according to the total number of frames.
 --
 
 *-z* credentials::
-+
---
 Collect credentials (username/passwords) from packets. The report includes
 the packet number, the protocol that had that credential, the username and
 the password. For protocols just using one single field as authentication,
 this is provided as a password and a placeholder in place of the user.
 Currently implemented protocols include FTP, HTTP, IMAP, POP, and SMTP.
---
 
 *-z* dcerpc,srt,__uuid__,__major__.__minor__[,__filter__]::
 +
@@ -1393,17 +1230,11 @@ SRT statistics for a specific host.
 --
 
 *-z* dests,tree[,__filter__]::
-+
---
 Calculate statistics on IPv4 destination addresses and the protocols
 and ports appearing on each address.
---
 
 *-z* dhcp,stat[,__filter__]::
-+
---
 Show DHCP (BOOTP) statistics.
---
 
 *-z* diameter,avp[,__cmd.code__,__field__,__field__,__...__]::
 +
@@ -1453,21 +1284,15 @@ Note: *tshark -q* option is recommended to suppress default *TShark* output.
 --
 
 *-z* diameter,srt[,__filter__]::
-+
---
 Collect requests/response SRT (Service Response Time) data for Diameter.
 Data collected is number of request and response pairs of each Diameter
 command code, Minimum SRT, Maximum SRT, Average SRT, and Sum SRT.
 Currently no statistics are gathered on unpaired messages.
---
 
 *-z* dns,tree[,__filter__]::
-+
---
 Create a summary of the captured DNS packets. General information are collected
 such as qtype and qclass distribution. For some data (as qname length or DNS
 payload) max, min and average values are also displayed.
---
 
 *-z* endpoints,__type__[,__filter__]::
 +
@@ -1505,13 +1330,10 @@ The table is sorted according to the total number of packets.
 --
 
 *-z* enrp,stat[,__filter__]::
-+
---
 Calculate statistics on Endpoint Handlespace Redundancy Protocol (ENRP).
 For each message type, displays the number, rate, and share among
 all message types of both packets and bytes, and the first and last
 time that it is seen.
---
 
 *-z* expert[__,error|,warn|,note|,chat|,comment__][,__filter__]::
 +
@@ -1529,39 +1351,27 @@ include the tcp protocol, with a severity of note or higher.
 --
 
 *-z* f1ap,tree[,__filter__]::
-+
---
 Calculate the distribution of F1AP packets, grouped by packet types.
---
 
 *-z* f5_tmm_dist,tree[,__filter__]::
-+
---
-Calculate the F5 Ethernet trailer Traffic Managment Microkernel distribution.
+Calculate the F5 Ethernet trailer Traffic Management Microkernel distribution.
 Displayed information is the number of packets and bytes, grouped by the TMM
 slot and number, whether packets are ingress or egress, and whether there is
 a flow ID and virtual server name, a flow ID without virtual server name, or
 no flow ID, along with total for all packets with F5 trailers.
---
 
 *-z* f5_virt_dist,tree[,__filter__]::
-+
---
 Calculate F5 Ethernet trailer Virtual Server distribution.
 Displayed information is the number of packets and bytes, grouped by the
 virtual server name if it exists, or by whether there is a flow ID or not
 if there is no virtual server name, as well as totals for all packets with
 F5 trailers.
---
 
 *-z* fc,srt[,__filter__]::
-+
---
 Collect requests/response SRT (Service Response Time) data for GTP.
-Data collected is the number of request/response pairs, mimimum SRT,
+Data collected is the number of request/response pairs, minimum SRT,
 maximum SRT, average SRT, and sum SRT for each value of the Type field
 (next protocol).  No statistics are gathered on unpaired messages.
---
 
 *-z* flow,__name__,__mode__[,__filter__]::
 +
@@ -1612,10 +1422,14 @@ __mode__ specifies the output mode.  It can be one of:
   ebcdic EBCDIC output with dots for non-printable characters
   hex    Hexadecimal and ASCII data with offsets
   raw    Hexadecimal data
+  utf-8  UTF-8 output with REPLACEMENT CHARACTERs for invalid sequences
   yaml   YAML format
 
-Since the output in *ascii* or *ebcdic* mode may contain newlines, the length
-of each section of output plus a newline precedes each section of output.
+Since the output in *ascii*, *ebcdic*, or *utf-8* mode may contain newlines,
+each section of output is preceded by its length in bytes plus a newline.
+(Note that for *utf-8* this is not UTF-8 characters, and may be different
+than the length as transmitted due to the substitution of replacement
+characters for invalid sequences.)
 
 __filter__ specifies the stream to be displayed. There are three formats:
 
@@ -1719,28 +1533,28 @@ can be one of:
   dtap_mm    DTAP Mobility Management
   dtap_rr    DTAP Radio Resource Management
   dtap_sacch SACCH Radio Resource Management
-  dtap_sm    DTAP GPRS Session Managment
+  dtap_sm    DTAP GPRS Session Management
   dtap_sms   DTAP Short Message Service
   dtap_ss    DTAP Supplementary Services
   dtap_tp    DTAP Special Conformance Testing Functions
 --
 
 *-z* gsm_map,operation[,__filter__]::
-+
---
 Calculate statistics on GSM MAP. For each op code, the total number of
 invokes and results, along with the average and total bytes for invokes
 and results separately and combined is displayed.
---
 
 *-z* gtp,srt[,__filter__]::
-+
---
 Collect requests/response SRT (Service Response Time) data for GTP.
-Data collected is the number of calls, mimimum SRT, maximum SRT, average
-SRT, and sum SRT for Echo and Create/Update/Delete PDP context commands only.
-Currently no statistics are gathered on unpaired messages.
---
+Data collected is the number of calls, minimum SRT, maximum SRT, average
+SRT, and sum SRT for certain commands.  Currently no statistics are gathered
+on unpaired messages.
+
+*-z* gtpv2,srt[,__filter__]::
+Collect requests/response SRT (Service Response Time) data for GTP.
+Data collected is the number of calls, minimum SRT, maximum SRT, average
+SRT, and sum SRT for certain commands.  Currently no statistics are gathered
+on unpaired messages.
 
 *-z* h225,counter[,__filter__]::
 +
@@ -1776,11 +1590,8 @@ ITU-T H.225 RAS packets exchanged by the host at IP address 1.2.3.4 .
 --
 
 *-z* hart_ip,tree[,__filter__]::
-+
---
 Calculate statistics on HART-IP packets, grouping by message types and
 message IDs within types.
---
 
 *-z* hosts[,ip][,ipv4][,ipv6]::
 +
@@ -1795,54 +1606,33 @@ files and captured traffic. Resolution must be enabled, e.g. through the
 --
 
 *-z* hpfeeds,tree[,__filter__]::
-+
---
 Calculate statistics for HPFEEDS traffic such as publish per channel, and opcode
 distribution.
---
 
 *-z* http,stat[,__filter__]::
-+
---
 Count the HTTP response status codes and the HTTP request methods.
---
 
 *-z* http,tree[,__filter__]::
-+
---
 Calculate the HTTP packet distribution. Displayed values are the
 response status codes and request methods.
---
 
 *-z* http_req,tree[,__filter__]::
-+
---
 Calculate the HTTP requests by server. Displayed values are the
 server name and the URI path.
---
 
 *-z* http_seq,tree[,__filter__]::
-+
---
 Calculate the HTTP request sequence statistics, which correlate
 referring URIs with request URIs.
---
 
 *-z* http_srv,tree[,__filter__]::
-+
---
 Calculate the HTTP requests and responses by server. For the HTTP
 requests, displayed values are the server IP address and server
 hostname. For the HTTP responses, displayed values are the server
 IP address and status.
---
 
 *-z* http2,tree[,__filter__]::
-+
---
 Calculate the HTTP/2 packet distribution. Displayed values are the
 frame types.
---
 
 *-z* icmp,srt[,__filter__]::
 +
@@ -2035,131 +1825,84 @@ the total number of bytes transmitted to the client (unidirectionally) at IP add
 --
 
 *-z* ip_hosts,tree[,__filter__]::
-+
---
 Calculate statistics on IPv4 addresses, with source and destination addresses
 all grouped together.
---
 
 *-z* ip_srcdst,tree[,__filter__]::
-+
---
 Calculate statistics on IPv4 addresses, with source and destination addresses
 separated into separate categories.
---
+
+*-z* ip_ttl,tree[,__filter__]::
+Calculate statistics on the time to live (TTL) values that occur for each
+IPv4 source address.
 
 *-z* ip6_dests,tree[,__filter__]::
-+
---
 Calculate statistics on IPv6 destination addresses and the protocols
 and ports appearing on each address.
---
 
 *-z* ip6_hosts,tree[,__filter__]::
-+
---
 Calculate statistics on IPv6 addresses, with source and destination addresses
 all grouped together.
---
 
 *-z* ip6_ptype,tree[,__filter__]::
-+
---
 Calculate statistics on port types that occur on IPv6 packets.
---
 
 *-z* ip6_srcdst,tree[,__filter__]::
-+
---
 Calculate statistics on IPv6 addresses, with source and destination addresses
 separated into separate categories.
---
+
+*-z* ip6_hop,tree[,__filter__]::
+Calculate statistics on the hop limits that occur for each IPv6 source address.
 
 *-z* isup_msg,tree[,__filter__]::
-+
---
 Calculate statistics on ISUP messages. Displayed information is message
 types and direction (originating point code and destination point code.)
---
 
 *-z* lbmr_queue_ads_queue,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays queue
 advertisements collated by queue name and then source addresses and port.
---
 
 *-z* lbmr_queue_ads_source,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays queue
 advertisements collated by source address and then queue and port.
---
 
 *-z* lbmr_queue_queries_queue,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays queue
 queries collated by queue name and then receiver addresses.
---
 
 *-z* lbmr_queue_queries_receiver,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays queue
 queries collated by receiver address and then queue.
---
 
 *-z* lbmr_topic_ads_source,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays topic
 advertisements collated by source address and then topic name and
 source string.
---
 
 *-z* lbmr_topic_ads_topic,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays topic
 advertisements collated by topic name and then source address and
 source string.
---
 
 *-z* lbmr_topic_ads_transport,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays topic
 advertisements collated by source string and then topic name.
---
 
 *-z* lbmr_topic_queries_pattern,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays topic
 queries collated by pattern and then receiver address.
---
 
 *-z* lbmr_topic_queries_pattern_receiver,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays topic
 queries collated by receiver address and then pattern.
---
 
 *-z* lbmr_topic_queries_receiver,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays topic
 queries collated by receiver address and then topic name.
---
 
 *-z* lbmr_topic_queries_topic,tree[,__filter__]::
-+
---
 Calculate statistics on LBM Topic Resolution Packets. Displays topic
 queries collated by topic name and then receiver address.
---
 
 *-z* mac-lte,stat[,__filter__]::
 +
@@ -2209,46 +1952,31 @@ MGCP packets exchanged by the host at IP address 1.2.3.4 .
 --
 
 *-z* mtp3,msus[,__filter__]::
-+
---
-Calculate statisics on MTP3 MSUs. For each combination of originating
+Calculate statistics on MTP3 MSUs. For each combination of originating
 point code, destination point code, and service indicator, calculates
 the total number of MSUs, the total bytes, and the average bytes per MSU.
---
 
 *-z* ncp,srt[,__filter__]::
-+
---
 Collect requests/response SRT (Service Response Time) data for Netware
 Core Protocol.  Minimum SRT, maximum SRT, average SRT, and sum SRT is
 displayed for request/response pairs, organized by group, function and
 subfunction, and verb.  No statistics are gathered on unpaired messages.
---
 
 *-z* osmux,tree[,__filter__]::
-+
---
 Calculate statistics for the OSmux voice/signaling multiplex protocol.
 Displays the total number of OSmux packets, and displays for each stream
 the number of packets, number of packets with the RTP market bit set,
 number of AMR frames, jitter analysis, and sequence number analysis.
---
 
 *-z* pingpongprotocol,stat[,__filter__]::
-+
---
 Calculate statistics on the Ping Pong Protocol of Reliable
 Server Pooling.  For each message type, displays the number, rate
 and share among all message types of both packets and bytes, and the
 first and last time that it is seen.
---
 
 *-z* plen,tree[,__filter__]::
-+
---
 Calculate statistics on packet lengths. Packets are grouped into buckets
 that grow exponentially with powers of two.
---
 
 *-z* proto,colinfo,__filter__,__field__::
 +
@@ -2281,20 +2009,14 @@ This option can be used multiple times on the command line.
 --
 
 *-z* ptype,tree[,__filter__]::
-+
---
 Calculate statistics on port types that occur on IPv4 packets.
---
 
 *-z* radius,rtd[,__filter__]::
-+
---
-Collect requests/response RTD (Response Time Delay) data for RAIDUS.
+Collect requests/response RTD (Response Time Delay) data for RADIUS.
 The data collected for each RADIUS code is the number of calls,
 Minimum RTD, Maximum RTD, Average RTD, Minimum in Frame, and Maximum in Frame,
 along with the number of Open Requests (Unresponded Requests), Discarded
 Responses (Responses without matching request) and Duplicate Messages.
---
 
 *-z* rlc-lte,stat[,__filter__]::
 +
@@ -2336,31 +2058,19 @@ SRT statistics for a specific file.
 --
 
 *-z* rtp,streams::
-+
---
 Collect statistics for all RTP streams and calculate max. delta, max. and
 mean jitter and packet loss percentages.
---
 
 *-z* rtsp,stat[,__filter__]::
-+
---
 Count the RTSP response status codes and the RSTP request methods.
---
 
 *-z* rtsp,tree[,__filter__]::
-+
---
 Calculate the RTSP packet distribution. Displayed values are the
 response status codes and request methods.
---
 
 *-z* sametime,tree[,__filter__]::
-+
---
 Calculate statistics on SAMETIME messages. Displayed values are the
 messages type, send type, and user status.
---
 
 *-z* scsi,srt,__cmdset__[,__filter__]::
 +
@@ -2381,14 +2091,11 @@ SRT statistics for a specific iscsi/ifcp/fcip host.
 --
 
 *-z* sctp,stat::
-+
---
 Activate a counter for SCTP chunks. In addition to the total number of
 SCTP packets, for each source and destination address and port combination
 the number of chunks of the most common types (DATA, SACK, HEARTBEAT,
 HEARTBEAT ACK, INIT, INIT ACK, COOKIE ECHO, COOKIE ACK, ABORT, and ERROR)
 are displayed.
---
 
 *-z* sip,stat[,__filter__]::
 +
@@ -2445,65 +2152,41 @@ SMB packets exchanged by the host at IP address 1.2.3.4 .
 --
 
 *-z* smb2,srt[,__filter__]::
-+
---
 Collect call/reply SRT (Service Response Time) data for SMB versions 2 and 3.
 The data collected for each normal command type is the number of calls,
 MinSRT, MaxSRT, AvgSRT, and SumSRT.  No data is collected on cancel or
 oplock break requests, or on unpaired commands.  Only the first response to
 a given request is used; retransmissions are not included in the calculation.
---
 
 *-z* smpp_commands,tree[,__filter__]::
-+
---
 Calculate the SMPP command distribution. Displayed values are
 command IDs for both requests and responses, and status for responses.
---
 
 *-z* snmp,srt[,__filter__]::
-+
---
 Collect call/reply SRT (Service Response Time) data for SNMP. The data
 collected for each PDU type is the number of request/response pairs,
 MinSRT, MaxSRT, AvgSRT, and SumSRT.  No data is collected on unpaired
 messages.
---
 
 *-z*  someip_messages,tree[,__filter__]::
-+
---
 Create statistic of SOME/IP messages. Messages are counted and displayed
 as Messages grouped by sender/receiver.
---
 
 *-z*  someipsd_entries,tree[,__filter__]::
-+
---
 Create statistic of SOME/IP-SD entries. Entries are counted and displayed
 as Entries grouped by sender/receiver.
---
 
 *-z* sv::
-+
---
 Print out the time since the start of the capture and sample count for each
 IEC 61850 Sampled Values packet.
---
 
 *-z* ucp_messages,tree[,__filter__]::
-+
---
 Calculate the message distribution of UCP packets. Displayed values are
 operation types for both operations and results, and whether results are
 positive or negative, with error codes displayed for negative results.
---
 
 *-z* wsp,stat[,__filter__]::
-+
---
 Count the PDU types and the status codes of reply packets for WSP packets.
---
 
 --capture-comment <comment>::
 +
@@ -2516,36 +2199,29 @@ currently only displays the first comment of a capture file.
 --
 
 --list-time-stamp-types::
-+
---
 List time stamp types supported for the interface. If no time stamp type can be
 set, no time stamp types are listed.
---
 
 --time-stamp-type <type>::
-+
---
 Change the interface's timestamp method.
---
+
+--update-interval  <interval>::
+Set the length of time in milliseconds between new packet reports during
+a capture. Also sets the granularity of file duration conditions.
+The default value is 100ms.
 
 --color::
-+
---
 Enable coloring of packets according to standard Wireshark color
 filters. On Windows colors are limited to the standard console
 character attribute colors. Other platforms require a terminal that
 handles 24-bit "true color" terminal escape sequences. See
 https://gitlab.com/wireshark/wireshark/-/wikis/ColoringRules for more information on
 configuring color filters.
---
 
 --no-duplicate-keys::
-+
---
 If a key appears multiple times in an object, only write it a single time with
 as value a json array containing all the separate values. (Only works with
--T json)
---
+*-T json*)
 
 --elastic-mapping-filter <protocol>,<protocol>,...::
 +
@@ -2571,29 +2247,12 @@ before the file extension.
 This interface is subject to change, adding the possibility to filter on files.
 --
 
---enable-protocol <proto_name>::
-+
---
-Enable dissection of proto_name.
---
+--print-timers::
+Output JSON containing elapsed times for each pass tshark does to process a capture
+file and the sum elapsed time for all passes. The per-pass output contains the total
+elapsed time and aggregate counters for per-packet operations (dissection and filtering).
 
---disable-protocol <proto_name>::
-+
---
-Disable dissection of proto_name.
---
-
---enable-heuristic <short_name>::
-+
---
-Enable dissection of heuristic protocol.
---
-
---disable-heuristic <short_name>::
-+
---
-Disable dissection of heuristic protocol.
---
+include::dissection-options.adoc[tag=!not_tshark]
 
 include::diagnostic-options.adoc[]
 
@@ -2635,18 +2294,23 @@ starts a comment that runs to the end of the line:
   capture.prom_mode: TRUE
 
 The global preferences file is looked for in the __wireshark__ directory
-under the __share__ subdirectory of the main installation directory (for
-example, __/usr/local/share/wireshark/preferences__) on UNIX-compatible
-systems, and in the main installation directory (for example,
-__C:\Program Files\Wireshark\preferences__) on Windows systems.
+under the __share__ subdirectory of the main installation directory.  On
+macOS, this would typically be
+__/Application/Wireshark.app/Contents/Resources/share__; on other
+UNIX-compatible systems, such as Linux, \*BSD, Solaris, and AIX, this
+would typically be __/usr/share/wireshark/preferences__ for
+system-installed packages and __/usr/local/share/wireshark/preferences__
+for locally-installed packages; on Windows, this would typically be
+__C:\Program Files\Wireshark\preferences__.
 
-The personal preferences file is looked for in
-__$XDG_CONFIG_HOME/wireshark/preferences__
-(or, if __$XDG_CONFIG_HOME/wireshark__ does not exist while __$HOME/.wireshark__
-is present, __$HOME/.wireshark/preferences__) on
-UNIX-compatible systems and __%APPDATA%\Wireshark\preferences__ (or, if
-%APPDATA% isn't defined, __%USERPROFILE%\Application
- Data\Wireshark\preferences__) on Windows systems.
+On UNIX-compatible systems, the personal preferences file is looked for
+in __$XDG_CONFIG_HOME/wireshark/preferences__, (or, if
+__$XDG_CONFIG_HOME/wireshark__ does not exist while __$HOME/.wireshark__
+does exist, __$HOME/.wireshark/preferences__); this is typically
+__$HOME/.config/wireshark/preferences__.  On Windows,
+the personal preferences file is looked for in
+__%APPDATA%\Wireshark\preferences__ (or, if %APPDATA% isn't defined,
+__%USERPROFILE%\Application Data\Wireshark\preferences__).
 --
 
 Disabled (Enabled) Protocols::
@@ -2679,8 +2343,9 @@ whitespace.  The same directory as for the personal preferences file is
 used.
 
 Capture filter name resolution is handled by libpcap on UNIX-compatible
-systems and Npcap or WinPcap on Windows.  As such the Wireshark personal
-__hosts__ file will not be consulted for capture filter name resolution.
+systems, such as Linux, macOS, \*BSD, Solaris, and AIX, and by Npcap or
+WinPcap on Windows.  As such the Wireshark personal __hosts__ file will
+not be consulted for capture filter name resolution.
 --
 
 Name Resolution (subnets)::
@@ -2723,8 +2388,9 @@ lines of an __ethers__ file:
   00.00.00.00.00.00          Zero_broadcast
 
 The global __ethers__ file is looked for in the __/etc__ directory on
-UNIX-compatible systems, and in the main installation directory (for
-example, __C:\Program Files\Wireshark__) on Windows systems.
+UNIX-compatible systems, such as Linux, macOS, \*BSD, Solaris, and AIX,
+and in the main installation directory (for example, __C:\Program
+Files\Wireshark__) on Windows systems.
 
 The personal __ethers__ file is looked for in the same directory as the personal
 preferences file.
@@ -2794,8 +2460,9 @@ For example, these four lines are valid lines of an __ipxnets__ file:
   110f                     FileServer3
 
 The global __ipxnets__ file is looked for in the __/etc__ directory on
-UNIX-compatible systems, and in the main installation directory (for
-example, __C:\Program Files\Wireshark__) on Windows systems.
+UNIX-compatible systems, such as Linux, macOS, \*BSD, Solaris, and AIX,
+and in the main installation directory (for example, __C:\Program
+Files\Wireshark__) on Windows systems.
 
 The personal __ipxnets__ file is looked for in the same directory as the
 personal preferences file.
@@ -2808,9 +2475,10 @@ output might not be valid. For example, a dissector might generate
 invalid UTF-8 character sequences. Programs reading *TShark* output
 should expect UTF-8 and be prepared for invalid output.
 
-If *TShark* detects that it is writing to a TTY on UNIX or Linux and
-the locale does not support UTF-8, output will be re-encoded to match the
-current locale.
+If *TShark* detects that it is writing to a TTY on a UNIX-compatible
+system, such as Linux, macOS, \*BSD, Solaris, and AIX, and the locale
+does not support UTF-8, output will be re-encoded to match the current
+locale.
 
 If *TShark* detects that it is writing to the console on Windows,
 dissection output will be encoded as UTF-16LE. Other output will be
@@ -2823,62 +2491,61 @@ and using a modern terminal application if possible.
 // Should this be moved to an include file?
 
 WIRESHARK_CONFIG_DIR::
-+
---
-This environment variable overrides the location of personal configuration
-files. It defaults to __$XDG_CONFIG_HOME/wireshark__ (or __$HOME/.wireshark__ if
-the former is missing while the latter exists). On Windows,
-__%APPDATA%\Wireshark__ is used instead. Available since Wireshark 3.0.
---
+This environment variable overrides the location of personal
+configuration files.  On UNIX-compatible systems, such as Linux, macOS,
+\*BSD, Solaris, and AIX, it defaults to __$XDG_CONFIG_HOME/wireshark__
+(or, if that directory doesn't exist but __$HOME/.wireshark__ does
+exist, __$HOME/.wireshark__); this is typically
+__$HOME/.config/wireshark__.  On Windows, it defaults to
+__%APPDATA%\Wireshark__ (or, if %APPDATA% isn't defined,
+__%USERPROFILE%\Application Data\Wireshark__).  Available since
+Wireshark 3.0.
 
 WIRESHARK_DEBUG_WMEM_OVERRIDE::
-+
---
 Setting this environment variable forces the wmem framework to use the
 specified allocator backend for *all* allocations, regardless of which
 backend is normally specified by the code. This is mainly useful to developers
 when testing or debugging. See __README.wmem__ in the source distribution for
 details.
---
 
 WIRESHARK_RUN_FROM_BUILD_DIRECTORY::
-+
---
-This environment variable causes the plugins and other data files to be loaded
-from the build directory (where the program was compiled) rather than from the
-standard locations.  It has no effect when the program in question is running
-with root (or setuid) permissions on *NIX.
---
+This environment variable causes the plugins and other data files to be
+loaded from the build directory (where the program was compiled) rather
+than from the standard locations.  It has no effect when the program in
+question is running with root (or setuid) permissions on UNIX-compatible
+systems, such as Linux, macOS, \*BSD, Solaris, and AIX.
 
 WIRESHARK_DATA_DIR::
-+
---
 This environment variable causes the various data files to be loaded from
 a directory other than the standard locations.  It has no effect when the
-program in question is running with root (or setuid) permissions on *NIX.
---
+program in question is running with root (or setuid) permissions on
+UNIX-compatible systems.
+
+WIRESHARK_EXTCAP_DIR::
+This environment variable causes the various extcap programs and scripts
+to be run from a directory other than the standard locations.  It has no
+effect when the program in question is running with root (or setuid)
+permissions on UNIX-compatible systems.
+
+WIRESHARK_PLUGIN_DIR::
+This environment variable causes the various plugins to be loaded from
+a directory other than the standard locations.  It has no effect when the
+program in question is running with root (or setuid) permissions on
+UNIX-compatible systems.
 
 ERF_RECORDS_TO_CHECK::
-+
---
 This environment variable controls the number of ERF records checked when
 deciding if a file really is in the ERF format.  Setting this environment
 variable a number higher than the default (20) would make false positives
 less likely.
---
 
 IPFIX_RECORDS_TO_CHECK::
-+
---
 This environment variable controls the number of IPFIX records checked when
 deciding if a file really is in the IPFIX format.  Setting this environment
 variable a number higher than the default (20) would make false positives
 less likely.
---
 
 WIRESHARK_ABORT_ON_DISSECTOR_BUG::
-+
---
 If this environment variable is set, *TShark* will call abort(3)
 when a dissector bug is encountered.  abort(3) will cause the program to
 exit abnormally; if you are running *TShark* in a debugger, it
@@ -2887,11 +2554,8 @@ you are not running it in a debugger, it will, on some OSes, assuming
 your environment is configured correctly, generate a core dump file.
 This can be useful to developers attempting to troubleshoot a problem
 with a protocol dissector.
---
 
 WIRESHARK_ABORT_ON_TOO_MANY_ITEMS::
-+
---
 If this environment variable is set, *TShark* will call abort(3)
 if a dissector tries to add too many items to a tree (generally this
 is an indication of the dissector not breaking out of a loop soon enough).
@@ -2901,48 +2565,32 @@ inspection of the process, and, if you are not running it in a debugger,
 it will, on some OSes, assuming your environment is configured correctly,
 generate a core dump file.  This can be useful to developers attempting to
 troubleshoot a problem with a protocol dissector.
---
 
 WIRESHARK_LOG_LEVEL::
-+
---
 This environment variable controls the verbosity of diagnostic messages to
 the console. From less verbose to most verbose levels can be `critical`,
 `warning`, `message`, `info`, `debug` or `noisy`. Levels above the
 current level are also active. Levels `critical` and `error` are always
 active.
---
 
 WIRESHARK_LOG_FATAL::
-+
---
 Sets the fatal log level. Fatal log levels cause the program to abort.
 This level can be set to `Error`, `critical` or `warning`. `Error` is
 always fatal and is the default.
---
 
 WIRESHARK_LOG_DOMAINS::
-+
---
 This environment variable selects which log domains are active. The filter is
 given as a case-insensitive comma separated list. If set only the included
 domains will be enabled. The default domain is always considered to be enabled.
 Domain filter lists can be preceded by '!' to invert the sense of the match.
---
 
 WIRESHARK_LOG_DEBUG::
-+
---
 List of domains with `debug` log level. This sets the level of the provided
 log domains and takes precedence over the active domains filter. If preceded
 by '!' this disables the `debug` level instead.
---
 
 WIRESHARK_LOG_NOISY::
-+
---
 Same as above but for `noisy` log level instead.
---
 
 == SEE ALSO
 

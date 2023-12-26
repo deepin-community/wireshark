@@ -55,6 +55,10 @@ extern "C" {
 #define USE_LAST_ENDPOINT 0x08		/**< Use last endpoint created, regardless of type */
 
 /* Types of conversations Wireshark knows about. */
+/* XXX: There should be a way to register conversation types used only
+ * within one dissector, similar to address types, instead of changing
+ * the global typedef.
+ */
 typedef enum {
     CONVERSATION_NONE,		/* no conversation key */
     CONVERSATION_SCTP,		/* SCTP */
@@ -88,6 +92,13 @@ typedef enum {
     CONVERSATION_IWARP_MPA,	/* iWarp MPA */
     CONVERSATION_BT_UTP,	/* BitTorrent uTP Connection ID */
     CONVERSATION_LOG,		/* Logging source */
+    CONVERSATION_LTP,		/* LTP Engine ID and Session Number */
+    CONVERSATION_MCTP,
+    CONVERSATION_NVME_MI,       /* NVMe management interface */
+    CONVERSATION_BP,		/* Bundle Protocol endpoint IDs */
+    CONVERSATION_SNMP,		/* SNMP */
+    CONVERSATION_QUIC,		/* QUIC */
+    CONVERSATION_IDN,
 } conversation_type;
 
 /*
@@ -132,6 +143,9 @@ typedef enum {
 #define ENDPOINT_IWARP_MPA	CONVERSATION_IWARP_MPA
 #define ENDPOINT_BT_UTP		CONVERSATION_BT_UTP
 #define ENDPOINT_LOG		CONVERSATION_LOG
+#define ENDPOINT_MCTP		CONVERSATION_MCTP
+#define ENDPOINT_NVME_MI	CONVERSATION_NVME_MI
+#define ENDPOINT_SNMP		CONVERSATION_SNMP
 
 typedef conversation_type endpoint_type;
 
@@ -145,6 +159,7 @@ typedef enum {
     CE_STRING,			/* string */
     CE_UINT,			/* unsigned integer not representing a port */
     CE_UINT64,			/* 64-bit unsigned integer */
+    CE_INT,             /* signed integer */
 } conversation_element_type;
 
 /**
@@ -177,6 +192,7 @@ typedef struct conversation_element {
         const char *str_val;
         unsigned int uint_val;
         uint64_t uint64_val;
+        int int_val;
     };
 } conversation_element_t;
 

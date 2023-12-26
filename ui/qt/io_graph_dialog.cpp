@@ -27,6 +27,8 @@
 #include <ui/qt/widgets/qcustomplot.h>
 #include "progress_frame.h"
 #include "main_application.h"
+
+#include <wsutil/filesystem.h>
 #include <wsutil/report_message.h>
 
 #include <ui/qt/utils/tango_colors.h> //provides some default colors
@@ -88,6 +90,9 @@ typedef struct _io_graph_settings_t {
 
 static const value_string graph_style_vs[] = {
     { IOGraph::psLine, "Line" },
+    { IOGraph::psDotLine, "Dot Line" },
+    { IOGraph::psStepLine, "Step Line" },
+    { IOGraph::psDotStepLine, "Dot Step Line" },
     { IOGraph::psImpulse, "Impulse" },
     { IOGraph::psBar, "Bar" },
     { IOGraph::psStackedBar, "Stacked Bar" },
@@ -152,7 +157,7 @@ static void basename ## _ ## field_name ## _tostr_cb(void* rec, char** out_ptr, 
     *out_ptr = ws_strdup_printf("%s",((rec_t*)rec)->field_name ? "Enabled" : "Disabled"); \
     *out_len = (unsigned)strlen(*out_ptr); }
 
-static gboolean uat_fld_chk_enable(void* u1 _U_, const char* strptr, guint len, const void* u2 _U_, const void* u3 _U_, char** err)
+static bool uat_fld_chk_enable(void* u1 _U_, const char* strptr, guint len, const void* u2 _U_, const void* u3 _U_, char** err)
 {
     char* str = g_strndup(strptr,len);
 
@@ -219,7 +224,7 @@ static void io_graph_sma_period_tostr_cb(void* rec, char** out_ptr, unsigned* ou
     *out_len = (unsigned)strlen("None");
 }
 
-static gboolean sma_period_chk_enum(void* u1 _U_, const char* strptr, guint len, const void* v, const void* u3 _U_, char** err) {
+static bool sma_period_chk_enum(void* u1 _U_, const char* strptr, guint len, const void* v, const void* u3 _U_, char** err) {
     char *str = g_strndup(strptr,len);
     guint i;
     const value_string* vs = (const value_string *)v;
@@ -332,12 +337,16 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
     ui->deleteToolButton->setStockIcon("list-remove");
     ui->copyToolButton->setStockIcon("list-copy");
     ui->clearToolButton->setStockIcon("list-clear");
+    ui->moveUpwardsToolButton->setStockIcon("list-move-up");
+    ui->moveDownwardsToolButton->setStockIcon("list-move-down");
 
 #ifdef Q_OS_MAC
     ui->newToolButton->setAttribute(Qt::WA_MacSmallSize, true);
     ui->deleteToolButton->setAttribute(Qt::WA_MacSmallSize, true);
     ui->copyToolButton->setAttribute(Qt::WA_MacSmallSize, true);
     ui->clearToolButton->setAttribute(Qt::WA_MacSmallSize, true);
+    ui->moveUpwardsToolButton->setAttribute(Qt::WA_MacSmallSize, true);
+    ui->moveDownwardsToolButton->setAttribute(Qt::WA_MacSmallSize, true);
 #endif
 
     QPushButton *save_bt = ui->buttonBox->button(QDialogButtonBox::Save);
@@ -356,6 +365,8 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
     }
 
     ui->automaticUpdateCheckBox->setChecked(prefs.gui_io_graph_automatic_update ? true : false);
+
+    ui->enableLegendCheckBox->setChecked(prefs.gui_io_graph_enable_legend ? true : false);
 
     stat_timer_ = new QTimer(this);
     connect(stat_timer_, SIGNAL(timeout()), this, SLOT(updateStatistics()));
@@ -422,6 +433,7 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
 
     loadProfileGraphs();
     bool filterExists = false;
+    QString graph_name = is_packet_configuration_namespace() ? tr("Filtered packets") : tr("Filtered events");
     if (uat_model_->rowCount() > 0) {
         for (int i = 0; i < uat_model_->rowCount(); i++) {
             createIOGraph(i);
@@ -429,13 +441,13 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
                 filterExists = true;
         }
         if (! filterExists && displayFilter.length() > 0)
-            addGraph(true, tr("Filtered packets"), displayFilter, ColorUtils::graphColor(uat_model_->rowCount()),
+            addGraph(true, graph_name, displayFilter, ColorUtils::graphColor(uat_model_->rowCount()),
                 IOGraph::psLine, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
     } else {
         addDefaultGraph(true, 0);
         addDefaultGraph(true, 1);
         if (displayFilter.length() > 0)
-            addGraph(true, tr("Filtered packets"), displayFilter, ColorUtils::graphColor(uat_model_->rowCount()),
+            addGraph(true, graph_name, displayFilter, ColorUtils::graphColor(uat_model_->rowCount()),
                 IOGraph::psLine, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
     }
 
@@ -495,7 +507,11 @@ void IOGraphDialog::addGraph(bool checked, QString name, QString dfilter, QRgb c
     newRowData.append(dfilter);
     newRowData.append(QColor(color_idx));
     newRowData.append(val_to_str_const(style, graph_style_vs, "None"));
-    newRowData.append(val_to_str_const(value_units, y_axis_vs, "Packets"));
+    if (is_packet_configuration_namespace()) {
+        newRowData.append(val_to_str_const(value_units, y_axis_vs, "Packets"));
+    } else {
+        newRowData.append(val_to_str_const(value_units, y_axis_vs, "Events"));
+    }
     newRowData.append(yfield);
     newRowData.append(val_to_str_const((guint32) moving_average, moving_avg_vs, "None"));
     newRowData.append(y_axis_factor);
@@ -558,15 +574,28 @@ void IOGraphDialog::createIOGraph(int currentRow)
 
 void IOGraphDialog::addDefaultGraph(bool enabled, int idx)
 {
-    switch (idx % 2) {
-    case 0:
-        addGraph(enabled, tr("All Packets"), QString(), ColorUtils::graphColor(idx),
-                 IOGraph::psLine, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
-        break;
-    default:
-        addGraph(enabled, tr("TCP Errors"), "tcp.analysis.flags", ColorUtils::graphColor(4), // 4 = red
-                 IOGraph::psBar, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
-        break;
+    if (is_packet_configuration_namespace()) {
+        switch (idx % 2) {
+        case 0:
+            addGraph(enabled, tr("All Packets"), QString(), ColorUtils::graphColor(idx),
+                    IOGraph::psLine, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
+            break;
+        default:
+            addGraph(enabled, tr("TCP Errors"), "tcp.analysis.flags", ColorUtils::graphColor(4), // 4 = red
+                    IOGraph::psBar, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
+            break;
+        }
+    } else {
+        switch (idx % 2) {
+        case 0:
+            addGraph(enabled, tr("All Events"), QString(), ColorUtils::graphColor(idx),
+                    IOGraph::psLine, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
+            break;
+        default:
+            addGraph(enabled, tr("Access Denied"), "ct.error == \"AccessDenied\"", ColorUtils::graphColor(4), // 4 = red
+                    IOGraph::psDot, IOG_ITEM_UNIT_PACKETS, QString(), DEFAULT_MOVING_AVERAGE, DEFAULT_Y_AXIS_FACTOR);
+            break;
+        }
     }
 }
 
@@ -615,6 +644,8 @@ void IOGraphDialog::syncGraphSettings(int row)
         hint_err_ = iog->configError();
         visible = false;
         retap = false;
+    } else {
+        hint_err_.clear();
     }
 
     iog->setVisible(visible);
@@ -972,7 +1003,14 @@ void IOGraphDialog::updateLegend()
             }
         }
     }
-    iop->legend->setVisible(true);
+
+    // Only show legend if the user requested it
+    if (prefs.gui_io_graph_enable_legend) {
+        iop->legend->setVisible(true);
+    }
+    else {
+        iop->legend->setVisible(false);
+    }
 }
 
 QRectF IOGraphDialog::getZoomRanges(QRect zoom_rect)
@@ -1072,13 +1110,19 @@ void IOGraphDialog::mouseMoved(QMouseEvent *event)
         if (interval_packet < 0) {
             hint += tr("Hover over the graph for details.");
         } else {
-            QString msg = tr("No packets in interval");
+            QString msg = is_packet_configuration_namespace() ? tr("No packets in interval") : tr("No events in interval");
             QString val;
             if (interval_packet > 0) {
                 packet_num_ = (guint32) interval_packet;
-                msg = QString("%1 %2")
-                        .arg(!file_closed_ ? tr("Click to select packet") : tr("Packet"))
-                        .arg(packet_num_);
+                if (is_packet_configuration_namespace()) {
+                    msg = QString("%1 %2")
+                            .arg(!file_closed_ ? tr("Click to select packet") : tr("Packet"))
+                            .arg(packet_num_);
+                } else {
+                    msg = QString("%1 %2")
+                            .arg(!file_closed_ ? tr("Click to select event") : tr("Event"))
+                            .arg(packet_num_);
+                }
                 val = " = " + QString::number(tracer_->position->value(), 'g', 4);
             }
             hint += tr("%1 (%2s%3).")
@@ -1289,10 +1333,14 @@ void IOGraphDialog::on_graphUat_currentItemChanged(const QModelIndex &current, c
         ui->deleteToolButton->setEnabled(true);
         ui->copyToolButton->setEnabled(true);
         ui->clearToolButton->setEnabled(true);
+        ui->moveUpwardsToolButton->setEnabled(true);
+        ui->moveDownwardsToolButton->setEnabled(true);
     } else {
         ui->deleteToolButton->setEnabled(false);
         ui->copyToolButton->setEnabled(false);
         ui->clearToolButton->setEnabled(false);
+        ui->moveUpwardsToolButton->setEnabled(false);
+        ui->moveDownwardsToolButton->setEnabled(false);
     }
 }
 
@@ -1362,6 +1410,40 @@ void IOGraphDialog::on_clearToolButton_clicked()
     mouseMoved(NULL);
 }
 
+void IOGraphDialog::on_moveUpwardsToolButton_clicked()
+{
+    const QModelIndex& current = ui->graphUat->currentIndex();
+    if (uat_model_ && current.isValid()) {
+
+        int current_row = current.row();
+        if (current_row > 0){
+            // Swap current row with the one above
+            IOGraph* temp = ioGraphs_[current_row - 1];
+            ioGraphs_[current_row - 1] = ioGraphs_[current_row];
+            ioGraphs_[current_row] = temp;
+
+            uat_model_->moveRow(current_row, current_row - 1);
+        }
+    }
+}
+
+void IOGraphDialog::on_moveDownwardsToolButton_clicked()
+{
+    const QModelIndex& current = ui->graphUat->currentIndex();
+    if (uat_model_ && current.isValid()) {
+
+        int current_row = current.row();
+        if (current_row < uat_model_->rowCount() - 1) {
+            // Swap current row with the one below
+            IOGraph* temp = ioGraphs_[current_row + 1];
+            ioGraphs_[current_row + 1] = ioGraphs_[current_row];
+            ioGraphs_[current_row] = temp;
+
+            uat_model_->moveRow(current_row, current_row + 1);
+        }
+    }
+}
+
 void IOGraphDialog::on_dragRadioButton_toggled(bool checked)
 {
     if (checked) mouse_drags_ = true;
@@ -1395,6 +1477,15 @@ void IOGraphDialog::on_automaticUpdateCheckBox_toggled(bool checked)
     {
         updateStatistics();
     }
+}
+
+void IOGraphDialog::on_enableLegendCheckBox_toggled(bool checked)
+{
+    prefs.gui_io_graph_enable_legend = checked ? TRUE : FALSE;
+
+    prefs_main_write();
+
+    updateLegend();
 }
 
 void IOGraphDialog::on_actionReset_triggered()
@@ -1507,7 +1598,7 @@ void IOGraphDialog::on_buttonBox_helpRequested()
 void IOGraphDialog::on_buttonBox_accepted()
 {
     QString file_name, extension;
-    QDir path(mainApp->lastOpenDir());
+    QDir path(mainApp->openDialogInitialDir());
     QString pdf_filter = tr("Portable Document Format (*.pdf)");
     QString png_filter = tr("Portable Network Graphics (*.png)");
     QString bmp_filter = tr("Windows Bitmap (*.bmp)");
@@ -1659,12 +1750,12 @@ void IOGraph::setFilter(const QString &filter)
     if (!full_filter.isEmpty()) {
         dfilter_t *dfilter;
         bool status;
-        gchar *err_msg;
-        status = dfilter_compile(full_filter.toUtf8().constData(), &dfilter, &err_msg);
+        df_error_t *df_err = NULL;
+        status = dfilter_compile(full_filter.toUtf8().constData(), &dfilter, &df_err);
         dfilter_free(dfilter);
         if (!status) {
-            config_err_ = QString::fromUtf8(err_msg);
-            g_free(err_msg);
+            config_err_ = QString::fromUtf8(df_err->msg);
+            df_error_free(&df_err);
             filter_ = full_filter;
             return;
         }
@@ -1778,6 +1869,23 @@ void IOGraph::setPlotStyle(int style)
     case psLine:
         if (graph_) {
             graph_->setLineStyle(QCPGraph::lsLine);
+        }
+        break;
+    case psDotLine:
+        if (graph_) {
+            graph_->setLineStyle(QCPGraph::lsLine);
+            graph_->setScatterStyle(QCPScatterStyle::ssDisc);
+        }
+        break;
+    case psStepLine:
+        if (graph_) {
+            graph_->setLineStyle(QCPGraph::lsStepLeft);
+        }
+        break;
+    case psDotStepLine:
+        if (graph_) {
+            graph_->setLineStyle(QCPGraph::lsStepLeft);
+            graph_->setScatterStyle(QCPScatterStyle::ssDisc);
         }
         break;
     case psImpulse:
@@ -1928,7 +2036,7 @@ void IOGraph::clearAllData()
 void IOGraph::recalcGraphData(capture_file *cap_file, bool enable_scaling)
 {
     /* Moving average variables */
-    unsigned int mavg_in_average_count = 0, mavg_left = 0, mavg_right = 0;
+    unsigned int mavg_in_average_count = 0, mavg_left = 0;
     unsigned int mavg_to_remove = 0, mavg_to_add = 0;
     double mavg_cumulated = 0;
     QCPAxis *x_axis = nullptr;
@@ -1963,7 +2071,6 @@ void IOGraph::recalcGraphData(capture_file *cap_file, bool enable_scaling)
 
             mavg_cumulated += getItemValue((int)warmup_interval / interval_, cap_file);
             mavg_in_average_count++;
-            mavg_right++;
         }
         mavg_to_add = (unsigned int)warmup_interval;
     }
@@ -1988,8 +2095,6 @@ void IOGraph::recalcGraphData(capture_file *cap_file, bool enable_scaling)
                     mavg_in_average_count++;
                     mavg_cumulated += getItemValue((int)mavg_to_add / interval_, cap_file);
                     mavg_to_add += interval_;
-                } else {
-                    mavg_right--;
                 }
             }
             if (mavg_in_average_count > 0) {

@@ -167,7 +167,7 @@ It also requires the following:
   https://support.microsoft.com/kb/2999226[KB2999226] or
   https://support.microsoft.com/kb/3118401[KB3118401].
 
-* Any modern 64-bit AMD64/x86-64 or 32-bit x86 processor.
+* Any modern 64-bit Intel or Arm processor.
 
 * 500 MB available RAM. Larger capture files require more RAM.
 
@@ -208,14 +208,17 @@ release lifecycle] page for more details.
 
 ==== macOS
 
-Wireshark supports macOS 10.13 and later.
+Wireshark supports macOS 10.14 and later.
 Similar to Windows, supported macOS versions depend on third party libraries and on Apple’s requirements.
+Apple Silicon hardware is supported natively starting with version 4.0
 
+// Wireshark 4.0 ships with Qt 6.2.4, which requires macOS 10.14 and later
 // Wireshark 3.6 ships with Qt 5.15, which requires macOS 10.13 and later.
 // Wireshark 3.4, 3.2 and 3.0 ship with Qt 5.12, which requires macOS 10.12 and later.
 // Wireshark 2.6 ships with Qt 5.3, which was the last release to support 10.6: https://wiki.qt.io/New_Features_in_Qt_5.3
 // "Mac OS 10.6 support is deprecated and scheduled for removal in Qt 5.4"
 
+* Wireshark 3.6 was the last release branch to support macOS 10.13.
 * Wireshark 3.4 was the last release branch to support macOS 10.12.
 * Wireshark 2.6 was the last release branch to support Mac OS X 10.6 and 10.7 and OS X 10.8 to 10.11.
 * Wireshark 2.0 was the last release branch to support OS X on 32-bit Intel.
@@ -312,6 +315,9 @@ implemented. Its release coincided with the first Wireshark Developer and User
 Conference, called Sharkfest.
 
 In 2015 Wireshark 2.0 was released, which featured a new user interface.
+
+In 2023 Wireshark moved to the link:{wireshark-foundation-url}[Wireshark Foundation], a nonprofit corporation that operates under section 501(c)(3) of the U.S. tax code.
+The foundation provides the project's infrastructure, hosts link:{sharkfest-url}[SharkFest], our developer and user conference, and promotes low level network education.
 
 [#ChIntroMaintenance]
 
@@ -485,7 +491,7 @@ In many cases you can use a tool like link:https://www.tracewrangler.com/[TraceW
 ====
 Do not send large files (> 1 MB) to the mailing lists. Instead, provide a
 download link. For bugs and feature requests, you can create an issue on
-link:{wireshark-bugs-url}[Gitlab Issues] and upload the file there.
+link:{wireshark-bugs-url}[GitLab Issues] and upload the file there.
 ====
 
 ==== Reporting Crashes on UNIX/Linux platforms
@@ -510,7 +516,6 @@ Email _backtrace.txt_ to mailto:{wireshark-dev-list-email}[].
 
 The Windows distributions don’t contain the symbol files (.pdb) because they are
 very large. You can download them separately at
-{wireshark-main-url}download/win32/all-versions/ and
 {wireshark-main-url}download/win64/all-versions/ .
 
 // End of WSUG Chapter 1

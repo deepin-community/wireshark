@@ -44,8 +44,8 @@ GIT_ABBREV_LENGTH = 12
 # If the text "$Format" is still present, it means that
 # git archive did not replace the $Format string, which
 # means that this not a git archive.
-GIT_EXPORT_SUBST_H = '81696bb748578d7de05a738b01f08057aa25e62d'
-GIT_EXPORT_SUBST_D = 'tag: wireshark-4.0.8, tag: v4.0.8, refs/pipelines/977975811, refs/merge-requests/11799/head, refs/keep-around/81696bb748578d7de05a738b01f08057aa25e62d'
+GIT_EXPORT_SUBST_H = '54eedfc63953c8180b5a9c60015917cce7a2548a'
+GIT_EXPORT_SUBST_D = 'tag: wireshark-4.2.0, tag: v4.2.0, refs/merge-requests/13278/head, refs/keep-around/54eedfc63953c8180b5a9c60015917cce7a2548a'
 IS_GIT_ARCHIVE = not GIT_EXPORT_SUBST_H.startswith('$Format')
 
 
@@ -83,7 +83,7 @@ def update_cmakelists_txt(src_dir, set_version, repo_data):
 
     with open(cmake_filepath, mode='w', encoding='utf-8') as fh:
         fh.write(new_cmake_contents)
-    print(cmake_filepath + " has been updated.")
+        print(cmake_filepath + " has been updated.")
 
 
 def update_debian_changelog(src_dir, repo_data):
@@ -99,7 +99,14 @@ def update_debian_changelog(src_dir, repo_data):
     new_changelog_contents = re.sub(CHANGELOG_PATTERN, text_replacement, changelog_contents)
     with open(deb_changelog_filepath, mode='w', encoding='utf-8') as fh:
         fh.write(new_changelog_contents)
-    print(deb_changelog_filepath + " has been updated.")
+        print(deb_changelog_filepath + " has been updated.")
+
+
+def create_version_file(version_f, repo_data):
+    'Write the version to the specified file handle'
+
+    version_f.write(f"{repo_data['version_major']}.{repo_data['version_minor']}.{repo_data['version_patch']}{repo_data['package_string']}\n")
+    print(version_f.name + " has been created.")
 
 
 def update_attributes_asciidoc(src_dir, repo_data):
@@ -117,8 +124,7 @@ def update_attributes_asciidoc(src_dir, repo_data):
 
     with open(asiidoc_filepath, mode='w', encoding='utf-8') as fh:
         fh.write(new_asciidoc_contents)
-
-    print(asiidoc_filepath + " has been updated.")
+        print(asiidoc_filepath + " has been updated.")
 
 
 def update_docinfo_asciidoc(src_dir, repo_data):
@@ -138,7 +144,7 @@ def update_docinfo_asciidoc(src_dir, repo_data):
 
         with open(doc_path, mode='w', encoding='utf-8') as fh:
             fh.write(new_doc_contents)
-        print(doc_path + " has been updated.")
+            print(doc_path + " has been updated.")
 
 
 def update_cmake_lib_releases(src_dir, repo_data):
@@ -162,7 +168,7 @@ def update_cmake_lib_releases(src_dir, repo_data):
 
         with open(cmakelists_filepath, mode='w', encoding='utf-8') as fh:
             fh.write(new_cmakelists_contents)
-        print(cmakelists_filepath + " has been updated.")
+            print(cmakelists_filepath + " has been updated.")
 
 
 # Update distributed files that contain any version information
@@ -222,7 +228,7 @@ def print_VCS_REVISION(version_file, repo_data, set_vcs):
     if needs_update:
         with open(version_file, mode='w', encoding='utf-8') as fh:
             fh.write(new_version_h)
-        print(version_file + " has been updated.")
+            print(version_file + " has been updated.")
     elif not repo_data['enable_vcsversion']:
         print(version_file + " disabled.")
     else:
@@ -413,14 +419,18 @@ def main():
     parser = argparse.ArgumentParser(description='Wireshark file and package versions')
     action_group = parser.add_mutually_exclusive_group()
     action_group.add_argument('--set-version', '-v', metavar='<x.y.z>', type=parse_versionstring, help='Set the major, minor, and patch versions in the top-level CMakeLists.txt, docbook/attributes.adoc, packaging/debian/changelog, and the CMakeLists.txt for all libraries to the provided version number')
-    sr = action_group.add_argument('--set-release', '-r', action='store_true', help='Set the extra release information in the top-level CMakeLists.txt based on either default or command-line specified options.')
+    action_group.add_argument('--set-release', '-r', action='store_true', help='Set the extra release information in the top-level CMakeLists.txt based on either default or command-line specified options.')
     setrel_group = parser.add_argument_group()
-    setrel_group._group_actions.append(sr)
     setrel_group.add_argument('--tagged-version-extra', '-t', default="", help="Extra version information format to use when a tag is found. No format \
 (an empty string) is used by default.")
     setrel_group.add_argument('--untagged-version-extra', '-u', default='-{vcsinfo}', help='Extra version information format to use when no tag is found. The format "-{vcsinfo}" (the number of commits and commit ID) is used by default.')
+    parser.add_argument('--version-file', '-f', metavar='<file>', type=argparse.FileType('w'), help='path to version file')
     parser.add_argument("src_dir", metavar='src_dir', nargs=1, help="path to source code")
     args = parser.parse_args()
+
+    if args.version_file and not args.set_release:
+        sys.stderr.write('Error: --version-file must be used with --set-release.\n')
+        sys.exit(1)
 
     src_dir = args.src_dir[0]
 
@@ -439,6 +449,10 @@ def main():
 
     if args.set_release or args.set_version:
         update_versioned_files(src_dir, args.set_version, repo_data)
+
+    if args.version_file:
+        create_version_file(args.version_file, repo_data)
+
 
 
 if __name__ == "__main__":

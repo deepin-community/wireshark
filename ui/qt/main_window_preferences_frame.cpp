@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-#include "main_application.h"
 #include "main_window_preferences_frame.h"
 #include <ui/qt/utils/qt_ui_utils.h>
 
@@ -16,6 +15,7 @@
 
 #include <epan/prefs-int.h>
 #include <ui/qt/models/pref_models.h>
+#include <ui/qt/utils/color_utils.h>
 #include <wsutil/filesystem.h>
 #include "ui/qt/widgets/wireshark_file_dialog.h"
 
@@ -52,8 +52,18 @@ MainWindowPreferencesFrame::MainWindowPreferencesFrame(QWidget *parent) :
     ui->maxRecentLineEdit->setStyleSheet(indent_ss);
 
     int num_entry_width = ui->maxFilterLineEdit->fontMetrics().height() * 3;
-    ui->maxFilterLineEdit->setMaximumWidth(num_entry_width);
-    ui->maxRecentLineEdit->setMaximumWidth(num_entry_width);
+    int num_entry_height = ui->maxFilterLineEdit->fontMetrics().height();
+    // Some styles (e.g., adwaita) add some extra space around the contents.
+    // Find the actual maximum size to set the widget.
+    QStyleOptionFrame opt;
+    initStyleOption(&opt);
+    QSize num_entry_size = ui->maxRecentLineEdit->style()->sizeFromContents(QStyle::CT_LineEdit, &opt, QSize(num_entry_width, num_entry_height));
+    ui->maxFilterLineEdit->setMaximumWidth(num_entry_size.width());
+    ui->maxRecentLineEdit->setMaximumWidth(num_entry_size.width());
+
+    QString li_path = QString(":/languages/language%1.svg").arg(ColorUtils::themeIsDark() ? ".dark" : "");
+    QIcon language_icon = QIcon(li_path);
+    ui->languageComboBox->setItemIcon(0, language_icon);
 
     QString globalLanguagesPath(QString(get_datafile_dir()) + "/languages/");
     QString userLanguagesPath(gchar_free_to_qstring(get_persconffile_path("languages/", FALSE)));
@@ -69,15 +79,8 @@ MainWindowPreferencesFrame::MainWindowPreferencesFrame(QWidget *parent) :
         locale.remove(0, locale.indexOf('_') + 1);
 
         QString lang = QLocale::languageToString(QLocale(locale).language());
-        QIcon ico = QIcon();
-        if (QFile::exists(QString(":/languages/%1.svg").arg(locale)))
-            ico.addFile(QString(":/languages/%1.svg").arg(locale));
-        if (QFile::exists(globalLanguagesPath + locale + ".svg"))
-            ico.addFile(globalLanguagesPath + locale + ".svg");
-        if (QFile::exists(userLanguagesPath + locale + ".svg"))
-            ico.addFile(userLanguagesPath + locale + ".svg");
 
-        ui->languageComboBox->addItem(ico, lang, locale);
+        ui->languageComboBox->addItem(lang, locale);
     }
 
     ui->languageComboBox->setItemData(0, USE_SYSTEM_LANGUAGE);
@@ -205,7 +208,7 @@ void MainWindowPreferencesFrame::on_languageComboBox_currentIndexChanged(int ind
 {
     g_free(language);
 
-    language = g_strdup(ui->languageComboBox->itemData(index).toString().toStdString().c_str());
+    language = qstring_strdup(ui->languageComboBox->itemData(index).toString());
 }
 
 void MainWindowPreferencesFrame::on_windowTitle_textEdited(const QString &new_title)

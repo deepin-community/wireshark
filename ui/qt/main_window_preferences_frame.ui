@@ -240,6 +240,7 @@
      </item>
     </layout>
    </item>
+   <!-- Language should be the last item. -->
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_6">
      <item>
@@ -282,6 +283,7 @@
      </item>
     </layout>
    </item>
+   <!-- Language should be the last item. -->
    <item>
     <spacer name="verticalSpacer">
      <property name="orientation">

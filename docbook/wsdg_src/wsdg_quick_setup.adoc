@@ -2,11 +2,11 @@
 
 [#ChapterSetup]
 
-== Quick Setup
+== Setup and Build Instructions
 
 [#ChSetupUNIX]
 
-=== UNIX: Installation and Build Instructions
+=== UN*X
 
 [#ChSetupUNIXBuildEnvironmentSetup]
 
@@ -28,100 +28,171 @@ To build the manual pages, Developer's Guide and User's Guide, Asciidoctor, Xslt
 Perl is required to generate some code and run some code analysis checks.
 
 Some features of Wireshark require additional libraries to be installed.
+The processes for doing so on various UN*X families is shown here.
 
-For Debian, and for Linux distributions based on Debian, such as Ubuntu,
-the script `tools/debian-setup.sh` will install the packages and
-libraries required to build Wireshark.  It supports the command-line
-options:
+There are shell scripts in the `tools` directory to install the packages
+and libraries required to build Wireshark. Usage is available with the
+`--help` option. `root` permission is required to run the scripts.
+The available scripts and their options for a given family of UN*Xes are
+shown in the section for that family.
 
-* `--install-optional` to install additional tools and to install
-libraries required for all Wireshark features;
-* `--install-deb-deps` to install packages required to build a .deb file
-for Wireshark;
-* `--install-test-deps` to install packages required to run all tests.
+[discrete]
+==== Alpine Linux
 
-For RPM-based Linux distributions such as Red Hat, Centos, Fedora, and
-openSUSE, the script `tools/rpm-setup.sh` will install the packages and
-libraries required to build Wireshark.  It supports the command-line
-options:
+The setup script is `tools/alpine-setup.sh`; its options are:
 
-* `--install-optional` to install additional tools and to install
-libraries required for all Wireshark features;
-* `--install-rpm-deps` to install packages required to build a .rpm file
-for Wireshark.
+* `--install-optional` install optional software as well
+* `--install-all` install everything
+* `[other]` other options are passed as-is to apk
 
-For Alpine Linux, the script `tools/alpine-setup.sh` will install the
-packages and libraries required to build Wireshark.  It supports the
-`--install-optional` command-line option to install additional tools and
-to install libraries required for all Wireshark features.
+[discrete]
+==== Arch Linux and pacman-based systems
 
-For FreeBSD, NetBSD, OpenBSD, and DragonFly BSD, the script
-`tools/bsd-setup.sh` will install the packages and libraries required to
-build Wireshark.  It supports the `--install-optional` command-line
-option to install additional tools and to install libraries required for
-all Wireshark features.
+The setup script is `tools/arch-setup.sh`; its options are:
 
-For macOS, you must first install Xcode.  After installing Xcode, the
-script `tools/macos-setup.sh` will install the rest of the tools and
-libraries required to build Wireshark, as well as the additional tools
-required to build the documentation and the libraries required for all
-Wireshark features.  If you're using Homebrew, the script
-`tools/macos-setup-brew.sh` will intall the same tools and libraries
-from Homebrew.
+* `--install-optional` install optional software as well
+* `--install-test-deps` install packages required to run all tests
+* `--install-all` install everything
+* `[other]` other options are passed as-is to pacman
 
-If an install package is not available or you have a
-reason not to use it (maybe because it’s simply too old), you
-can install that tool from source code. The following sections
-will provide you with the webpage addresses where you can get
-these sources.
+[discrete]
+==== BSD systems such as FreeBSD, NetBSD, OpenBSD, and DragonFly BSD
+
+The setup script is `tools/bsd-setup.sh`; its options are:
+
+* `--install-optional` install optional software as well
+* `[other]` other options are passed as-is to pkg manager
+
+[discrete]
+==== Debian, and Linux distributions based on Debian, such as Ubuntu
+
+The setup script is `tools/debian-setup.sh`; its options are:
+
+* `--install-optional` install optional software as well
+* `--install-deb-deps` install packages required to build the .deb file
+* `--install-test-deps` install packages required to run all tests
+* `--install-qt5-deps` force installation of packages required to use Qt5
+* `--install-qt6-deps` force installation of packages required to use Qt6
+* `--install-all` install everything
+* `[other]` other options are passed as-is to apt
+
+[discrete]
+==== RPM-based Linux distributions such as Red Hat, Centos, Fedora, and openSUSE +
+
+The setup script is `tools/rpm-setup.sh`; its options are:
+
+* `--install-optional` install optional software as well
+* `--install-rpm-deps` install packages required to build the .rpm file
+* `--install-qt5-deps` force installation of packages required to use Qt5
+* `--install-qt6-deps` force installation of packages required to use Qt6
+* `--install-all` install everything
+* `[other]` other options are passed as-is to the packet manager
+
+[discrete]
+==== macOS
+
+You must first install Xcode.
+
+After installing Xcode, the setup script `tools/macos-setup.sh` will
+install the rest of the tools and libraries required to build Wireshark,
+except for Qt 6, as well as the additional tools required to build the
+documentation and the libraries required for all Wireshark features.  If
+you're using Homebrew, the script `tools/macos-setup-brew.sh` will
+install the same tools and libraries from Homebrew.
+
+If you will be building Wireshark with Qt 6, which is the default for
+Wireshark 4.0 and later, you will also have to install Qt; the
+`tools/macos-setup.sh` script will not install Qt 6. To install
+Qt, go to the https://www.qt.io/download-qt-installer-oss[Download Qt
+for open source use page], select “macOS” if it's not already selected,
+and then select “Qt online installer for macOS“.  This will download a
+.dmg for the installer; launch the installer.  It will require that you
+log into your Qt account; if you don't have an account, select “Sign up“
+to create one.  The next page will require you to accept the LGPL (Lesser
+GNU Public License); do so.  Continue to the “Installation Folder“ page
+of the installer screen, and select the “Custom installation“ option.
+On the “Select Components“ screen of the installer, select, for the
+desired Qt version, the “macOS” component. For example, at the time of
+this writing the Qt {qt6-lts-version} “macOS” component is used to build
+the official packages.  The “Qt Debug Information Files” component
+contains dSYM files which can be used for debugging. You can deselect
+all of the other the components such as “Qt Charts” or “Android xxxx”
+as they aren’t required.
+
+Qt 6 needs the "Qt 5 Compatibility Module" to be installed as well. Additionally, the module
+"Qt Multimedia" may be installed, to support advanced controls for playing back streams in the
+RTP Player dialog.
 
 [#ChSetupUNIXBuild]
 
 ==== Building
 
+Before building:
+
+On macOS, you will need to set the Qt installation directory in the
+environment:
+
+[subs="attributes+"]
+----
+WIRESHARK_QT6_PREFIX_PATH=~/Qt/{qt6-lts-version}/macos
+export WIRESHARK_QT6_PREFIX_PATH
+----
+
+If you want to append a custom string to the package version, run the
+command
+
+[subs="attributes+"]
+----
+WIRESHARK_VERSION_EXTRA=-YourExtraVersionInfo
+export WIRESHARK_VERSION_EXTRA
+----
+
 The recommended (and fastest) way to build Wireshark is with CMake
-and Ninja.  Building with make took nearly 2x time as Ninja in one
+and Ninja. Building with make took nearly 2x time as Ninja in one
 experiment.
 
 CMake builds are best done in a separate build directory, such as a
-`build` subdirectory of the top-level source directory.  If that
-directory is a subdirectory of the top-level source directory, to
-generate the build files, change to the build directory and enter the
+`build` subdirectory of the top-level source directory.  +
+If that directory is a subdirectory of the top-level source directory,
+to generate the build files, change to the build directory and enter the
 following command:
 
 ----
-$ cmake ..
+cmake ..
 ----
 
 to use make as the build tool or
 
 ----
-$ cmake -G Ninja ..
+cmake -G Ninja ..
 ----
 
-to use Ninja as the build tool.  If you create the build tool in the
+to use Ninja as the build tool.
+
+If you created the build directory in the
 same directory that contains the top-level Wireshark source directory,
 to generate the build files, change to the build directory and enter the
 following command:
 
 ----
-$ cmake ../{source directory}
+cmake ../{source directory}
 ----
 
 to use make as the build tool or
 
 ----
-$ cmake -G Ninja ../{source directory}
+cmake -G Ninja ../{source directory}
 ----
 
-to use Ninja as the build tool.  `{source directory}` is the name of the
+to use Ninja as the build tool.  +
+`{source directory}` is the name of the
 top-level Wireshark source directory.
 
 If you need to build with a non-standard configuration, you can run
 
 [source,sh]
 ----
-$ cmake -LH ../{source directory}
+cmake -LH ../{source directory}
 ----
 
 to see what options you have.
@@ -129,9 +200,9 @@ to see what options you have.
 You can then run Ninja or make to build Wireshark.
 
 ----
-$ ninja
-$ # or
-$ make
+ninja
+# or
+make
 ----
 
 Once you have build Wireshark with `ninja` or `make` above, you should be able to test it
@@ -199,7 +270,7 @@ _wireshark-dev_ mailing list explaining your problem. Include the output from
 
 // Retain ChSetupWin32 for backward compatibility
 [#ChSetupWindows]
-=== Windows: Step-by-Step Guide[[ChSetupWin32]]
+=== Windows: Using Microsoft Visual Studio[[ChSetupWin32]]
 
 A quick setup guide for Windows development with recommended configurations.
 
@@ -233,11 +304,11 @@ You can install Chocolatey packages using the command `choco install` (or its sh
 
 [source,cmd]
 ----
-> rem Flex is required.
-> choco install -y winflexbison3
-> rem Git, CMake, Python, etc are also required, but can be installed
-> rem via their respective installation packages.
-> choco install -y git cmake python3
+rem Flex is required.
+choco install -y winflexbison3
+rem Git, CMake, Python, etc are also required, but can be installed
+rem via their respective installation packages.
+choco install -y git cmake python3
 ----
 
 
@@ -245,28 +316,31 @@ You can install Chocolatey packages using the command `choco install` (or its sh
 
 ==== Install Microsoft Visual Studio
 
-Download and install https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=Community&rel=16[“Microsoft Visual Studio 2019 Community Edition”].
-If you prefer you can instead download and install https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=Community&rel=17[“Microsoft Visual Studio 2022 Community Edition”].
+Download and install https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=Community&rel=17[“Microsoft Visual Studio 2022 Community Edition”].
+If you prefer you can instead download and install https://visualstudio.microsoft.com/thank-you-downloading-visual-studio/?sku=Community&rel=16[“Microsoft Visual Studio 2019 Community Edition”].
+The examples below are for Visual Studio 2022 but can be adapted for Visual Studio 2019.
 These are small utilities that download all the other required parts (which are quite large).
 
 Check the checkbox for “Desktop development with {cpp}” and then uncheck
-all the optional components other than the “V{cpp} 2019” or “V{cpp} 2022” item with the
-“latest ... tools”, the “Windows 10 SDK”, and the “Visual {cpp} tools for
-CMake” (unless you want to use them for purposes other than Wireshark).
+all the optional components other than
+
+* “MSVC ... VS 2022 {cpp}” item with the “... build tools (Latest)”
+* “Windows 11 SDK”
+* “{cpp} CMake tools for Windows"
+
+(unless you want to use them for purposes other than Wireshark).
 
 You can alternatively use Chocolatey to install Visual Studio, using the Visual Studio Community and Native Desktop workload packages.
 Note that this includes Visual Studio’s CMake component.
 
 ----
-PS$> choco install -y visualstudio2019community visualstudio2019-workload-nativedesktop
-PS$> # OR
-PS$> choco install -y visualstudio2022community visualstudio2022-workload-nativedesktop
+choco install -y visualstudio2022community visualstudio2022-workload-nativedesktop
 ----
 
 // winget has basic VS 2022 and 2019 packages, but no native desktop workload packages.
 // https://github.com/microsoft/winget-pkgs/tree/master/manifests/m/Microsoft/VisualStudio
 
-You can use other Microsoft C compiler variants, but VS2019 is used to
+You can use other Microsoft C compiler variants, but VS2022 is used to
 build the development releases and is the preferred option. It’s
 possible to compile Wireshark with a wide range of Microsoft C compiler
 variants. For details see <<ChToolsMSChain>>.
@@ -285,32 +359,35 @@ of Visual Studio add more cross-platform support.
 
 Why is this recommended?
 While this is a huge download, the Community Editions of Visual Studio are free (as in beer) and include the Visual Studio integrated debugger.
-Visual Studio 2019 is also used to create official Wireshark builds, so it will likely have fewer development-related problems.
+Visual Studio 2022 is also used to create official Wireshark builds, so it will likely have fewer development-related problems.
 
 [#ChSetupQt]
 
 ==== Install Qt
 
 The main Wireshark application uses the Qt windowing toolkit. To install
-Qt, go to the https://www.qt.io/download[“Download Qt” page], select “Go
-open source”, download the *Qt Online Installer for Windows* from the Qt
-Project and select, for the desired Qt version, a component that matches
-your target system and compiler. For example, at the time of this
-writing the Qt {qt-lts-version}.2 “msvc2019 64-bit” component is used to
-build the official 64-bit packages. The “Qt Debug Information Files”
-component contains PDB files which can be used for debugging. You can
-deselect all of the other the components such as “Qt Charts” or “Android
-xxxx” as they aren’t required.
+Qt, go to the https://www.qt.io/download[“Download Qt” page], select
+"Download open source", then "Download Qt Online Installer", and download
+"*Qt Online Installer for Windows*". When executing it, sign up or log in,
+and use Next button to proceed. When asked, select "*Custom installation*".
 
-Note that installation of separate Qt components are required for 64 bit and 32 bit builds, e.g. “msvc2019 64-bit” and “msvc2019 32-bit”.
-The components are forward compatible; you can build Wireshark using Qt’s “msvc2019 64-bit” and Visual {cpp} 2022.
-The environment variable `https://doc.qt.io/qt-5/cmake-get-started.html[CMAKE_PREFIX_PATH]` should be set as appropriate for your environment and should point to the Qt installation directory, e.g. _C:\Qt{backslash}{qt-lts-version}.2\msvc2019_64_
+In the "Select Components" page, select your desired Qt version. We recommend
+the latest LTS version, and the stable Windows installers currently ship with Qt {qt6-lts-version}.
+Select the following components:
 
-Wireshark has experimental support for Qt 6.
-If you would like to build Wireshark with Qt 6 you must install it along with the “Qt5 Compatibility Module” component and and pass `-DUSE_qt6=ON` to cmake.
-You can optionally set the `WIRESHARK_QT6_PREFIX_PATH` environment variable to your Qt 6 installation directory instead of `CMAKE_PREFIX_PATH`.
+* MSVC 2019 64-bit
+* Qt 5 Compatibility Module
+* Qt Debug Information Files (contains PDB files which can be used for debugging)
+* Under "Additional Libraries" select "Qt Multimedia" to support advanced
+controls for playing back streams in the RTP Player dialog
+* You can deselect all of the other the components
+such as “Qt Charts” or “Android xxxx” as they aren’t required.
 
-The Qt maintenance tool (_C:\Qt\MaintenanceTool.exe_) can be used to upgrade Qt to newer versions.
+The CMake variable CMAKE_PREFIX_PATH (see `https://doc.qt.io/qt-6/cmake-get-started.html`) should be set as appropriate for your environment and should point to the Qt installation directory, e.g. _C:\Qt{backslash}{qt6-lts-version}\msvc2019_64_
+Alternatively you can also use the environment variable WIRESHARK_QT6_PREFIX_PATH.
+
+Qt 6 is the default option for building Wireshark, but Wireshark has support for Qt 5.12 and later. To enable Wireshark to build with Qt 5 pass `-DUSE_qt6=OFF`
+to cmake.
 
 [#ChSetupPython]
 
@@ -324,7 +401,7 @@ _C:\Users{backslash}**username**\AppData\Local\Programs\Python\Python310_, _C:\P
 Alternatively you can install Python using Chocolatey:
 
 ----
-PS$> choco install -y python3
+choco install -y python3
 ----
 
 // Not sure how to document Chocolatey's installation location other than "could be anywhere, LOL"
@@ -353,7 +430,7 @@ Note that many of the GUI interfaces depend on the command line version.
 
 If installing the Windows version of git select the
 _Use Git from the Windows Command Prompt_ (in chocolatey the _/GitOnlyOnPath_
-option).  Do *not* select the _Use Git and optional Unix tools from the Windows Command Prompt_
+option). Do *not* select the _Use Git and optional Unix tools from the Windows Command Prompt_
 option (in chocolatey the _/GitAndUnixToolsOnPath_ option).
 
 ===== The Official Windows Installer
@@ -363,7 +440,7 @@ The official command-line installer is available at https://git-scm.com/download
 ===== Git Extensions
 
 Git Extensions is a native Windows graphical Git client for
-Windows.  You can download the installer from
+Windows. You can download the installer from
 https://github.com/gitextensions/gitextensions/releases/latest.
 
 ===== TortoiseGit
@@ -376,7 +453,7 @@ https://tortoisegit.org/download/.
 
 The command line client can be installed (and updated) using Chocolatey:
 ----
-PS$> choco install -y git
+choco install -y git
 ----
 
 // winget has git.
@@ -401,7 +478,7 @@ Ensure the directory containing cmake.exe is added to your path.
 Alternatively you can install it using Chocolatey:
 
 ----
-PS$> choco install -y cmake
+choco install -y cmake
 ----
 
 // winget has CMake.
@@ -423,8 +500,8 @@ Chocolatey doesn't support alternative package dependencies at the present time,
 As a result, installing the asciidoctorj package won't automatically install a Java runtime -- you must install one separately.
 
 ----
-PS$> choco install -y <your favorite Java runtime>
-PS$> choco install -y asciidoctorj xsltproc docbook-bundle
+choco install -y <your favorite Java runtime>
+choco install -y asciidoctorj xsltproc docbook-bundle
 ----
 
 Chocolatey ensures that asciidoctorj.exe and xsltproc.exe is on your
@@ -442,7 +519,7 @@ Ensure the directory containing win_flex.exe is on your path.
 Alternatively you can install Winflexbison using Chocolatey:
 
 ----
-PS$> choco install -y winflexbison3
+choco install -y winflexbison3
 ----
 
 Chocolatey ensures win_flex.exe is on your path.
@@ -460,9 +537,9 @@ and install Perl into the default location.
 Alternatively you can install Perl using Chocolatey:
 
 ----
-PS$> choco install -y strawberryperl
+choco install -y strawberryperl
 # ...or...
-PS$> choco install -y activeperl
+choco install -y activeperl
 ----
 
 // winget has StrawberryPerl.
@@ -484,8 +561,8 @@ _C:\Development\wireshark_ using either the command line or Git Extensions:
 Using the command line:
 
 ----
->cd C:\Development
->git clone https://gitlab.com/wireshark/wireshark.git
+cd C:\Development
+git clone https://gitlab.com/wireshark/wireshark.git
 ----
 
 Using Git extensions:
@@ -516,11 +593,11 @@ Make sure your repository path doesn't contain spaces.
 
 ==== Open a Visual Studio Command Prompt
 
-From the Start Menu (or Start Screen), navigate to the “Visual Studio 2019” folder and choose the https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019#developer_command_prompt_shortcuts[Command Prompt] appropriate for the build you wish to make, e.g. “x64 Native Tools Command Prompt for VS 2019” for a 64-bit version or “x86 Native Tools Command Prompt for VS 2019” for a 32-bit version.
-Depending on your version of Windows the Command Prompt list might be directly under “Visual Studio 2019” or you might have to dig for it under multiple folders, e.g. menu:Visual Studio 2019[Visual Studio Tools,Windows Desktop Command Prompts].
+From the Start Menu (or Start Screen), navigate to the “Visual Studio 2022” folder and choose the https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-170#developer_command_prompt_shortcuts[Command Prompt] appropriate for the build you wish to make, e.g. “x64 Native Tools Command Prompt for VS 2022” for a 64-bit version.
+Depending on your version of Windows the Command Prompt list might be directly under “Visual Studio 2022” or you might have to dig for it under multiple folders, e.g. menu:Visual Studio 2022[Visual Studio Tools,Windows Desktop Command Prompts].
 
 You can set up a build environment in your own command prompt by running the appropriate `vcvars__ARCHITECTURE__.bat` command.
-See https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019#use-the-developer-tools-in-an-existing-command-window[Use the Microsoft C++ toolset from the command line] for details.
+See https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-170#use-the-developer-tools-in-an-existing-command-window[Use the Microsoft C++ toolset from the command line] for details.
 
 [TIP]
 .Pin the items to the Task Bar
@@ -537,26 +614,25 @@ Set the following environment variables, using paths and values suitable for you
 
 [subs="attributes+"]
 ----
-> rem Let CMake determine the library download directory name under
-> rem WIRESHARK_BASE_DIR or set it explicitly by using WIRESHARK_LIB_DIR.
-> rem Set *one* of these.
-> set WIRESHARK_BASE_DIR=C:\Development
-> rem set WIRESHARK_LIB_DIR=c:\wireshark-win64-libs
-> rem Set the Qt installation directory
-> set CMAKE_PREFIX_PATH=C:\Qt{backslash}{qt-lts-version}.2\msvc2019_64
-> rem Append a custom string to the package version. Optional.
-> set WIRESHARK_VERSION_EXTRA=-YourExtraVersionInfo
+rem Let CMake determine the library download directory name under
+rem WIRESHARK_BASE_DIR or set it explicitly by using WIRESHARK_LIB_DIR.
+rem Set *one* of these.
+set WIRESHARK_BASE_DIR=C:\Development
+rem set WIRESHARK_LIB_DIR=c:\wireshark-x64-libs
+rem Set the Qt installation directory
+set WIRESHARK_QT6_PREFIX_PATH=C:\Qt{backslash}{qt6-lts-version}\msvc2019_64
+rem Append a custom string to the package version. Optional.
+set WIRESHARK_VERSION_EXTRA=-YourExtraVersionInfo
 ----
 
 Setting these variables could be added to a batch file to be run after you open
 the Visual Studio Tools Command Prompt.
 
 [TIP]
-.Use Qt’s LTS branch
+.Use of Qt’s LTS branch
 ====
-We recommend using the most recent “long term support” branch of Qt5 to
-compile Wireshark on Windows. At the time of writing this is Qt
-{qt-lts-version}.
+It is generally recommended to use a LTS ("long term support") version for Qt. The current LTS version for Qt 6 is
+{qt6-lts-version}.
 ====
 
 --
@@ -569,8 +645,8 @@ Create (if required) and change to the appropriate build directory.
 --
 // XXX Our CI builds are in-tree in <src dir>/build.
 ----
-> mkdir C:\Development\wsbuild64
-> cd C:\Development\wsbuild64
+mkdir C:\Development\wsbuild64
+cd C:\Development\wsbuild64
 ----
 to create and jump into the build directory.
 
@@ -585,18 +661,16 @@ CMake is used to process the CMakeLists.txt files in the source tree and produce
 for your system.
 
 You can generate Visual Studio solution files to build either from within Visual Studio, or from the command
-line with MSBuild.  CMake can also generate other build types but they aren't supported.
+line with MSBuild. CMake can also generate other build types but they aren't supported.
 
-The initial generation step is only required the first time a build directory is created.  Subsequent
+The initial generation step is only required the first time a build directory is created. Subsequent
 builds will regenerate the build files as required.
 
 If you've closed the Visual Studio Command Prompt <<ChSetupPrepareCommandCom,prepare>> it again.
 
 To generate the build files enter the following at the Visual Studio command prompt:
 ----
-> cmake -G "Visual Studio 17 2022" -A x64 ..\wireshark
-> : or
-> cmake -G "Visual Studio 16 2019" -A x64 ..\wireshark
+cmake -G "Visual Studio 17 2022" -A x64 ..\wireshark
 ----
 
 Adjusting the path to the Wireshark source tree as required.
@@ -630,7 +704,7 @@ Now it’s time to build Wireshark!
 +
 --
 ----
-> msbuild /m /p:Configuration=RelWithDebInfo Wireshark.sln
+msbuild /m /p:Configuration=RelWithDebInfo Wireshark.sln
 ----
 to build Wireshark.
 --
@@ -653,7 +727,7 @@ The build files produced by CMake will regenerate themselves if required by chan
 
 ==== Debug Environment Setup
 
-You can debug using the Visual Studio Debugger or WinDbg.  See the section
+You can debug using the Visual Studio Debugger or WinDbg. See the section
 on using the <<ChToolsDebugger, Debugger Tools>>.
 
 ==== Optional: Create User’s and Developer’s Guide
@@ -669,29 +743,223 @@ Note: You should have successfully built Wireshark
 before doing the following.
 
 If you want to build your own
-_Wireshark-win64-{wireshark-version}-myprotocol123.exe_, you'll need
+_Wireshark-{wireshark-version}-myprotocol123-x64.exe_, you'll need
 NSIS. You can download it from http://nsis.sourceforge.net[].
 
 Note that the 32-bit version of NSIS will work for both 64-bit and 32-bit versions of Wireshark.
 NSIS version 3 is required.
 
-If you've closed the Visual Studio Command Prompt <<ChSetupPrepareCommandCom,prepare>> it again.
-
-Run
+If you've closed the Visual Studio Command Prompt <<ChSetupPrepareCommandCom,prepare>> it again. Run
 
 ----
-> msbuild /m /p:Configuration=RelWithDebInfo wireshark_nsis_prep.vcxproj
-> msbuild /m /p:Configuration=RelWithDebInfo wireshark_nsis.vcxproj
+msbuild /m /p:Configuration=RelWithDebInfo wireshark_nsis_prep.vcxproj
+msbuild /m /p:Configuration=RelWithDebInfo wireshark_nsis.vcxproj
 ----
 
 to build a Wireshark installer.
 If you sign your executables you should do so between the “wireshark_nsis_prep” and “wireshark_nsis” steps.
+To sign your installer you should place the signing batch script on the path. It must be named "sign-wireshark.bat".
+It should be autodetected by CMake, to always require signing set the -DENABLE_SIGNED_NSIS=On CMake option.
 
 Run
 
 ----
-> packaging\nsis\wireshark-win64-{wireshark-version}-myprotocol123.exe
+packaging\nsis\wireshark-{wireshark-version}-myprotocol123-x64.exe
 ----
 
 to test your new installer.
 It’s a good idea to test on a different machine than the developer machine.
+
+[#ChSetupMSYS2]
+
+=== Windows: Using MinGW-w64 with MSYS2
+
+MSYS2 comes with different environments/subsystems and the first thing you
+have to decide is which one to use. The differences among the environments
+are mainly environment variables, default compilers/linkers, architecture,
+system libraries used etc. If you are unsure, go with UCRT64.
+
+==== Building from source
+
+. Open the shell for the selected 64-bit environment.
+
+. Download the Wireshark source code using Git, if you haven't done so already,
+  and cd into that directory.
+
+. Install needed dependencies:
+
+    tools/msys2-setup.sh --install-all
+
+. Build using CMake + Ninja:
+
+    mkdir build && cd build
+    # Ninja generator is the default
+    cmake -DENABLE_CCACHE=On -DFETCH_lua=Yes ..
+    ninja
+    ninja test        # optional, to run the test suite
+    ninja install     # optional, install to the MSYS2 shell path
+
+The application should be launched using the same shell.
+
+==== Building an .exe installer
+
+. Follow the instructions above to compile Wireshark from source.
+
+. Build the NSIS installer target.
+
+    ninja wireshark_nsis_prep
+    ninja wireshark_nsis
+
+If successful the installer can be found in `$CMAKE_BINARY_DIR/packaging/nsis`.
+
+Alternatively you can also use the PKGBUILD included in the Wireshark
+source distribution to compile Wireshark into a binary package that can be
+https://www.msys2.org/wiki/Creating-Packages/[installed using pacman].
+
+==== Comparison with MSVC toolchain
+
+The official Wireshark Windows installer is compiled using Microsoft Visual
+Studio (MSVC). Currently the MSYS2 build has the following limitations compared to
+the build using MSVC:
+
+* Lua does not have https://github.com/Lekensteyn/lua-unicode[custom UTF-8 patches].
+
+* The Event Tracing for Windows (ETW) extcap cannot be compiled using MinGW-w64.
+
+* Enhanced Kerberos dissection with decryption is not available.
+
+* AirPcap is not supported.
+
+[#ChSetupCross]
+
+=== Windows: Cross-compilation using Linux
+
+It is possible to compile Wireshark for Microsoft Windows using Linux and MinGW.
+This way developers can deploy Wireshark on Windows systems without requiring
+a Windows host machine. Building for Windows using a Linux host is also
+easier for devs already familiar with Linux, the build itself is faster and it
+uses a very mature C/C++ compiler (GCC) and debugger (GDB).
+
+==== Using Fedora Linux
+
+https://fedoraproject.org/[Fedora Linux] provides the best out-of-the-box
+support for MinGW cross-compilation. Fedora is what the project uses to test
+the build and it's what we recommend. While any other reasonably modern Linux
+distribution can be used, that will make the process more time consuming and
+involve some trial and error to setup.
+
+The build instructions on Fedora follow the familiar recipe for building Wireshark
+using Linux.
+
+===== Building from source
+
+. Install needed dependencies:
+
+  tools/mingw-rpm-setup.sh --install-all
+
+. Build using CMake + Ninja:
+
+  mkdir build && cd build
+  mingw64-cmake -G Ninja -DENABLE_CCACHE=Yes -DFETCH_lua=Yes ..
+  ninja
++
+Note that currently it is not possible to run the test-suite when cross-compiling.
+
+. Build the NSIS installer
+
+  ninja wireshark_nsis_prep
+  ninja wireshark_nsis
+
+If successful the installer can be found in `$CMAKE_BINARY_DIR/packaging/nsis`.
+
+===== Notes and comparison with MSVC builds
+
+* Only the MSVCRT C library for Microsoft Windows can be used. Support for the
+  UCRT (Universal C Runtime) library on Fedora Linux is in the initial stages of
+  deployment and not ready for prime-time (at the time of this writing).
+
+* Some optional dependencies are missing from Fedora repositories and must be
+  compiled from source if desired. An up-to-date complete list can be found in
+  the bug tracker (https://gitlab.com/wireshark/wireshark/-/issues/19108[issue 19108]).
+
+* Lua does not have https://github.com/Lekensteyn/lua-unicode[custom UTF-8 patches].
+
+* The Event Tracing for Windows (ETW) extcap cannot be compiled using MinGW-w64.
+
+* Enhanced Kerberos dissection with decryption is not available.
+
+* AirPcap is not supported.
+
+==== Using Arch Linux
+
+https://archlinux.org/[Arch Linux] has good support for MinGW using packages
+from the https://aur.archlinux.org/[AUR]. Note that the mingw-w64 AUR packages
+sometimes break. If that happens you may be required to fix it or skip the
+package until it is fixed by the maintainer, if it's an optional dependency.
+You may also want to consider using an
+https://wiki.archlinux.org/title/unofficial_user_repositories[unofficial user repository]
+(such as the https://martchus.no-ip.biz/repo/arch/ownstuff/[ownstuff] repository)
+to provide pre-compiled packages. This will greatly simplify the initial setup
+and subsequent upgrades.
+
+CAUTION: AUR packages and unofficial user repositories are user-produced
+content. These packages are completely unofficial and have not been thoroughly
+vetted. It is your decision whether to trust their maintainers and you take
+full responsibility for choosing to use them.
+
+You will need to install an https://wiki.archlinux.org/title/AUR_helpers[AUR helper].
+This guide assumes `paru` is being used.
+
+. Install required dependencies from official repositories:
+
+  pacman -S mingw-w64 nsis lemon qt6-tools ccache
+
+. Install required dependencies from the AUR:
+
+  paru -S mingw-w64-cmake
+  paru -S mingw-w64-glib2
+  paru -S mingw-w64-libgcrypt
+  paru -S mingw-w64-c-ares
+  paru -S mingw-w64-speexdsp
+  paru -S mingw-w64-libpcap
+
+. Install Qt6:
+
+  paru -S mingw-w64-qt6-base mingw-w64-qt6-5compat mingw-w64-qt6-multimedia
+
+. Install optional dependencies:
+
+  paru -S mingw-w64-gnutls
+  paru -S mingw-w64-lz4
+  paru -S mingw-w64-snappy
+  paru -S mingw-w64-opus
+  paru -S mingw-w64-opencore-amr
+  paru -S mingw-w64-libxml2
+  paru -S mingw-w64-libnghttp2
+  paru -S mingw-w64-libssh
+  paru -S mingw-w64-minizip
++
+Search the AUR for other dependencies not listed above.
+
+. Build Wireshark using CMake + Ninja. From the directory containing the
+  Wireshark source tree run:
+
+  mkdir build && cd build
+  x86_64-w64-mingw32-cmake -G Ninja -DENABLE_CCACHE=Yes -DFETCH_lua=Yes \
+        -DMINGW_SYSROOT=/usr/x86_64-w64-mingw32 ..
+  ninja
++
+This will automatically download and build Lua as a static library.
++
+To reconfigure the CMake build you may to do it explicitly by running
+`x86_64-w64-mingw32-cmake .` in the build directory,
+instead of letting `ninja` do it for you automatically.
+
+. Build the NSIS installer
+
+  ninja wireshark_nsis_prep
+  ninja wireshark_nsis
+
+If everything goes well the installer can be found in `$CMAKE_BINARY_DIR/packaging/nsis`.
+
+The same notes as the build using Fedora apply.

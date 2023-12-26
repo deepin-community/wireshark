@@ -26,6 +26,7 @@ set(WIRESHARK_WIDGET_HEADERS
 	widgets/detachable_tabwidget.h
 	widgets/display_filter_combo.h
 	widgets/display_filter_edit.h
+	widgets/dissector_syntax_line_edit.h
 	widgets/dissector_tables_view.h
 	widgets/drag_drop_toolbar.h
 	widgets/drag_label.h
@@ -106,6 +107,7 @@ set(WIRESHARK_MODEL_HEADERS
 	models/interface_sort_filter_model.h
 	models/interface_tree_cache_model.h
 	models/interface_tree_model.h
+	models/manuf_table_model.h
 	models/numeric_value_chooser_delegate.h
 	models/packet_list_model.h
 	models/packet_list_record.h
@@ -172,6 +174,7 @@ set(WIRESHARK_QT_HEADERS
 	filter_dialog.h
 	filter_expression_frame.h
 	firewall_rules_dialog.h
+	follow_stream_action.h
 	follow_stream_dialog.h
 	font_color_preferences_frame.h
 	funnel_statistics.h
@@ -185,6 +188,7 @@ set(WIRESHARK_QT_HEADERS
 	interface_frame.h
 	interface_toolbar_reader.h
 	interface_toolbar.h
+	io_console_dialog.h
 	io_graph_dialog.h
 	layout_preferences_frame.h
 	lbm_lbtrm_transport_dialog.h
@@ -198,6 +202,7 @@ set(WIRESHARK_QT_HEADERS
 	main_window_preferences_frame.h
 	main_window.h
 	manage_interfaces_dialog.h
+	manuf_dialog.h
 	module_preferences_scroll_area.h
 	mtp3_summary_dialog.h
 	multicast_statistics_dialog.h
@@ -237,6 +242,7 @@ set(WIRESHARK_QT_HEADERS
 	service_response_time_dialog.h
 	show_packet_bytes_dialog.h
 	simple_statistics_dialog.h
+	tlskeylog_launcher_dialog.h
 	stats_tree_dialog.h
 	strip_headers_dialog.h
 	supported_protocols_dialog.h
@@ -280,6 +286,7 @@ set(WIRESHARK_WIDGET_SRCS
 	widgets/detachable_tabwidget.cpp
 	widgets/display_filter_combo.cpp
 	widgets/display_filter_edit.cpp
+	widgets/dissector_syntax_line_edit.cpp
 	widgets/dissector_tables_view.cpp
 	widgets/drag_drop_toolbar.cpp
 	widgets/drag_label.cpp
@@ -357,6 +364,7 @@ set(WIRESHARK_MODEL_SRCS
 	models/interface_sort_filter_model.cpp
 	models/interface_tree_cache_model.cpp
 	models/interface_tree_model.cpp
+	models/manuf_table_model.cpp
 	models/numeric_value_chooser_delegate.cpp
 	models/packet_list_model.cpp
 	models/packet_list_record.cpp
@@ -418,6 +426,7 @@ set(WIRESHARK_QT_SRC
 	filter_dialog.cpp
 	filter_expression_frame.cpp
 	firewall_rules_dialog.cpp
+	follow_stream_action.cpp
 	follow_stream_dialog.cpp
 	font_color_preferences_frame.cpp
 	funnel_string_dialog.cpp
@@ -429,6 +438,7 @@ set(WIRESHARK_QT_SRC
 	interface_frame.cpp
 	interface_toolbar_reader.cpp
 	interface_toolbar.cpp
+	io_console_dialog.cpp
 	layout_preferences_frame.cpp
 	lbm_lbtrm_transport_dialog.cpp
 	lbm_lbtru_transport_dialog.cpp
@@ -443,6 +453,7 @@ set(WIRESHARK_QT_SRC
 	main_window.cpp
 	main.cpp
 	manage_interfaces_dialog.cpp
+	manuf_dialog.cpp
 	module_preferences_scroll_area.cpp
 	packet_comment_dialog.cpp
 	packet_diagram.cpp
@@ -481,8 +492,9 @@ set(WIRESHARK_QT_SRC
 	show_packet_bytes_dialog.cpp
 	simple_dialog.cpp
 	simple_statistics_dialog.cpp
-	supported_protocols_dialog.cpp
+	tlskeylog_launcher_dialog.cpp
 	strip_headers_dialog.cpp
+	supported_protocols_dialog.cpp
 	tabnav_tree_widget.cpp
 	tap_parameter_dialog.cpp
 	tcp_stream_dialog.cpp
@@ -577,6 +589,7 @@ set(WIRESHARK_QT_UI
 	import_text_dialog.ui
 	interface_frame.ui
 	interface_toolbar.ui
+	io_console_dialog.ui
 	io_graph_dialog.ui
 	layout_preferences_frame.ui
 	lbm_lbtrm_transport_dialog.ui
@@ -585,6 +598,7 @@ set(WIRESHARK_QT_UI
 	lte_rlc_graph_dialog.ui
 	main_window_preferences_frame.ui
 	manage_interfaces_dialog.ui
+	manuf_dialog.ui
 	module_preferences_scroll_area.ui
 	mtp3_summary_dialog.ui
 	packet_comment_dialog.ui
@@ -611,6 +625,7 @@ set(WIRESHARK_QT_UI
 	search_frame.ui
 	sequence_dialog.ui
 	show_packet_bytes_dialog.ui
+	tlskeylog_launcher_dialog.ui
 	strip_headers_dialog.ui
 	supported_protocols_dialog.ui
 	tap_parameter_dialog.ui
@@ -640,6 +655,7 @@ set(WIRESHARK_QT_TS
 	wireshark_fr.ts
 	wireshark_it.ts
 	wireshark_ja_JP.ts
+	wireshark_ko.ts
 	wireshark_pl.ts
 	wireshark_ru.ts
 	wireshark_sv.ts
@@ -655,6 +671,24 @@ foreach(_file ${WIRESHARK_QT_TS})
 endforeach()
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/i18n.qrc.in ${CMAKE_CURRENT_BINARY_DIR}/i18n.qrc)
 
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/authors.qrc"
+"<RCC>\n"
+"    <qresource prefix=\"/about\">\n"
+"        <file compress-algo=\"zstd\">authors.csv</file>\n"
+"    </qresource>\n"
+"</RCC>\n"
+)
+
+add_custom_command(
+	OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/authors.csv
+	COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/make-authors-csv.py
+			< ${CMAKE_SOURCE_DIR}/AUTHORS
+			> ${CMAKE_CURRENT_BINARY_DIR}/authors.csv
+	DEPENDS
+		${CMAKE_SOURCE_DIR}/tools/make-authors-csv.py
+		${CMAKE_SOURCE_DIR}/AUTHORS
+)
+
 set(WIRESHARK_QT_QRC
 	../../resources/about.qrc
 	../../resources/languages/languages.qrc
@@ -662,6 +696,8 @@ set(WIRESHARK_QT_QRC
 	../../resources/stock_icons.qrc
 	../../resources/wsicon.qrc
 	${CMAKE_CURRENT_BINARY_DIR}/i18n.qrc
+	${CMAKE_CURRENT_BINARY_DIR}/authors.qrc
+	${CMAKE_CURRENT_BINARY_DIR}/authors.csv
 )
 
 if(NOT Qt${qtver}Widgets_VERSION VERSION_LESS "5.9")
@@ -688,6 +724,15 @@ else()
 	QT5_ADD_TRANSLATION(WIRESHARK_QT_QM ${WIRESHARK_QT_TS})
 endif()
 
+if (WIN32)
+	add_custom_target(copy_qt_translations ALL)
+	add_custom_command(TARGET copy_qt_translations
+		POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:wireshark>/translations
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different ${WIRESHARK_QT_QM} $<TARGET_FILE_DIR:wireshark>/translations
+	)
+endif()
+
 add_custom_target(
 	translations
 	DEPENDS
@@ -707,7 +752,7 @@ set_source_files_properties(
 	SKIP_AUTOGEN ON
 )
 
-add_definitions(${QT_DEFINITIONS})
+add_definitions(${QT5_DEFINITIONS})
 
 register_tap_files(wireshark-tap-register.c
 	${WIRESHARK_QT_TAP_SRC}
@@ -744,13 +789,25 @@ add_library(qtui OBJECT
 	wireshark-tap-register.c
 )
 
+if(USE_qt6)
+	target_link_libraries(qtui PUBLIC
+		Qt6::Widgets
+		Qt6::Core5Compat
+		Qt6::Concurrent
+		Qt6::PrintSupport
+	)
+	if(Qt6Multimedia_FOUND)
+		target_link_libraries(qtui PUBLIC Qt6::Multimedia)
+	endif()
+endif()
+
 target_include_directories(qtui
 	SYSTEM PRIVATE
 		# Include Qt before anything else, see the comment about
-		# QT_INCLUDE_DIRS in the top-level CMakeLists.txt
+		# QT5_INCLUDE_DIRS in the top-level CMakeLists.txt
 		# Basically, qt@5 headers should be prioritized over qt@6 which
 		# would be found due to GCRYPT_INCLUDE_DIRS=/usr/local/include
-		${QT_INCLUDE_DIRS}
+		${QT5_INCLUDE_DIRS}
 		${GCRYPT_INCLUDE_DIRS}
 		${MINIZIP_INCLUDE_DIRS}
 		${PCAP_INCLUDE_DIRS}
@@ -763,7 +820,7 @@ target_include_directories(qtui
 
 target_compile_definitions(qtui
 	PUBLIC
-		${QT_COMPILE_DEFINITIONS}
+		${QT5_COMPILE_DEFINITIONS}
 )
 
 set_target_properties(qtui PROPERTIES

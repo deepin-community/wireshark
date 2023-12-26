@@ -21,6 +21,8 @@
 
 #include "ui/progress_dlg.h"
 #include "ui/simple_dialog.h"
+#include <ui/qt/main_window.h>
+#include <ui/qt/io_console_dialog.h>
 
 #include "funnel_statistics.h"
 #include "funnel_string_dialog.h"
@@ -30,6 +32,7 @@
 #include <QClipboard>
 #include <QDebug>
 #include <QDesktopServices>
+#include <QMenu>
 #include <QUrl>
 
 #include "main_application.h"
@@ -42,7 +45,6 @@ extern "C" {
 static struct _funnel_text_window_t* text_window_new(funnel_ops_id_t *ops_id, const char* title);
 static void string_dialog_new(funnel_ops_id_t *ops_id, const gchar* title, const gchar** field_names, const gchar** field_values, funnel_dlg_cb_t dialog_cb, void* dialog_cb_data, funnel_dlg_cb_data_free_t dialog_cb_data_free);
 
-static void funnel_statistics_logger(const gchar *, enum ws_log_level, const gchar *message, gpointer);
 static void funnel_statistics_retap_packets(funnel_ops_id_t *ops_id);
 static void funnel_statistics_copy_to_clipboard(GString *text);
 static const gchar *funnel_statistics_get_filter(funnel_ops_id_t *ops_id);
@@ -61,48 +63,188 @@ static void progress_window_update(struct progdlg *progress_dialog, float percen
 static void progress_window_destroy(struct progdlg *progress_dialog);
 }
 
-class FunnelAction : public QAction
+FunnelAction::FunnelAction(QObject *parent) :
+        QAction(parent),
+        callback_(nullptr),
+        callback_data_(NULL),
+        retap_(FALSE),
+        packetCallback_(nullptr),
+        packetData_(NULL)
 {
-public:
-    FunnelAction(QString title, funnel_menu_callback callback, gpointer callback_data, gboolean retap, QObject *parent = nullptr) :
+
+}
+
+FunnelAction::FunnelAction(QString title, funnel_menu_callback callback, gpointer callback_data, gboolean retap, QObject *parent = nullptr) :
         QAction(parent),
         title_(title),
         callback_(callback),
         callback_data_(callback_data),
         retap_(retap)
+{
+    // Use "&&" to get a real ampersand in the menu item.
+    title.replace('&', "&&");
+
+    setText(title);
+    setObjectName(FunnelStatistics::actionName());
+    packetRequiredFields_ = QSet<QString>();
+}
+
+FunnelAction::FunnelAction(QString title, funnel_packet_menu_callback callback, gpointer callback_data, gboolean retap, const char *packet_required_fields, QObject *parent = nullptr) :
+        QAction(parent),
+        title_(title),
+        callback_data_(callback_data),
+        retap_(retap),
+        packetCallback_(callback),
+        packetRequiredFields_(QSet<QString>())
+{
+    // Use "&&" to get a real ampersand in the menu item.
+    title.replace('&', "&&");
+
+    QStringList menuComponents = title.split(QString("/"));
+    // Set the menu's text to the rightmost component, set the path to being everything to the left:
+    setText("(empty)");
+    packetSubmenu_ = "";
+    if (!menuComponents.isEmpty())
     {
-        // Use "&&" to get a real ampersand in the menu item.
-        title.replace('&', "&&");
-
-        setText(title);
-        setObjectName(FunnelStatistics::actionName());
+        setText(menuComponents.last());
+        menuComponents.removeLast();
+        packetSubmenu_ = menuComponents.join("/");
     }
 
-    funnel_menu_callback callback() const {
-        return callback_;
-    }
+    setObjectName(FunnelStatistics::actionName());
+    setPacketRequiredFields(packet_required_fields);
+}
 
-    QString title() const {
-        return title_;
-    }
+FunnelAction::~FunnelAction(){
+}
 
-    void triggerCallback() {
-        if (callback_) {
-            callback_(callback_data_);
+funnel_menu_callback FunnelAction::callback() const {
+    return callback_;
+}
+
+QString FunnelAction::title() const {
+    return title_;
+}
+
+void FunnelAction::triggerCallback() {
+    if (callback_) {
+        callback_(callback_data_);
+    }
+}
+
+void FunnelAction::setPacketCallback(funnel_packet_menu_callback packet_callback) {
+    packetCallback_ = packet_callback;
+}
+
+void FunnelAction::setPacketRequiredFields(const char *required_fields_str) {
+    packetRequiredFields_.clear();
+    // If multiple fields are required to be present, they're split by commas
+    // Also remove leading and trailing spaces, in case someone writes
+    // "http, dns" instead of "http,dns"
+    QString requiredFieldsJoined = QString(required_fields_str);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    QStringList requiredFieldsSplit = requiredFieldsJoined.split(",", Qt::SkipEmptyParts);
+#else
+    QStringList requiredFieldsSplit = requiredFieldsJoined.split(",", QString::SkipEmptyParts);
+#endif
+    foreach (QString requiredField, requiredFieldsSplit) {
+        QString trimmedFieldName = requiredField.trimmed();
+        if (! trimmedFieldName.isEmpty()) {
+            packetRequiredFields_.insert(trimmedFieldName);
         }
     }
+}
 
-    bool retap() {
-        if (retap_) return true;
-        return false;
+const QSet<QString> FunnelAction::getPacketRequiredFields() {
+    return packetRequiredFields_;
+}
+
+
+void FunnelAction::setPacketData(GPtrArray* finfos) {
+    packetData_ = finfos;
+}
+
+void FunnelAction::addToMenu(QMenu * ctx_menu, QHash<QString, QMenu *> &menuTextToMenus) {
+    QString submenusText = this->getPacketSubmenus();
+    if (submenusText.isEmpty()) {
+        ctx_menu->addAction(this);
+    } else {
+        // If the action has a submenu, ensure that the
+        // the full submenu chain exists:
+        QStringList menuComponents = submenusText.split("/");
+        QString menuSubComponentsStringPrior = NULL;
+        for (int menuIndex=0; menuIndex < menuComponents.size(); menuIndex++) {
+            QStringList menuSubComponents = menuComponents.mid(0, menuIndex+1);
+            QString menuSubComponentsString = menuSubComponents.join("/");
+            if (!menuTextToMenus.contains(menuSubComponentsString)) {
+                // Create a new menu object under the prior object
+                QMenu *previousSubmenu = menuTextToMenus.value(menuSubComponentsStringPrior);
+                QMenu *submenu = previousSubmenu->addMenu(menuComponents.at(menuIndex));
+                menuTextToMenus.insert(menuSubComponentsString, submenu);
+            }
+            menuSubComponentsStringPrior = menuSubComponentsString;
+        }
+        // Then add the action to the relevant submenu
+        QMenu *parentMenu = menuTextToMenus.value(submenusText);
+        parentMenu->addAction(this);
     }
 
-private:
-    QString title_;
-    funnel_menu_callback callback_;
-    gpointer callback_data_;
-    gboolean retap_;
-};
+}
+
+void FunnelAction::triggerPacketCallback() {
+    if (packetCallback_) {
+        packetCallback_(callback_data_, packetData_);
+    }
+}
+
+bool FunnelAction::retap() {
+    if (retap_) return true;
+    return false;
+}
+
+QString FunnelAction::getPacketSubmenus() {
+    return packetSubmenu_;
+}
+
+FunnelConsoleAction::FunnelConsoleAction(QString name,
+                        funnel_console_eval_cb_t eval_cb,
+                        funnel_console_open_cb_t open_cb,
+                        funnel_console_close_cb_t close_cb,
+                        void *callback_data, QObject *parent = nullptr) :
+        FunnelAction(parent),
+        eval_cb_(eval_cb),
+        open_cb_(open_cb),
+        close_cb_(close_cb),
+        callback_data_(callback_data)
+{
+    // Use "&&" to get a real ampersand in the menu item.
+    QString title = QString("%1 Console").arg(name).replace('&', "&&");
+
+    setText(title);
+    setObjectName(FunnelStatistics::actionName());
+}
+
+FunnelConsoleAction::~FunnelConsoleAction()
+{
+}
+
+void FunnelConsoleAction::triggerCallback() {
+    if (!dialog_) {
+        dialog_ = new IOConsoleDialog(*qobject_cast<QWidget *>(parent()),
+                                            this->text(),
+                                            eval_cb_, open_cb_, close_cb_, callback_data_);
+        dialog_->setAttribute(Qt::WA_DeleteOnClose);
+    }
+
+    if (dialog_->isMinimized()) {
+        dialog_->showNormal();
+    }
+    else {
+        dialog_->show();
+    }
+    dialog_->raise();
+    dialog_->activateWindow();
+}
 
 static QHash<int, QList<FunnelAction *> > funnel_actions_;
 const QString FunnelStatistics::action_name_ = "FunnelStatisticsAction";
@@ -135,7 +277,6 @@ FunnelStatistics::FunnelStatistics(QObject *parent, CaptureFile &cf) :
     funnel_ops_->add_button = text_window_add_button;
     funnel_ops_->new_dialog = string_dialog_new;
     funnel_ops_->close_dialogs = string_dialogs_close;
-    funnel_ops_->logger = funnel_statistics_logger;
     funnel_ops_->retap_packets = funnel_statistics_retap_packets;
     funnel_ops_->copy_to_clipboard = funnel_statistics_copy_to_clipboard;
     funnel_ops_->get_filter = funnel_statistics_get_filter;
@@ -245,13 +386,6 @@ void string_dialog_new(funnel_ops_id_t *ops_id, const gchar* title, const gchar*
         field_list << field;
     }
     FunnelStringDialog::stringDialogNew(qobject_cast<QWidget *>(ops_id->funnel_statistics->parent()), title, field_list, dialog_cb, dialog_cb_data, dialog_cb_data_free);
-}
-
-void funnel_statistics_logger(const gchar *log_domain,
-                          enum ws_log_level log_level,
-                          const gchar *message,
-                          gpointer) {
-    ws_log(log_domain, log_level, "%s", message);
 }
 
 void funnel_statistics_retap_packets(funnel_ops_id_t *ops_id) {
@@ -368,6 +502,33 @@ static void register_menu_cb(const char *name,
     funnel_actions_[group] << funnel_action;
 }
 
+/*
+ * Callback used to register packet menus in the GUI.
+ *
+ * Creates a new FunnelAction with the Lua
+ * callback and stores it in the Wireshark GUI with
+ * appendPacketMenu() so it can be retrieved when
+ * the packet's context menu is open.
+ *
+ * @param name packet menu item's name
+ * @param required_fields fields required to be present for the packet menu to be displayed
+ * @param callback function called when the menu item is invoked. The function must take one argument and return nothing.
+ * @param callback_data Lua state for the callback function
+ * @param retap whether or not to rescan all packets
+ */
+static void register_packet_menu_cb(const char *name,
+                             const char *required_fields,
+                             funnel_packet_menu_callback callback,
+                             gpointer callback_data,
+                             gboolean retap)
+{
+    FunnelAction *funnel_action = new FunnelAction(name, callback, callback_data, retap, required_fields, mainApp);
+    MainWindow * mainwindow = qobject_cast<MainWindow *>(mainApp->mainWindow());
+    if (mainwindow) {
+        mainwindow->appendPacketMenu(funnel_action);
+    }
+}
+
 static void deregister_menu_cb(funnel_menu_callback callback)
 {
     foreach (int group, funnel_actions_.keys()) {
@@ -390,6 +551,7 @@ void
 register_tap_listener_qt_funnel(void)
 {
     funnel_register_all_menus(register_menu_cb);
+    funnel_statistics_load_console_menus();
     menus_registered = TRUE;
 }
 
@@ -397,6 +559,61 @@ void
 funnel_statistics_reload_menus(void)
 {
     funnel_reload_menus(deregister_menu_cb, register_menu_cb);
+    funnel_statistics_load_packet_menus();
+}
+
+
+/**
+ * Returns whether the packet menus have been modified since they were last registered
+ *
+ * @return TRUE if the packet menus were modified since the last registration
+ */
+gboolean
+funnel_statistics_packet_menus_modified(void)
+{
+    return funnel_packet_menus_modified();
+}
+
+/*
+ * Loads all registered_packet_menus into the
+ * Wireshark GUI.
+ */
+void
+funnel_statistics_load_packet_menus(void)
+{
+    funnel_register_all_packet_menus(register_packet_menu_cb);
+}
+
+static void register_console_menu_cb(const char *name,
+                                         funnel_console_eval_cb_t eval_cb,
+                                         funnel_console_open_cb_t open_cb,
+                                         funnel_console_close_cb_t close_cb,
+                                         void *callback_data)
+{
+    FunnelConsoleAction *funnel_action = new FunnelConsoleAction(name, eval_cb,
+                                                                open_cb,
+                                                                close_cb,
+                                                                callback_data,
+                                                                mainApp);
+    if (menus_registered) {
+        mainApp->appendDynamicMenuGroupItem(REGISTER_TOOLS_GROUP_UNSORTED, funnel_action);
+    } else {
+        mainApp->addDynamicMenuGroupItem(REGISTER_TOOLS_GROUP_UNSORTED, funnel_action);
+    }
+    if (!funnel_actions_.contains(REGISTER_TOOLS_GROUP_UNSORTED)) {
+        funnel_actions_[REGISTER_TOOLS_GROUP_UNSORTED] = QList<FunnelAction *>();
+    }
+    funnel_actions_[REGISTER_TOOLS_GROUP_UNSORTED] << funnel_action;
+}
+
+/*
+ * Loads all registered console menus into the
+ * Wireshark GUI.
+ */
+void
+funnel_statistics_load_console_menus(void)
+{
+    funnel_register_all_console_menus(register_console_menu_cb);
 }
 
 } // extern "C"

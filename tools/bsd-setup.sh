@@ -19,26 +19,28 @@
 #
 
 print_usage() {
-	echo "\nUtility to setup a bsd-based system for Wireshark Development.\n"
-	echo "The basic usage installs the needed software\n\n"
-	echo "Usage: $0 [--install-optional] [...other options...]\n"
-	echo "\t--install-optional: install optional software as well"
-	echo "\t[other]: other options are passed as-is to pkg manager.\n"
+	printf "\\nUtility to setup a bsd-based system for Wireshark Development.\\n"
+	printf "The basic usage installs the needed software\\n\\n"
+	printf "Usage: $0 [--install-optional] [...other options...]\\n"
+	printf "\\t--install-optional: install optional software as well\\n"
+	printf "\\t[other]: other options are passed as-is to pkg manager.\\n"
 }
 
+ADDITIONAL=0
 OPTIONS=
-for op
-do
-	if [ "$op" = "--install-optional" ]
-	then
-		ADDITIONAL=1
-	elif [ "$op" = "--help" ]
-	then
-		print_usage
-		exit 0
-	else
-		OPTIONS="$OPTIONS $op"
-	fi
+for arg; do
+	case $arg in
+		--help)
+			print_usage
+			exit 0
+			;;
+		--install-optional)
+			ADDITIONAL=1
+			;;
+		*)
+			OPTIONS="$OPTIONS $arg"
+			;;
+	esac
 done
 
 # Check if the user is root
@@ -50,9 +52,10 @@ fi
 
 BASIC_LIST="\
 	cmake \
-	qt5 \
+	qt6 \
 	git \
-	pcre2"
+	pcre2 \
+	speexdsp"
 
 ADDITIONAL_LIST="\
 	gettext-tools \
@@ -62,7 +65,6 @@ ADDITIONAL_LIST="\
 	libmaxminddb \
 	libsmi \
 	brotli \
-	speexdsp \
 	zstd \
 	lua52 \
 	"
@@ -146,9 +148,17 @@ add_package ADDITIONAL_LIST liblz4 ||
 add_package ADDITIONAL_LIST lz4 ||
 echo "lz4 is unavailable"
 
+# libnghttp2: FreeBSD
 # nghttp2: NetBSD
+add_package ADDITIONAL_LIST libnghttp2 ||
 add_package ADDITIONAL_LIST nghttp2 ||
 echo "nghttp2 is unavailable"
+
+# libnghttp3: FreeBSD
+# nghttp3: NetBSD
+add_package ADDITIONAL_LIST libnghttp3 ||
+add_package ADDITIONAL_LIST nghttp3 ||
+echo "nghttp3 is unavailable"
 
 # spandsp: NetBSD
 add_package ADDITIONAL_LIST spandsp ||
@@ -167,7 +177,7 @@ echo "libilbc is unavailable"
 # Add OS-specific required/optional packages
 # Those not listed don't require additions.
 case `uname` in
-	NetBSD)
+	FreeBSD | NetBSD)
 		add_package ADDITIONAL_LIST libgcrypt || echo "libgcrypt is unavailable"
 		;;
 esac
@@ -175,7 +185,7 @@ esac
 ACTUAL_LIST=$BASIC_LIST
 
 # Now arrange for optional support libraries
-if [ "$ADDITIONAL" != "" ]
+if [ $ADDITIONAL -ne 0 ]
 then
 	ACTUAL_LIST="$ACTUAL_LIST $ADDITIONAL_LIST"
 fi
@@ -186,7 +196,7 @@ then
 	exit 2
 fi
 
-if [ "$ADDITIONAL" == "" ]
+if [ $ADDITIONAL -eq 0 ]
 then
 	echo -e "\n*** Optional packages not installed. Rerun with --install-optional to have them.\n"
 fi

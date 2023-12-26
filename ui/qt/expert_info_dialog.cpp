@@ -17,6 +17,7 @@
 #include <epan/stat_tap_ui.h>
 #include <epan/tap.h>
 
+#include "progress_frame.h"
 #include "main_application.h"
 
 #include <QAction>
@@ -43,6 +44,8 @@ ExpertInfoDialog::ExpertInfoDialog(QWidget &parent, CaptureFile &capture_file, Q
     ui->setupUi(this);
     ui->hintLabel->setSmallText();
     ui->limitCheckBox->setChecked(! display_filter_.isEmpty());
+    connect(ui->limitCheckBox, &QCheckBox::toggled,
+            this, &ExpertInfoDialog::limitCheckBoxToggled);
 
     proxyModel_->setSourceModel(expert_info_model_);
     ui->expertInfoTreeView->setModel(proxyModel_);
@@ -107,6 +110,8 @@ ExpertInfoDialog::ExpertInfoDialog(QWidget &parent, CaptureFile &capture_file, Q
 
     connect(&cap_file_, SIGNAL(captureEvent(CaptureEvent)),
             this, SLOT(captureEvent(CaptureEvent)));
+
+    ProgressFrame::addToButtonBox(ui->buttonBox, &parent);
 
     updateWidgets();
     QTimer::singleShot(0, this, SLOT(retapPackets()));
@@ -298,7 +303,7 @@ void ExpertInfoDialog::expandTree()
     ui->expertInfoTreeView->expandAll();
 }
 
-void ExpertInfoDialog::on_limitCheckBox_toggled(bool)
+void ExpertInfoDialog::limitCheckBoxToggled(bool)
 {
     retapPackets();
 }

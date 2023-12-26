@@ -16,7 +16,7 @@ endif::[]
 // XXX This should be surrounded by single quotes in the text. It’s
 // currently surrounded by plus signs for AsciiDoc compatibility.
 :dlt-glob: DLT_*
-:qt-lts-version: 5.15
+:qt6-lts-version: 6.2.4
 :source-highlighter: coderay
 
 include::wsdg_preface.adoc[]
@@ -29,7 +29,7 @@ include::../common_src/typographic_conventions.adoc[]
 [partintro]
 .Wireshark Build Environment
 --
-The first part describes how to set up the tools, libraries and source needed to
+The first part describes how to set up the tools, libraries and sources needed to
 generate Wireshark and how to do some typical development tasks.
 --
 

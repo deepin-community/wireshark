@@ -434,7 +434,7 @@ void SequenceDialog::on_buttonBox_clicked(QAbstractButton *button)
 void SequenceDialog::exportDiagram()
 {
     QString file_name, extension;
-    QDir path(mainApp->lastOpenDir());
+    QDir path(mainApp->openDialogInitialDir());
     QString pdf_filter = tr("Portable Document Format (*.pdf)");
     QString png_filter = tr("Portable Network Graphics (*.png)");
     QString bmp_filter = tr("Windows Bitmap (*.bmp)");
@@ -802,7 +802,7 @@ void SequenceDialog::zoomXAxis(bool in)
     sp->replot();
 }
 
-gboolean SequenceDialog::addFlowSequenceItem(const void* key, void *value, void *userdata)
+bool SequenceDialog::addFlowSequenceItem(const void* key, void *value, void *userdata)
 {
     const char* name = (const char*)key;
     register_analysis_t* analysis = (register_analysis_t*)value;

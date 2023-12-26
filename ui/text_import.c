@@ -70,7 +70,7 @@
  * Fields are decoded using a leanient parser, but only one attempt is made.
  * Except for in data invalid values will be replaced by default ones.
  * data currently only accepts plain HEX, OCT or BIN encoded data.
- * common field seperators are ignored. Note however that 0x or 0b prefixing is
+ * common field separators are ignored. Note however that 0x or 0b prefixing is
  * not supported and no automatic format detection is attempted.
  */
 
@@ -81,6 +81,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wsutil/file_util.h>
+#include <ws_exit_codes.h>
 
 #include <time.h>
 #include <glib.h>
@@ -92,14 +93,14 @@
 #include <wsutil/crc32.h>
 #include <epan/in_cksum.h>
 
-#include <ui/exit_codes.h>
 #include <wsutil/report_message.h>
 #include <wsutil/exported_pdu_tlvs.h>
 
 #include <wsutil/nstime.h>
 #include <wsutil/time_util.h>
+#include <wsutil/ws_strptime.h>
 
-#include <ui/version_info.h>
+#include <wsutil/version_info.h>
 #include <wsutil/cpu_info.h>
 #include <wsutil/os_version_info.h>
 
@@ -892,7 +893,7 @@ DIAG_ON_INIT_TWICE
  * The modularized part of this mess, used by the wrapper around the regex
  * engine in text_import_regex.c to hook into this state-machine backend.
  *
- * Should the rest be modularized aswell? Maybe, but then start with pcap2text.c
+ * Should the rest be modularized as well? Maybe, but then start with pcap2text.c
  */
 
  /**
@@ -1079,7 +1080,7 @@ _parse_time(const guchar* start_field, const guchar* end_field, const gchar* _fo
             *subsecs_fmt = 0;
         }
 
-        cursor = ws_strptime(cursor, format, &timecode);
+        cursor = ws_strptime_p(cursor, format, &timecode);
 
         if (cursor == NULL) {
             return FALSE;
@@ -1096,7 +1097,7 @@ _parse_time(const guchar* start_field, const guchar* end_field, const gchar* _fo
 
             subseclen = (int) (p - cursor);
             cursor = p;
-            cursor = ws_strptime(cursor, subsecs_fmt + 2, &timecode);
+            cursor = ws_strptime_p(cursor, subsecs_fmt + 2, &timecode);
             if (cursor == NULL) {
                 return FALSE;
             }
@@ -1479,7 +1480,7 @@ parse_token(token_t token, char *str)
                     tmp_str[0] = pkt_lnstart[i*3];
                     tmp_str[1] = pkt_lnstart[i*3+1];
                     tmp_str[2] = '\0';
-                    /* it is a valid convertable string */
+                    /* it is a valid convertible string */
                     if (!g_ascii_isxdigit(tmp_str[0]) || !g_ascii_isxdigit(tmp_str[1])) {
                         break;
                     }
@@ -1569,7 +1570,7 @@ text_import(text_import_info_t * const info)
          * Windows builds with 64 bit time_t by default now), so....
          */
         report_failure("localtime(right now) failed");
-        return INIT_FAILED;
+        return WS_EXIT_INIT_FAILED;
     }
     timecode_default = *now_tm;
     timecode_default.tm_isdst = -1;     /* Unknown for now, depends on time given to the strptime() function */
@@ -1692,20 +1693,20 @@ text_import(text_import_info_t * const info)
         case (WTAP_ENCAP_RAW_IP4):
             if (info->ipv6) {
                 report_failure("Encapsulation %s only supports IPv4 headers, not IPv6", wtap_encap_name(info->encapsulation));
-                return INVALID_OPTION;
+                return WS_EXIT_INVALID_OPTION;
             }
             break;
 
         case (WTAP_ENCAP_RAW_IP6):
             if (!info->ipv6) {
                 report_failure("Encapsulation %s only supports IPv6 headers, not IPv4", wtap_encap_name(info->encapsulation));
-                return INVALID_OPTION;
+                return WS_EXIT_INVALID_OPTION;
             }
             break;
 
         default:
             report_failure("Dummy IP header not supported with encapsulation: %s (%s)", wtap_encap_name(info->encapsulation), wtap_encap_description(info->encapsulation));
-            return INVALID_OPTION;
+            return WS_EXIT_INVALID_OPTION;
         }
     }
 
@@ -1722,7 +1723,7 @@ text_import(text_import_info_t * const info)
          * error, unlike malloc or g_try_malloc.
          */
         report_failure("FATAL ERROR: no memory for packet buffer");
-        return INIT_FAILED;
+        return WS_EXIT_INIT_FAILED;
     }
 
     if (info->mode == TEXT_IMPORT_HEXDUMP) {
@@ -1732,11 +1733,11 @@ text_import(text_import_info_t * const info)
             ret = 0;
             break;
         case (IMPORT_FAILURE):
-            ret = INVALID_FILE;
+            ret = WS_EXIT_INVALID_FILE;
             break;
         case (IMPORT_INIT_FAILED):
             report_failure("Can't initialize scanner: %s", g_strerror(errno));
-            ret = INIT_FAILED;
+            ret = WS_EXIT_INIT_FAILED;
             break;
         default:
             ret = 0;
@@ -1747,10 +1748,10 @@ text_import(text_import_info_t * const info)
             info->num_packets_read = ret;
             ret = 0;
         } else if (ret < 0) {
-            ret = INVALID_FILE;
+            ret = WS_EXIT_INVALID_FILE;
         }
     } else {
-        ret = INVALID_OPTION;
+        ret = WS_EXIT_INVALID_OPTION;
     }
     g_free(packet_buf);
     return ret;
@@ -1819,46 +1820,34 @@ text_import_pre_open(wtap_dump_params * const params, int file_type_subtype, con
         } else {
             wtap_block_add_string_option(int_data, OPT_IDB_NAME, "Fake IF, text2pcap", strlen("Fake IF, text2pcap"));
         }
-        switch (params->tsprec) {
+        if (params->tsprec >= 0 && params->tsprec <= WS_TSPREC_MAX) {
+            /*
+             * This is a valid time precision.
+             */
 
-        case WTAP_TSPREC_SEC:
-                int_data_mand->time_units_per_second = 1;
-                wtap_block_add_uint8_option(int_data, OPT_IDB_TSRESOL, 0);
-                break;
+            /*
+             * Compute 10^{params->tsprec}.
+             */
+            int_data_mand->time_units_per_second = 1;
+            for (int i = 0; i < params->tsprec; i++)
+                int_data_mand->time_units_per_second *= 10;
 
-        case WTAP_TSPREC_DSEC:
-                int_data_mand->time_units_per_second = 10;
-                wtap_block_add_uint8_option(int_data, OPT_IDB_TSRESOL, 1);
-                break;
-
-        case WTAP_TSPREC_CSEC:
-                int_data_mand->time_units_per_second = 100;
-                wtap_block_add_uint8_option(int_data, OPT_IDB_TSRESOL, 2);
-                break;
-
-        case WTAP_TSPREC_MSEC:
-                int_data_mand->time_units_per_second = 1000;
-                wtap_block_add_uint8_option(int_data, OPT_IDB_TSRESOL, 3);
-                break;
-
-        case WTAP_TSPREC_USEC:
-                int_data_mand->time_units_per_second = 1000000;
-                /* This is the default, so no need to add an option */
-                break;
-
-        case WTAP_TSPREC_NSEC:
-                int_data_mand->time_units_per_second = 1000000000;
-                wtap_block_add_uint8_option(int_data, OPT_IDB_TSRESOL, 9);
-                break;
-
-        case WTAP_TSPREC_PER_PACKET:
-        case WTAP_TSPREC_UNKNOWN:
-        default:
+            if (params->tsprec != WTAP_TSPREC_USEC) {
                 /*
-                 * Don't do this.
+                 * Microsecond precision is the default, so we only
+                 * add an option if the precision isn't microsecond
+                 * precision.
                  */
-                ws_assert_not_reached();
-                break;
+                wtap_block_add_uint8_option(int_data, OPT_IDB_TSRESOL, params->tsprec);
+            }
+        } else {
+            /*
+             * Either WTAP_TSPREC_PER_PACKET, WTAP_TSPREC_UNKNOWN,
+             * or not a valid precision.
+             *
+             * Don't do this.
+             */
+            ws_assert_not_reached();
         }
 
         params->idb_inf = g_new(wtapng_iface_descriptions_t,1);

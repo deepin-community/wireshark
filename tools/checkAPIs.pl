@@ -534,32 +534,6 @@ sub check_included_files($$)
 
         @incFiles = (${$fileContentsRef} =~ m/\#include \s* ([<"].+[>"])/gox);
 
-        # only our wrapper file wsutils/wsgcrypt.h may include gcrypt.h
-        # all other files should include the wrapper
-        if ($filename !~ /wsgcrypt\.h/) {
-                foreach (@incFiles) {
-                        if ( m#([<"]|/+)gcrypt\.h[>"]$# ) {
-                                print STDERR "Warning: ".$filename.
-                                        " includes gcrypt.h directly. ".
-                                        "Include wsutil/wsgcrypt.h instead.\n";
-                                last;
-                        }
-                }
-        }
-
-        # only our wrapper file wspcap.h may include pcap.h
-        # all other files should include the wrapper
-        if ($filename !~ /wspcap\.h/) {
-                foreach (@incFiles) {
-                        if ( m#([<"]|/+)pcap\.h[>"]$# ) {
-                                print STDERR "Warning: ".$filename.
-                                        " includes pcap.h directly. ".
-                                        "Include wspcap.h instead.\n";
-                                last;
-                        }
-                }
-        }
-
         # files in the ui/qt directory should include the ui class includes
         # by using #include <>
         # this ensures that Visual Studio picks up these files from the
@@ -1191,12 +1165,13 @@ while ($_ = pop @filelist)
             $errorCount += check_hf_entries(\$fileContents, $filename);
         }
 
-        if ($fileContents =~ m{ %ll }xo)
+        if ($fileContents =~ m{ %\d*?ll }dxo)
         {
                 # use PRI[dux...]N instead of ll
                 print STDERR "Error: Found %ll in " .$filename."\n";
                 $errorCount++;
         }
+
         if ($fileContents =~ m{ %hh }xo)
         {
                 # %hh is C99 and Windows doesn't like it:

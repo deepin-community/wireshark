@@ -426,7 +426,7 @@ void InterfaceFrame::on_interfaceTree_doubleClicked(const QModelIndex &index)
     if (extcap_string.length() > 0)
     {
         /* this checks if configuration is required and not yet provided or saved via prefs */
-        if (extcap_has_configuration((const char *)(device_name.toStdString().c_str()), TRUE))
+        if (extcap_requires_configuration((const char *)(device_name.toStdString().c_str())))
         {
             emit showExtcapOptions(device_name, true);
             return;
@@ -458,7 +458,7 @@ void InterfaceFrame::on_interfaceTree_clicked(const QModelIndex &index)
         if (extcap_string.length() > 0)
         {
             /* this checks if configuration is required and not yet provided or saved via prefs */
-            if (extcap_has_configuration((const char *)(device_name.toStdString().c_str()), FALSE))
+            if (extcap_has_configuration((const char *)(device_name.toStdString().c_str())))
             {
                 emit showExtcapOptions(device_name, false);
                 return;
@@ -494,7 +494,9 @@ void InterfaceFrame::showRunOnFile(void)
 void InterfaceFrame::showContextMenu(QPoint pos)
 {
     QMenu * ctx_menu = new QMenu(this);
-    ctx_menu->setAttribute(Qt::WA_DeleteOnClose);
+    // Work around QTBUG-106718. For some reason Qt::WA_DeleteOnClose +
+    // Qt::QueuedConnection don't work here.
+    QObject::connect(ctx_menu, &QMenu::triggered, ctx_menu, &QMenu::deleteLater);
 
     ctx_menu->addAction(tr("Start capture"), this, [=] () {
         QStringList ifaces;

@@ -90,6 +90,13 @@ QByteArray gchar_free_to_qbytearray(gchar *glib_string);
  */
 QByteArray gstring_free_to_qbytearray(GString *glib_gstring);
 
+/** Transfer ownership of a GbyteArray to a newly constructed QByteArray
+ *
+ * @param glib_array A GByteArray or NULL. Will be freed.
+ * @return A QByteArray instance created from the input array.
+ */
+QByteArray gbytearray_free_to_qbytearray(GByteArray *glib_array);
+
 /** Convert an integer to a formatted string representation.
  *
  * @param value The integer to format.
@@ -252,6 +259,21 @@ void qvector_rtpstream_ids_free(QVector<rtpstream_id_t *> stream_ids);
  * @return Filter or empty string
  */
 QString make_filter_based_on_rtpstream_id(QVector<rtpstream_id_t *> stream_ids);
+
+/**
+ * @brief Return the last directory that had been opened.
+ *
+ * This can be influenced by prefs.gui_fileopen_style which will allow to either
+ * open the real last dir or have the user set one specifically.
+ *
+ * @return a reference to that directory.
+ */
+QString openDialogInitialDir();
+
+/**
+ * @brief Store the directory as last directory being used
+ */
+void storeLastDir(QString dir);
 
 #endif /* __QT_UI_UTILS__H__ */
 
