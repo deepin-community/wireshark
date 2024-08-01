@@ -399,6 +399,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
         {"dumpconf",   "pref",       2, JSMN_STRING,       SHARKD_JSON_STRING,   SHARKD_OPTIONAL},
         {"follow",     "follow",     2, JSMN_STRING,       SHARKD_JSON_STRING,   SHARKD_MANDATORY},
         {"follow",     "filter",     2, JSMN_STRING,       SHARKD_JSON_STRING,   SHARKD_MANDATORY},
+        {"follow",     "sub_stream", 2, JSMN_PRIMITIVE,    SHARKD_JSON_UINTEGER, SHARKD_OPTIONAL},
         {"frame",      "frame",      2, JSMN_PRIMITIVE,    SHARKD_JSON_UINTEGER, SHARKD_MANDATORY},
         {"frame",      "proto",      2, JSMN_PRIMITIVE,    SHARKD_JSON_BOOLEAN,  SHARKD_OPTIONAL},
         {"frame",      "ref_frame",  2, JSMN_PRIMITIVE,    SHARKD_JSON_UINTEGER, SHARKD_OPTIONAL},
@@ -631,7 +632,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
                     {
                         sharkd_json_error(
                                 rpcid, -32600, NULL,
-                                "The data type for member %s is not a valid", attr_name
+                                "The data type for member %s is not valid", attr_name
                                 );
                         return FALSE;
                     }
@@ -1220,11 +1221,16 @@ sharkd_session_process_load(const char *buf, const jsmntok_t *tokens, int count)
  * Process status request
  *
  * Output object with attributes:
- *   (m) frames   - count of currently loaded frames
- *   (m) duration - time difference between time of first frame, and last loaded frame
- *   (o) filename - capture filename
- *   (o) filesize - capture filesize
- *   (o) columns  - array of column titles
+ *   (m) frames      - count of currently loaded frames
+ *   (m) duration    - time difference between time of first frame, and last loaded frame
+ *   (o) filename    - capture filename
+ *   (o) filesize    - capture filesize
+ *   (o) columns     - array of column titles
+ *   (o) column_info - array of column infos, array of object with attributes:
+ *                      'title'    - column title
+ *                      'format'   - column format (%x or %Cus:<expr>:<occurrence> if COL_CUSTOM)
+ *                      'visible'  - true if column is visible
+ *                      'resolved' - true if column is resolved
  */
 static void
 sharkd_session_process_status(void)
@@ -1256,6 +1262,24 @@ sharkd_session_process_status(void)
         for (int i = 0; i < cfile.cinfo.num_cols; ++i)
         {
             sharkd_json_value_string(NULL, get_column_title(i));
+        }
+        sharkd_json_array_close();
+
+        sharkd_json_array_open("column_info");
+        for (int i = 0; i < cfile.cinfo.num_cols; ++i)
+        {
+            int fmt = get_column_format(i);
+            sharkd_json_object_open(NULL);
+            sharkd_json_value_string("title", get_column_title(i));
+            if (fmt != COL_CUSTOM)
+            {
+                sharkd_json_value_string("format", col_format_to_string(fmt));
+            } else {
+                sharkd_json_value_stringf("format", "%s:%s:%d", col_format_to_string(fmt), get_column_custom_fields(i), get_column_custom_occurrence(i));
+            }
+            sharkd_json_value_anyf("visible", get_column_visible(i) ? "true" : "false");
+            sharkd_json_value_anyf("resolved", get_column_resolved(i) ? "true" : "false");
+            sharkd_json_object_close();
         }
         sharkd_json_array_close();
     }
@@ -3894,8 +3918,10 @@ sharkd_session_process_tap(char *buf, const jsmntok_t *tokens, int count)
  * Process follow request
  *
  * Input:
- *   (m) follow  - follow protocol request (e.g. HTTP)
- *   (m) filter  - filter request (e.g. tcp.stream == 1)
+ *   (m) follow     - follow protocol request (e.g. HTTP)
+ *   (m) filter     - filter request (e.g. tcp.stream == 1)
+ *   (m) stream     - stream index number
+ *   (o) sub_stream - follow sub-stream index number (e.g. for HTTP/2 and QUIC streams)
  *
  * Output object with attributes:
  *
@@ -3916,6 +3942,7 @@ sharkd_session_process_follow(char *buf, const jsmntok_t *tokens, int count)
 {
     const char *tok_follow = json_find_attr(buf, tokens, count, "follow");
     const char *tok_filter = json_find_attr(buf, tokens, count, "filter");
+    const char *tok_sub_stream = json_find_attr(buf, tokens, count, "sub_stream");
 
     register_follow_t *follower;
     GString *tap_error;
@@ -3934,8 +3961,15 @@ sharkd_session_process_follow(char *buf, const jsmntok_t *tokens, int count)
         return;
     }
 
+    guint64 substream_id = SUBSTREAM_UNUSED;
+    if (tok_sub_stream)
+    {
+        ws_strtou64(tok_sub_stream, NULL, &substream_id);
+    }
+
     /* follow_reset_stream ? */
     follow_info = g_new0(follow_info_t, 1);
+    follow_info->substream_id = substream_id;
     /* gui_data, filter_out_filter not set, but not used by dissector */
 
     tap_error = register_tap_listener(get_follow_tap_string(follower), follow_info, tok_filter, 0, NULL, get_follow_tap_handler(follower), NULL, NULL);
@@ -4120,7 +4154,8 @@ static bool
 sharkd_follower_visit_layers_cb(const void *key _U_, void *value, void *user_data)
 {
     register_follow_t *follower = (register_follow_t *) value;
-    packet_info *pi = (packet_info *) user_data;
+    epan_dissect_t *edt = (epan_dissect_t *) user_data;
+    packet_info *pi = &edt->pi;
 
     const int proto_id = get_follow_proto_id(follower);
 
@@ -4132,12 +4167,50 @@ sharkd_follower_visit_layers_cb(const void *key _U_, void *value, void *user_dat
         const char *layer_proto = proto_get_protocol_short_name(find_protocol_by_id(proto_id));
         char *follow_filter;
 
-        follow_filter = get_follow_conv_func(follower)(NULL, pi, &ignore_stream, &ignore_sub_stream);
+        follow_filter = get_follow_conv_func(follower)(edt, pi, &ignore_stream, &ignore_sub_stream);
 
         json_dumper_begin_array(&dumper);
         json_dumper_value_string(&dumper, layer_proto);
         json_dumper_value_string(&dumper, follow_filter);
         json_dumper_end_array(&dumper);
+
+        g_free(follow_filter);
+    }
+
+    return FALSE;
+}
+
+static bool
+sharkd_followers_visit_layers_cb(const void *key _U_, void *value, void *user_data)
+{
+    register_follow_t *follower = (register_follow_t *) value;
+    epan_dissect_t *edt = (epan_dissect_t *) user_data;
+    packet_info *pi = &edt->pi;
+
+    const int proto_id = get_follow_proto_id(follower);
+
+    guint stream;
+    guint sub_stream;
+
+    if (proto_is_frame_protocol(pi->layers, proto_get_protocol_filter_name(proto_id)))
+    {
+        const char *layer_proto = proto_get_protocol_short_name(find_protocol_by_id(proto_id));
+        char *follow_filter;
+
+        follow_filter = get_follow_conv_func(follower)(edt, pi, &stream, &sub_stream);
+
+        sharkd_json_object_open(NULL);
+        sharkd_json_value_string("protocol", layer_proto);
+        sharkd_json_value_string("filter", follow_filter);
+        if (get_follow_stream_count_func(follower) != NULL)
+        {
+            sharkd_json_value_anyf("stream", "%u", stream);
+        }
+        if (get_follow_sub_stream_id_func(follower) != NULL)
+        {
+            sharkd_json_value_anyf("sub_stream", "%u", sub_stream);
+        }
+        sharkd_json_object_close();
 
         g_free(follow_filter);
     }
@@ -4304,7 +4377,11 @@ sharkd_session_process_frame_cb(epan_dissect_t *edt, proto_tree *tree, struct ep
     }
 
     sharkd_json_array_open("fol");
-    follow_iterate_followers(sharkd_follower_visit_layers_cb, pi);
+    follow_iterate_followers(sharkd_follower_visit_layers_cb, edt);
+    sharkd_json_array_close();
+
+    sharkd_json_array_open("followers");
+    follow_iterate_followers(sharkd_followers_visit_layers_cb, edt);
     sharkd_json_array_close();
 
     sharkd_json_result_epilogue();
@@ -4686,6 +4763,11 @@ sharkd_session_process_intervals(char *buf, const jsmntok_t *tokens, int count)
  *   (o) fol   - array of follow filters:
  *                  [0] - protocol
  *                  [1] - filter string
+ *   (o) followers - array of followers with attributes:
+ *                      protocol - protocol string
+ *                      filter - filter string
+ *                      stream - stream index number
+ *                      sub_stream - sub-stream index number (optional, e.g. for HTTP/2 and QUIC streams)
  *   (o) i   - if frame is ignored
  *   (o) m   - if frame is marked
  *   (o) bg  - color filter - background color in hex
@@ -5836,7 +5918,7 @@ sharkd_session_process(char *buf, const jsmntok_t *tokens, int count)
 int
 sharkd_session_main(int mode_setting)
 {
-    char buf[2 * 1024];
+    char buf[8 * 1024];
     jsmntok_t *tokens = NULL;
     int tokens_max = -1;
 

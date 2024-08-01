@@ -23,6 +23,7 @@
 #include <epan/exceptions.h>
 #include <epan/tap.h>
 #include <epan/asn1.h>
+#include <epan/proto_data.h>
 #include <epan/prefs.h>
 #include <epan/exported_pdu.h>
 #include <epan/address_types.h>
@@ -4246,9 +4247,14 @@ static const ber_sequence_t SecondEventsDescriptor_sequence[] = {
 
 static int
 dissect_h248_SecondEventsDescriptor(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  // SecondEventsDescriptor → SecondEventsDescriptor/eventList → SecondRequestedEvent → SecondRequestedActions → NotifyBehaviour → RegulatedEmbeddedDescriptor → SecondEventsDescriptor
+  actx->pinfo->dissection_depth += 6;
+  increment_dissection_depth(actx->pinfo);
   offset = dissect_ber_sequence(implicit_tag, actx, tree, tvb, offset,
                                    SecondEventsDescriptor_sequence, hf_index, ett_h248_SecondEventsDescriptor);
 
+  actx->pinfo->dissection_depth -= 6;
+  decrement_dissection_depth(actx->pinfo);
   return offset;
 }
 

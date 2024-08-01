@@ -1015,7 +1015,7 @@ static const value_string option_vals[] = {
 #define ND_RA_FLAG_H    0x20
 #define ND_RA_FLAG_PRF  0x18
 #define ND_RA_FLAG_P    0x04
-#define ND_RA_FLAG_RSV  0x02
+#define ND_RA_FLAG_RSV  0x03
 
 #define ND_NA_FLAG_R    0x80000000
 #define ND_NA_FLAG_S    0x40000000
@@ -1349,20 +1349,22 @@ static const value_string mpl_seed_id_lengths[] = {
 };
 static const guint8 mpl_seed_id_code_to_length[] = { 0, 2, 8, 16 }; /* bytes */
 
+#define LIFETIME_INFINITY 0xFFFFFFFF
+
 static const value_string unique_infinity[] = {
-    { 0xffffffff, "Infinity" },
+    { LIFETIME_INFINITY, "Infinity" },
     { 0, NULL}
 };
 
 static const value_string dnssl_infinity[] = {
     { 0, "DNSSL domain name MUST no longer be used" },
-    { 0xffffffff, "Infinity" },
+    { LIFETIME_INFINITY, "Infinity" },
     { 0, NULL}
 };
 
 static const value_string rdnss_infinity[] = {
     { 0, "RDNSS address MUST no longer be used" },
-    { 0xffffffff, "Infinity" },
+    { LIFETIME_INFINITY, "Infinity" },
     { 0, NULL}
 };
 
@@ -1682,8 +1684,9 @@ static icmp_transaction_t *transaction_end(packet_info *pinfo, proto_tree *tree,
 
 } /* transaction_end() */
 
-static int
-dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree)
+// This is recursive, but we'll run out of PDU before we'll run out of stack.
+// NOLINTNEXTLINE(misc-no-recursion)
+static int dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree *tree)
 {
     proto_tree *icmp6opt_tree;
     proto_item *ti, *ti_opt, *ti_opt_len;
@@ -1819,12 +1822,16 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
 
                 /* Prefix Valid Lifetime */
                 ti_opt = proto_tree_add_item_ret_uint(icmp6opt_tree, hf_icmpv6_opt_prefix_valid_lifetime, tvb, opt_offset, 4, ENC_BIG_ENDIAN, &lifetime);
-                proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                if (lifetime != LIFETIME_INFINITY) {
+                  proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                }
                 opt_offset += 4;
 
                 /* Prefix Preferred Lifetime */
                 ti_opt = proto_tree_add_item_ret_uint(icmp6opt_tree, hf_icmpv6_opt_prefix_preferred_lifetime, tvb, opt_offset, 4, ENC_BIG_ENDIAN, &lifetime);
-                proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                if (lifetime != LIFETIME_INFINITY) {
+                  proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                }
                 opt_offset += 4;
 
                 proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_reserved, tvb, opt_offset, 4, ENC_NA);
@@ -2227,7 +2234,9 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
 
                 /* Route Lifetime */
                 ti_opt = proto_tree_add_item_ret_uint(icmp6opt_tree, hf_icmpv6_opt_route_lifetime, tvb, opt_offset, 4, ENC_BIG_ENDIAN, &lifetime);
-                proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                if (lifetime != LIFETIME_INFINITY) {
+                  proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                }
                 opt_offset += 4;
 
                 /* Prefix */
@@ -2266,7 +2275,9 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
 
                 /* RDNSS Lifetime */
                 ti_opt = proto_tree_add_item_ret_uint(icmp6opt_tree, hf_icmpv6_opt_rdnss_lifetime, tvb, opt_offset, 4, ENC_BIG_ENDIAN, &lifetime);
-                proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                if (lifetime != LIFETIME_INFINITY) {
+                  proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                }
                 opt_offset += 4;
 
                 while(opt_offset < (offset + opt_len) ) {
@@ -2414,7 +2425,9 @@ dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree 
 
                 /* DNSSL Lifetime */
                 ti_opt = proto_tree_add_item_ret_uint(icmp6opt_tree, hf_icmpv6_opt_dnssl_lifetime, tvb, opt_offset, 4, ENC_BIG_ENDIAN, &lifetime);
-                proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                if (lifetime != LIFETIME_INFINITY) {
+                  proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                }
                 opt_offset += 4;
                 while(opt_offset < (offset + opt_len) ) {
 
@@ -2902,6 +2915,8 @@ dissect_icmpv6_rpl_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
                 guint8 prefix_len;
                 ws_in6_addr prefix;
                 address prefix_addr;
+                uint32_t lifetime;
+
                 static int * const rpl_flags[] = {
                     &hf_icmpv6_rpl_opt_route_pref,
                     &hf_icmpv6_rpl_opt_route_reserved,
@@ -2919,7 +2934,10 @@ dissect_icmpv6_rpl_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
                 opt_offset +=1;
 
                 /* Prefix lifetime. */
-                proto_tree_add_item(icmp6opt_tree, hf_icmpv6_rpl_opt_route_lifetime, tvb, opt_offset, 4, ENC_BIG_ENDIAN);
+                ti_opt = proto_tree_add_item_ret_uint(icmp6opt_tree, hf_icmpv6_rpl_opt_route_lifetime, tvb, opt_offset, 4, ENC_BIG_ENDIAN, &lifetime);
+                if (lifetime != LIFETIME_INFINITY) {
+                  proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                }
                 opt_offset += 4;
 
                 switch(opt_len){
@@ -3127,12 +3145,16 @@ dissect_icmpv6_rpl_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, proto_tree
 
                 /* Valid Lifetime */
                 ti_opt = proto_tree_add_item_ret_uint(icmp6opt_tree, hf_icmpv6_rpl_opt_prefix_vlifetime, tvb, opt_offset, 4, ENC_BIG_ENDIAN, &lifetime);
-                proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                if (lifetime != LIFETIME_INFINITY) {
+                  proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                }
                 opt_offset += 4;
 
                 /* Preferred Lifetime */
                 ti_opt = proto_tree_add_item_ret_uint(icmp6opt_tree, hf_icmpv6_rpl_opt_prefix_plifetime, tvb, opt_offset, 4, ENC_BIG_ENDIAN, &lifetime);
-                proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                if (lifetime != LIFETIME_INFINITY) {
+                  proto_item_append_text(ti_opt, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+                }
                 opt_offset += 4;
 
                 /* 4 reserved bytes. */
@@ -3851,12 +3873,16 @@ dissect_rrenum(tvbuff_t *tvb, int rr_offset, packet_info *pinfo _U_, proto_tree 
 
             /* Valid Lifetime */
             ti = proto_tree_add_item_ret_uint(up_tree, hf_icmpv6_rr_pco_up_validlifetime, tvb, rr_offset, 4, ENC_BIG_ENDIAN, &lifetime);
-            proto_item_append_text(ti, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+            if (lifetime != LIFETIME_INFINITY) {
+              proto_item_append_text(ti, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+            }
             rr_offset += 4;
 
             /* Preferred Lifetime */
             ti = proto_tree_add_item_ret_uint(up_tree, hf_icmpv6_rr_pco_up_preferredlifetime, tvb, rr_offset, 4, ENC_BIG_ENDIAN, &lifetime);
-            proto_item_append_text(ti, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+            if (lifetime != LIFETIME_INFINITY) {
+              proto_item_append_text(ti, " (%s)", unsigned_time_secs_to_str(wmem_packet_scope(), lifetime));
+            }
             rr_offset += 4;
 
             /* Flags */

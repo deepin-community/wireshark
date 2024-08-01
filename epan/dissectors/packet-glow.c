@@ -18,6 +18,7 @@
 # include "config.h"
 
 #include <epan/packet.h>
+#include <epan/proto_data.h>
 #include "packet-ber.h"
 
 #define PNAME  "Glow"
@@ -1084,9 +1085,14 @@ dissect_glow_SEQUENCE_OF_Element(bool implicit_tag _U_, tvbuff_t *tvb _U_, int o
 
 static int
 dissect_glow_ElementCollection(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  // ElementCollection → ElementCollection/_untag → Element → Node → Node/_untag → ElementCollection
+  actx->pinfo->dissection_depth += 5;
+  increment_dissection_depth(actx->pinfo);
   offset = dissect_ber_tagged_type(implicit_tag, actx, tree, tvb, offset,
                                       hf_index, BER_CLASS_APP, 4, TRUE, dissect_glow_SEQUENCE_OF_Element);
 
+  actx->pinfo->dissection_depth -= 5;
+  decrement_dissection_depth(actx->pinfo);
   return offset;
 }
 
@@ -1110,9 +1116,14 @@ dissect_glow_Parameter_U(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U
 
 static int
 dissect_glow_Parameter(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  // Parameter → Parameter/_untag → ElementCollection → ElementCollection/_untag → Element → Parameter
+  actx->pinfo->dissection_depth += 5;
+  increment_dissection_depth(actx->pinfo);
   offset = dissect_ber_tagged_type(implicit_tag, actx, tree, tvb, offset,
                                       hf_index, BER_CLASS_APP, 1, TRUE, dissect_glow_Parameter_U);
 
+  actx->pinfo->dissection_depth -= 5;
+  decrement_dissection_depth(actx->pinfo);
   return offset;
 }
 
@@ -1162,9 +1173,14 @@ dissect_glow_Template_U(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_
 
 static int
 dissect_glow_Template(bool implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+  // Template → Template/_untag → TemplateElement → Parameter → Parameter/_untag → ElementCollection → ElementCollection/_untag → Element → Template
+  actx->pinfo->dissection_depth += 8;
+  increment_dissection_depth(actx->pinfo);
   offset = dissect_ber_tagged_type(implicit_tag, actx, tree, tvb, offset,
                                       hf_index, BER_CLASS_APP, 24, TRUE, dissect_glow_Template_U);
 
+  actx->pinfo->dissection_depth -= 8;
+  decrement_dissection_depth(actx->pinfo);
   return offset;
 }
 

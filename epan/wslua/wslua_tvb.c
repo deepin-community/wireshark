@@ -159,9 +159,9 @@ WSLUA_METHOD Tvb_len(lua_State* L) {
 WSLUA_METHOD Tvb_reported_length_remaining(lua_State* L) {
     /* Obtain the reported (not captured) length of packet data to end of a <<lua_class_Tvb,`Tvb`>> or 0 if the
        offset is beyond the end of the <<lua_class_Tvb,`Tvb`>>. */
-#define Tvb_reported_length_remaining_OFFSET 2 /* offset */
+#define WSLUA_OPTARG_Tvb_reported_length_remaining_OFFSET 2 /* offset */
     Tvb tvb = checkTvb(L,1);
-    int offset = (int) luaL_optinteger(L, Tvb_reported_length_remaining_OFFSET, 0);
+    int offset = (int) luaL_optinteger(L, WSLUA_OPTARG_Tvb_reported_length_remaining_OFFSET, 0);
 
     lua_pushnumber(L,tvb_reported_length_remaining(tvb->ws_tvb, offset));
     WSLUA_RETURN(1); /* The captured length of the <<lua_class_Tvb,`Tvb`>>. */
@@ -176,9 +176,13 @@ WSLUA_METHOD Tvb_bytes(lua_State* L) {
 #define WSLUA_OPTARG_Tvb_bytes_LENGTH 3 /* The length (in octets) of the range. Defaults to until the end of the <<lua_class_Tvb,`Tvb`>>. */
     Tvb tvb = checkTvb(L,1);
     GByteArray* ba;
+#if LUA_VERSION_NUM >= 503
+    int offset = (int)luaL_optinteger(L, WSLUA_OPTARG_Tvb_bytes_OFFSET, 0);
+    int len = (int)luaL_optinteger(L, WSLUA_OPTARG_Tvb_bytes_LENGTH, -1);
+#else
     int offset = luaL_optint(L, WSLUA_OPTARG_Tvb_bytes_OFFSET, 0);
     int len = luaL_optint(L,WSLUA_OPTARG_Tvb_bytes_LENGTH,-1);
-
+#endif
     if (tvb->expired) {
         luaL_error(L,"expired tvb");
         return 0;

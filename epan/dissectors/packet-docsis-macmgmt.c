@@ -3832,6 +3832,7 @@ dissect_uccrsp (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree, void* da
  * attributes.  It's called recursively, to dissect embedded attributes
  */
 static void
+// NOLINTNEXTLINE(misc-no-recursion)
 dissect_attrs (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 {
   guint8 type;
@@ -3843,6 +3844,7 @@ dissect_attrs (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
   tvbuff_t *attr_tvb;
 
   total_len = tvb_reported_length_remaining (tvb, 0);
+  increment_dissection_depth(pinfo);
   while (pos < total_len)
   {
     type = tvb_get_guint8 (tvb, pos);
@@ -4017,6 +4019,7 @@ dissect_attrs (tvbuff_t * tvb, packet_info * pinfo, proto_tree * tree)
 
     pos += length;            /* switch */
   }                           /* while */
+  decrement_dissection_depth(pinfo);
 }
 
 static int

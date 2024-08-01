@@ -1,15 +1,16 @@
-# translation of wireshark_sv.po to Swedish
-# Copyright (C) 2009
+# Translation of wireshark debconf template to Swedish
+# Copyright (C) 2024 Martin Bagge <brother@persilja.net>
 # This file is distributed under the same license as the wireshark package.
 #
 # Martin Ågren <martin.agren@gmail.com>, 2009, 2010.
+# Martin Bagge <brother@persilja.net>, 2024
 msgid ""
 msgstr ""
 "Project-Id-Version: wireshark_sv\n"
 "Report-Msgid-Bugs-To: wireshark@packages.debian.org\n"
-"POT-Creation-Date: 2017-08-07 00:07-0400\n"
-"PO-Revision-Date: 2010-06-20 17:19+0200\n"
-"Last-Translator: Martin Ågren <martin.agren@gmail.com>\n"
+"POT-Creation-Date: 2019-09-13 00:04+0200\n"
+"PO-Revision-Date: 2024-01-12 13:57+0100\n"
+"Last-Translator: Martin Bagge <brother@persilja.net>\n"
 "Language-Team: Swedish <debian-l10n-swedish@lists.debian.org>\n"
 "Language: sv\n"
 "MIME-Version: 1.0\n"
@@ -43,9 +44,9 @@ msgstr ""
 #: ../templates:2001
 msgid ""
 "For more detailed information please see /usr/share/doc/wireshark-common/"
-"README.Debian."
+"README.Debian.gz once the package is installed."
 msgstr ""
-"Se /usr/share/doc/wireshark-common/README.Debian för mer detaljerad "
+"Se /usr/share/doc/wireshark-common/README.Debian.gz för mer detaljerad "
 "information."
 
 #. Type: boolean
@@ -62,7 +63,7 @@ msgstr ""
 #. Description
 #: ../templates:3001
 msgid "Creating the wireshark system group failed"
-msgstr ""
+msgstr "Kunde inte skapa systemgruppen wireshark"
 
 #. Type: error
 #. Description
@@ -71,6 +72,9 @@ msgid ""
 "The wireshark group does not exist, and creating it failed, so Wireshark "
 "cannot be configured to capture traffic as an unprivileged user."
 msgstr ""
+"Gruppen wireshark finns inte och det gick inte att skapa den. Detta leder "
+"till att Wireshark inte kan ställas in för att fånga trafik för vanliga "
+"användare."
 
 #. Type: error
 #. Description
@@ -79,12 +83,14 @@ msgid ""
 "Please create the wireshark system group and try configuring wireshark-"
 "common again."
 msgstr ""
+"Skapa systemgruppen wireshark och försök göra inställningar för wireshark-"
+"common igen."
 
 #. Type: error
 #. Description
 #: ../templates:4001
 msgid "The wireshark group is a system group"
-msgstr ""
+msgstr "Gruppen wireshark är en systemgrupp"
 
 #. Type: error
 #. Description
@@ -93,6 +99,8 @@ msgid ""
 "The wireshark group exists as a user group, but the preferred configuration "
 "is for it to be created as a system group."
 msgstr ""
+"Gruppen wireshark finns redan men är en användargrupp. Att ha gruppen som en "
+"systemgrupp är att föredra."
 
 #. Type: error
 #. Description
@@ -101,12 +109,14 @@ msgid ""
 "As a result, purging wireshark-common will not remove the wireshark group, "
 "but everything else should work properly."
 msgstr ""
+"Om wireshark-common raderas helt och hållet så kommer gruppen wireshark inte "
+"tas bort, allt annat fungerar dock som vanligt."
 
 #. Type: error
 #. Description
 #: ../templates:5001
 msgid "Setting capabilities for dumpcap failed"
-msgstr ""
+msgstr "Kunde inte aktivera rätt inställningar för dumpcap"
 
 #. Type: error
 #. Description
@@ -115,12 +125,14 @@ msgid ""
 "The attempt to use Linux capabilities to grant packet-capturing privileges "
 "to the dumpcap binary failed. Instead, it has had the set-user-id bit set."
 msgstr ""
+"Försökte aktivera Linux capabilities för att låta dumpcap-binären läsa "
+"datapaket misslyckades. Istället har biten set-user-id aktiverats."
 
 #. Type: error
 #. Description
 #: ../templates:6001
 msgid "Removal of the wireshark group failed"
-msgstr ""
+msgstr "Kunde inte radera wireshark-gruppen"
 
 #. Type: error
 #. Description
@@ -130,6 +142,9 @@ msgid ""
 "capture packets the postinst script of wireshark-common creates the "
 "wireshark group as a system group."
 msgstr ""
+"När paketet wireshark-common ställs in för att låta vanliga användare fånga "
+"paket så kommer postinst-skriptet att skapa gruppen wireshark som en "
+"systemgrupp."
 
 #. Type: error
 #. Description
@@ -138,9 +153,11 @@ msgid ""
 "However, on this system the wireshark group is a user group instead of being "
 "a system group, so purging wireshark-common did not remove it."
 msgstr ""
+"Men på detta system är wireshark-gruppen en användargrupp istället därför "
+"har den vanliga upprensningen efter wireshark-common inte tagit bort gruppen."
 
 #. Type: error
 #. Description
 #: ../templates:6001
 msgid "If the group is no longer needed, please remove it manually."
-msgstr ""
+msgstr "Om gruppen inte längre behövs måste den raderas manuellt."

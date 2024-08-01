@@ -1550,6 +1550,21 @@ class EthCtx:
         if self.conform.check_item('PDU', tname):
             out += self.output_proto_root()
 
+        cycle_funcs = []
+        if self.eth_dep_cycle:
+            for cur_cycle in self.eth_dep_cycle:
+                t = self.type[cur_cycle[0]]['ethname']
+                if t == tname:
+                    cycle_funcs = cur_cycle
+                    break
+
+        if len(cycle_funcs) > 1:
+            out += f'''\
+  // {' → '.join(cycle_funcs)}
+  actx->pinfo->dissection_depth += {len(cycle_funcs) - 1};
+  increment_dissection_depth(actx->pinfo);
+'''
+
         if self.conform.get_fn_presence(self.eth_type[tname]['ref'][0]):
             out += self.conform.get_fn_text(self.eth_type[tname]['ref'][0], 'FN_HDR')
         return out
@@ -1560,6 +1575,21 @@ class EthCtx:
         #if self.conform.get_fn_presence(tname):
         #  out += self.conform.get_fn_text(tname, 'FN_FTR')
         #el
+
+        cycle_funcs = []
+        if self.eth_dep_cycle:
+            for cur_cycle in self.eth_dep_cycle:
+                t = self.type[cur_cycle[0]]['ethname']
+                if t == tname:
+                    cycle_funcs = cur_cycle
+                    break
+
+        if len(cycle_funcs) > 1:
+            out += f'''\
+  actx->pinfo->dissection_depth -= {len(cycle_funcs) - 1};
+  decrement_dissection_depth(actx->pinfo);
+'''
+
         if self.conform.get_fn_presence(self.eth_type[tname]['ref'][0]):
             out += self.conform.get_fn_text(self.eth_type[tname]['ref'][0], 'FN_FTR')
         out += "  return offset;\n"
@@ -1827,12 +1857,15 @@ class EthCtx:
                     fx.write(self.eth_out_pdu_decl(f))
             if not first_decl:
                 fx.write('\n')
+
+        add_depth_define = False
         if self.eth_dep_cycle:
             fx.write('/*--- Cyclic dependencies ---*/\n\n')
             i = 0
             while i < len(self.eth_dep_cycle):
                 t = self.type[self.eth_dep_cycle[i][0]]['ethname']
                 if self.dep_cycle_eth_type[t][0] != i: i += 1; continue
+                add_depth_define = True
                 fx.write(''.join(['/* %s */\n' % ' -> '.join(self.eth_dep_cycle[i]) for i in self.dep_cycle_eth_type[t]]))
                 if not self.eth_type[t]['export'] & EF_TYPE:
                     fx.write(self.eth_type_fn_h(t))

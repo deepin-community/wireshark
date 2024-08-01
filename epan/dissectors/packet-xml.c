@@ -1119,6 +1119,7 @@ static gchar *fully_qualified_name(GPtrArray *hier, gchar *name, gchar *proto_na
 }
 
 
+// NOLINTNEXTLINE(misc-no-recursion)
 static xml_ns_t *make_xml_hier(gchar      *elem_name,
                                xml_ns_t   *root,
                                wmem_map_t *elements,
@@ -1142,6 +1143,11 @@ static xml_ns_t *make_xml_hier(gchar      *elem_name,
 
     if (! ( orig = (xml_ns_t *)wmem_map_lookup(elements, elem_name) )) {
         g_string_append_printf(error, "element '%s' is not defined\n", elem_name);
+        return NULL;
+    }
+
+    if (hier->len >= prefs.gui_max_tree_depth) {
+        g_string_append_printf(error, "hierarchy too deep: %u\n", hier->len);
         return NULL;
     }
 
@@ -1512,7 +1518,9 @@ static void init_xml_names(void)
 static void
 xml_init_protocol(void)
 {
-    encoding_pattern = g_regex_new("^<[?]xml\\s+version\\s*=\\s*[\"']\\s*.+\\s*[\"']\\s+encoding\\s*=\\s*[\"']\\s*(.+)\\s*[\"']", G_REGEX_CASELESS, 0, 0);
+    // The longest encoding at https://www.iana.org/assignments/character-sets/character-sets.xml
+    // is 45 characters (Extended_UNIX_Code_Packed_Format_for_Japanese).
+    encoding_pattern = g_regex_new("^\\s*<[?]xml\\s+version\\s*=\\s*[\"']\\s*(?U:.+)\\s*[\"']\\s+encoding\\s*=\\s*[\"']\\s*((?U).{1,50})\\s*[\"']", G_REGEX_CASELESS, 0, 0);
 }
 
 static void

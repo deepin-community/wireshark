@@ -49,9 +49,8 @@ class SequenceDialog : public WiresharkDialog
     Q_OBJECT
 
 public:
-    explicit SequenceDialog(QWidget &parent, CaptureFile &cf, SequenceInfo *info = NULL);
+    explicit SequenceDialog(QWidget &parent, CaptureFile &cf, SequenceInfo *info = NULL, bool voipFeatures = false);
     ~SequenceDialog();
-    void enableVoIPFeatures();
 
 protected:
     void showEvent(QShowEvent *event);
@@ -78,6 +77,7 @@ private slots:
     void fillDiagram();
     void resetView();
     void exportDiagram();
+    void layoutAxisLabels();
 
     void on_buttonBox_clicked(QAbstractButton *button);
     void on_actionGoToPacket_triggered();
@@ -123,6 +123,7 @@ private:
     QPointer<RtpStreamDialog> rtp_stream_dialog_;       // Singleton pattern used
     bool voipFeaturesEnabled;
 
+    void enableVoIPFeatures();
     void zoomXAxis(bool in);
     void panAxes(int x_pixels, int y_pixels);
     void resetAxes(bool keep_lower = false);
