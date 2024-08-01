@@ -1135,17 +1135,18 @@ ssh_tree_add_hostsignature(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_
         offset += ssh_tree_add_mpint(tvb, offset, tree, hf_ssh_hostsig_rsa);
     } else if (0 == strcmp(sig_type, "ssh-dss")) {
         offset += ssh_tree_add_mpint(tvb, offset, tree, hf_ssh_hostsig_dsa);
-    } else if (g_str_has_prefix(sig_type, "ecdsa-sha2-")) {
+//    } else if (g_str_has_prefix(sig_type, "ecdsa-sha2-")) {
 //        offset += ssh_tree_add_string(tvb, offset, tree,
 //                                      hf_ssh_hostkey_ecdsa_curve_id, hf_ssh_hostkey_ecdsa_curve_id_length);
 //        ssh_tree_add_string(tvb, offset, tree,
 //                            hf_ssh_hostkey_ecdsa_q, hf_ssh_hostkey_ecdsa_q_length);
-    } else if (g_str_has_prefix(sig_type, "ssh-ed")) {
+//    } else if (g_str_has_prefix(sig_type, "ssh-ed")) {
 //        ssh_tree_add_string(tvb, offset, tree,
 //                            hf_ssh_hostkey_eddsa_key, hf_ssh_hostkey_eddsa_key_length);
     } else {
         remaining_len = sig_len - (type_len + 4);
         proto_tree_add_item(tree, hf_ssh_hostsig_data, tvb, offset, remaining_len, ENC_NA);
+        offset += remaining_len;
     }
 
     if(offset-offset0!=(int)(4+sig_len)){
@@ -2130,6 +2131,8 @@ ssh_kex_hash_type(gchar *type_string)
         return SSH_KEX_HASH_SHA1;
     }else if (type_string && g_str_has_suffix(type_string, "sha256")) {
         return SSH_KEX_HASH_SHA256;
+    }else if (type_string && g_str_has_suffix(type_string, "sha256@libssh.org")) {
+        return SSH_KEX_HASH_SHA256;
     }else if (type_string && g_str_has_suffix(type_string, "sha512")) {
         return SSH_KEX_HASH_SHA512;
     } else {
@@ -2750,7 +2753,6 @@ ssh_decryption_set_mac_id(struct ssh_peer_data *peer)
     } else if (0 == strcmp(mac_name, "hmac-sha2-256")) {
         peer->mac_id = CIPHER_MAC_SHA2_256;
     } else {
-        peer->mac = NULL;
         ws_debug("decryption MAC not supported: %s", mac_name);
     }
 }

@@ -250,6 +250,7 @@ void t38_add_address(packet_info *pinfo,
         p_conversation_data->setup_frame_number = setup_frame_number;
         p_conversation_data->src_t38_info.reass_ID = 0;
         p_conversation_data->src_t38_info.reass_start_seqnum = -1;
+        p_conversation_data->src_t38_info.reass_start_data_field = 0;
         p_conversation_data->src_t38_info.reass_data_type = 0;
         p_conversation_data->src_t38_info.last_seqnum = -1;
         p_conversation_data->src_t38_info.packet_lost = 0;
@@ -261,6 +262,7 @@ void t38_add_address(packet_info *pinfo,
 
         p_conversation_data->dst_t38_info.reass_ID = 0;
         p_conversation_data->dst_t38_info.reass_start_seqnum = -1;
+        p_conversation_data->dst_t38_info.reass_start_data_field = 0;
         p_conversation_data->dst_t38_info.reass_data_type = 0;
         p_conversation_data->dst_t38_info.last_seqnum = -1;
         p_conversation_data->dst_t38_info.packet_lost = 0;
@@ -323,8 +325,9 @@ force_reassemble_seq(reassembly_table *table, packet_info *pinfo, guint32 id)
 	  last_fd=fd_i;
 	}
 
-	data = (guint8 *) wmem_alloc(pinfo->pool, size);
+	data = (guint8 *) g_malloc(size);
 	fd_head->tvb_data = tvb_new_real_data(data, size, size);
+        tvb_set_free_cb(fd_head->tvb_data, g_free);
 	fd_head->len = size;		/* record size for caller	*/
 
 	/* add all data fragments */
@@ -432,6 +435,7 @@ init_t38_info_conv(packet_info *pinfo)
 
 		p_t38_conv->src_t38_info.reass_ID = 0;
 		p_t38_conv->src_t38_info.reass_start_seqnum = -1;
+		p_t38_conv->src_t38_info.reass_start_data_field = 0;
 		p_t38_conv->src_t38_info.reass_data_type = 0;
 		p_t38_conv->src_t38_info.last_seqnum = -1;
 		p_t38_conv->src_t38_info.packet_lost = 0;
@@ -443,6 +447,7 @@ init_t38_info_conv(packet_info *pinfo)
 
 		p_t38_conv->dst_t38_info.reass_ID = 0;
 		p_t38_conv->dst_t38_info.reass_start_seqnum = -1;
+		p_t38_conv->dst_t38_info.reass_start_data_field = 0;
 		p_t38_conv->dst_t38_info.reass_data_type = 0;
 		p_t38_conv->dst_t38_info.last_seqnum = -1;
 		p_t38_conv->dst_t38_info.packet_lost = 0;

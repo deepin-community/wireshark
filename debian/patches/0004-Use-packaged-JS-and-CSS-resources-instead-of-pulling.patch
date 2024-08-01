@@ -1,15 +1,12 @@
-From: Balint Reczey <balint.reczey@canonical.com>
-Date: Sun, 10 Mar 2019 19:51:39 +0100
-Subject: Use packaged JS and CSS resources instead of pulling them from the
- Internet
+From: Uli Heilmeier <uh@heilmeier.eu>
+Date: Wed, 6 Dec 2023 10:36:55 +0100
+Subject: Use packaged JS and CSS resources instead of downloading them
+ https://gitlab.com/wireshark/wireshark/-/issues/19013#note_1682959548
 
-Change-Id: I75aa5c14a9305ccff12cf4d6f751c2f8eb359c0b
 ---
  ipmap.html | 20 +++++---------------
  1 file changed, 5 insertions(+), 15 deletions(-)
 
-diff --git a/resources/share/wireshark/ipmap.html b/resources/share/wireshark/ipmap.html
-index fa8b542..708b84c 100644
 --- a/resources/share/wireshark/ipmap.html
 +++ b/resources/share/wireshark/ipmap.html
 @@ -2,15 +2,9 @@
@@ -31,7 +28,7 @@ index fa8b542..708b84c 100644
  <!--
  <link rel="stylesheet" href="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.css"
      integrity="sha512-wgiKVjb46JxgnGNL6xagIy2+vpqLQmmHH7fWD/BnPzouddSmbRTf6xatWIRbH2Rgr2F+tLtCZKbxnhm5Xz0BcA=="
-@@ -43,12 +37,8 @@ html, body {
+@@ -43,12 +37,14 @@
  .range-control-input { padding: 0; width: 130px; }
  .range-control-input, .range-control-label { vertical-align: middle; }
  </style>
@@ -41,8 +38,26 @@ index fa8b542..708b84c 100644
 -<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"
 -    integrity="sha512-MQlyPV+ol2lp4KodaU/Xmrn+txc1TP15pOBF/2Sfre7MRsA/pB4Vy58bEqe9u7a7DczMLtU5wT8n7OblJepKbg=="
 -    crossorigin=""></script>
-+<script src="file:///usr/share/javascript/leaflet/leaflet.js"></script>
-+<script src="file:///usr/share/javascript/leaflet/leaflet.markercluster.js"></script>
++<script>
++var failedLoad=false;
++function loadError() {
++    failedLoad = true;
++    }
++</script>
++<script src="file:///usr/share/javascript/leaflet/leaflet.js" onerror=loadError()></script>
++<script src="file:///usr/share/javascript/leaflet/leaflet.markercluster.js" onerror=loadError()></script>
  <!--
  <script src="https://unpkg.com/leaflet-measure@3.1.0/dist/leaflet-measure.js"
      integrity="sha512-ovh6EqS7MUI3QjLWBM7CY8Gu8cSM5x6vQofUMwKGbHVDPSAS2lmNv6Wq5es5WCz1muyojQxcc8rA3CvVjD2Z+A=="
+@@ -372,6 +368,11 @@
+ <input type="file" id="file-picker" accept=".json,.html"></label>
+ <p id="error-message"></p>
+ </div>
++<script>
++    if (failedLoad) {
++        showError("Failed to load leaflet. Please install packages libjs-leaflet and libjs-leaflet.markercluster.");
++    }
++</script>
+ <div id="map"></div>
+ <!--
+     Wireshark will append a script tag (id="ipmap-data" type="application/json")

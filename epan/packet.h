@@ -465,15 +465,19 @@ typedef struct heur_dtbl_entry {
 	const gchar *display_name;     /* the string used to present heuristic to user */
 	gchar *short_name;     /* string used for "internal" use to uniquely identify heuristic */
 	gboolean enabled;
+	bool enabled_by_default;
 } heur_dtbl_entry_t;
 
 /** A protocol uses this function to register a heuristic sub-dissector list.
  *  Call this in the parent dissectors proto_register function.
  *
- * @param name the name of this protocol
+ * @param name a unique short name for the list
  * @param proto the value obtained when registering the protocol
  */
 WS_DLL_PUBLIC heur_dissector_list_t register_heur_dissector_list(const char *name, const int proto);
+
+/** Deregister a heuristic dissector list by unique short name. */
+void deregister_heur_dissector_list(const char *name);
 
 typedef void (*DATFunc_heur) (const gchar *table_name,
     struct heur_dtbl_entry *entry, gpointer user_data);
@@ -885,6 +889,20 @@ WS_DLL_PUBLIC gboolean postdissectors_want_hfids(void);
  */
 WS_DLL_PUBLIC void
 prime_epan_dissect_with_postdissector_wanted_hfids(epan_dissect_t *edt);
+
+/** Increment the dissection depth.
+ * This should be used to limit recursion outside the tree depth checks in
+ * call_dissector and dissector_try_heuristic.
+ * @param pinfo Packet Info.
+ */
+
+WS_DLL_PUBLIC void increment_dissection_depth(packet_info *pinfo);
+
+/** Decrement the dissection depth.
+ * @param pinfo Packet Info.
+ */
+
+WS_DLL_PUBLIC void decrement_dissection_depth(packet_info *pinfo);
 
 /** @} */
 

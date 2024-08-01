@@ -9,9 +9,26 @@
 
 include /usr/share/dpkg/pkg-info.mk
 
-distrelease  := $(shell lsb_release -cs)
-ifeq ($(distrelease),n/a)
-  distrelease     := sid
+QT6_BUILD_DEPS = qt6-5compat-dev, qt6-base-dev, qt6-base-dev-tools, qt6-multimedia-dev, qt6-tools-dev
+QT6_DEPS = libqt6svg6
+QT6_RECOMMENDS = libqt6multimedia6
+QT5_BUILD_DEPS = qtbase5-dev, qtbase5-dev-tools, qtbase5-dev-tools, qtmultimedia5-dev, qttools5-dev
+QT5_DEPS = libqt5svg5
+QT5_RECOMMENDS = libqt5multimedia5-plugins
+
+CONTROL_IN_SED_CMD =
+ifneq ($(filter focal jammy,$(DEB_DISTRIBUTION)),)
+CONTROL_IN_SED_CMD := $(CONTROL_IN_SED_CMD)s/@QT_BUILD_DEPS@/$(QT5_BUILD_DEPS)/;s/@QT_DEPS@/$(QT5_DEPS)/;s/@QT_RECOMMENDS@/$(QT5_RECOMMENDS)/;s/, qt/,\\n               qt/g;
+else
+CONTROL_IN_SED_CMD := $(CONTROL_IN_SED_CMD)s/@QT_BUILD_DEPS@/$(QT6_BUILD_DEPS)/;s/@QT_DEPS@/$(QT6_DEPS)/;s/@QT_RECOMMENDS@/$(QT6_RECOMMENDS)/;s/, qt/,\\n               qt/g;
+endif
+ifneq ($(filter focal,$(DEB_DISTRIBUTION)),)
+CONTROL_IN_SED_CMD := $(CONTROL_IN_SED_CMD)s/^ *libbcg729-dev/\# libbcg729-dev/;s/^ *libnghttp3-dev/\# libnghttp3-dev/;
+endif
+ifneq ($(filter noble oracular unstable sid testing trixie UNRELEASED,$(DEB_DISTRIBUTION)),)
+CONTROL_IN_SED_CMD := $(CONTROL_IN_SED_CMD)s/@LIBSSH_DEV@/libssh-dev/;
+else
+CONTROL_IN_SED_CMD := $(CONTROL_IN_SED_CMD)s/@LIBSSH_DEV@/libssh-gcrypt-dev/;
 endif
 
 # This has to be exported to make some magic below work.
@@ -25,7 +42,8 @@ export docdir = /usr/share/doc/wireshark-doc
 
 override_dh_auto_configure:
 	dh_auto_configure -- -DBUILD_xxx2deb=ON -DBUILD_corbaidl2wrs=ON -DBUILD_falcodump=ON \
-		-DVCSVERSION_OVERRIDE="Git v$(DEB_VERSION_UPSTREAM) packaged as $(DEB_VERSION)"
+		-DVCSVERSION_OVERRIDE="Git v$(DEB_VERSION_UPSTREAM) packaged as $(DEB_VERSION)" \
+		-DUSE_qt6=$$(if grep -q qt6-base-dev debian/control; then echo ON; else echo OFF; fi)
 
 override_dh_auto_build-arch:
 	# regenerate ASN.1 dissectors
@@ -50,6 +68,8 @@ override_dh_dwz:
 override_dh_auto_install-arch:
 	dh_auto_install -a
 	$(MAKE) DESTDIR=$(CURDIR)/debian/tmp -C $(CURDIR)/obj-* install-headers
+	# fixes #1068410, can be dropped in wireshark 4.4
+	cp epan/dfilter/dfilter-loc.h debian/tmp/usr/include/wireshark/epan/dfilter/
 	rm -f debian/*.shlibs
 	mkdir -p $(CURDIR)/debian/tmp/etc/wireshark/
 
@@ -81,6 +101,18 @@ endif
 endif
 
 override_dh_clean:
-	dh_clean
+	dh_clean -- debian/control
+	# regenerate debian/control
+ifneq ($(filter noble oracular unstable sid testing trixie UNRELEASED,$(DEB_DISTRIBUTION)),)
+	sed "$(CONTROL_IN_SED_CMD)" debian/control.t64.in > debian/control
+else
+	sed "$(CONTROL_IN_SED_CMD)" debian/control.in > debian/control
+        # also revert t64-related changes in backports
+	for f in debian/lib*t64*; do \
+		[ -f $$f ] || continue; \
+		sed -i 's/\([0-9]\)t64/\1/g' $$f; \
+		echo $$f | sed 's/t64//' | xargs mv $$f; \
+	done
+endif
 	# ignore #653916
 	@echo 'blhc: ignore-line-regexp: .*CMakeCXXCompilerABI.cpp .*'

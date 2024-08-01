@@ -288,7 +288,8 @@ QDir MainApplication::openDialogInitialDir() {
 
 void MainApplication::setLastOpenDirFromFilename(const QString file_name)
 {
-    QString directory = QFileInfo(file_name).absolutePath();
+    /* XXX - Use canonicalPath() instead of absolutePath()? */
+    QString directory = QDir::toNativeSeparators(QFileInfo(file_name).absolutePath());
     /* XXX - printable? */
     set_last_open_dir(qUtf8Printable(directory));
 }
@@ -1234,15 +1235,17 @@ bool MainApplication::softwareUpdateCanShutdown() {
     software_update_ok_ = true;
     // At this point the update is ready to install, but WinSparkle has
     // not yet run the installer. We need to close our "Wireshark is
-    // running" mutexes along with those of our child processes, e.g.
-    // dumpcap.
+    // running" mutexes since the IsWiresharkRunning NSIS macro checks
+    // for them.
+    //
+    // We must not exit the Qt main event loop here, which means we must
+    // not close the main window.
 
     // Step 1: See if we have any open files.
     emit softwareUpdateRequested();
     if (software_update_ok_ == true) {
 
         // Step 2: Close the "running" mutexes.
-        emit softwareUpdateClose();
         close_app_running_mutex();
     }
     return software_update_ok_;
@@ -1251,7 +1254,9 @@ bool MainApplication::softwareUpdateCanShutdown() {
 void MainApplication::softwareUpdateShutdownRequest() {
     // At this point the installer has been launched. Neither Wireshark nor
     // its children should have any "Wireshark is running" mutexes open.
-    // The main window should be closed.
+    // The main window should still be open as noted above in
+    // softwareUpdateCanShutdown and it's safe to exit the Qt main
+    // event loop.
 
     // Step 3: Quit.
     emit softwareUpdateQuit();

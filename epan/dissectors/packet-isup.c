@@ -9723,6 +9723,7 @@ dissect_japan_chg_inf(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *isu
 }
 
 /* ------------------------------------------------------------------ */
+// NOLINTBEGIN(misc-no-recursion)
 static void
 dissect_ansi_isup_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *isup_tree, guint8 itu_isup_variant, guint32 circuit_id)
 {
@@ -9738,6 +9739,9 @@ dissect_ansi_isup_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree 
                                             params explicitly set to TRUE in case statement */
   tap_calling_number            = NULL;
   offset                        = 0;
+
+  // We call ourselves for MESSAGE_TYPE_PASS_ALONG.
+  increment_dissection_depth(pinfo);
 
   /* Extract message type field */
   message_type = tvb_get_guint8(message_tvb, 0);
@@ -9991,8 +9995,12 @@ dissect_ansi_isup_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree 
   tap_rec->called_number  = tap_called_number;
   tap_rec->cause_value    = tap_cause_value;
   tap_queue_packet(isup_tap, pinfo, tap_rec);
-}
 
+  decrement_dissection_depth(pinfo);
+}
+// NOLINTEND(misc-no-recursion)
+
+// NOLINTBEGIN(misc-no-recursion)
 static void
 dissect_isup_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *isup_tree, guint8 itu_isup_variant, guint32 circuit_id)
 {
@@ -10008,6 +10016,9 @@ dissect_isup_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *isup
                                              params explicitly set to TRUE in case statement */
   tap_calling_number            = NULL;
   offset                        = 0;
+
+  // We call ourselves for MESSAGE_TYPE_PASS_ALONG.
+  increment_dissection_depth(pinfo);
 
   /* Extract message type field */
   message_type = tvb_get_guint8(message_tvb, 0);
@@ -10360,7 +10371,10 @@ dissect_isup_message(tvbuff_t *message_tvb, packet_info *pinfo, proto_tree *isup
   tap_rec->called_number  = tap_called_number;
   tap_rec->cause_value    = tap_cause_value;
   tap_queue_packet(isup_tap, pinfo, tap_rec);
+
+  decrement_dissection_depth(pinfo);
 }
+// NOLINTEND(misc-no-recursion)
 
 /* ------------------------------------------------------------------ */
 static int

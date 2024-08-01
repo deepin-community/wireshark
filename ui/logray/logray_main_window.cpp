@@ -399,8 +399,6 @@ LograyMainWindow::LograyMainWindow(QWidget *parent) :
 #if defined(HAVE_SOFTWARE_UPDATE) && defined(Q_OS_WIN)
     connect(mainApp, SIGNAL(softwareUpdateRequested()), this, SLOT(softwareUpdateRequested()),
         Qt::BlockingQueuedConnection);
-    connect(mainApp, SIGNAL(softwareUpdateClose()), this, SLOT(close()),
-        Qt::BlockingQueuedConnection);
 #endif
 
     df_combo_box_ = new DisplayFilterCombo(this);
@@ -447,6 +445,11 @@ LograyMainWindow::LograyMainWindow(QWidget *parent) :
 
 #ifndef HAVE_LIBPCAP
     main_ui_->menuCapture->setEnabled(false);
+    main_ui_->actionCaptureStart->setEnabled(false);
+    main_ui_->actionCaptureStop->setEnabled(false);
+    main_ui_->actionCaptureRestart->setEnabled(false);
+    main_ui_->actionCaptureOptions->setEnabled(false);
+    main_ui_->actionCaptureRefreshInterfaces->setEnabled(false);
 #endif
 
     // Set OS specific shortcuts for fullscreen mode

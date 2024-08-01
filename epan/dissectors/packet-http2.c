@@ -38,6 +38,7 @@
 
 #ifdef HAVE_NGHTTP2
 #include <epan/uat.h>
+#include <epan/charsets.h>
 #include <epan/decode_as.h>
 #include <nghttp2/nghttp2.h>
 #include <epan/export_object.h>
@@ -1187,6 +1188,7 @@ http2_cleanup_protocol(void) {
 }
 
 static dissector_handle_t http2_handle;
+static dissector_handle_t data_handle;
 
 static reassembly_table http2_body_reassembly_table;
 static reassembly_table http2_streaming_reassembly_table;
@@ -2947,6 +2949,78 @@ get_reassembly_id_from_stream(packet_info *pinfo, http2_session_t* session)
     return stream_info->stream_id | (flow_index << 31);
 }
 
+/*
+ * Like process_reassembled_data() in reassemble.[ch], but ignores the layer
+ * number, which is not always stable in HTTP/2, if multiple TLS records are
+ * in the same frame.
+ */
+static tvbuff_t*
+http2_process_reassembled_data(tvbuff_t *tvb, const int offset, packet_info *pinfo,
+	const char *name, fragment_head *fd_head, const fragment_items *fit,
+	gboolean *update_col_infop, proto_tree *tree)
+{
+    tvbuff_t* next_tvb;
+    gboolean update_col_info;
+    proto_item* frag_tree_item;
+
+    if (fd_head != NULL) {
+        /*
+         * OK, we've reassembled this.
+         * Is this something that's been reassembled from more
+         * than one fragment?
+         */
+        if (fd_head->next != NULL) {
+            /*
+             * Yes.
+             * Allocate a new tvbuff, referring to the
+             * reassembled payload, and set
+             * the tvbuff to the list of tvbuffs to which
+             * the tvbuff we were handed refers, so it'll get
+             * cleaned up when that tvbuff is cleaned up.
+             */
+            next_tvb = tvb_new_chain(tvb, fd_head->tvb_data);
+
+            /* Add the defragmented data to the data source list. */
+            add_new_data_source(pinfo, next_tvb, name);
+
+            /* show all fragments */
+            if (fd_head->flags & FD_BLOCKSEQUENCE) {
+                update_col_info = !show_fragment_seq_tree(
+                    fd_head, fit, tree, pinfo, next_tvb, &frag_tree_item);
+            }
+            else {
+                update_col_info = !show_fragment_tree(fd_head,
+                    fit, tree, pinfo, next_tvb, &frag_tree_item);
+            }
+        }
+        else {
+            /*
+             * No.
+             * Return a tvbuff with the payload. next_tvb ist from offset until end
+             */
+            next_tvb = tvb_new_subset_remaining(tvb, offset);
+            pinfo->fragmented = FALSE;	/* one-fragment packet */
+            update_col_info = TRUE;
+        }
+        if (update_col_infop != NULL)
+            *update_col_infop = update_col_info;
+    } else {
+        /*
+         * We don't have the complete reassembled payload, or this
+         * isn't the final frame of that payload.
+         */
+        next_tvb = NULL;
+        /* process_reassembled_data() in reassemble.[ch] adds reassembled_in
+         * here, but the reas_in_layer_num is often unstable in HTTP/2 now so
+         * we rely on the stream end flag (that's why we have this function).
+         *
+         * Perhaps we could DISSECTOR_ASSERT() in this path, we shouldn't
+         * get here.
+         */
+    }
+    return next_tvb;
+}
+
 static tvbuff_t*
 reassemble_http2_data_into_full_frame(tvbuff_t *tvb, packet_info *pinfo, http2_session_t* http2_session, proto_tree *http2_tree, guint offset,
                                       guint8 flags, guint datalen)
@@ -2973,8 +3047,8 @@ reassemble_http2_data_into_full_frame(tvbuff_t *tvb, packet_info *pinfo, http2_s
      * incorrectly match for frames that exist in the same packet as the final DATA frame and incorrectly add
      * reassembly information to those dissection trees */
     if (head && IS_HTTP2_END_STREAM(flags)) {
-        return process_reassembled_data(tvb, offset, pinfo, "Reassembled body", head,
-                                        &http2_body_fragment_items, NULL, http2_tree);
+        return http2_process_reassembled_data(tvb, offset, pinfo, "Reassembled body", head,
+                                              &http2_body_fragment_items, NULL, http2_tree);
     }
 
     /* Add frame where reassembly happened. process_reassembled_data() does this automatically if the reassembled
@@ -3085,6 +3159,21 @@ reassemble_http2_data_according_to_subdissector(tvbuff_t* tvb, packet_info* pinf
     streaming_reassembly_info_t* reassembly_info = get_streaming_reassembly_info(pinfo, http2_session);
 
     dissector_handle_t subdissector_handle = dissector_get_string_handle(streaming_content_type_dissector_table, content_type);
+    if (subdissector_handle == NULL) {
+        /* We didn't get the content type, possibly because of byte errors.
+         * Note that the content type is per direction (as it should be)
+         * but reassembly_mode is set the same for *both* directions.
+         *
+         * We could try to set it to the content type used in the other
+         * direction, but among other things, if this is the request,
+         * we might be getting here for the first time on the second pass,
+         * and reassemble_streaming_data_and_call_subdissector() asserts in
+         *
+         * Just set it to data for now to avoid an assert from a NULL handle.
+         */
+        subdissector_handle = data_handle;
+    }
+    /* XXX - Do we still need to set this? */
     pinfo->match_string = content_type;
 
     reassemble_streaming_data_and_call_subdissector(
@@ -3166,7 +3255,7 @@ get_real_header_value(packet_info* pinfo, const gchar* name, gboolean the_other_
                 value_len = pntoh32(data + 4 + name_len);
                 if (4 + name_len + 4 + value_len == hdr->table.data.datalen) {
                     /* return value */
-                    return wmem_strndup(pinfo->pool, data + 4 + name_len + 4, value_len);
+                    return get_ascii_string(pinfo->pool, data + 4 + name_len + 4, value_len);
                 }
                 else {
                     return NULL; /* unexpected error */
@@ -4794,6 +4883,8 @@ proto_reg_handoff_http2(void)
 #ifdef HAVE_NGHTTP2
     media_type_dissector_table = find_dissector_table("media_type");
 #endif
+
+    data_handle = find_dissector("data");
 
     dissector_add_uint_range_with_preference("tcp.port", "", http2_handle);
     dissector_add_for_decode_as("tcp.port", http2_handle);

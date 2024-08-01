@@ -108,10 +108,8 @@ FunctionIdentifier	[[:alpha:]_][[:alnum:]_]*
  * Some protocol names contain dots, e.g: _ws.expert
  * Protocol or protocol field cannot contain DOTDOT anywhere.
  */
-VarIdentifier1		[[:alpha:]_][[:alnum:]_-]*
-VarIdentifier2		[[:alnum:]_]+
-ProtocolName		{VarIdentifier1}|{VarIdentifier2}
-ProtoFieldIdentifier	{ProtocolName}(\.{ProtocolName})*
+VarIdentifier		[[:alnum:]_][[:alnum:]_-]*
+ProtoFieldIdentifier	{VarIdentifier}(\.{VarIdentifier})*
 
 hex2			[[:xdigit:]]{2}
 ColonMacAddress		{hex2}:{hex2}:{hex2}:{hex2}:{hex2}:{hex2}
@@ -137,7 +135,7 @@ V6CidrPrefix		\/[[:digit:]]{1,3}
 
 /* Catch all valid semantic values. Cannot contain DOT DOT or start with MINUS. */
 StartAlphabet		[[:alnum:]_:]
-Alphabet		[[:alnum:]_:/]
+Alphabet		[[:alnum:]_:/-]
 LiteralValue		{StartAlphabet}{Alphabet}*(\.{Alphabet}+)*
 
 Exponent		([eE][+-]?[[:digit:]]+)
@@ -904,8 +902,8 @@ parse_charconst(dfsyntax_t *dfs, const char *s, unsigned long *valuep)
 					dfilter_fail(dfs, DF_ERROR_GENERIC, dfs->string_loc, "%s isn't a valid character constant.", s);
 					return false;
 				}
+				cp++;
 			}
-			cp++;
 			break;
 
 		case 'u':

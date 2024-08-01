@@ -1,3 +1,91 @@
+wireshark (4.2.6-1) unstable; urgency=medium
+
+  * Build depend on libssh-dev instead of libssh-gcrypt-dev on latest
+    distribution releases. This is made possible by OpenSSL switching
+    its license to Apache 2.0.
+    (Closes: #1074268)
+  * New upstream version:
+    - security fixes:
+      - The SPRT dissector could crash
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 11 Jul 2024 23:26:26 +0200
+
+wireshark (4.2.5-2) sid; urgency=medium
+
+  * debian/rules: Keep the t64 transition when targeting sid or oracular
+    (Closes: #1072821)
+
+ -- Balint Reczey <balint@balintreczey.hu>  Sun, 09 Jun 2024 11:49:52 +0200
+
+wireshark (4.2.5-1) unstable; urgency=medium
+
+  * New upstream version:
+    - security fixes:
+      - MONGO and ZigBee TLV dissector infinite loops (CVE-2024-4854)
+      - The editcap command line utility could crash when chopping bytes
+        from the beginning of a packet. (CVE-2024-4853)
+      - The editcap command line utility could crash when injecting secrets
+        while writing multiple files (CVE-2024-4855)
+  * debian/patches: Drop cherry picked patch already integrated upstream
+  * Update symbols files
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 16 May 2024 21:07:29 +0200
+
+wireshark (4.2.4-1) unstable; urgency=medium
+
+  [ Martin Bagge ]
+  * Update Swedish debconf translation (Closes: #1060670)
+
+  [ Balint Reczey ]
+  * debian/control: Drop comment about libgnutls28-dev's version's GPL
+    compatibility. All supported releases already have the GPL2+ compatible
+    libgnutls28-dev version.
+  * Generate debian/control from control.in based on the target release
+  * ACK NMU
+  * Drop t64-related changes for backports
+  * debian/watch: Update handling GitLab's page to make uscan work again
+  * New upstream version 4.2.4:
+    - security fixes (Closes: #1068111):
+      - T.38 dissector crash (CVE-2024-2955)
+  * Update symbols for libwireshark17t64
+  * libwireshark-dev: Ship missing dfilter-loc.h.
+    Also check if dfilter.h is usable, too, in debian/headers-check.c.
+    (Closes: #1068410)
+  * Cherry-pick upstream patch to fix Lua 5.2 integration on 32 bit systems
+
+ -- Balint Reczey <balint@balintreczey.hu>  Fri, 26 Apr 2024 11:30:27 +0200
+
+wireshark (4.2.2-1.1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Rename libraries for 64-bit time_t transition.  Closes: #1063071
+
+ -- Steve Langasek <vorlon@debian.org>  Thu, 29 Feb 2024 02:04:43 +0000
+
+wireshark (4.2.2-1) unstable; urgency=medium
+
+  * New upstream version 4.2.1:
+    - security fixes (Closes: #1059925):
+      - GVCP dissector crash (CVE-2024-0208)
+      - IEEE 1609.2 dissector crash (CVE-2024-0209)
+      - HTTP3 dissector crash (CVE-2024-0207)
+      - Zigbee TLV dissector crash (CVE-2024-0210)
+      - DOCSIS dissector crash (CVE-2024-0211)
+  * debian/control: Replace all Qt5 dependencies with Qt6 equivalents
+    (Closes: #1056642)
+  * debian/control: Use versioned Conflicts+Replaces to migrate wireshark-qt
+    files to wireshark (Closes: #1056985)
+  * Suggest installing the missing packages on ipmap.html
+    when the JavaScript files are missing.
+    Thanks to Uli Heilmeier for the improved patch.
+  * debian/control: Skip pytest build dependencies in the nocheck profile
+  * debian/copyright: Don't exclude debian/
+    Upstream moved the dir to packaging/debian thus there can't be any
+    file collision between upsteam's and Debian's packaing
+  * New upstream version 4.2.2
+
+ -- Balint Reczey <balint@balintreczey.hu>  Fri, 05 Jan 2024 23:25:07 +0100
+
 wireshark (4.2.0-1) unstable; urgency=medium
 
   * Merge wireshark-qt to the wireshark package

@@ -57,7 +57,7 @@ endif()
 # Updated by tools/make-version.py
 set(PROJECT_MAJOR_VERSION 4)
 set(PROJECT_MINOR_VERSION 2)
-set(PROJECT_PATCH_VERSION 0)
+set(PROJECT_PATCH_VERSION 6)
 set(PROJECT_BUILD_VERSION 0)
 set(PROJECT_VERSION_EXTENSION "")
 
@@ -1201,6 +1201,10 @@ find_package(GCRYPT "1.8.0" REQUIRED)
 # C Asynchronous resolver
 reset_find_package(CARES)
 find_package(CARES "1.13.0" REQUIRED)
+if (CARES_VERSION VERSION_GREATER_EQUAL "1.28.0")
+	# Suppress deprecation warnings.
+	add_compile_definitions(CARES_NO_DEPRECATED)
+endif ()
 find_package(LEX REQUIRED)
 find_package(Perl)
 find_package(PCRE2 REQUIRED)
@@ -1499,15 +1503,15 @@ if (QT_FOUND)
 		# https://doc.qt.io/qt-5.11/supported-platforms-and-configurations.html
 		# https://doc.qt.io/qt-5.15/supported-platforms.html
 		# https://doc-snapshots.qt.io/qt6-dev/supported-platforms.html
-		if(Qt${qtver}Widgets_VERSION VERSION_GREATER_EQUAL "6.5.0")
+		if(Qt${qtver}Widgets_VERSION VERSION_GREATER_EQUAL "6.5.0" AND MIN_MACOS_VERSION VERSION_LESS "11.0")
 			set(MIN_MACOS_VERSION 11.0)
-		elseif(Qt${qtver}Widgets_VERSION VERSION_GREATER_EQUAL "6.0.0")
+		elseif(Qt${qtver}Widgets_VERSION VERSION_GREATER_EQUAL "6.0.0" AND MIN_MACOS_VERSION VERSION_LESS "10.14")
 			set(MIN_MACOS_VERSION 10.14)
-		elseif(Qt5Widgets_VERSION VERSION_GREATER_EQUAL "5.14.0")
+		elseif(Qt5Widgets_VERSION VERSION_GREATER_EQUAL "5.14.0" AND MIN_MACOS_VERSION VERSION_LESS "10.13")
 			set(MIN_MACOS_VERSION 10.13)
-		elseif(Qt5Widgets_VERSION VERSION_GREATER_EQUAL "5.12.0")
+		elseif(Qt5Widgets_VERSION VERSION_GREATER_EQUAL "5.12.0" AND MIN_MACOS_VERSION VERSION_LESS "10.12")
 			set(MIN_MACOS_VERSION 10.12)
-		elseif(Qt5Widgets_VERSION VERSION_GREATER_EQUAL "5.10.0")
+		elseif(Qt5Widgets_VERSION VERSION_GREATER_EQUAL "5.10.0" AND MIN_MACOS_VERSION VERSION_LESS "10.11")
 			set(MIN_MACOS_VERSION 10.11)
 		endif()
 		if(CMAKE_OSX_DEPLOYMENT_TARGET AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS MIN_MACOS_VERSION)
@@ -4255,6 +4259,7 @@ if(SHELLCHECK_EXECUTABLE)
 			tools/pre-commit
 			tools/randpkt-test.sh
 			tools/release-update-debian-soversions.sh
+			tools/rpm-setup.sh
 			tools/test-captures.sh
 			tools/update-tx
 			tools/valgrind-wireshark.sh

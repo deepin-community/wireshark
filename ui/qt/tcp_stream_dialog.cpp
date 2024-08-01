@@ -45,6 +45,8 @@
 // - ACK & RWIN segment ticks in tcptrace graph
 // - Add missing elements (retrans, URG, SACK, etc) to tcptrace. It probably makes
 //   sense to subclass QCPGraph for this.
+// - Allow switching the tracer between graphs when there are two / selecting
+//   the other graph, at the very least if base_graph_ is disabled.
 
 // The GTK+ version computes a 20 (or 21!) segment moving average. Comment
 // out the line below to use that. By default we use a 1 second MA.
@@ -73,6 +75,7 @@ const QString segment_length_label_ = QObject::tr("Segment Length (B)");
 const QString sequence_number_label_ = QObject::tr("Sequence Number (B)");
 const QString time_s_label_ = QObject::tr("Time (s)");
 const QString window_size_label_ = QObject::tr("Window Size (B)");
+const QString cwnd_label_ = QObject::tr("Unacked (Outstanding) Bytes (B)");
 
 QCPErrorBarsNotSelectable::QCPErrorBarsNotSelectable(QCPAxis *keyAxis, QCPAxis *valueAxis) :
     QCPErrorBars(keyAxis, valueAxis)
@@ -353,7 +356,6 @@ TCPStreamDialog::TCPStreamDialog(QWidget *parent, capture_file *cf, tcp_graph_ty
     connect(sp, SIGNAL(axisClick(QCPAxis*,QCPAxis::SelectablePart,QMouseEvent*)),
             this, SLOT(axisClicked(QCPAxis*,QCPAxis::SelectablePart,QMouseEvent*)));
     connect(sp->yAxis, SIGNAL(rangeChanged(QCPRange)), this, SLOT(transformYRange(QCPRange)));
-    disconnect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
     this->setResult(QDialog::Accepted);
 }
 
@@ -551,6 +553,9 @@ void TCPStreamDialog::fillGraph(bool reset_axes, bool set_focus)
     sp->yAxis->setNumberPrecision(0);
     sp->yAxis2->setVisible(false);
     sp->yAxis2->setLabel(QString());
+
+    /* For graphs other than receive window, the axes are not in sync. */
+    disconnect(sp->yAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged), sp->yAxis2, QOverload<const QCPRange&>::of(&QCPAxis::setRange));
 
     if (!cap_file_) {
         QString dlg_title = QString(tr("No Capture Data"));
@@ -903,6 +908,7 @@ void TCPStreamDialog::fillTcptrace()
     sack_eb_->setData(sack_span);
     sack2_graph_->setData(sack2_time, sack2_center, true);
     sack2_eb_->setData(sack2_span);
+    rwin_graph_->setValueAxis(sp->yAxis);
     rwin_graph_->setData(ackrwin_time, rwin, true);
     dup_ack_graph_->setData(dup_ack_time, dup_ack, true);
     zero_win_graph_->setData(zero_win_time, zero_win, true);
@@ -1580,9 +1586,27 @@ void TCPStreamDialog::fillWindowScale()
             }
         }
     }
+    /* base_graph_ is the one that the tracer is on and allows selecting
+     * segments. XXX - Is the congestion window more interesting to see
+     * the exact value and select?
+     *
+     * We'll put the graphs on the same axis so they'll use the same scale.
+     */
     base_graph_->setData(cwnd_time, cwnd_size);
+    rwin_graph_->setValueAxis(sp->yAxis);
     rwin_graph_->setData(rel_time, win_size);
-    sp->yAxis->setLabel(window_size_label_);
+
+    /* The left axis has the color and label for the unacked bytes,
+     * and the right axis will have the color and label for the window size.
+     */
+    sp->yAxis->setLabel(cwnd_label_);
+    sp->yAxis2->setLabel(window_size_label_);
+    sp->yAxis2->setLabelColor(QColor(graph_color_3));
+    sp->yAxis2->setTickLabelColor(QColor(graph_color_3));
+    sp->yAxis2->setVisible(true);
+
+    /* Keep the ticks on the two axes in sync. */
+    connect(sp->yAxis, QOverload<const QCPRange&>::of(&QCPAxis::rangeChanged), sp->yAxis2, QOverload<const QCPRange&>::of(&QCPAxis::setRange));
 }
 
 QString TCPStreamDialog::streamDescription()
@@ -1772,7 +1796,7 @@ void TCPStreamDialog::mouseMoved(QMouseEvent *event)
             tracer_->setVisible(false);
             hint += "Hover over the graph for details. " + stream_desc_ + "</i></small>";
             ui->hintLabel->setText(hint);
-            ui->streamPlot->replot();
+            ui->streamPlot->replot(QCustomPlot::rpQueuedReplot);
             return;
         }
 
@@ -1787,7 +1811,7 @@ void TCPStreamDialog::mouseMoved(QMouseEvent *event)
                 .arg(packet_seg->th_ack)
                 .arg(packet_seg->th_win);
         tracer_->setGraphKey(ui->streamPlot->xAxis->pixelToCoord(event->pos().x()));
-        sp->replot();
+        sp->replot(QCustomPlot::rpQueuedReplot);
     } else {
         if (rubber_band_ && rubber_band_->isVisible() && event) {
             rubber_band_->setGeometry(QRect(rb_origin_, event->pos()).normalized());
