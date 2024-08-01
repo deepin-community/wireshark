@@ -1,3 +1,9 @@
+wireshark (4.2.6-1deepin1) unstable; urgency=medium
+
+  * Revert t64.
+
+ -- xiangzelong <xiangzelong@deepin.org>  Thu, 01 Aug 2024 10:39:21 +0800
+
 wireshark (4.2.6-1) unstable; urgency=medium
 
   * Build depend on libssh-dev instead of libssh-gcrypt-dev on latest
