@@ -66,8 +66,8 @@ Package: wireshark-common
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
-         libwireshark17t64 (>= ${binary:Version}),
-         libwiretap14t64 (>= ${binary:Version}),
+         libwireshark17 (>= ${binary:Version}),
+         libwiretap14 (>= ${binary:Version}),
          debconf,
          libcap2-bin [linux-any]
 Recommends: wireshark (>= ${binary:Version}) | tshark (>= ${binary:Version})
@@ -147,8 +147,8 @@ Description: network traffic analyzer - documentation
  This package contains Wireshark User's guide, Wireshark Developer's Guide
  and the Lua Reference.
 
-Package: libwireshark17t64
-Provides: ${t64:Provides}
+Package: libwireshark17
+Provides: ${:Provides}
 Replaces: libwireshark17
 Breaks: libwireshark17 (<< ${source:Version})
 Architecture: any
@@ -157,15 +157,15 @@ Section: libs
 Depends: ${shlibs:Depends},
          ${misc:Depends},
          libwireshark-data (>= ${source:Version}),
-         libwsutil15t64 (>= ${source:Version})
+         libwsutil15 (>= ${source:Version})
 Suggests: wireshark-doc (>= ${source:Version})
 Pre-Depends: ${misc:Pre-Depends}
 Description: network packet dissection library -- shared library
  The libwireshark library provides the network packet dissection services
  developed by the Wireshark project.
 
-Package: libwsutil15t64
-Provides: ${t64:Provides}
+Package: libwsutil15
+Provides: ${:Provides}
 Replaces: libwsutil15
 Breaks: libwsutil15 (<< ${source:Version})
 Architecture: any
@@ -182,7 +182,7 @@ Package: libwsutil-dev
 Architecture: any
 Section: libdevel
 Depends: ${misc:Depends},
-         libwsutil15t64 (= ${binary:Version})
+         libwsutil15 (= ${binary:Version})
 Breaks: libwireshark-dev (<< 3.7.0~)
 Replaces: libwireshark-dev (<< 3.7.0~)
 Description: network packet dissection utilities library -- development files
@@ -215,7 +215,7 @@ Section: libdevel
 Depends: ${misc:Depends},
          libwsutil-dev,
          libwiretap-dev,
-         libwireshark17t64 (= ${binary:Version})
+         libwireshark17 (= ${binary:Version})
 Description: network packet dissection library -- development files
  The "libwireshark" library provides the network packet dissection services
  developed by the Wireshark project.
@@ -223,8 +223,8 @@ Description: network packet dissection library -- development files
  This package contains the static library and the C header files that are
  needed for applications to use libwireshark services.
 
-Package: libwiretap14t64
-Provides: ${t64:Provides}
+Package: libwiretap14
+Provides: ${:Provides}
 Replaces: libwiretap14
 Breaks: libwiretap14 (<< ${source:Version})
 Architecture: any
@@ -263,7 +263,7 @@ Package: libwiretap-dev
 Architecture: any
 Section: libdevel
 Depends: ${misc:Depends},
-         libwiretap14t64 (= ${binary:Version})
+         libwiretap14 (= ${binary:Version})
 Description: network packet capture library -- development files
  Wiretap, part of the Wireshark project, is a library that allows one to
  read and write several packet capture file formats.

@@ -103,16 +103,6 @@ endif
 override_dh_clean:
 	dh_clean -- debian/control
 	# regenerate debian/control
-ifneq ($(filter noble oracular unstable sid testing trixie UNRELEASED,$(DEB_DISTRIBUTION)),)
-	sed "$(CONTROL_IN_SED_CMD)" debian/control.t64.in > debian/control
-else
 	sed "$(CONTROL_IN_SED_CMD)" debian/control.in > debian/control
-        # also revert t64-related changes in backports
-	for f in debian/lib*t64*; do \
-		[ -f $$f ] || continue; \
-		sed -i 's/\([0-9]\)t64/\1/g' $$f; \
-		echo $$f | sed 's/t64//' | xargs mv $$f; \
-	done
-endif
 	# ignore #653916
 	@echo 'blhc: ignore-line-regexp: .*CMakeCXXCompilerABI.cpp .*'
