@@ -60,7 +60,7 @@ set(PROGRAM_NAME ${CMAKE_PROJECT_NAME})
 file(TO_NATIVE_PATH "${CMAKE_SOURCE_DIR}" TOP_SRC_DIR)
 # STAGING_DIR depends on the build configuration so we pass it
 # on the command line below.
-file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docbook" DOCBOOK_DIR)
+file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/doc" DOC_DIR)
 
 # To do:
 # - Sync the various version names between CMake and Wix.
@@ -126,11 +126,11 @@ foreach(_dll ${GLIB2_DLLS_RELEASE})
 endforeach()
 file(APPEND "${_all_manifest_wix}" "      <?endif?>\n")
 SET(unique_component "")
-set (_dll_list ${CARES_DLL} ${PCRE2_RELEASE_DLL} ${GCRYPT_DLLS}
+set (_dll_list ${AMRNB_DLL} ${CARES_DLL} ${PCRE2_RELEASE_DLL} ${GCRYPT_DLLS}
 	${GNUTLS_DLLS} ${KERBEROS_DLLS} ${LIBSSH_DLLS} ${LUA_DLL}
-	${LZ4_DLL} ${MINIZIP_DLL} ${NGHTTP2_DLL} ${NGHTTP3_DLL} ${SBC_DLL} ${SMI_DLL}
+	${LZ4_DLL} ${MINIZIP_DLL} ${MINIZIPNG_DLLS} ${NGHTTP2_DLL} ${NGHTTP3_DLL} ${SBC_DLL} ${SMI_DLL}
 	${SNAPPY_DLL} ${SPANDSP_DLL} ${BCG729_DLL} ${LIBXML2_DLLS} ${WINSPARKLE_DLL}
-	${ZLIB_DLL} ${BROTLI_DLLS} ${ZSTD_DLL} ${ILBC_DLL} ${OPUS_DLL}
+	${ZLIB_DLL} ${ZLIBNG_DLL} ${BROTLI_DLLS} ${ZSTD_DLL} ${ILBC_DLL} ${OPUS_DLL}
 	${SPEEXDSP_DLL}
 	# Required for mmdbresolve
 	${MAXMINDDB_DLL}
@@ -196,7 +196,7 @@ set(WIX_CANDLE_DEFINES
 	-dQtTranslationDir=${ARCHIVE_OUTPUT_PATH}/${CMAKE_CFG_INTDIR}/translations
 	-dRadiusDictDir=${ARCHIVE_OUTPUT_PATH}/${CMAKE_CFG_INTDIR}/radius
 	-dSnmpMibDir=${ARCHIVE_OUTPUT_PATH}/${CMAKE_CFG_INTDIR}/snmp/mibs
-	-dUsersGuideDir=${ARCHIVE_OUTPUT_PATH}/${CMAKE_CFG_INTDIR}/docbook/wsug_html_chunked
+	-dUsersGuideDir=${ARCHIVE_OUTPUT_PATH}/${CMAKE_CFG_INTDIR}/doc/wsug_html_chunked
 	-dVCRedistVersion=${MSVC_CRT_VERSION}
 	-dVCRedistDir=${MERGE_MODULE_DIR}
 	${d_smi_dir}
@@ -252,7 +252,7 @@ macro( ADD_WIX_PACKAGE_TARGET )
 		# UsersGuide.wxs. Collects the contents of wsug_html_chunked.
 		# Generated with heat.exe
 		add_custom_command(OUTPUT ${_wix_binary_dir}/UsersGuide.wxs
-			COMMAND ${WIX_HEAT_EXECUTABLE} dir ${CMAKE_BINARY_DIR}/docbook/wsug_html_chunked
+			COMMAND ${WIX_HEAT_EXECUTABLE} dir ${CMAKE_BINARY_DIR}/doc/wsug_html_chunked
 					${WIX_HEAT_FLAGS} -cg CG.Documentation -dr dirUsersGuide -var var.UsersGuideDir
 					-out ${_wix_binary_dir}/UsersGuide.wxs
 		)
@@ -297,8 +297,9 @@ macro( ADD_WIX_PACKAGE_TARGET )
 			DEPENDS
 				${WIX_FILES}
 				copy_data_files
-				user_guide_html
 				faq_html
+				user_guide_html
+				release_notes_html
 		)
 		set_target_properties(wireshark_wix_prep PROPERTIES
 			FOLDER "Packaging"
@@ -335,7 +336,5 @@ set(CLEAN_FILES
 	RadiusDict.wxs
 	Diameter.wxs
 	QtTranslation.wxs
-	#NEWS.txt
-	#user-guide.chm
 	wireshark-${VERSION}-${WIRESHARK_TARGET_PLATFORM}.msi
 )

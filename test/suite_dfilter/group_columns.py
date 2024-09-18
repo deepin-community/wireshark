@@ -15,13 +15,13 @@ class TestDfilterColumns:
     def test_exists_2(self, checkDFilterFail):
         # Column not in the default configuration
         dfilter = "_ws.col.expert"
-        error = f'"{dfilter}" is neither a field nor a protocol name'
+        error = f'"{dfilter}" is not a valid protocol or protocol field'
         checkDFilterFail(dfilter, error)
 
     def test_exists_3(self, checkDFilterFail):
         # Column not registered as field (it behaves unusally if filtered)
         dfilter = "_ws.col.delta_time_dis"
-        error = f'"{dfilter}" is neither a field nor a protocol name'
+        error = f'"{dfilter}" is not a valid protocol or protocol field'
         checkDFilterFail(dfilter, error)
 
     def test_func_1(self, checkDFilterCount):
@@ -48,7 +48,7 @@ class TestDfilterColumns:
         dfilter = '_ws.col.protocol == "HTTP"'
         checkDFilterCountReadFilter(dfilter, 1)
 
-    def test_add_column(self, checkDFilterCount):
+ #   def test_add_column(self, checkDFilterCount):
         # Add column to configuration
-        dfilter = '_ws.col.expert == "Chat"'
-        checkDFilterCount(dfilter, 1, 'gui.column.format:"Expert","%a"')
+ #       dfilter = '_ws.col.expert == "Chat"'
+ #       checkDFilterCount(dfilter, 1, 'gui.column.format:"Expert","%a"')

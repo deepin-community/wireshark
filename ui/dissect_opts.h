@@ -46,9 +46,11 @@ extern "C" {
     {"enable-protocol", ws_required_argument, NULL, LONGOPT_ENABLE_PROTOCOL }, \
     {"only-protocols", ws_required_argument, NULL, LONGOPT_ONLY_PROTOCOLS }, \
     {"disable-all-protocols", ws_no_argument, NULL, LONGOPT_DISABLE_ALL_PROTOCOLS }, \
+    {"read-filter", ws_required_argument, NULL, 'R' }, \
+    {"display-filter", ws_required_argument, NULL, 'Y' }, \
 
 #define OPTSTRING_DISSECT_COMMON \
-    "d:K:nN:t:u:"
+    "d:K:nN:R:t:u:Y:"
 
 /** Capture options coming from user interface */
 typedef struct dissect_options_tag {
@@ -64,20 +66,20 @@ extern dissect_options global_dissect_options;
 
 /*
  * Handle a command line option.
- * Returns TRUE if the option is valid, FALSE if not; an error message
+ * Returns true if the option is valid, false if not; an error message
  * is reported with cmdarg_err() if it's not valid.
  */
-extern gboolean
+extern bool
 dissect_opts_handle_opt(int opt, char *optarg_str_p);
 
 /*
  * Set up disabled protocols and enabled/disabled heuristic protocols
  * as per specified command-line options.
  *
- * Returns TRUE if all specified heuristic protocols exist, FALSE
+ * Returns true if all specified heuristic protocols exist, false
  * otherwise.
  */
-extern gboolean
+extern bool
 setup_enabled_and_disabled_protocols(void);
 
 #ifdef __cplusplus

@@ -1,16 +1,20 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the wireshark package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 # 
 # Translators:
+# Gerald Combs <gerald@wireshark.org>, 2024
+# 
+#, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Wireshark\n"
+"Project-Id-Version: wireshark\n"
 "Report-Msgid-Bugs-To: wireshark@packages.debian.org\n"
-"POT-Creation-Date: 2017-08-06 18:31-0400\n"
-"PO-Revision-Date: 2017-09-22 06:50+0000\n"
-"Last-Translator: Gerald Combs <gerald@wireshark.org>\n"
-"Language-Team: Vietnamese (http://www.transifex.com/wireshark/wireshark/language/vi/)\n"
+"POT-Creation-Date: 2024-05-20 18:25+0000\n"
+"PO-Revision-Date: 2024-08-12 22:31+0000\n"
+"Last-Translator: Gerald Combs <gerald@wireshark.org>, 2024\n"
+"Language-Team: Vietnamese (https://app.transifex.com/wireshark/teams/36457/vi/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -31,23 +35,35 @@ msgid ""
 "system group to capture packets. This is recommended over the alternative of"
 " running Wireshark/Tshark directly as root, because less of the code will "
 "run with elevated privileges."
-msgstr "Dumpcap có thể được cài đặt bằng một cách cấp cho các thành viên của nhóm « wireshark » có quyền bắt gói tin. Thiết lập này khuyến khích, so với chạy Wireshark/Tshark trực tiếp dưới người chủ, vì ít mã nguồn hơn sẽ chạy với quyền truy cập cao."
+msgstr ""
+"Dumpcap có thể được cài đặt bằng một cách cấp cho các thành viên của nhóm « "
+"wireshark » có quyền bắt gói tin. Thiết lập này khuyến khích, so với chạy "
+"Wireshark/Tshark trực tiếp dưới người chủ, vì ít mã nguồn hơn sẽ chạy với "
+"quyền truy cập cao."
 
 #. Type: boolean
 #. Description
-#: ../templates:2001
+#. Type: boolean
+#. Description
+#: ../templates:2001 ../templates:7001
 msgid ""
 "For more detailed information please see /usr/share/doc/wireshark-"
 "common/README.Debian."
-msgstr "Để tìm chi tiết, xem tài liệu Đọc Đi « /usr/share/doc/wireshark-common/README.Debian »."
+msgstr ""
+"Để tìm chi tiết, xem tài liệu Đọc Đi « /usr/share/doc/wireshark-"
+"common/README.Debian »."
 
 #. Type: boolean
 #. Description
-#: ../templates:2001
+#. Type: boolean
+#. Description
+#: ../templates:2001 ../templates:7001
 msgid ""
 "Enabling this feature may be a security risk, so it is disabled by default. "
 "If in doubt, it is suggested to leave it disabled."
-msgstr "Bật tính năng này có thể rủi ro bảo mật thì nó bị tắt theo mặc định. Chưa chắc nên để lại bị tắt."
+msgstr ""
+"Bật tính năng này có thể rủi ro bảo mật thì nó bị tắt theo mặc định. Chưa "
+"chắc nên để lại bị tắt."
 
 #. Type: error
 #. Description
@@ -134,4 +150,62 @@ msgstr ""
 #. Description
 #: ../templates:6001
 msgid "If the group is no longer needed, please remove it manually."
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../templates:7001
+msgid "Should non-superusers be able to capture system calls?"
+msgstr ""
+
+#. Type: boolean
+#. Description
+#: ../templates:7001
+msgid ""
+"The falcodump external capture utility (extcap) can be installed in a way "
+"that allows members of the \"scap\" system group to capture system calls. "
+"This is recommended over the alternative of running Logray directly as root,"
+" because less of the code will run with elevated privileges."
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../templates:8001
+msgid "Creating the \"scap\" system group failed"
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../templates:8001
+msgid ""
+"The \"scap\" group does not exist, and creating it failed, so Logray cannot "
+"be configured to capture system calls as an unprivileged user."
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../templates:8001
+msgid "Please create the \"scap\" system group and try configuring logray again."
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../templates:9001
+msgid "The \"scap\" group is a system group"
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../templates:9001
+msgid ""
+"The \"scap\" group exists as a user group, but the preferred configuration "
+"is for it to be created as a system group."
+msgstr ""
+
+#. Type: error
+#. Description
+#: ../templates:9001
+msgid ""
+"As a result, purging logray will not remove the \"scap\" group, but "
+"everything else should work properly."
 msgstr ""

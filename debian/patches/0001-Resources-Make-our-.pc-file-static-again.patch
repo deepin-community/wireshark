@@ -1,0 +1,28 @@
+From 81b2647233ced75165e37de2ef5bee4659c9d3a9 Mon Sep 17 00:00:00 2001
+From: AndersBroman <a.broman58@gmail.com>
+Date: Wed, 4 Sep 2024 15:47:41 +0000
+Subject: [PATCH] Resources: Make our .pc file static again
+
+Partially revert 107550c9c0 and make the pkgconfig prefix static.
+
+
+(cherry picked from commit a9d17a13afa15c7ffe5afc6db817208bc2887a13)
+
+Co-authored-by: Gerald Combs <gerald@wireshark.org>
+---
+ resources/wireshark.pc.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/resources/wireshark.pc.in b/resources/wireshark.pc.in
+index 212d4ec311..a3fead0dc4 100644
+--- a/resources/wireshark.pc.in
++++ b/resources/wireshark.pc.in
+@@ -1,4 +1,4 @@
+-prefix=${pcfiledir}/../..
++prefix=@CMAKE_INSTALL_PREFIX@
+ exec_prefix=${prefix}
+ libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+ includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+-- 
+2.43.0
+

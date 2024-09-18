@@ -1,0 +1,12 @@
+# ieee-data is not a library, just data processed at build time
+libwireshark18: embedded-library
+
+# small plugins
+libwireshark18: library-not-linked-against-libc [usr/lib/*/wireshark/plugins/*/codecs/g7*.so]
+libwireshark18: library-not-linked-against-libc [usr/lib/*/wireshark/plugins/*/ipaddr.so]
+libwireshark18: library-not-linked-against-libc [usr/lib/*/wireshark/plugins/*/codecs/l16mono.so]
+
+# Typo directly on IANA enterprise-numbers (epan/enterprise-numbers)
+libwireshark18: spelling-error-in-binary Nam Name [usr/lib/*/libwireshark.so.*]
+libwireshark18: spelling-error-in-binary Dont Don't [usr/lib/*/libwireshark.so.*]
+libwireshark18: package-name-doesnt-match-sonames libwireshark18

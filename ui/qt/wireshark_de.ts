@@ -44,8 +44,8 @@
         <translation>Ordner</translation>
     </message>
     <message>
-        <source>Filter by path</source>
-        <translation>Nach Pfad filtern</translation>
+        <source>Search Folders</source>
+        <translation>Ordner suchen</translation>
     </message>
     <message>
         <source>Plugins</source>
@@ -78,6 +78,14 @@
     <message>
         <source>License</source>
         <translation>Lizenzen</translation>
+    </message>
+    <message>
+        <source>About Logray</source>
+        <translation>Über Logray</translation>
+    </message>
+    <message>
+        <source>Logray</source>
+        <translation>Logray</translation>
     </message>
     <message>
         <source>The directory does not exist</source>
@@ -755,6 +763,28 @@
     </message>
 </context>
 <context>
+    <name>CaptureCommentDialog</name>
+    <message>
+        <source>Edit Capture Comments</source>
+        <translation>Aufzeichnungskommentare bearbeiten</translation>
+    </message>
+    <message>
+        <source>Add Comment</source>
+        <translation>Kommentar hinzufügen</translation>
+    </message>
+    <message>
+        <source>Section %1</source>
+        <translation>Bereich %1</translation>
+    </message>
+</context>
+<context>
+    <name>CaptureCommentTabWidget</name>
+    <message>
+        <source>Comment %1</source>
+        <translation>Kommentar %1</translation>
+    </message>
+</context>
+<context>
     <name>CaptureFile</name>
     <message>
         <source> [closing]</source>
@@ -863,10 +893,6 @@
         <translation>Lesefilter:</translation>
     </message>
     <message>
-        <source>Compress with g&amp;zip</source>
-        <translation>Mit g&amp;zip komprimieren</translation>
-    </message>
-    <message>
         <source>Open Capture File</source>
         <oldsource>Wireshark: Open Capture File</oldsource>
         <translation>Mitschnittdatei öffnen</translation>
@@ -948,8 +974,8 @@
         <translation>Details</translation>
     </message>
     <message>
-        <source>Capture file comments</source>
-        <translation>Mitschnittdateikommentare</translation>
+        <source>Edit Comments</source>
+        <translation>Kommentare bearbeiten</translation>
     </message>
     <message>
         <source>Refresh</source>
@@ -958,10 +984,6 @@
     <message>
         <source>Copy To Clipboard</source>
         <translation>In die Zwischenablage kopieren</translation>
-    </message>
-    <message>
-        <source>Save Comments</source>
-        <translation>Kommentar speichern</translation>
     </message>
     <message>
         <source>Capture File Properties</source>
@@ -1012,8 +1034,16 @@
         <translation>Erstes Paket</translation>
     </message>
     <message>
+        <source>First event</source>
+        <translation>Erstes Ereignis</translation>
+    </message>
+    <message>
         <source>Last packet</source>
         <translation>Letztes Paket</translation>
+    </message>
+    <message>
+        <source>Last event</source>
+        <translation>Letztes Ereignis</translation>
     </message>
     <message>
         <source>Elapsed</source>
@@ -1052,6 +1082,10 @@
         <translation>Verworfene Pakete</translation>
     </message>
     <message>
+        <source>Dropped events</source>
+        <translation>Verworfene Ereignisse</translation>
+    </message>
+    <message>
         <source>Capture filter</source>
         <translation>Mitschnittfilter</translation>
     </message>
@@ -1064,12 +1098,36 @@
         <translation>Paketgrößenlimit (snaplen)</translation>
     </message>
     <message>
+        <source>Event size limit (snaplen)</source>
+        <translation>Max. Ereignisgröße (snaplen)</translation>
+    </message>
+    <message>
         <source>none</source>
         <translation>keine</translation>
     </message>
     <message>
         <source>%1 bytes</source>
         <translation>%1 Byte</translation>
+    </message>
+    <message>
+        <source>Comments</source>
+        <translation>Kommentare</translation>
+    </message>
+    <message>
+        <source>Comment %1: </source>
+        <translation>Kommentar %1:</translation>
+    </message>
+    <message>
+        <source>Decryption Secrets</source>
+        <translation>Entschlüsselungs-Secrets</translation>
+    </message>
+    <message>
+        <source>Type</source>
+        <translation>Typ</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Größe</translation>
     </message>
     <message>
         <source>Statistics</source>
@@ -1096,6 +1154,10 @@
         <translation>Pakete</translation>
     </message>
     <message>
+        <source>Events</source>
+        <translation>Ereignisse</translation>
+    </message>
+    <message>
         <source>Time span, s</source>
         <translation>Zeitspanne, s</translation>
     </message>
@@ -1105,7 +1167,11 @@
     </message>
     <message>
         <source>Average packet size, B</source>
-        <translation>Durschnittliche Paketgröße, B</translation>
+        <translation>Durchschnittliche Paketgröße, B</translation>
+    </message>
+    <message>
+        <source>Average event size, B</source>
+        <translation>Durchschnittliche Ereignisgröße, B</translation>
     </message>
     <message>
         <source>Bytes</source>
@@ -1113,19 +1179,19 @@
     </message>
     <message>
         <source>Average bytes/s</source>
-        <translation>Durschnittliche Byte/s</translation>
+        <translation>Durchschnittliche Byte/s</translation>
     </message>
     <message>
         <source>Average bits/s</source>
-        <translation>Durschnittliche Bit/s</translation>
-    </message>
-    <message>
-        <source>Section Comment</source>
-        <translation>Kommentar Bereich</translation>
+        <translation>Durchschnittliche Bit/s</translation>
     </message>
     <message>
         <source>Packet Comments</source>
         <translation>Paketkommentar</translation>
+    </message>
+    <message>
+        <source>Event Comments</source>
+        <translation>Ereigniskommentare</translation>
     </message>
     <message>
         <source>&lt;p&gt;Frame %1: </source>
@@ -1136,6 +1202,14 @@
 
 </source>
         <translation>Erstellt von Wireshark %1
+
+</translation>
+    </message>
+    <message>
+        <source>Created by Logray %1
+
+</source>
+        <translation>Erstellt von Logray %1
 
 </translation>
     </message>
@@ -1366,6 +1440,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angeben.</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Usually a wireless network card will only capture the traffic sent to and from its own network address, and only captures &lt;em&gt;user data&lt;/em&gt; traffic with &amp;quot;fake&amp;quot; Ethernet headers. If you want to capture all traffic that wireless network cards can &amp;quot;see&amp;quot;, or are interested in 802.11 management or control packets, or radio-layer information, mark this option. Monitor mode availability depends on the wireless card and driver. See the Wiki for some more details of capturing packets on WLAN networks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Normalerweise erfasst eine WLAN-Netzwerkkarte nur Verkehr, der zu oder von ihrer Netzwerkadresse gesendet wird. Zudem wird nur &lt;em&gt;user data&lt;/em&gt;-Verkehr mit &amp;quot;fake&amp;quot; Ethernet-Headern aufgezeichnet. Wenn Sie den gesamten Datenverkehr, den die Netzwerkkarte &amp;quot;sehen&amp;quot; kann, aufzeichnen möchten, an 802.11 Management-/Kontrollpaketen oder Radio-Layer-Infos interessiert sind, wählen Sie diese Option an. Monitor-Mode-Verfügbarkeit hängt von der Netzwerkkarte und den Treibern ab. Schauen Sie für mehr Informationen zum Mitschneiden in WLAN-Netzwerken ins Wiki.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Enable monitor mode on all 802.11 interfaces</source>
+        <translation>Monitor Modus für alle 802.11 Schnittstellen aktivieren</translation>
+    </message>
+    <message>
         <source>compression</source>
         <translation>Komprimierung</translation>
     </message>
@@ -1376,6 +1458,30 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>gzip</source>
         <translation>gzip</translation>
+    </message>
+    <message>
+        <source>File infix pattern</source>
+        <translation>Datei Infix Muster</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In multiple file mode, the date and time and file index number are inserted between filename template and any suffix. Select their order.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Beim Erzeugen mehrerer Dateien werden Datum und Uhrzeit sowie die Datei-Indexnummer zwischen dem Dateinamen und Suffix eingefügt. Wählen Sie deren Sortierungsart.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>YYYYmmDDHHMMSS_NNNNN</source>
+        <translation>YYYYmmDDHHMMSS_NNNNN</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Date and time before the file index number. This causes files to sort in creation time order, and keeps files from the same batch closely ordered.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Datum und Uhrzeit vor der Datei-Indexnummer. Dies führt zur Sortierung nach Erstellungszeit und hält Dateien vom gleichen Stapel in der Sortierung eng zusammen.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>NNNNN_YYYYmmDDHHMMSS</source>
+        <translation>NNNNN_YYYYmmDDHHMMSS</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;File index number before the date and time. This is the historic Wireshark ordering.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Datei-Indexnummer vor Datum und Uhrzeit. Dies ist die alte Wireshark Sortierung.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;After capturing has switched to the next file and the given number of files has exceeded, the oldest file will be removed.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -1467,7 +1573,7 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     </message>
     <message>
         <source>Stop capturing after the specified number of files have been created.</source>
-        <translation type="unfinished"></translation>
+        <translation>Mitschneiden beenden, nachdem die angegebene Anzahl an Dateien erstellt wurde.</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Stop capturing after the specified amount of data has been captured.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -1530,8 +1636,8 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Fehler</translation>
     </message>
     <message>
-        <source>Multiple files: Requested filesize too large. The filesize cannot be greater than 2 GiB.</source>
-        <translation>Dateisatz: Angeforderte Dateigröße zu groß. Die Dateigröße kann nicht größer als 2 GiB sein.</translation>
+        <source>Multiple files: Requested filesize too large. The filesize cannot be greater than 2 TB.</source>
+        <translation>Dateisatz: Angeforderte Dateigröße zu groß. Die Dateigröße kann nicht größer als 2 TB sein.</translation>
     </message>
     <message>
         <source>Multiple files: No capture file name given. You must specify a filename if you want to use multiple files.</source>
@@ -1559,6 +1665,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Capture packets in promiscuous mode</source>
         <translation>Pakete im promiskuitiven Modus mitschneiden</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Usually a wireless network card will only capture the traffic sent to and from its own network address, and only captures &lt;em&gt;user data&lt;/em&gt; traffic with &amp;quot;fake&amp;quot; Ethernet headers. If you want to capture all traffic that wireless network cards can &amp;quot;see&amp;quot;, or are interested in 802.11 management or control packets, or radio-layer information, mark this option. Monitor mode availability depends on the wireless card and driver. See the Wiki for more details of capturing packets on WLAN networks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Normalerweise erfasst eine WLAN-Netzwerkkarte nur Verkehr, der zu oder von ihrer Netzwerkadresse gesendet wird. Zudem wird nur &lt;em&gt;user data&lt;/em&gt; -Verkehr mit &amp;quot;fake&amp;quot; Ethernet-Headern aufgezeichnet. Wenn Sie den gesamten Datenverkehr, den die Netzwerkkarte &amp;quot;sehen&amp;quot; kann, aufzeichnen möchten, an 802.11 Management-/Kontrollpaketen oder Radio-Layer-Infos interessiert sind, wählen Sie diese Option an. Monitor-Mode-Verfügbarkeit hängt von der Netzwerkkarte und den Treibern ab. Schauen Sie für mehr Informationen zum Mitschneiden in WLAN-Netzwerken ins Wiki.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Capture packets in monitor mode on 802.11 devices</source>
+        <translation>Pakete im Monitor Modus der 802.11 Schnittstelle mitschneiden</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Capture packets in the next-generation capture file format.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -1788,6 +1902,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Aufgelöst</translation>
     </message>
     <message>
+        <source>Width</source>
+        <translation>Breite</translation>
+    </message>
+    <message>
+        <source>Alignment</source>
+        <translation>Ausrichtung</translation>
+    </message>
+    <message>
         <source>&lt;html&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/html&gt;</source>
         <translation>&lt;html&gt;In Feldern menschenleserliche Zeichenketten anstatt Rohwerte anzeigen. Nur auf benutzerdefinierte Spalten mit Zeichenketten anwendbar.&lt;/html&gt;</translation>
     </message>
@@ -1832,6 +1954,25 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Copy filter text to the clipboard.</source>
         <translation>Filter text in die Zwischenablage kopieren.</translation>
+    </message>
+</context>
+<context>
+    <name>CompressionGroupBox</name>
+    <message>
+        <source>Compression options</source>
+        <translation>Komprimierungsoptionen</translation>
+    </message>
+    <message>
+        <source>&amp;Uncompressed</source>
+        <translation>&amp;Unkomprimiert</translation>
+    </message>
+    <message>
+        <source>Compress with g&amp;zip</source>
+        <translation>Mit g&amp;zip komprimieren</translation>
+    </message>
+    <message>
+        <source>Compress with &amp;LZ4</source>
+        <translation>Mit &amp;LZ4 komprimieren</translation>
     </message>
 </context>
 <context>
@@ -1899,6 +2040,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Bits/s B </source>
         <translation>Bits/s B </translation>
+    </message>
+    <message>
+        <source>Flows</source>
+        <translation>Flows</translation>
     </message>
     <message>
         <source>Total Packets</source>
@@ -2015,14 +2160,6 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Paketbytes als Hex Dump kopieren</translation>
     </message>
     <message>
-        <source>…as Printable Text</source>
-        <translation>…als druckbarer Text</translation>
-    </message>
-    <message>
-        <source>Copy only the printable text in the packet.</source>
-        <translation>Nur den druckbaren Text im Paket kopieren.</translation>
-    </message>
-    <message>
         <source>…as MIME Data</source>
         <translation>...als MIME Daten</translation>
     </message>
@@ -2035,8 +2172,40 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Paket-Bytes als druckbare ASCII-Zeichen und Escape-Sequenzen kopieren.</translation>
     </message>
     <message>
+        <source>…as Go literal</source>
+        <translation>als Go Literal</translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as Go literal.</source>
+        <translation>Paketbytes als Go Literal kopieren</translation>
+    </message>
+    <message>
+        <source>…as C Array</source>
+        <translation>…als C Array</translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as C Array.</source>
+        <translation>Paketbytes als C Array kopieren.</translation>
+    </message>
+    <message>
         <source>…as a Hex Stream</source>
         <translation>...als Hex Stream</translation>
+    </message>
+    <message>
+        <source>…as UTF-8 Text</source>
+        <translation>…als UTF-8 Text</translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as text, treating as UTF-8.</source>
+        <translation>Paketbytes als Text kopieren (als UTF-8 behandeln).</translation>
+    </message>
+    <message>
+        <source>…as ASCII Text</source>
+        <translation>…als ASCII Text</translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as text, treating as ASCII.</source>
+        <translation>Paketbytes als Text kopieren (als ASCII behandeln).</translation>
     </message>
     <message>
         <source>Copy packet bytes as a stream of hex.</source>
@@ -2834,6 +3003,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <source>Display filter:</source>
         <translation>Anzeigefilter:</translation>
     </message>
+    <message>
+        <source>Export PDUs</source>
+        <translation>PDUs exportieren</translation>
+    </message>
 </context>
 <context>
     <name>ExtArgSelector</name>
@@ -2871,10 +3044,6 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Start</source>
         <translation>Start</translation>
-    </message>
-    <message>
-        <source>Save</source>
-        <translation>Speichern</translation>
     </message>
     <message>
         <source>Default</source>
@@ -3018,6 +3187,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Anzeigefilter</translation>
     </message>
     <message>
+        <source>Display Filter Macros</source>
+        <translation>Anzeigefilter Makros</translation>
+    </message>
+    <message>
+        <source>New macro</source>
+        <translation>Neues Makro</translation>
+    </message>
+    <message>
         <source>Open </source>
         <translation>Öffnen</translation>
     </message>
@@ -3101,8 +3278,16 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
 <context>
     <name>FilterListModel</name>
     <message>
+        <source>Macro Name</source>
+        <translation>Makroname</translation>
+    </message>
+    <message>
         <source>Filter Name</source>
         <translation>Filtername</translation>
+    </message>
+    <message>
+        <source>Macro Expression</source>
+        <translation>Makroausdruck</translation>
     </message>
     <message>
         <source>Filter Expression</source>
@@ -3190,20 +3375,8 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
 <context>
     <name>FolderListModel</name>
     <message>
-        <source>&quot;File&quot; dialogs</source>
-        <translation>&quot;Datei&quot; Dialoge</translation>
-    </message>
-    <message>
-        <source>capture files</source>
-        <translation>Mitschnittdateien</translation>
-    </message>
-    <message>
         <source>Temp</source>
         <translation>Temp</translation>
-    </message>
-    <message>
-        <source>untitled capture files</source>
-        <translation>Unbenannte Mitschnittdateien</translation>
     </message>
     <message>
         <source>Personal configuration</source>
@@ -3212,14 +3385,6 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Global configuration</source>
         <translation>Globale Konfiguration</translation>
-    </message>
-    <message>
-        <source>dfilters, preferences, ethers, …</source>
-        <translation>dfilters, preferences, ethers, …</translation>
-    </message>
-    <message>
-        <source>dfilters, preferences, manuf, …</source>
-        <translation>dfilters, preferences, manuf, …</translation>
     </message>
     <message>
         <source>System</source>
@@ -3234,16 +3399,8 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Programm</translation>
     </message>
     <message>
-        <source>program files</source>
-        <translation>program files</translation>
-    </message>
-    <message>
         <source>Personal Plugins</source>
         <translation>Benutzerspezifische Plugins</translation>
-    </message>
-    <message>
-        <source>binary plugins</source>
-        <translation>binary plugins</translation>
     </message>
     <message>
         <source>Global Plugins</source>
@@ -3262,11 +3419,35 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Lua Skripte</translation>
     </message>
     <message>
+        <source>&quot;File&quot; dialog location</source>
+        <translation>&quot;Datei&quot; Dialog Pfad</translation>
+    </message>
+    <message>
+        <source>Capture files</source>
+        <translation>Mitschnittdateien</translation>
+    </message>
+    <message>
+        <source>Untitled capture files</source>
+        <translation>Unbenannte Mitschnittdateien</translation>
+    </message>
+    <message>
+        <source>Preferences, profiles, manuf, …</source>
+        <translation>Einstellungen, Profile, manuf, …</translation>
+    </message>
+    <message>
+        <source>Program files</source>
+        <translation>Programmdateien</translation>
+    </message>
+    <message>
+        <source>Binary plugins</source>
+        <translation>Binary Plug-Ins</translation>
+    </message>
+    <message>
         <source>Personal Extcap path</source>
         <translation>Benutzerspezifischer Extcap Pfad</translation>
     </message>
     <message>
-        <source>external capture (extcap) plugins</source>
+        <source>External capture (extcap) plugins</source>
         <translation>Externe Aufzeichnungs-Plug-Ins (extcap)</translation>
     </message>
     <message>
@@ -3303,7 +3484,7 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     </message>
     <message>
         <source>Location</source>
-        <translation>Lokation</translation>
+        <translation>Pfad</translation>
     </message>
     <message>
         <source>Typical Files</source>
@@ -3404,6 +3585,24 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         </translation>
     </message>
     <message>
+        <source>Event %1. </source>
+        <translation>Ereignis %1.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;reads&lt;/span&gt;, </source>
+        <translation>
+            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;Lesevorgang&lt;/span&gt;, </numerusform>
+            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;Lesevorgänge&lt;/span&gt;, </numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;writes&lt;/span&gt;, </source>
+        <translation>
+            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;Schreibvorgang&lt;/span&gt;, </numerusform>
+            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;Schreibvorgänge&lt;/span&gt;, </numerusform>
+        </translation>
+    </message>
+    <message>
         <source> Click to select.</source>
         <translation> Zur Auswahl anklicken.</translation>
     </message>
@@ -3436,6 +3635,18 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>%1 Stream in ausgewähltem Paket nicht gefunden.</translation>
     </message>
     <message>
+        <source>Read activity(%6)</source>
+        <translation>Leseaktivität(%6)</translation>
+    </message>
+    <message>
+        <source>Write activity(%6)</source>
+        <translation>Schreibaktivität(%6)</translation>
+    </message>
+    <message>
+        <source>Entire I/O activity (%1)</source>
+        <translation>Gesamte E/A Aktivität (%1)</translation>
+    </message>
+    <message>
         <source>Entire conversation (%1)</source>
         <translation>Gesamte Verbindung (%1)</translation>
     </message>
@@ -3450,10 +3661,6 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Save Stream Content As…</source>
         <translation>Stream Inhalt speichern als…</translation>
-    </message>
-    <message>
-        <source>[Stream output truncated]</source>
-        <translation>[Streamausgabe gekürzt]</translation>
     </message>
     <message numerus="yes">
         <source>%Ln total stream(s).</source>
@@ -3482,9 +3689,20 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Hinweis.</translation>
     </message>
     <message>
-        <source>Show data as</source>
-        <oldsource>Show and save data as</oldsource>
-        <translation>Daten anzeigen als</translation>
+        <source>Show as</source>
+        <translation>Anzeigen als</translation>
+    </message>
+    <message>
+        <source>No delta times</source>
+        <translation>Keine Delta-Zeiten</translation>
+    </message>
+    <message>
+        <source>Turn delta times</source>
+        <translation>Delta-Zeiten umdrehen</translation>
+    </message>
+    <message>
+        <source>All delta times</source>
+        <translation>Alle Delta-Zeiten</translation>
     </message>
     <message>
         <source>Stream</source>
@@ -3499,8 +3717,19 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Suchen:</translation>
     </message>
     <message>
+        <source>Case sensitive</source>
+        <translation>Groß- / Kleinschreibung beachten</translation>
+    </message>
+    <message>
         <source>Find &amp;Next</source>
         <translation>&amp;Nächstes suchen</translation>
+    </message>
+</context>
+<context>
+    <name>FollowStreamText</name>
+    <message>
+        <source>[Stream output truncated]</source>
+        <translation>[Streamausgabe gekürzt]</translation>
     </message>
 </context>
 <context>
@@ -3839,29 +4068,28 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
 &lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>Remove this graph.</source>
-        <oldsource>Remove this dissection behavior.</oldsource>
-        <translation>Diesen Graph entfernen.</translation>
-    </message>
-    <message>
         <source>Add a new graph.</source>
         <translation>Einen neuen Graph hinzufügen.</translation>
-    </message>
-    <message>
-        <source>Duplicate this graph.</source>
-        <translation>Diesen Graph duplizieren.</translation>
     </message>
     <message>
         <source>Clear all graphs.</source>
         <translation>Alle Graphen löschen.</translation>
     </message>
     <message>
-        <source>Move this graph upwards.</source>
-        <translation>Graphen nach oben verschieben.</translation>
+        <source>Remove the selected graph(s).</source>
+        <translation>Ausgewählte(n) Graphen entfernen.</translation>
     </message>
     <message>
-        <source>Move this graph downwards.</source>
-        <translation>Graphen nach unten verschieben.</translation>
+        <source>Duplicate the selected graph(s).</source>
+        <translation>Ausgewählte(n) Graphen duplizieren.</translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) upwards.</source>
+        <translation>Ausgewählte(n) Graphen nach oben verschieben.</translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) downwards.</source>
+        <translation>Ausgewählte(n) Graphen nach unten verschieben.</translation>
     </message>
     <message>
         <source>Mouse</source>
@@ -3902,10 +4130,6 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Enable legend</source>
         <translation>Legende einschalten</translation>
-    </message>
-    <message>
-        <source>Reset</source>
-        <translation>Zurücksetzen</translation>
     </message>
     <message>
         <source>Reset Graph</source>
@@ -4121,6 +4345,42 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Graph von einem anderen Profil kopieren.</translation>
     </message>
     <message>
+        <source>1 μs</source>
+        <translation>1 μs</translation>
+    </message>
+    <message>
+        <source>2 μs</source>
+        <translation>2 μs</translation>
+    </message>
+    <message>
+        <source>5 μs</source>
+        <translation>5 μs</translation>
+    </message>
+    <message>
+        <source>10 μs</source>
+        <translation>10 μs</translation>
+    </message>
+    <message>
+        <source>20 μs</source>
+        <translation>20 μs</translation>
+    </message>
+    <message>
+        <source>50 μs</source>
+        <translation>50 μs</translation>
+    </message>
+    <message>
+        <source>100 μs</source>
+        <translation>100 μs</translation>
+    </message>
+    <message>
+        <source>200 μs</source>
+        <translation>200 μs</translation>
+    </message>
+    <message>
+        <source>500 μs</source>
+        <translation>500 μs</translation>
+    </message>
+    <message>
         <source>1 ms</source>
         <translation>1 ms</translation>
     </message>
@@ -4165,6 +4425,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>5 Sek.</translation>
     </message>
     <message>
+        <source>2 min</source>
+        <translation>2 min</translation>
+    </message>
+    <message>
+        <source>5 min</source>
+        <translation>5 min</translation>
+    </message>
+    <message>
         <source>Wireshark I/O Graphs: %1</source>
         <translation>Wireshark I/O Graphen: %1</translation>
     </message>
@@ -4175,6 +4443,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Filtered events</source>
         <translation>Gefilterte Ereignisse</translation>
+    </message>
+    <message>
+        <source>All packets</source>
+        <translation>Alle Pakete</translation>
+    </message>
+    <message>
+        <source>All events</source>
+        <translation>Alle Ereignisse</translation>
     </message>
     <message>
         <source>All Packets</source>
@@ -4189,8 +4465,8 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Alle Ereignisse</translation>
     </message>
     <message>
-        <source>Access Denied</source>
-        <translation>Zugriff verboten</translation>
+        <source>All Execs</source>
+        <translation>Alle Ausführungen</translation>
     </message>
     <message>
         <source>Hover over the graph for details.</source>
@@ -4235,6 +4511,34 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Click to select a portion of the graph.</source>
         <translation>Klicken um einen Teil des Graphen auszuwählen.</translation>
+    </message>
+    <message>
+        <source>%1 Intervals </source>
+        <translation>%1 Intervalle </translation>
+    </message>
+    <message>
+        <source>Move to top left</source>
+        <translation>Nach oben links verschieben</translation>
+    </message>
+    <message>
+        <source>Move to top center</source>
+        <translation>Nach oben mittig verschieben</translation>
+    </message>
+    <message>
+        <source>Move to top right</source>
+        <translation>Nach oben rechts verschieben</translation>
+    </message>
+    <message>
+        <source>Move to bottom left</source>
+        <translation>Nach unten links verschieben</translation>
+    </message>
+    <message>
+        <source>Move to bottom center</source>
+        <translation>Nach unten mittig verschieben</translation>
+    </message>
+    <message>
+        <source>Move to bottom right</source>
+        <translation>Nach unten rechts verschieben</translation>
     </message>
     <message>
         <source>Portable Document Format (*.pdf)</source>
@@ -4986,6 +5290,13 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Apply changes</source>
         <translation>Änderungen anwenden</translation>
+    </message>
+</context>
+<context>
+    <name>InterfaceTreeDelegate</name>
+    <message>
+        <source>default</source>
+        <translation>Standard</translation>
     </message>
 </context>
 <context>
@@ -5965,8 +6276,8 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
 <context>
     <name>LteMacStatisticsDialog</name>
     <message>
-        <source>LTE Mac Statistics</source>
-        <translation>LTE Mac Statistiken</translation>
+        <source>LTE/NR Mac Statistics</source>
+        <translation>LTE/NR Mac Statistiken</translation>
     </message>
     <message>
         <source>Include SR frames in filter</source>
@@ -6270,12 +6581,12 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Sequenznummer</translation>
     </message>
     <message>
-        <source>LTE RLC Graph (UE=%1 chan=%2%3 %4 - %5)</source>
-        <translation>LTE RLC Graph (UE=%1 Kanal=%2%3 %4 - %5)</translation>
+        <source>%1 RLC Graph (UE=%2 chan=%3%4 %5 - %6)</source>
+        <translation>%1 RLC Graph (UE=%2 Kanal=%3%4 %5 - %6)</translation>
     </message>
     <message>
-        <source>LTE RLC Graph - no channel selected</source>
-        <translation>LTE RLC Graph - Kein Kanal ausgewählt</translation>
+        <source>3GPP RLC Graph - no channel selected</source>
+        <translation>3GPP RLC Graph - kein Kanal ausgewählt</translation>
     </message>
     <message>
         <source>Save As…</source>
@@ -6329,8 +6640,8 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
 <context>
     <name>LteRlcStatisticsDialog</name>
     <message>
-        <source>LTE RLC Statistics</source>
-        <translation>LTE RLC Statistiken</translation>
+        <source>3GPP RLC Statistics</source>
+        <translation>3GPP RLC Statistiken</translation>
     </message>
     <message>
         <source>Include SR frames in filter</source>
@@ -6416,6 +6727,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Profil: %1</translation>
     </message>
     <message>
+        <source> %1 Displayed: %2 (%3%)</source>
+        <translation> %1 Angezeigt: %2 (%3%)</translation>
+    </message>
+    <message>
         <source>Manage Profiles…</source>
         <translation>Profile verwalten…</translation>
     </message>
@@ -6477,6 +6792,13 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
             <numerusform>%Ln Bytes</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation>
+            <numerusform>%Ln Bit</numerusform>
+            <numerusform>%Ln Bits</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Byte %1</source>
         <translation>Byte %1</translation>
@@ -6490,9 +6812,12 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Ausgewähltes Paket: %1 %2</translation>
     </message>
     <message>
-        <source>Packets: %1 %4 Displayed: %2 (%3%)</source>
-        <oldsource>Packets: %1 %4 Displayed: %2 %4 Marked: %3</oldsource>
-        <translation>Pakete: %1 %4 Angezeigt: %2 (%3%)</translation>
+        <source>Selected Event: %1 %2 </source>
+        <translation>Ausgewählte Ereignisse: %1 %2 </translation>
+    </message>
+    <message>
+        <source>Events: %1</source>
+        <translation>Ereignisse: %1</translation>
     </message>
     <message>
         <source> %1 Selected: %2 (%3%)</source>
@@ -6522,6 +6847,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>No Packets</source>
         <translation>Keine Pakete</translation>
+    </message>
+    <message>
+        <source>No Events</source>
+        <translation>Keine Ereignisse</translation>
     </message>
     <message>
         <source>From Zip File...</source>
@@ -6556,6 +6885,13 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     </message>
 </context>
 <context>
+    <name>MainWindow</name>
+    <message>
+        <source>Display filter as %1</source>
+        <translation>Filter anzeigen als %1</translation>
+    </message>
+</context>
+<context>
     <name>MainWindowPreferencesFrame</name>
     <message>
         <source>Frame</source>
@@ -6585,6 +6921,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>The most recently used folder</source>
         <translation>Zuletzt genutztem Ordner</translation>
+    </message>
+    <message>
+        <source>The current working directory</source>
+        <translation>Das aktuelle Arbeitsverzeichnis</translation>
     </message>
     <message>
         <source>Show up to</source>
@@ -7017,6 +7357,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Zeige Feldwerte</translation>
     </message>
     <message>
+        <source>Refresh</source>
+        <translation>Aktualisieren</translation>
+    </message>
+    <message>
         <source>Save Diagram As…</source>
         <translation>Diagramm speichern als…</translation>
     </message>
@@ -7064,6 +7408,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Paketbytes anzeigen</translation>
     </message>
     <message>
+        <source>Layout:</source>
+        <translation>Ansicht:</translation>
+    </message>
+    <message>
         <source>Packet %1</source>
         <translation>Paket %1</translation>
     </message>
@@ -7084,6 +7432,13 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>
             <numerusform>%Ln Byte</numerusform>
             <numerusform>%Ln Bytes</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation>
+            <numerusform>%Ln Bit</numerusform>
+            <numerusform>%Ln Bits</numerusform>
         </translation>
     </message>
 </context>
@@ -7545,8 +7900,20 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Dieses Profil kopieren.</translation>
     </message>
     <message>
+        <source>The number of packets or events to check for automatic profile switching.</source>
+        <translation>Die für den automatischen Profilwechsel geprüfte Anzahl von Paketen oder Ereignissen.</translation>
+    </message>
+    <message>
+        <source>Auto switch packet limit</source>
+        <translation>Autoswitch Paketlimit</translation>
+    </message>
+    <message>
         <source>Configuration Profiles</source>
         <translation>Profile konfigurieren</translation>
+    </message>
+    <message>
+        <source>Auto switch event limit</source>
+        <translation>Autoswitch Ereignislimit</translation>
     </message>
     <message>
         <source>Import</source>
@@ -7729,6 +8096,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>deleted</source>
         <translation>gelöscht</translation>
+    </message>
+    <message>
+        <source>Auto Switch Filter</source>
+        <translation>Autoswitch Filter</translation>
     </message>
     <message>
         <source>copy</source>
@@ -8091,7 +8462,7 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     </message>
     <message>
         <source>Unacked (Outstanding) Bytes (B)</source>
-        <translation type="unfinished"></translation>
+        <translation>Nicht-ACK-bestätigte (ausstehende) Bytes (B)</translation>
     </message>
     <message>
         <source>[no capture file]</source>
@@ -8254,6 +8625,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Marker fehlt?</translation>
     </message>
     <message>
+        <source>LTE</source>
+        <translation>LTE</translation>
+    </message>
+    <message>
+        <source>NR</source>
+        <translation>NR</translation>
+    </message>
+    <message>
         <source>C-RNTI</source>
         <translation>C-RNTI</translation>
     </message>
@@ -8272,6 +8651,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>UEId</source>
         <translation>UEId</translation>
+    </message>
+    <message>
+        <source>RAT</source>
+        <translation>RAT</translation>
     </message>
     <message>
         <source>UL Frames</source>
@@ -8497,9 +8880,69 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <source>Browse…</source>
         <translation>Öffnen…</translation>
     </message>
+    <message>
+        <source>PACKETS</source>
+        <translation>PAKETE</translation>
+    </message>
+    <message>
+        <source>EVENTS</source>
+        <translation>EREIGNISSE</translation>
+    </message>
+    <message>
+        <source>BYTES</source>
+        <translation>BYTES</translation>
+    </message>
+    <message>
+        <source>BITS</source>
+        <translation>BITS</translation>
+    </message>
+    <message>
+        <source>COUNT FRAMES</source>
+        <translation>ANZAHL FRAMES</translation>
+    </message>
+    <message>
+        <source>COUNT FIELDS</source>
+        <translation>ANZAHL FELDER</translation>
+    </message>
+    <message>
+        <source>SUM</source>
+        <translation>SUMME</translation>
+    </message>
+    <message>
+        <source>MAX</source>
+        <translation>MAX</translation>
+    </message>
+    <message>
+        <source>MIN</source>
+        <translation>MIN</translation>
+    </message>
+    <message>
+        <source>AVERAGE</source>
+        <translation>DURCHSCHNITT</translation>
+    </message>
+    <message>
+        <source>THROUGHPUT</source>
+        <translation>DURCHSATZ</translation>
+    </message>
+    <message>
+        <source>LOAD</source>
+        <translation>LAST</translation>
+    </message>
+    <message>
+        <source>Left</source>
+        <translation>Links</translation>
+    </message>
+    <message>
+        <source>Center</source>
+        <translation>Zentriert</translation>
+    </message>
+    <message>
+        <source>Right</source>
+        <translation>Rechts</translation>
+    </message>
 </context>
 <context>
-    <name>QObject::QObject</name>
+    <name>QObject::QObject::QObject</name>
     <message>
         <source>CCCH</source>
         <translation>CCCH</translation>
@@ -8597,6 +9040,13 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>milliseconds</source>
         <translation>Millisekunden</translation>
+    </message>
+</context>
+<context>
+    <name>ResizeHeaderView</name>
+    <message>
+        <source>Resize all %1 to contents</source>
+        <translation>Alle %1 an Inhalt anpassen</translation>
     </message>
 </context>
 <context>
@@ -8715,6 +9165,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Aufgelöste Adressen</translation>
     </message>
     <message>
+        <source>Copy</source>
+        <translation>Kopieren</translation>
+    </message>
+    <message>
+        <source>Save as…</source>
+        <translation>Speichern als...</translation>
+    </message>
+    <message>
         <source># Resolved addresses found in %1</source>
         <translation># Resolved addresses found in %1 </translation>
     </message>
@@ -8725,6 +9183,61 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation># Comments
 #
 # </translation>
+    </message>
+</context>
+<context>
+    <name>ResolvedAddressesView</name>
+    <message>
+        <source>as Plain Text</source>
+        <translation>als reiner Text</translation>
+    </message>
+    <message>
+        <source>Copy selected rows</source>
+        <translation>Ausgewählte Reihen kopieren</translation>
+    </message>
+    <message>
+        <source>Copy table</source>
+        <translation>Tabelle kopieren</translation>
+    </message>
+    <message>
+        <source>as CSV</source>
+        <translation>als CSV</translation>
+    </message>
+    <message>
+        <source>as JSON</source>
+        <translation>als JSON</translation>
+    </message>
+    <message>
+        <source>Save selected rows as…</source>
+        <translation>Ausgewählte Reihen speichern...</translation>
+    </message>
+    <message>
+        <source>Save table as…</source>
+        <translation>Tabelle speichern als...</translation>
+    </message>
+    <message>
+        <source>Save Resolved Addresses As…</source>
+        <translation>Aufgelöste Adressen speichern als...</translation>
+    </message>
+    <message>
+        <source>Plain text (*.txt)</source>
+        <translation>Reiner Text (*.txt)</translation>
+    </message>
+    <message>
+        <source>CSV Document (*.csv)</source>
+        <translation>CSV Dokument (*.csv)</translation>
+    </message>
+    <message>
+        <source>JSON Document (*.json)</source>
+        <translation>JSON Dokument (*.json)</translation>
+    </message>
+    <message>
+        <source>Warning</source>
+        <translation>Warnung</translation>
+    </message>
+    <message>
+        <source>Unable to save %1: %2</source>
+        <translation>Speichern von %1 nicht möglich: %2</translation>
     </message>
 </context>
 <context>
@@ -10402,6 +10915,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Paket Bytes</translation>
     </message>
     <message>
+        <source>&lt;b&gt;Options:&lt;/b&gt;</source>
+        <translation>&lt;b&gt;Optionen:&lt;/b&gt;</translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search for strings containing narrow (UTF-8 and ASCII) or wide (UTF-16) characters.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Zeichenketten suchen, die schmale (UTF-8 oder ASCII) or breite (UTF-16) Zeichen enthalten.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
@@ -10420,6 +10937,18 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Case sensitive</source>
         <translation>Groß- / Kleinschreibung beachten</translation>
+    </message>
+    <message>
+        <source>Backwards</source>
+        <translation>Rückwärts</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search for a subsequent occurrence in the current packet before advancing to the next packet.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Nach weiterem Vorkommen im aktuellen Paket suchen bevor mit dem nächsten Paket fortgefahren wird.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Multiple occurrences</source>
+        <translation>Mehreres Vorkommen</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search for data using display filter syntax (e.g. ip.addr==10.1.1.1), a hexadecimal string (e.g. fffffda5), a plain string (e.g. My String) or a regular expression (e.g. colou?r).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -10457,6 +10986,22 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Invalid filter.</source>
         <translation>Ungültiger Filter.</translation>
+    </message>
+    <message>
+        <source>Event List</source>
+        <translation>Ereignisliste</translation>
+    </message>
+    <message>
+        <source>Event Details</source>
+        <translation>Ereignisdetails</translation>
+    </message>
+    <message>
+        <source>Event Bytes</source>
+        <translation>Ereignis-Bytes</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search the Info column of the event list (summary pane), decoded event display labels (tree view pane) or the ASCII-converted event data (hex view pane).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Durchsuchen der Informationsspalte der Ereignisliste (Übersichtsfenster), der dekodierten Ereignisanzeigebeschriftungen (Baumansicht) oder der ASCII-konvertierten Ereignisdaten (Hex-Ansicht).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>That filter doesn&apos;t test anything.</source>
@@ -10902,6 +11447,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Suchen:</translation>
     </message>
     <message>
+        <source>Case sensitive</source>
+        <translation>Groß- / Kleinschreibung beachten</translation>
+    </message>
+    <message>
         <source>Find &amp;Next</source>
         <translation>&amp;Nächstes suchen</translation>
     </message>
@@ -10997,14 +11546,22 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Speichern als…</translation>
     </message>
     <message>
+        <source>Decoded as %1.</source>
+        <translation>Dekodiert als %1.</translation>
+    </message>
+    <message>
         <source>Save Selected Packet Bytes As…</source>
         <translation>Ausgewählte Paketbytes speichern als…</translation>
     </message>
+    <message>
+        <source>compressed %1</source>
+        <translation>%1 komprimiert</translation>
+    </message>
     <message numerus="yes">
-        <source>Displaying %Ln byte(s).</source>
+        <source>Using %Ln byte(s).</source>
         <translation>
-            <numerusform>Zeige %Ln Byte an.</numerusform>
-            <numerusform>Zeige %Ln Bytes an.</numerusform>
+            <numerusform>Verwende %Ln Byte.</numerusform>
+            <numerusform>Verwende %Ln Bytes.</numerusform>
         </translation>
     </message>
     <message>
@@ -11103,6 +11660,10 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     <message>
         <source>Display filter:</source>
         <translation>Anzeigefilter:</translation>
+    </message>
+    <message>
+        <source>Strip Headers</source>
+        <translation>Kopfdaten entfernen</translation>
     </message>
 </context>
 <context>
@@ -12077,22 +12638,20 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Einen neuen Eintrag erstellen.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <oldsource>Remove this profile.</oldsource>
-        <translation>Diesen Eintrag entfernen.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation>Ausgewählte(n) Eintrag(e) entfernen.</translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <oldsource>Copy this profile.</oldsource>
-        <translation>Diesen Eintrag kopieren.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation>Ausgewählte(n) Eintrag(e) kopieren.</translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Eintrag nach oben verschieben.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation>Ausgewählte(n) Eintrag(e) nach oben verschieben.</translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Eintrag nach unten verschieben.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation>Ausgewählte(n) Eintrag(e) nach unten verschieben.</translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12118,20 +12677,20 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Einen neuen Eintrag erstellen.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <translation>Diesen Eintrag entfernen.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation>Ausgewählte(n) Eintrag(e) entfernen.</translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <translation>Diesen Eintrag kopieren.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation>Ausgewählte(n) Eintrag(e) kopieren.</translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Eintrag nach oben verschieben.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation>Ausgewählte(n) Eintrag(e) nach oben verschieben.</translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Eintrag nach unten verschieben.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation>Ausgewählte(n) Eintrag(e) nach unten verschieben.</translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12502,8 +13061,16 @@ a:hover {
         <translation>Mit Wireshark den Kleber schnüffeln, der das Internet zusammenhält.</translation>
     </message>
     <message>
+        <source>You are sniffing the glue that holds your system together using Logray </source>
+        <translation>Mit Logray den Kleber schnüffeln, der Ihr System zusammenhält.</translation>
+    </message>
+    <message>
         <source>You are running Wireshark </source>
         <translation>Sie nutzen Wireshark </translation>
+    </message>
+    <message>
+        <source>You are running Logray </source>
+        <translation>Sie nutzen Logray</translation>
     </message>
     <message>
         <source> You receive automatic updates.</source>
@@ -12782,14 +13349,6 @@ a:hover {
         <translation>Keine Dateien gefunden</translation>
     </message>
     <message>
-        <source>&amp;Contents</source>
-        <translation>&amp;Inhalt</translation>
-    </message>
-    <message>
-        <source>Wireshark Filter</source>
-        <translation>Wireshark Filter</translation>
-    </message>
-    <message>
         <source>TShark</source>
         <translation>TShark</translation>
     </message>
@@ -13055,10 +13614,6 @@ a:hover {
         <translation>Wireless Toolbar</translation>
     </message>
     <message>
-        <source>Help contents</source>
-        <translation>Hilfe Inhalt</translation>
-    </message>
-    <message>
         <source>FAQs</source>
         <translation>Häufige Fragen (en)</translation>
     </message>
@@ -13179,11 +13734,6 @@ a:hover {
         <translation>Vorheriges Paket finden</translation>
     </message>
     <message>
-        <source>&amp;Mark/Unmark Packet(s)</source>
-        <oldsource>&amp;Mark/Unmark Packet</oldsource>
-        <translation>Paket &amp;markieren</translation>
-    </message>
-    <message>
         <source>Mark All Displayed</source>
         <translation>Alle angezeigte Pakete markieren</translation>
     </message>
@@ -13210,11 +13760,6 @@ a:hover {
     <message>
         <source>Go to the previous marked packet</source>
         <translation>Zum vorherigen markierten Paket gehen</translation>
-    </message>
-    <message>
-        <source>&amp;Ignore/Unignore Packet(s)</source>
-        <oldsource>&amp;Ignore/Unignore Packet</oldsource>
-        <translation>Paket &amp;ignorieren bzw. zurücksetzen</translation>
     </message>
     <message>
         <source>Ignore All Displayed</source>
@@ -13657,10 +14202,6 @@ a:hover {
         <translation>Ansicht zurücksetzen</translation>
     </message>
     <message>
-        <source>Reset appearance layout to default size</source>
-        <translation>Anzeige auf Ausgangsgröße zurücksetzen</translation>
-    </message>
-    <message>
         <source>Seconds Since First Captured Packet</source>
         <translation>Sekunden seit erstem aufgezeichneten Paket</translation>
     </message>
@@ -13670,19 +14211,19 @@ a:hover {
     </message>
     <message>
         <source>Tenths of a millisecond</source>
-        <translation>Zehntelmillisekunde</translation>
+        <translation>Zehntelmillisekunden</translation>
     </message>
     <message>
         <source>Hundredths of a millisecond</source>
-        <translation>Hundertstelmillisekunde</translation>
+        <translation>Hundertstelmillisekunden</translation>
     </message>
     <message>
         <source>Tenths of a microsecond</source>
-        <translation>Zehntelmikrosekunde</translation>
+        <translation>Zehntelmikrosekunden</translation>
     </message>
     <message>
         <source>Hundredths of a microsecond</source>
-        <translation>Hundertstelmikrosekunde</translation>
+        <translation>Hundertstelmikrosekunden</translation>
     </message>
     <message>
         <source>Packet &amp;Diagram</source>
@@ -13821,20 +14362,28 @@ a:hover {
         <translation>MAC Adressblöcke</translation>
     </message>
     <message>
-        <source>TLS Keylog Launcher</source>
-        <translation>TLS Keylog Launcher</translation>
-    </message>
-    <message>
-        <source>Release Notes</source>
-        <translation>Veröffentlichungshinweise</translation>
-    </message>
-    <message>
         <source>&amp;Options…</source>
         <translation>&amp;Optionen...</translation>
     </message>
     <message>
+        <source>&amp;3GPP Uu</source>
+        <translation>&amp;3GPP Uu</translation>
+    </message>
+    <message>
         <source>&amp;Wireless</source>
         <translation>&amp;Wireless</translation>
+    </message>
+    <message>
+        <source>&amp;User&apos;s Guide</source>
+        <translation>Ben&amp;utzerhandbuch (en)</translation>
+    </message>
+    <message>
+        <source>Wireshark User&apos;s Guide</source>
+        <translation>Wireshark Benutzerhandbuch (en)</translation>
+    </message>
+    <message>
+        <source>Display Filters</source>
+        <translation>Anzeigefilter</translation>
     </message>
     <message>
         <source>Capture &amp;Filters…</source>
@@ -13881,8 +14430,16 @@ a:hover {
         <translation>Vorheriges finden</translation>
     </message>
     <message>
+        <source>&amp;Mark/Unmark Selected</source>
+        <translation>Ausgewählte &amp;markieren</translation>
+    </message>
+    <message>
         <source>Mark or unmark each selected packet</source>
         <translation>Jedes ausgewählte Paket markieren bzw. Markierung rückgängig machen</translation>
+    </message>
+    <message>
+        <source>&amp;Ignore/Unignore Selected</source>
+        <translation>Ausgewählte &amp;ignorieren</translation>
     </message>
     <message>
         <source>Ignore or unignore each selected packet</source>
@@ -13925,12 +14482,32 @@ a:hover {
         <translation>TCP Durchsatz</translation>
     </message>
     <message>
+        <source>General</source>
+        <translation>Allgemein</translation>
+    </message>
+    <message>
+        <source>Query-Response</source>
+        <translation>Query-Response</translation>
+    </message>
+    <message>
+        <source>DNS Query-Response Statistics</source>
+        <translation>DNS Query-Response Statistiken</translation>
+    </message>
+    <message>
         <source>Request Sequences</source>
         <translation>Anfrage Sequenzen</translation>
     </message>
     <message>
         <source>HTTP Request Sequences</source>
         <translation>HTTP Anfrage Sequenzen</translation>
+    </message>
+    <message>
+        <source>E2AP</source>
+        <translation>E2AP</translation>
+    </message>
+    <message>
+        <source>E2AP Messages</source>
+        <translation>E2AP Nachrichten</translation>
     </message>
     <message>
         <source>Decode &amp;As…</source>
@@ -13991,6 +14568,10 @@ a:hover {
     <message>
         <source>Normal Size</source>
         <translation>Normale Größe</translation>
+    </message>
+    <message>
+        <source>Reset layout to default size</source>
+        <translation>Anzeige auf Standardgröße zurücksetzen</translation>
     </message>
     <message>
         <source>Resize Columns</source>
@@ -14082,11 +14663,11 @@ a:hover {
     </message>
     <message>
         <source>Tenths of a second</source>
-        <translation>Zehntelsekunde</translation>
+        <translation>Zehntelsekunden</translation>
     </message>
     <message>
         <source>Hundredths of a second</source>
-        <translation>Hundertstel</translation>
+        <translation>Hundertstelsekunden</translation>
     </message>
     <message>
         <source>Milliseconds</source>
@@ -14251,6 +14832,14 @@ a:hover {
         <translation>Zum Paket gehen auf das das ausgewählte Feld referenziert.</translation>
     </message>
     <message>
+        <source>TLS Keylog Launcher</source>
+        <translation>TLS Keylog Launcher</translation>
+    </message>
+    <message>
+        <source>Release Notes</source>
+        <translation>Release Notes</translation>
+    </message>
+    <message>
         <source>&amp;VoIP Calls</source>
         <translation>&amp;VoIP Anrufe</translation>
     </message>
@@ -14281,10 +14870,6 @@ a:hover {
     <message>
         <source>&amp;GSM</source>
         <translation>&amp;GSM</translation>
-    </message>
-    <message>
-        <source>&amp;LTE</source>
-        <translation>&amp;LTE</translation>
     </message>
     <message>
         <source>&amp;MTP3</source>
@@ -14569,6 +15154,10 @@ a:hover {
         <source>Quit &amp;without Saving</source>
         <oldsource>Quit without Saving</oldsource>
         <translation>&amp;Ohne Speichern beenden</translation>
+    </message>
+    <message>
+        <source>USB CDC Data</source>
+        <translation>USB CDC-Daten</translation>
     </message>
     <message>
         <source>There is no &quot;rtp.ssrc&quot; field in this version of Wireshark.</source>
