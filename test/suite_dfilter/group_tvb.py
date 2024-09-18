@@ -47,11 +47,8 @@ class TestDfilterProtocol:
 
     def test_protocol_2(self, checkDFilterFail):
         dfilter = 'frame contains aa.bb.hh'
-        checkDFilterFail(dfilter, 'is not a valid byte string')
+        checkDFilterFail(dfilter, '"aa.bb.hh" is not a valid byte string')
 
     def test_protocol_3(self, checkDFilterFail):
         dfilter = 'ip.port == 5'
-        ### XXX This should say something about ip.port not being a valid
-        # protocol or protocol field but ip.port is interpreted as
-        # a literal/unparsed value.
-        checkDFilterFail(dfilter, 'Constant expression is invalid')
+        checkDFilterFail(dfilter, '"ip.port" is not a valid protocol or protocol field')

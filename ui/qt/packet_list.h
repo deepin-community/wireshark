@@ -24,6 +24,7 @@
 
 class PacketListHeader;
 class OverlayScrollBar;
+class ProfileSwitcher;
 
 class QAction;
 class QTimerEvent;
@@ -49,6 +50,7 @@ public:
     };
     Q_ENUM(SummaryCopyType)
 
+    virtual void scrollTo(const QModelIndex &index, QAbstractItemView::ScrollHint hint = EnsureVisible) override;
     QMenu *conversationMenu() { return &conv_menu_; }
     QMenu *colorizeMenu() { return &colorize_menu_; }
     void setProtoTree(ProtoTree *proto_tree);
@@ -73,9 +75,9 @@ public:
     bool contextMenuActive();
     QString getFilterFromRowAndColumn(QModelIndex idx);
     void resetColorized();
-    QString getPacketComment(guint c_number);
+    QString getPacketComment(unsigned c_number);
     void addPacketComment(QString new_comment);
-    void setPacketComment(guint c_number, QString new_comment);
+    void setPacketComment(unsigned c_number, QString new_comment);
     QString allPacketComments();
     void deleteCommentsFromPackets();
     void deleteAllPacketComments();
@@ -85,6 +87,7 @@ public:
     void resetColumns();
     bool haveNextHistory(bool update_cur = false);
     bool havePreviousHistory(bool update_cur = false);
+    void setProfileSwitcher(ProfileSwitcher *profile_switcher);
 
     frame_data * getFDataForRow(int row) const;
 
@@ -147,15 +150,15 @@ private:
     int cur_history_;
     bool in_history_;
     GPtrArray *finfo_array; // Packet data from the last selected packet entry
+    ProfileSwitcher *profile_switcher_;
 
-    void setFrameReftime(gboolean set, frame_data *fdata);
+    void setFrameReftime(bool set, frame_data *fdata);
     void setColumnVisibility();
     int sizeHintForColumn(int column) const override;
     void setRecentColumnWidth(int column);
     void drawCurrentPacket();
     void applyRecentColumnWidths();
     void scrollViewChanged(bool at_end);
-    void colorsChanged();
     QString joinSummaryRow(QStringList col_parts, int row, SummaryCopyType type);
 
 signals:
@@ -172,6 +175,7 @@ signals:
 public slots:
     void setCaptureFile(capture_file *cf);
     void setMonospaceFont(const QFont &mono_font);
+    void setRegularFont(const QFont &regular_font);
     void goNextPacket();
     void goPreviousPacket();
     void goFirstPacket();
@@ -189,6 +193,7 @@ public slots:
     void recolorPackets();
     void redrawVisiblePackets();
     void redrawVisiblePacketsDontSelectCurrent();
+    void colorsChanged();
     void columnsChanged();
     void fieldsChanged(capture_file *cf);
     void preferencesChanged();

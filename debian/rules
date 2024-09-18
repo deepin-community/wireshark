@@ -59,7 +59,7 @@ override_dh_auto_build-indep:
 	dh_auto_build -i
 	$(MAKE) -C $(CURDIR)/obj-* user_guide_html developer_guide_html
 	# fix links in documentation
-	sed -i "s|$(CURDIR)/docbook|..|" obj-*/docbook/ws*g_html_chunked/*.html
+	sed -i "s|$(CURDIR)/doc|..|" obj-*/doc/ws*g_html_chunked/*.html
 
 override_dh_dwz:
 	# run dh_dwz only with debhelper (>= 12.6) to work around https://bugs.debian.org/939164
@@ -92,11 +92,11 @@ override_dh_fixperms-arch:
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	$(MAKE) -C obj-* test-programs
-ifneq (,$(filter armel armhf hppa mips mipsel s390x,$(DEB_HOST_ARCH)))
+ifneq (,$(filter hppa m68k powerpc ppc64 sparc64 s390x,$(DEB_HOST_ARCH)))
 	# reported as https://gitlab.com/wireshark/wireshark/-/issues/15945
-	-dh_auto_test
+	-env LC_ALL=C.UTF-8 dh_auto_test
 else
-	dh_auto_test
+	env LC_ALL=C.UTF-8 dh_auto_test
 endif
 endif
 

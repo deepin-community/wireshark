@@ -8,7 +8,6 @@
  */
 
 #include <algorithm>
-#include <glib.h>
 #include <cmath>
 #include <stdexcept>
 
@@ -55,7 +54,7 @@ class SortAbort : public std::runtime_error
 static PacketListModel * glbl_plist_model = Q_NULLPTR;
 static const int reserved_packets_ = 100000;
 
-guint
+unsigned
 packet_list_append(column_info *, frame_data *fdata)
 {
     if (!glbl_plist_model)
@@ -143,7 +142,7 @@ int PacketListModel::packetNumberToRow(int packet_num) const
     return number_to_row_.value(packet_num) - 1;
 }
 
-guint PacketListModel::recreateVisibleRows()
+unsigned PacketListModel::recreateVisibleRows()
 {
     beginResetModel();
     visible_rows_.resize(0);
@@ -155,7 +154,7 @@ guint PacketListModel::recreateVisibleRows()
 
         if (fdata->passed_dfilter || fdata->ref_time) {
             visible_rows_ << record;
-            if (static_cast<guint32>(number_to_row_.size()) <= fdata->num) {
+            if (static_cast<uint32_t>(number_to_row_.size()) <= fdata->num) {
                 number_to_row_.resize(fdata->num + 10000);
             }
             number_to_row_[fdata->num] = static_cast<int>(visible_rows_.count());
@@ -166,7 +165,7 @@ guint PacketListModel::recreateVisibleRows()
         endInsertRows();
     }
     idle_dissection_row_ = 0;
-    return static_cast<guint>(visible_rows_.count());
+    return static_cast<unsigned>(visible_rows_.count());
 }
 
 void PacketListModel::clear() {
@@ -285,7 +284,7 @@ void PacketListModel::toggleFrameMark(const QModelIndexList &indeces)
     }
 }
 
-void PacketListModel::setDisplayedFrameMark(gboolean set)
+void PacketListModel::setDisplayedFrameMark(bool set)
 {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     emit layoutAboutToBeChanged();
@@ -334,7 +333,7 @@ void PacketListModel::toggleFrameIgnore(const QModelIndexList &indeces)
     }
 }
 
-void PacketListModel::setDisplayedFrameIgnore(gboolean set)
+void PacketListModel::setDisplayedFrameIgnore(bool set)
 {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     emit layoutAboutToBeChanged();
@@ -447,7 +446,7 @@ void PacketListModel::addFrameComment(const QModelIndexList &indices, const QByt
     }
 }
 
-void PacketListModel::setFrameComment(const QModelIndex &index, const QByteArray &comment, guint c_number)
+void PacketListModel::setFrameComment(const QModelIndex &index, const QByteArray &comment, unsigned c_number)
 {
     int sectionMax = columnCount() - 1;
     frame_data *fdata;
@@ -492,10 +491,10 @@ void PacketListModel::deleteFrameComments(const QModelIndexList &indices)
 
         fdata = record->frameData();
         wtap_block_t pkt_block = cf_get_packet_block(cap_file_, fdata);
-        guint n_comments = wtap_block_count_option(pkt_block, OPT_COMMENT);
+        unsigned n_comments = wtap_block_count_option(pkt_block, OPT_COMMENT);
 
         if (n_comments) {
-            for (guint i = 0; i < n_comments; i++) {
+            for (unsigned i = 0; i < n_comments; i++) {
                 wtap_block_remove_nth_option_instance(pkt_block, OPT_COMMENT, 0);
             }
             if (!cf_set_modified_block(cap_file_, fdata, pkt_block)) {
@@ -522,10 +521,10 @@ void PacketListModel::deleteAllFrameComments()
     foreach (PacketListRecord *record, physical_rows_) {
         frame_data *fdata = record->frameData();
         wtap_block_t pkt_block = cf_get_packet_block(cap_file_, fdata);
-        guint n_comments = wtap_block_count_option(pkt_block, OPT_COMMENT);
+        unsigned n_comments = wtap_block_count_option(pkt_block, OPT_COMMENT);
 
         if (n_comments) {
-            for (guint i = 0; i < n_comments; i++) {
+            for (unsigned i = 0; i < n_comments; i++) {
                 wtap_block_remove_nth_option_instance(pkt_block, OPT_COMMENT, 0);
             }
             cf_set_modified_block(cap_file_, fdata, pkt_block);
@@ -557,7 +556,7 @@ int PacketListModel::sort_column_is_numeric_;
 int PacketListModel::text_sort_column_;
 Qt::SortOrder PacketListModel::sort_order_;
 capture_file *PacketListModel::sort_cap_file_;
-gboolean PacketListModel::stop_flag_;
+bool PacketListModel::stop_flag_;
 ProgressFrame *PacketListModel::progress_frame_;
 double PacketListModel::comps_;
 double PacketListModel::exp_comps_;
@@ -579,7 +578,7 @@ void PacketListModel::sort(int column, Qt::SortOrder order)
 
     QString col_title = get_column_title(column);
 
-    if (text_sort_column_ >= 0 && (guint)visible_rows_.count() > prefs.gui_packet_list_cached_rows_max) {
+    if (text_sort_column_ >= 0 && (unsigned)visible_rows_.count() > prefs.gui_packet_list_cached_rows_max) {
         /* Column not based on frame data but by column text that requires
          * dissection, so to sort in a reasonable amount of time the column
          * text needs to be cached.
@@ -614,7 +613,7 @@ void PacketListModel::sort(int column, Qt::SortOrder order)
          */
         return;
     }
-    sort_cap_file_->read_lock = TRUE;
+    sort_cap_file_->read_lock = true;
 
     QString busy_msg;
     if (!col_title.isEmpty()) {
@@ -622,7 +621,7 @@ void PacketListModel::sort(int column, Qt::SortOrder order)
     } else {
         busy_msg = tr("Sorting …");
     }
-    stop_flag_ = FALSE;
+    stop_flag_ = false;
     comps_ = 0;
     /* XXX: The expected number of comparisons is O(N log N), but this could
      * be a pretty significant overestimate of the amount of time it takes,
@@ -672,7 +671,7 @@ void PacketListModel::sort(int column, Qt::SortOrder order)
         disconnect(progress_frame_, &ProgressFrame::stopLoading,
                    this, &PacketListModel::stopSorting);
     }
-    sort_cap_file_->read_lock = FALSE;
+    sort_cap_file_->read_lock = false;
 
     if (cap_file_->current_frame) {
         emit goToPacket(cap_file_->current_frame->num);
@@ -681,11 +680,14 @@ void PacketListModel::sort(int column, Qt::SortOrder order)
 
 void PacketListModel::stopSorting()
 {
-    stop_flag_ = TRUE;
+    stop_flag_ = true;
 }
 
 bool PacketListModel::isNumericColumn(int column)
 {
+    /* XXX - Should this and ui/packet_list_utils.c right_justify_column()
+     * be the same list of columns?
+     */
     if (column < 0) {
         return false;
     }
@@ -720,10 +722,19 @@ bool PacketListModel::isNumericColumn(int column)
         return false;
     }
 
-    guint num_fields = g_slist_length(sort_cap_file_->cinfo.columns[column].col_custom_fields_ids);
-    for (guint i = 0; i < num_fields; i++) {
-        guint *field_idx = (guint *) g_slist_nth_data(sort_cap_file_->cinfo.columns[column].col_custom_fields_ids, i);
-        header_field_info *hfi = proto_registrar_get_nth(*field_idx);
+    unsigned num_fields = g_slist_length(sort_cap_file_->cinfo.columns[column].col_custom_fields_ids);
+    col_custom_t *col_custom;
+    for (unsigned i = 0; i < num_fields; i++) {
+        col_custom = (col_custom_t *) g_slist_nth_data(sort_cap_file_->cinfo.columns[column].col_custom_fields_ids, i);
+        if (col_custom->field_id == 0) {
+            /* XXX - We need some way to check the compiled dfilter's expected
+             * return type. Best would be to use the actual field values return
+             * and sort on those (we could skip expensive string conversions
+             * in the numeric case, see below)
+             */
+            return false;
+        }
+        header_field_info *hfi = proto_registrar_get_nth(col_custom->field_id);
 
         /*
          * Reject a field when there is no numeric field type or when:
@@ -824,7 +835,7 @@ double PacketListModel::parseNumericColumn(const QString &val, bool *ok)
 {
     QByteArray ba = val.toUtf8();
     const char *strval = ba.constData();
-    gchar *end = NULL;
+    char *end = NULL;
     double num = g_ascii_strtod(strval, &end);
     *ok = strval != end;
     return num;
@@ -871,13 +882,10 @@ QVariant PacketListModel::data(const QModelIndex &d_index, int role) const
         switch(recent_get_column_xalign(d_index.column())) {
         case COLUMN_XALIGN_RIGHT:
             return Qt::AlignRight;
-            break;
         case COLUMN_XALIGN_CENTER:
             return Qt::AlignCenter;
-            break;
         case COLUMN_XALIGN_LEFT:
             return Qt::AlignLeft;
-            break;
         case COLUMN_XALIGN_DEFAULT:
         default:
             if (right_justify_column(d_index.column(), cap_file_)) {
@@ -995,6 +1003,12 @@ void PacketListModel::dissectIdle(bool reset)
 
     idle_dissection_timer_->restart();
 
+    if (!cap_file_ || cap_file_->read_lock) {
+        // File is in use (at worst, being rescanned). Try again later.
+        QTimer::singleShot(idle_dissection_interval_, this, [=]() { dissectIdle(); });
+        return;
+    }
+
     int first = idle_dissection_row_;
     while (idle_dissection_timer_->elapsed() < idle_dissection_interval_
            && idle_dissection_row_ < physical_rows_.count()) {
@@ -1015,7 +1029,7 @@ void PacketListModel::dissectIdle(bool reset)
 
 // XXX Pass in cinfo from packet_list_append so that we can fill in
 // line counts?
-gint PacketListModel::appendPacket(frame_data *fdata)
+int PacketListModel::appendPacket(frame_data *fdata)
 {
     PacketListRecord *record = new PacketListRecord(fdata);
     qsizetype pos = -1;
@@ -1038,17 +1052,19 @@ gint PacketListModel::appendPacket(frame_data *fdata)
         pos = static_cast<int>( visible_rows_.count() + new_visible_rows_.count() ) - 1;
     }
 
-    return static_cast<gint>(pos);
+    emit packetAppended(cap_file_, fdata, physical_rows_.size() - 1);
+
+    return static_cast<int>(pos);
 }
 
-frame_data *PacketListModel::getRowFdata(QModelIndex idx)
+frame_data *PacketListModel::getRowFdata(QModelIndex idx) const
 {
     if (!idx.isValid())
         return Q_NULLPTR;
     return getRowFdata(idx.row());
 }
 
-frame_data *PacketListModel::getRowFdata(int row) {
+frame_data *PacketListModel::getRowFdata(int row) const {
     if (row < 0 || row >= visible_rows_.count())
         return NULL;
     PacketListRecord *record = visible_rows_[row];
@@ -1071,13 +1087,8 @@ void PacketListModel::ensureRowColorized(int row)
 
 int PacketListModel::visibleIndexOf(frame_data *fdata) const
 {
-    int row = 0;
-    foreach (PacketListRecord *record, visible_rows_) {
-        if (record->frameData() == fdata) {
-            return row;
-        }
-        row++;
+    if (fdata == nullptr) {
+        return -1;
     }
-
-    return -1;
+    return packetNumberToRow(fdata->num);
 }

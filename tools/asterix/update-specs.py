@@ -20,6 +20,8 @@ import os
 import sys
 import re
 
+import convertspec as convert
+
 # Path to default upstream repository
 upstream_repo = 'https://zoranbosnjak.github.io/asterix-specs'
 dissector_file = 'epan/dissectors/packet-asterix.c'
@@ -68,42 +70,15 @@ class Context(object):
         self.offset = Offset()
 
 def get_number(value):
-    """Get Natural/Real/Rational number as an object."""
-    class Integer(object):
-        def __init__(self, val):
-            self.val = val
-        def __str__(self):
-            return '{}'.format(self.val)
-        def __float__(self):
-            return float(self.val)
-
-    class Ratio(object):
-        def __init__(self, a, b):
-            self.a = a
-            self.b = b
-        def __str__(self):
-            return '{}/{}'.format(self.a, self.b)
-        def __float__(self):
-            return float(self.a) / float(self.b)
-
-    class Real(object):
-        def __init__(self, val):
-            self.val = val
-        def __str__(self):
-            return '{0:f}'.format(self.val).rstrip('0')
-        def __float__(self):
-            return float(self.val)
-
     t = value['type']
-    val = value['value']
-
     if t == 'Integer':
-        return Integer(int(val))
-    if t == 'Ratio':
-        x, y = val['numerator'], val['denominator']
-        return Ratio(x, y)
-    if t == 'Real':
-        return Real(float(val))
+        return float(value['value'])
+    if t == 'Div':
+        a = get_number(value['numerator'])
+        b = get_number(value['denominator'])
+        return a/b
+    if t == 'Pow':
+        return float(pow(value['base'], value['exponent']))
     raise Exception('unexpected value type {}'.format(t))
 
 def replace_string(s, mapping):
@@ -132,19 +107,10 @@ def safe_string(s):
 
 def get_scaling(content):
     """Get scaling factor from the content."""
-    k = content.get('scaling')
-    if k is None:
+    lsb = content.get('lsb')
+    if lsb is None:
         return None
-    k = get_number(k)
-
-    fract = content['fractionalBits']
-
-    if fract > 0:
-        scale = format(float(k) / (pow(2, fract)), '.29f')
-        scale = scale.rstrip('0')
-    else:
-        scale = format(float(k))
-    return scale
+    return '{}'.format(get_number(lsb))
 
 def get_fieldpart(content):
     """Get FIELD_PART* from the content."""
@@ -297,14 +263,12 @@ def reference(cat, edition, path):
         return('{:03d}_{}'.format(cat, name))
     return('{:03d}_V{}_{}_{}'.format(cat, edition['major'], edition['minor'], name))
 
-def get_content(rule):
+def get_rule(rule):
     t = rule['type']
-    # Most cases are 'ContextFree', use as specified.
     if t == 'ContextFree':
-        return rule['content']
-    # Handle 'Dependent' contents as 'Raw'.
+        return rule['value']
     elif t == 'Dependent':
-        return {'type': "Raw"}
+        return rule['default']
     else:
         raise Exception('unexpected type: {}'.format(t))
 
@@ -313,7 +277,7 @@ def get_bit_size(item):
     if item['spare']:
         return item['length']
     else:
-        return item['variation']['size']
+        return get_rule(item['rule'])['size']
 
 def get_description(item, content=None):
     """Return item description."""
@@ -336,12 +300,18 @@ def generate_group(item, variation=None):
     level2['is_generated'] = True
     if variation is None:
         level1 = copy(item)
-        level1['variation'] = {
-            'type': 'Group',
-            'items': [level2],
+        level1['rule'] = {
+            'type': 'ContextFree',
+            'value': {
+                'type': 'Group',
+                'items': [level2],
+            },
         }
     else:
-        level2['variation'] = variation['variation']
+        level2['rule'] = {
+            'type': 'ContextFree',
+            'value': variation,
+        }
         level1 = {
             'type': "Group",
             'items': [level2],
@@ -353,15 +323,18 @@ def is_generated(item):
 
 def ungroup(item):
     """Convert group of items of known size to element"""
-    n = sum([get_bit_size(i) for i in item['variation']['items']])
+    n = sum([get_bit_size(i) for i in get_rule(item['rule'])['items']])
     result = copy(item)
-    result['variation'] = {
-        'rule': {
-            'content': {'type': 'Raw'},
-            'type': 'ContextFree',
+    result['rule'] = {
+        'type': 'ContextFree',
+        'value': {
+            'type': 'Element',
+            'size': n,
+            'rule': {
+                'type': 'ContextFree',
+                'value': {'type': 'Raw'},
+            },
         },
-        'size': n,
-        'type': 'Element',
     }
     return result
 
@@ -397,9 +370,9 @@ def part1(ctx, get_ref, catalogue):
                 return '&I{}_{}'.format(ref, item['name'])
 
             if t == 'Element':
-                tell('static int hf_{} = -1;'.format(ref))
+                tell('static int hf_{};'.format(ref))
                 n = variation['size']
-                content = get_content(variation['rule'])
+                content = get_rule(variation['rule'])
                 scaling = get_scaling(content)
                 scaling = scaling if scaling is not None else 1.0
                 fp = get_fieldpart(content)
@@ -425,12 +398,12 @@ def part1(ctx, get_ref, catalogue):
                 description = get_description(item)
                 tell_pr('        {} &hf_{}, {} "{}", "asterix.{}", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL {} {},'.format('{', ref, '{', description, ref, '}', '}'))
 
-                tell('static int hf_{} = -1;'.format(ref))
+                tell('static int hf_{};'.format(ref))
                 for i in variation['items']:
                     handle_item(path, i)
 
                 # FieldPart[]
-                tell('static const FieldPart *I{}_PARTS[] = {}'.format(ref,'{'))
+                tell('static const FieldPart * const I{}_PARTS[] = {}'.format(ref,'{'))
                 for i in variation['items']:
                     tell('    {},'.format(part_of(i)))
                 tell('    NULL')
@@ -450,15 +423,15 @@ def part1(ctx, get_ref, catalogue):
 
                 description = get_description(item)
                 tell_pr('        {} &hf_{}, {} "{}", "asterix.{}", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL {} {},'.format('{', ref, '{', description, ref, '}', '}'))
-                tell('static int hf_{} = -1;'.format(ref))
+                tell('static int hf_{};'.format(ref))
 
                 items = []
                 for i in variation['items']:
                     if i is None:
                         items.append(i)
                         continue
-                    if i.get('variation') is not None:
-                        if i['variation']['type'] == 'Group':
+                    if i.get('rule') is not None:
+                        if get_rule(i['rule'])['type'] == 'Group':
                             i = ungroup(i)
                     items.append(i)
 
@@ -468,7 +441,7 @@ def part1(ctx, get_ref, catalogue):
                     else:
                         handle_item(path, i)
 
-                tell('static const FieldPart *I{}_PARTS[] = {}'.format(ref,'{'))
+                tell('static const FieldPart * const I{}_PARTS[] = {}'.format(ref,'{'))
                 for i in items:
                     if i is None:
                         tell('    &IXXX_FX,')
@@ -479,12 +452,10 @@ def part1(ctx, get_ref, catalogue):
                 tell('};')
 
                 # AsterixField
-                first_part = list(takewhile(lambda x: x is not None, items))
-                n = (sum([get_bit_size(i) for i in first_part]) + 1) // 8
                 parts = 'I{}_PARTS'.format(ref)
                 comp = '{ NULL }'
-                tell('static const AsterixField I{} = {} FX, {}, 0, {}, &hf_{}, {}, {} {};'.format
-                    (ref, '{', n, 0, ref, parts, comp, '}'))
+                tell('static const AsterixField I{} = {} FX, 0, 0, 0, &hf_{}, {}, {} {};'.format
+                    (ref, '{', ref, parts, comp, '}'))
 
             elif t == 'Repetitive':
                 ctx.reset_offset()
@@ -492,7 +463,7 @@ def part1(ctx, get_ref, catalogue):
 
                 # Group is required below this item.
                 if variation['variation']['type'] == 'Element':
-                    subvar = generate_group(item, variation)
+                    subvar = generate_group(item, variation['variation'])
                 else:
                     subvar = variation['variation']
                 handle_variation(path, subvar)
@@ -509,14 +480,14 @@ def part1(ctx, get_ref, catalogue):
 
             elif t == 'Explicit':
                 ctx.reset_offset()
-                tell('static int hf_{} = -1;'.format(ref))
+                tell('static int hf_{};'.format(ref))
                 description = get_description(item)
                 tell_pr('        {} &hf_{}, {} "{}", "asterix.{}", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL {} {},'.format('{', ref, '{', description, ref, '}', '}'))
                 tell('static const AsterixField I{} = {} EXP, 0, 0, 1, &hf_{}, NULL, {} NULL {} {};'.format(ref, '{', ref, '{', '}', '}'))
 
             elif t == 'Compound':
                 ctx.reset_offset()
-                tell('static int hf_{} = -1;'.format(ref))
+                tell('static int hf_{};'.format(ref))
                 description = get_description(item)
                 tell_pr('        {} &hf_{}, {} "{}", "asterix.{}", FT_NONE, BASE_NONE, NULL, 0x00, NULL, HFILL {} {},'.format('{', ref, '{', description, ref, '}', '}'))
                 comp = '{'
@@ -525,7 +496,7 @@ def part1(ctx, get_ref, catalogue):
                         comp += ' &IX_SPARE,'
                         continue
                     # Group is required below this item.
-                    if i['variation']['type'] == 'Element':
+                    if get_rule(i['rule'])['type'] == 'Element':
                         subitem = generate_group(i)
                     else:
                         subitem = i
@@ -545,30 +516,36 @@ def part1(ctx, get_ref, catalogue):
             return
 
         # Group is required on the first level.
-        if path == [] and item['variation']['type'] == 'Element':
-            variation = generate_group(item)['variation']
+        if path == [] and get_rule(item['rule'])['type'] == 'Element':
+            variation = get_rule(generate_group(item)['rule'])
         else:
-            variation = item['variation']
+            variation = get_rule(item['rule'])
         handle_variation(path + [item['name']], variation)
 
     for item in catalogue:
         # adjust 'repetitive fx' item
-        if item['variation']['type'] == 'Repetitive' and item['variation']['rep']['type'] == 'Fx':
-            var = item['variation']['variation'].copy()
+        if get_rule(item['rule'])['type'] == 'Repetitive' and get_rule(item['rule'])['rep']['type'] == 'Fx':
+            var = get_rule(item['rule'])['variation'].copy()
             if var['type'] != 'Element':
                 raise Exception("Expecting 'Element'")
             item = item.copy()
-            item['variation'] = {
-                'type': 'Extended',
-                'items': [{
-                    'definition': None,
-                    'description': None,
-                    'name': 'Subitem',
-                    'remark': None,
-                    'spare': False,
-                    'title': 'Subitem',
-                    'variation': var,
+            item['rule'] = {
+                'type': 'ContextFree',
+                'value': {
+                    'type': 'Extended',
+                    'items': [{
+                        'definition': None,
+                        'description': None,
+                        'name': 'Subitem',
+                        'remark': None,
+                        'spare': False,
+                        'title': 'Subitem',
+                        'rule': {
+                            'type': 'ContextFree',
+                            'value': var,
+                        },
                     }, None]
+                }
             }
         handle_item([], item)
     tell('')
@@ -577,7 +554,6 @@ def part2(ctx, ref, uap):
     """Generate UAPs"""
 
     tell = lambda s: ctx.tell('insert1', s)
-    tell('DIAG_OFF_PEDANTIC')
 
     ut = uap['type']
     if ut == 'uap':
@@ -588,7 +564,7 @@ def part2(ctx, ref, uap):
         raise Exception('unexpected uap type {}'.format(ut))
 
     for var in variations:
-        tell('static const AsterixField *I{}_{}[] = {}'.format(ref, var['name'], '{'))
+        tell('static const AsterixField * const I{}_{}[] = {}'.format(ref, var['name'], '{'))
         for i in var['items']:
             if i is None:
                 tell('    &IX_SPARE,')
@@ -597,12 +573,11 @@ def part2(ctx, ref, uap):
         tell('    NULL')
         tell('};')
 
-    tell('static const AsterixField **I{}[] = {}'.format(ref, '{'))
+    tell('static const AsterixField * const * const I{}[] = {}'.format(ref, '{'))
     for var in variations:
         tell('    I{}_{},'.format(ref, var['name']))
     tell('    NULL')
     tell('};')
-    tell('DIAG_ON_PEDANTIC')
     tell('')
 
 def part3(ctx, specs):
@@ -620,9 +595,7 @@ def part3(ctx, specs):
         editions = sorted([val['edition'] for val in lst], key = lambda x: (x['major'], x['minor']), reverse=True)
         editions_fmt = [fmt_edition(cat, edition) for edition in editions]
         editions_str = ', '.join(['I{:03d}'.format(cat)] + editions_fmt)
-        tell('DIAG_OFF_PEDANTIC')
-        tell('static const AsterixField ***I{:03d}all[] = {} {} {};'.format(cat, '{', editions_str, '}'))
-        tell('DIAG_ON_PEDANTIC')
+        tell('static const AsterixField * const * const * const I{:03d}all[] = {} {} {};'.format(cat, '{', editions_str, '}'))
         tell('')
 
         tell('static const enum_val_t I{:03d}_versions[] = {}'.format(cat, '{'))
@@ -646,7 +619,7 @@ def part4(ctx, cats):
     tell = lambda s: ctx.tell('insert1', s)
     tell_pr = lambda s: ctx.tell('insert3', s)
 
-    tell('static const AsterixField ****categories[] = {')
+    tell('static const AsterixField * const * const * const * const categories[] = {')
     for i in range(0, 256):
         val = 'I{:03d}all'.format(i) if i in cats else 'NULL'
         tell('    {}, /* {:03d} */'.format(val, i))
@@ -683,7 +656,7 @@ def remove_rfs(spec):
     catalogue = []  # create new catalogue without RFS
     rfs_items = []
     for i in spec['catalogue']:
-        if i['variation']['type'] == 'Rfs':
+        if get_rule(i['rule'])['type'] == 'Rfs':
             rfs_items.append(i['name'])
         else:
             catalogue.append(i)
@@ -716,7 +689,7 @@ def is_valid(spec):
     def check_item(item):
         if item['spare']:
             return True
-        return check_variation(item['variation'])
+        return check_variation(get_rule(item['rule']))
     def check_variation(variation):
         t = variation['type']
         if t == 'Element':
@@ -757,6 +730,7 @@ def main():
     # read and json-decode input files
     jsons = load_jsons(args.paths)
     jsons = [json.loads(i) for i in jsons]
+    jsons = [convert.handle_asterix(i) for i in jsons]
     jsons = sorted(jsons, key = lambda x: (x['number'], x['edition']['major'], x['edition']['minor']))
     jsons = [spec for spec in jsons if spec['type'] == 'Basic']
     jsons = [remove_rfs(spec) for spec in jsons]
@@ -780,13 +754,15 @@ def main():
         for spec in jsons:
             is_latest = spec['edition'] == latest_editions[spec['number']]
 
-            ctx.tell('insert1', '/* Category {:03d}, edition {}.{} */'.format(spec['number'], spec['edition']['major'], spec['edition']['minor']))
+            ctx.tell('insert1', '/* Category {:03d}, edition {}.{} */'.format(
+                spec['number'], spec['edition']['major'], spec['edition']['minor']))
 
             # handle part1
             get_ref = lambda path: reference(spec['number'], spec['edition'], path)
             part1(ctx, get_ref, spec['catalogue'])
             if is_latest:
-                ctx.tell('insert1', '/* Category {:03d}, edition {}.{} (latest) */'.format(spec['number'], spec['edition']['major'], spec['edition']['minor']))
+                ctx.tell('insert1', '/* Category {:03d}, edition {}.{} (latest) */'.format(
+                    spec['number'], spec['edition']['major'], spec['edition']['minor']))
                 get_ref = lambda path: reference(spec['number'], None, path)
                 part1(ctx, get_ref, spec['catalogue'])
 
@@ -826,4 +802,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

@@ -1,8 +1,32 @@
-wireshark (4.2.6-1deepin1) unstable; urgency=medium
+wireshark (4.4.0-1) unstable; urgency=medium
 
-  * Revert t64.
+  * Upload to unstable (Closes :#1080298)
 
- -- xiangzelong <xiangzelong@deepin.org>  Thu, 01 Aug 2024 10:39:21 +0800
+ -- Balint Reczey <balint@balintreczey.hu>  Fri, 06 Sep 2024 10:59:54 +0200
+
+wireshark (4.4.0-0exp2) experimental; urgency=medium
+
+  * Cherry-pick upstream commit to fix prefix in wireshark.pc
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 05 Sep 2024 00:06:58 +0200
+
+wireshark (4.4.0-0exp1) experimental; urgency=medium
+
+  * debian/rules: Ignore test results only on big endian architectures.
+    Wireshark's Lua integration is fixed upstream to work correctly on ARM,
+    thus tests are passing there.
+    A few crypto related tests are still failing on big endian architectures.
+    (Closes: #1076536)
+  * New major upstream release
+  * Update symbols files
+  * debian/rules: Use Lua 5.4 and fall back to building with Lua 5.3 when 5.4
+    is not available
+  * debian/rules: Fix fixing links in documentation
+  * Ignore Lintian warning library-not-linked-against-libc for ipaddr.so plugin
+  * debian/rules: Run tests with LC_ALL=C.UTF-8.
+    This lets tests pass with some interesting locales.
+
+ -- Balint Reczey <balint@balintreczey.hu>  Sat, 31 Aug 2024 13:19:16 +0200
 
 wireshark (4.2.6-1) unstable; urgency=medium
 
@@ -53,7 +77,7 @@ wireshark (4.2.4-1) unstable; urgency=medium
   * New upstream version 4.2.4:
     - security fixes (Closes: #1068111):
       - T.38 dissector crash (CVE-2024-2955)
-  * Update symbols for libwireshark17t64
+  * Update symbols for libwireshark18
   * libwireshark-dev: Ship missing dfilter-loc.h.
     Also check if dfilter.h is usable, too, in debian/headers-check.c.
     (Closes: #1068410)

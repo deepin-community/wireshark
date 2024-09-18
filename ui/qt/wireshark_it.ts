@@ -44,8 +44,8 @@
         <translation>Cartelle</translation>
     </message>
     <message>
-        <source>Filter by path</source>
-        <translation>Filtro per percorso</translation>
+        <source>Search Folders</source>
+        <translation>Cerca cartelle</translation>
     </message>
     <message>
         <source>Plugins</source>
@@ -78,6 +78,14 @@
     <message>
         <source>License</source>
         <translation>Licenza</translation>
+    </message>
+    <message>
+        <source>About Logray</source>
+        <translation>Informazioni su Logray</translation>
+    </message>
+    <message>
+        <source>Logray</source>
+        <translation>Logray</translation>
     </message>
     <message>
         <source>The directory does not exist</source>
@@ -755,6 +763,28 @@
     </message>
 </context>
 <context>
+    <name>CaptureCommentDialog</name>
+    <message>
+        <source>Edit Capture Comments</source>
+        <translation>Modifica commento della cattura</translation>
+    </message>
+    <message>
+        <source>Add Comment</source>
+        <translation>Aggiungi commento</translation>
+    </message>
+    <message>
+        <source>Section %1</source>
+        <translation>Sezione %1</translation>
+    </message>
+</context>
+<context>
+    <name>CaptureCommentTabWidget</name>
+    <message>
+        <source>Comment %1</source>
+        <translation>Commento %1</translation>
+    </message>
+</context>
+<context>
     <name>CaptureFile</name>
     <message>
         <source> [closing]</source>
@@ -863,10 +893,6 @@
         <translation>Filtro di lettura:</translation>
     </message>
     <message>
-        <source>Compress with g&amp;zip</source>
-        <translation>Comprimi con g&amp;zip</translation>
-    </message>
-    <message>
         <source>Open Capture File</source>
         <oldsource>Wireshark: Open Capture File</oldsource>
         <translation>Apri un file di cattura</translation>
@@ -948,8 +974,8 @@
         <translation>Dettagli</translation>
     </message>
     <message>
-        <source>Capture file comments</source>
-        <translation>Commenti del file di cattura</translation>
+        <source>Edit Comments</source>
+        <translation>Modifica commenti</translation>
     </message>
     <message>
         <source>Refresh</source>
@@ -958,10 +984,6 @@
     <message>
         <source>Copy To Clipboard</source>
         <translation>Copia negli appunti</translation>
-    </message>
-    <message>
-        <source>Save Comments</source>
-        <translation>Salva i commenti</translation>
     </message>
     <message>
         <source>Capture File Properties</source>
@@ -1012,8 +1034,16 @@
         <translation>Primo pacchetto</translation>
     </message>
     <message>
+        <source>First event</source>
+        <translation>Primo evento</translation>
+    </message>
+    <message>
         <source>Last packet</source>
         <translation>Ultimo pacchetto</translation>
+    </message>
+    <message>
+        <source>Last event</source>
+        <translation>Ultimo evento</translation>
     </message>
     <message>
         <source>Elapsed</source>
@@ -1052,6 +1082,10 @@
         <translation>Pacchetti persi</translation>
     </message>
     <message>
+        <source>Dropped events</source>
+        <translation>Eventi scartati</translation>
+    </message>
+    <message>
         <source>Capture filter</source>
         <translation>Filtro di cattura</translation>
     </message>
@@ -1064,12 +1098,36 @@
         <translation>Dimensione limite del pacchetto (snaplen)</translation>
     </message>
     <message>
+        <source>Event size limit (snaplen)</source>
+        <translation>Limite dimensione degli eventi (snaplen)</translation>
+    </message>
+    <message>
         <source>none</source>
         <translation>nessuno</translation>
     </message>
     <message>
         <source>%1 bytes</source>
         <translation>%1 byte</translation>
+    </message>
+    <message>
+        <source>Comments</source>
+        <translation>Commenti</translation>
+    </message>
+    <message>
+        <source>Comment %1: </source>
+        <translation>Commento %1:</translation>
+    </message>
+    <message>
+        <source>Decryption Secrets</source>
+        <translation>Segreti di decifratura</translation>
+    </message>
+    <message>
+        <source>Type</source>
+        <translation>Tipo</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Dimensione</translation>
     </message>
     <message>
         <source>Statistics</source>
@@ -1096,6 +1154,10 @@
         <translation>Pacchetti</translation>
     </message>
     <message>
+        <source>Events</source>
+        <translation>Eventi</translation>
+    </message>
+    <message>
         <source>Time span, s</source>
         <translation>Tempo, s</translation>
     </message>
@@ -1106,6 +1168,10 @@
     <message>
         <source>Average packet size, B</source>
         <translation>Dimensione media dei pacchetti, B</translation>
+    </message>
+    <message>
+        <source>Average event size, B</source>
+        <translation>Dimensione media degli eventi, B</translation>
     </message>
     <message>
         <source>Bytes</source>
@@ -1120,12 +1186,12 @@
         <translation>Bit/s medi</translation>
     </message>
     <message>
-        <source>Section Comment</source>
-        <translation>Commento sezione</translation>
-    </message>
-    <message>
         <source>Packet Comments</source>
         <translation>Commenti pacchetto</translation>
+    </message>
+    <message>
+        <source>Event Comments</source>
+        <translation>Commenti evento</translation>
     </message>
     <message>
         <source>&lt;p&gt;Frame %1: </source>
@@ -1136,6 +1202,14 @@
 
 </source>
         <translation>Creato da Wireshark %1
+
+</translation>
+    </message>
+    <message>
+        <source>Created by Logray %1
+
+</source>
+        <translation>Creato da Logray %1
 
 </translation>
     </message>
@@ -1366,6 +1440,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
 Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Usually a wireless network card will only capture the traffic sent to and from its own network address, and only captures &lt;em&gt;user data&lt;/em&gt; traffic with &amp;quot;fake&amp;quot; Ethernet headers. If you want to capture all traffic that wireless network cards can &amp;quot;see&amp;quot;, or are interested in 802.11 management or control packets, or radio-layer information, mark this option. Monitor mode availability depends on the wireless card and driver. See the Wiki for some more details of capturing packets on WLAN networks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Di solito una scheda di rete wireless catturerà solo il traffico inviato e ricevuto dal suo indirizzo di rete e catturerà solo il traffico &lt;em&gt;dati dell&apos;utente&lt;/em&gt; con intestazioni Ethernet &amp;quot;fittizie&amp;quot;. Se desideri catturare tutto il traffico che transita sulle schede di rete wireless o sei interessato ai pacchetti di gestione o di controllo 802.11, o alle informazioni del livello radio, seleziona questa opzione. La disponibilità della modalità di monitoraggio dipende dalla scheda di rete wireless e dal driver. Consulta il Wiki per ulteriori dettagli sulla cattura dei pacchetti nelle reti WLAN.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Enable monitor mode on all 802.11 interfaces</source>
+        <translation>Abilita la modalità monitor su tutte le interfacce 802.11</translation>
+    </message>
+    <message>
         <source>compression</source>
         <translation>compressione</translation>
     </message>
@@ -1376,6 +1458,30 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>gzip</source>
         <translation>gzip</translation>
+    </message>
+    <message>
+        <source>File infix pattern</source>
+        <translation>Modello di infisso dei file</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In multiple file mode, the date and time and file index number are inserted between filename template and any suffix. Select their order.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;In modalità file multipli, la data e l&apos;ora e il numero di indice del file sono inseriti tra il modello del nome del file e qualsiasi suffisso. Seleziona il loro ordine.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>YYYYmmDDHHMMSS_NNNNN</source>
+        <translation>AAAAmmGGHHMMSS_NNNNN</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Date and time before the file index number. This causes files to sort in creation time order, and keeps files from the same batch closely ordered.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Data e ora prima del numero di indice del file. Ciò fa sì che i file vengano ordinati in base all&apos;ora di creazione e mantiene i file dello stesso lotto ordinati in modo stretto.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>NNNNN_YYYYmmDDHHMMSS</source>
+        <translation>NNNNN_AAAAmmGGHHMMSS</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;File index number before the date and time. This is the historic Wireshark ordering.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Numero di indice del file prima della data e dell&apos;ora. Questo è l&apos;ordinamento storico di Wireshark.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;After capturing has switched to the next file and the given number of files has exceeded, the oldest file will be removed.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -1459,7 +1565,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>Stop capturing after the specified number of packets have been captured.</source>
-        <translation>Ferma la cattura dopo che un certo numero di pacchetti è stato catturato.</translation>
+        <translation>Ferma la cattura dopo che il numero di pacchetti specificato è stato catturato.</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Stop capturing after the specified number of files have been created.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -1471,15 +1577,15 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Stop capturing after the specified amount of data has been captured.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Ferma la cattura dopo che una certa quantità di dati è stata catturata.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Ferma la cattura dopo che la quantità di dati specificata è stata catturata.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Stop capturing after the specified amount of data has been captured.</source>
-        <translation>Ferma la cattura dopo che una certa quantità di dati è stata catturata.</translation>
+        <translation>Ferma la cattura dopo che la quantità di dati specificata è stata catturata.</translation>
     </message>
     <message>
         <source>Stop capturing after the specified amount of time has passed.</source>
-        <translation>Ferma la cattura dopo che la quantità di tempo specificato è trascorsa.</translation>
+        <translation>Ferma la cattura dopo che la quantità di tempo specificata è trascorsa.</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Optionally specify a temporary directory for unnamed capture files.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -1530,8 +1636,8 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Errore</translation>
     </message>
     <message>
-        <source>Multiple files: Requested filesize too large. The filesize cannot be greater than 2 GiB.</source>
-        <translation>File multipli: la dimensione del file richiesta è troppo grande. La dimensione del file non può essere superiore a 2 GiB.</translation>
+        <source>Multiple files: Requested filesize too large. The filesize cannot be greater than 2 TB.</source>
+        <translation>File multipli: la dimensione del file richiesta è troppo grande. La dimensione del file non può essere superiore a 2 TB.</translation>
     </message>
     <message>
         <source>Multiple files: No capture file name given. You must specify a filename if you want to use multiple files.</source>
@@ -1561,6 +1667,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Cattura i pacchetti in modalità promiscua</translation>
     </message>
     <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Usually a wireless network card will only capture the traffic sent to and from its own network address, and only captures &lt;em&gt;user data&lt;/em&gt; traffic with &amp;quot;fake&amp;quot; Ethernet headers. If you want to capture all traffic that wireless network cards can &amp;quot;see&amp;quot;, or are interested in 802.11 management or control packets, or radio-layer information, mark this option. Monitor mode availability depends on the wireless card and driver. See the Wiki for more details of capturing packets on WLAN networks.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Di solito una scheda di rete wireless catturerà solo il traffico inviato e ricevuto dal suo indirizzo di rete e catturerà solo il traffico &lt;em&gt;dati dell&apos;utente&lt;/em&gt; con intestazioni Ethernet &amp;quot;fittizie&amp;quot;. Se desideri catturare tutto il traffico che transita sulle schede di rete wireless o sei interessato ai pacchetti di gestione o di controllo 802.11, o alle informazioni del livello radio, seleziona questa opzione. La disponibilità della modalità di monitoraggio dipende dalla scheda di rete wireless e dal driver. Consulta il Wiki per ulteriori dettagli sulla cattura dei pacchetti nelle reti WLAN.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Capture packets in monitor mode on 802.11 devices</source>
+        <translation>Cattura i pacchetti in modalità monitor sui dispositivi 802.11</translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Capture packets in the next-generation capture file format.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Cattura i pacchetti nel formato di file di nuova generazione.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
@@ -1582,11 +1696,11 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;How often the capture notifies the GUI of new packets. Affects how often the GUI updates and the granularity of timers.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;La frequenza con cui l&apos;acquisizione notifica alla GUI i nuovi pacchetti. Influisce sulla frequenza degli aggiornamenti della GUI e sulla granularità dei timer.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;La frequenza con cui l&apos;acquisizione notifica all&apos;interfaccia grafica i nuovi pacchetti. Influisce sulla frequenza degli aggiornamenti dell&apos;interfaccia e sulla granularità dei timer.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The interval between new packet updates. Affects how often the GUI updates and the granularity of timers.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;L&apos;intervallo tra gli aggiornamenti dei nuovi pacchetti. Influisce sulla frequenza degli aggiornamenti della GUI e sulla granularità dei timer.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;L&apos;intervallo tra gli aggiornamenti dei nuovi pacchetti. Influisce sulla frequenza degli aggiornamenti dell&apos;interfaccia grafica e sulla granularità dei timer.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Don&apos;t load interfaces on startup</source>
@@ -1788,6 +1902,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Risolto</translation>
     </message>
     <message>
+        <source>Width</source>
+        <translation>Larghezza</translation>
+    </message>
+    <message>
+        <source>Alignment</source>
+        <translation>Allineamento</translation>
+    </message>
+    <message>
         <source>&lt;html&gt;Show human-readable strings instead of raw values for fields. Only applicable to custom columns with fields that have value strings.&lt;/html&gt;</source>
         <translation>&lt;html&gt;Mostra stringhe comprensibili invece che i valori grezzi dei campi. Applicabile solo alle colonne personalizzate con campi che hanno stringhe con valori.&lt;/html&gt;</translation>
     </message>
@@ -1832,6 +1954,25 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Copy filter text to the clipboard.</source>
         <translation>Copia il testo del filtro negli appunti.</translation>
+    </message>
+</context>
+<context>
+    <name>CompressionGroupBox</name>
+    <message>
+        <source>Compression options</source>
+        <translation>Opzioni di compressione</translation>
+    </message>
+    <message>
+        <source>&amp;Uncompressed</source>
+        <translation>&amp;Non compresso</translation>
+    </message>
+    <message>
+        <source>Compress with g&amp;zip</source>
+        <translation>Comprimi con g&amp;zip</translation>
+    </message>
+    <message>
+        <source>Compress with &amp;LZ4</source>
+        <translation>Comprimi con &amp;LZ4</translation>
     </message>
 </context>
 <context>
@@ -1899,6 +2040,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Bits/s B </source>
         <translation>Bit/s B</translation>
+    </message>
+    <message>
+        <source>Flows</source>
+        <translation>Flussi</translation>
     </message>
     <message>
         <source>Total Packets</source>
@@ -2015,14 +2160,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Copia i byte del pacchetto come un dump esadecimale.</translation>
     </message>
     <message>
-        <source>…as Printable Text</source>
-        <translation>...come testo stampabile</translation>
-    </message>
-    <message>
-        <source>Copy only the printable text in the packet.</source>
-        <translation>Copia solo il testo stampabile nel pacchetto.</translation>
-    </message>
-    <message>
         <source>…as MIME Data</source>
         <translation>…come dati MIME</translation>
     </message>
@@ -2035,8 +2172,40 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Copia i byte dei pacchetti come caratteri ASCII stampabili e sequenze di escape.</translation>
     </message>
     <message>
+        <source>…as Go literal</source>
+        <translation>…come Go letterale</translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as Go literal.</source>
+        <translation>Copia i byte del pacchetto come Go letterale.</translation>
+    </message>
+    <message>
+        <source>…as C Array</source>
+        <translation>...come Array C</translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as C Array.</source>
+        <translation>Copia i byte del pacchetto come Array C.</translation>
+    </message>
+    <message>
         <source>…as a Hex Stream</source>
         <translation>...come un flusso esadecimale</translation>
+    </message>
+    <message>
+        <source>…as UTF-8 Text</source>
+        <translation>…come testo UTF-8</translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as text, treating as UTF-8.</source>
+        <translation>Copia i byte del pacchetto come testo, trattandolo come UTF-8.</translation>
+    </message>
+    <message>
+        <source>…as ASCII Text</source>
+        <translation>…come testo ASCII</translation>
+    </message>
+    <message>
+        <source>Copy packet bytes as text, treating as ASCII.</source>
+        <translation>Copia i byte del pacchetto come testo, trattandolo come ASCII.</translation>
     </message>
     <message>
         <source>Copy packet bytes as a stream of hex.</source>
@@ -2834,6 +3003,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <source>Display filter:</source>
         <translation>Filtro di visualizzazione:</translation>
     </message>
+    <message>
+        <source>Export PDUs</source>
+        <translation>Esporta PDU</translation>
+    </message>
 </context>
 <context>
     <name>ExtArgSelector</name>
@@ -2871,10 +3044,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Start</source>
         <translation>Avvia</translation>
-    </message>
-    <message>
-        <source>Save</source>
-        <translation>Salva</translation>
     </message>
     <message>
         <source>Default</source>
@@ -3018,6 +3187,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Filtri di visualizzazione</translation>
     </message>
     <message>
+        <source>Display Filter Macros</source>
+        <translation>Visualizza macro dei filtri</translation>
+    </message>
+    <message>
+        <source>New macro</source>
+        <translation>Nuova macro</translation>
+    </message>
+    <message>
         <source>Open </source>
         <translation>Apri </translation>
     </message>
@@ -3101,8 +3278,16 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
 <context>
     <name>FilterListModel</name>
     <message>
+        <source>Macro Name</source>
+        <translation>Nome macro</translation>
+    </message>
+    <message>
         <source>Filter Name</source>
         <translation>Nome filtro</translation>
+    </message>
+    <message>
+        <source>Macro Expression</source>
+        <translation>Espressione macro</translation>
     </message>
     <message>
         <source>Filter Expression</source>
@@ -3190,20 +3375,8 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
 <context>
     <name>FolderListModel</name>
     <message>
-        <source>&quot;File&quot; dialogs</source>
-        <translation>Finestre &quot;File&quot;</translation>
-    </message>
-    <message>
-        <source>capture files</source>
-        <translation>file di cattura</translation>
-    </message>
-    <message>
         <source>Temp</source>
         <translation>Temporanei</translation>
-    </message>
-    <message>
-        <source>untitled capture files</source>
-        <translation>file di cattura senza titolo</translation>
     </message>
     <message>
         <source>Personal configuration</source>
@@ -3212,14 +3385,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Global configuration</source>
         <translation>Configurazione globale</translation>
-    </message>
-    <message>
-        <source>dfilters, preferences, ethers, …</source>
-        <translation>dfilters, preferences, ethers, </translation>
-    </message>
-    <message>
-        <source>dfilters, preferences, manuf, …</source>
-        <translation>dfilters, preferences, manuf, </translation>
     </message>
     <message>
         <source>System</source>
@@ -3234,16 +3399,8 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Programma</translation>
     </message>
     <message>
-        <source>program files</source>
-        <translation>file di programma</translation>
-    </message>
-    <message>
         <source>Personal Plugins</source>
         <translation>Plugin personali</translation>
-    </message>
-    <message>
-        <source>binary plugins</source>
-        <translation>plugin binari</translation>
     </message>
     <message>
         <source>Global Plugins</source>
@@ -3262,12 +3419,36 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Script Lua</translation>
     </message>
     <message>
+        <source>&quot;File&quot; dialog location</source>
+        <translation>Posizione finestra &quot;File&quot;</translation>
+    </message>
+    <message>
+        <source>Capture files</source>
+        <translation>File di cattura</translation>
+    </message>
+    <message>
+        <source>Untitled capture files</source>
+        <translation>File di cattura senza titolo</translation>
+    </message>
+    <message>
+        <source>Preferences, profiles, manuf, …</source>
+        <translation>Preferenze, profili, prod, …</translation>
+    </message>
+    <message>
+        <source>Program files</source>
+        <translation>File di programma</translation>
+    </message>
+    <message>
+        <source>Binary plugins</source>
+        <translation>Plugin binari</translation>
+    </message>
+    <message>
         <source>Personal Extcap path</source>
         <translation>Percorso Extcap personale</translation>
     </message>
     <message>
-        <source>external capture (extcap) plugins</source>
-        <translation>estensioni di cattura esterna (extcap)</translation>
+        <source>External capture (extcap) plugins</source>
+        <translation>Plugin di cattura esterna (extcap)</translation>
     </message>
     <message>
         <source>Global Extcap path</source>
@@ -3404,6 +3585,24 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         </translation>
     </message>
     <message>
+        <source>Event %1. </source>
+        <translation>Evento %1.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;reads&lt;/span&gt;, </source>
+        <translation>
+            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;scrittura&lt;/span&gt;,</numerusform>
+            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;scritture&lt;/span&gt;,</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;writes&lt;/span&gt;, </source>
+        <translation>
+            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;scritture&lt;/span&gt;,</numerusform>
+            <numerusform>%Ln &lt;span style=&quot;color: %1; background-color:%2&quot;&gt;scritture&lt;/span&gt;,</numerusform>
+        </translation>
+    </message>
+    <message>
         <source> Click to select.</source>
         <translation> Fai clic per selezionare.</translation>
     </message>
@@ -3436,6 +3635,18 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Flussi %1 non trovati nel pacchetto selezionato.</translation>
     </message>
     <message>
+        <source>Read activity(%6)</source>
+        <translation>Attività di lettura(%6)</translation>
+    </message>
+    <message>
+        <source>Write activity(%6)</source>
+        <translation>Attività di scrittura(%6)</translation>
+    </message>
+    <message>
+        <source>Entire I/O activity (%1)</source>
+        <translation>Intera attività I/O (%1)</translation>
+    </message>
+    <message>
         <source>Entire conversation (%1)</source>
         <translation>Conversazione intera (%1)</translation>
     </message>
@@ -3450,10 +3661,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Save Stream Content As…</source>
         <translation>Salva il contenuto del flusso come...</translation>
-    </message>
-    <message>
-        <source>[Stream output truncated]</source>
-        <translation>[Flusso di output troncato]</translation>
     </message>
     <message numerus="yes">
         <source>%Ln total stream(s).</source>
@@ -3482,9 +3689,20 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Suggerimento.</translation>
     </message>
     <message>
-        <source>Show data as</source>
-        <oldsource>Show and save data as</oldsource>
-        <translation>Mostra dati come</translation>
+        <source>Show as</source>
+        <translation>Mostra come</translation>
+    </message>
+    <message>
+        <source>No delta times</source>
+        <translation>Nessun delta dei tempi</translation>
+    </message>
+    <message>
+        <source>Turn delta times</source>
+        <translation>Attiva i delta dei tempi</translation>
+    </message>
+    <message>
+        <source>All delta times</source>
+        <translation>Tutti i delta dei tempi</translation>
     </message>
     <message>
         <source>Stream</source>
@@ -3499,8 +3717,19 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Trova:</translation>
     </message>
     <message>
+        <source>Case sensitive</source>
+        <translation>Distingui maiuscole</translation>
+    </message>
+    <message>
         <source>Find &amp;Next</source>
         <translation>Trova &amp;successivo</translation>
+    </message>
+</context>
+<context>
+    <name>FollowStreamText</name>
+    <message>
+        <source>[Stream output truncated]</source>
+        <translation>[Flusso di uscita troncato]</translation>
     </message>
 </context>
 <context>
@@ -3839,28 +4068,27 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
 &lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>Remove this graph.</source>
-        <oldsource>Remove this dissection behavior.</oldsource>
-        <translation>Rimuovi questo grafico.</translation>
-    </message>
-    <message>
         <source>Add a new graph.</source>
         <translation>Aggiungi un nuovo grafico.</translation>
-    </message>
-    <message>
-        <source>Duplicate this graph.</source>
-        <translation>Duplica questo grafico.</translation>
     </message>
     <message>
         <source>Clear all graphs.</source>
         <translation>Cancella tutti i grafici.</translation>
     </message>
     <message>
-        <source>Move this graph upwards.</source>
-        <translation>Sposta questo grafico verso l&apos;alto.</translation>
+        <source>Remove the selected graph(s).</source>
+        <translation>Rimuovi i grafici selezionati.</translation>
     </message>
     <message>
-        <source>Move this graph downwards.</source>
+        <source>Duplicate the selected graph(s).</source>
+        <translation>Duplica i grafici selezionati.</translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) upwards.</source>
+        <translation>Sposta i grafici selezionati in alto.</translation>
+    </message>
+    <message>
+        <source>Move the selected graph(s) downwards.</source>
         <translation>Sposta questo grafico verso il basso.</translation>
     </message>
     <message>
@@ -3873,7 +4101,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>drags</source>
-        <translation>trascinamenti</translation>
+        <translation>trascina</translation>
     </message>
     <message>
         <source>Select using the mouse button.</source>
@@ -3881,7 +4109,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>zooms</source>
-        <translation>zoom</translation>
+        <translation>ingrandisce</translation>
     </message>
     <message>
         <source>Interval</source>
@@ -3902,10 +4130,6 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Enable legend</source>
         <translation>Abilita la legenda</translation>
-    </message>
-    <message>
-        <source>Reset</source>
-        <translation>Ripristina</translation>
     </message>
     <message>
         <source>Reset Graph</source>
@@ -4121,6 +4345,42 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Copia grafici da un altro profilo.</translation>
     </message>
     <message>
+        <source>1 μs</source>
+        <translation>1 μs</translation>
+    </message>
+    <message>
+        <source>2 μs</source>
+        <translation>2 μs</translation>
+    </message>
+    <message>
+        <source>5 μs</source>
+        <translation>5 μs</translation>
+    </message>
+    <message>
+        <source>10 μs</source>
+        <translation>10 μs</translation>
+    </message>
+    <message>
+        <source>20 μs</source>
+        <translation>20 μs</translation>
+    </message>
+    <message>
+        <source>50 μs</source>
+        <translation>50 μs</translation>
+    </message>
+    <message>
+        <source>100 μs</source>
+        <translation>100 μs</translation>
+    </message>
+    <message>
+        <source>200 μs</source>
+        <translation>200 μs</translation>
+    </message>
+    <message>
+        <source>500 μs</source>
+        <translation>500 μs</translation>
+    </message>
+    <message>
         <source>1 ms</source>
         <translation>1 ms</translation>
     </message>
@@ -4165,6 +4425,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>5 sec</translation>
     </message>
     <message>
+        <source>2 min</source>
+        <translation>2 min</translation>
+    </message>
+    <message>
+        <source>5 min</source>
+        <translation>5 min</translation>
+    </message>
+    <message>
         <source>Wireshark I/O Graphs: %1</source>
         <translation>Grafici di I/O di Wireshark: %1</translation>
     </message>
@@ -4175,6 +4443,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Filtered events</source>
         <translation>Eventi filtrati</translation>
+    </message>
+    <message>
+        <source>All packets</source>
+        <translation>Tutti i pacchetti</translation>
+    </message>
+    <message>
+        <source>All events</source>
+        <translation>Tutti gli eventi</translation>
     </message>
     <message>
         <source>All Packets</source>
@@ -4189,8 +4465,8 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Tutti gli eventi</translation>
     </message>
     <message>
-        <source>Access Denied</source>
-        <translation>Accesso negato</translation>
+        <source>All Execs</source>
+        <translation>Tutti gli eseguibili</translation>
     </message>
     <message>
         <source>Hover over the graph for details.</source>
@@ -4235,6 +4511,34 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Click to select a portion of the graph.</source>
         <translation>Fai clic per selezionare una porzione del grafico.</translation>
+    </message>
+    <message>
+        <source>%1 Intervals </source>
+        <translation>%1 intervalli</translation>
+    </message>
+    <message>
+        <source>Move to top left</source>
+        <translation>Sposta in alto a sinistra</translation>
+    </message>
+    <message>
+        <source>Move to top center</source>
+        <translation>Sposta in alto al centro</translation>
+    </message>
+    <message>
+        <source>Move to top right</source>
+        <translation>Sposta in alto a destra</translation>
+    </message>
+    <message>
+        <source>Move to bottom left</source>
+        <translation>Sposta in basso a sinistra</translation>
+    </message>
+    <message>
+        <source>Move to bottom center</source>
+        <translation>Sposta in basso al centro</translation>
+    </message>
+    <message>
+        <source>Move to bottom right</source>
+        <translation>Sposta in basso a destra</translation>
     </message>
     <message>
         <source>Portable Document Format (*.pdf)</source>
@@ -4986,6 +5290,13 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Apply changes</source>
         <translation>Applica modifiche</translation>
+    </message>
+</context>
+<context>
+    <name>InterfaceTreeDelegate</name>
+    <message>
+        <source>default</source>
+        <translation>predefinito</translation>
     </message>
 </context>
 <context>
@@ -5923,7 +6234,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>Packet List settings:</source>
-        <translation>Impostazioni elenco dei pacchetti:</translation>
+        <translation>Impostazioni elenco pacchetti:</translation>
     </message>
     <message>
         <source>Show packet separator</source>
@@ -5965,8 +6276,8 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
 <context>
     <name>LteMacStatisticsDialog</name>
     <message>
-        <source>LTE Mac Statistics</source>
-        <translation>Statistiche Mac LTE</translation>
+        <source>LTE/NR Mac Statistics</source>
+        <translation>Statistiche Mac LTE/NR</translation>
     </message>
     <message>
         <source>Include SR frames in filter</source>
@@ -6051,7 +6362,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>drags</source>
-        <translation>trascinamenti</translation>
+        <translation>trascina</translation>
     </message>
     <message>
         <source>Select using the mouse button.</source>
@@ -6059,7 +6370,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>zooms</source>
-        <translation>ingrandimenti</translation>
+        <translation>ingrandisce</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Reset the graph to its initial state.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -6270,12 +6581,12 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Numero di sequenza</translation>
     </message>
     <message>
-        <source>LTE RLC Graph (UE=%1 chan=%2%3 %4 - %5)</source>
-        <translation>Grafico RLC LTE (UE=%1 can=%2%3 %4 - %5)</translation>
+        <source>%1 RLC Graph (UE=%2 chan=%3%4 %5 - %6)</source>
+        <translation>Grafico RLC %1 (UE=%2 can=%3%4 %5 - %6)</translation>
     </message>
     <message>
-        <source>LTE RLC Graph - no channel selected</source>
-        <translation>Grafico RLC LTE - nessun canale selezionato</translation>
+        <source>3GPP RLC Graph - no channel selected</source>
+        <translation>Grafico 3GPP RLC LTE - nessun canale selezionato</translation>
     </message>
     <message>
         <source>Save As…</source>
@@ -6329,8 +6640,8 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
 <context>
     <name>LteRlcStatisticsDialog</name>
     <message>
-        <source>LTE RLC Statistics</source>
-        <translation>Statistiche RLC LTE</translation>
+        <source>3GPP RLC Statistics</source>
+        <translation>Statistiche 3GPP RLC</translation>
     </message>
     <message>
         <source>Include SR frames in filter</source>
@@ -6416,6 +6727,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Profilo: %1</translation>
     </message>
     <message>
+        <source> %1 Displayed: %2 (%3%)</source>
+        <translation>%1 visualizzati: %2 (%3%)</translation>
+    </message>
+    <message>
         <source>Manage Profiles…</source>
         <translation>Gestisci i profili...</translation>
     </message>
@@ -6477,6 +6792,13 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
             <numerusform>%Ln byte</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation>
+            <numerusform>%Ln bit</numerusform>
+            <numerusform>%Ln bit</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Byte %1</source>
         <translation>Byte %1</translation>
@@ -6490,9 +6812,12 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Pacchetto selezionato: %1 %2 </translation>
     </message>
     <message>
-        <source>Packets: %1 %4 Displayed: %2 (%3%)</source>
-        <oldsource>Packets: %1 %4 Displayed: %2 %4 Marked: %3</oldsource>
-        <translation>Pacchetti: %1 %4 visualizzati: %2 (%3%)</translation>
+        <source>Selected Event: %1 %2 </source>
+        <translation>Evento selezionato: %1 %2</translation>
+    </message>
+    <message>
+        <source>Events: %1</source>
+        <translation>Eventi: %1</translation>
     </message>
     <message>
         <source> %1 Selected: %2 (%3%)</source>
@@ -6522,6 +6847,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>No Packets</source>
         <translation>Nessun pacchetto</translation>
+    </message>
+    <message>
+        <source>No Events</source>
+        <translation>Nessun evento</translation>
     </message>
     <message>
         <source>From Zip File...</source>
@@ -6556,6 +6885,13 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
 </context>
 <context>
+    <name>MainWindow</name>
+    <message>
+        <source>Display filter as %1</source>
+        <translation>Filtro di visualizzazione come %1</translation>
+    </message>
+</context>
+<context>
     <name>MainWindowPreferencesFrame</name>
     <message>
         <source>Frame</source>
@@ -6585,6 +6921,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>The most recently used folder</source>
         <translation>La cartella usata più di recente</translation>
+    </message>
+    <message>
+        <source>The current working directory</source>
+        <translation>La cartella di lavoro attuale</translation>
     </message>
     <message>
         <source>Show up to</source>
@@ -6742,7 +7082,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>Search vendor name using a case-insentitive regular expression.</source>
-        <translation>Cerca il nome del fornitore utilizzando un&apos;espressione regolare senza distinzione tra maiuscole e minuscole.</translation>
+        <translation>Cerca il nome del produttore utilizzando un&apos;espressione regolare senza distinzione tra maiuscole e minuscole.</translation>
     </message>
     <message>
         <source>Vendor Name</source>
@@ -7017,6 +7357,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Mostra i valori dei campi</translation>
     </message>
     <message>
+        <source>Refresh</source>
+        <translation>Aggiorna</translation>
+    </message>
+    <message>
         <source>Save Diagram As…</source>
         <translation>Salva diagramma come...</translation>
     </message>
@@ -7064,6 +7408,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Mostra byte del pacchetto</translation>
     </message>
     <message>
+        <source>Layout:</source>
+        <translation>Disposizione:</translation>
+    </message>
+    <message>
         <source>Packet %1</source>
         <translation>Pacchetto %1</translation>
     </message>
@@ -7084,6 +7432,13 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>
             <numerusform>%Ln byte</numerusform>
             <numerusform>%Ln byte</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln bit(s)</source>
+        <translation>
+            <numerusform>%Ln bit</numerusform>
+            <numerusform>%Ln bit</numerusform>
         </translation>
     </message>
 </context>
@@ -7295,7 +7650,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>Also include packets depended upon, such as those used to reassemble displayed packets</source>
-        <translation>Includi anche i pacchetti di dipendenza, come quelli utilizzati per riassemblare i pacchetti visualizzati</translation>
+        <translation>Includi anche i pacchetti di dipendenza, come quelli utilizzati per ri-assemblare i pacchetti visualizzati</translation>
     </message>
     <message>
         <source>First &amp;to last marked</source>
@@ -7545,8 +7900,20 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Copia questo profilo.</translation>
     </message>
     <message>
+        <source>The number of packets or events to check for automatic profile switching.</source>
+        <translation>Il numero di pacchetti o eventi da verificare per la commutazione automatica del profilo.</translation>
+    </message>
+    <message>
+        <source>Auto switch packet limit</source>
+        <translation>Limite pacchetti per commutazione automatica</translation>
+    </message>
+    <message>
         <source>Configuration Profiles</source>
         <translation>Profili di configurazione</translation>
+    </message>
+    <message>
+        <source>Auto switch event limit</source>
+        <translation>Limite eventi per commutazione automatica</translation>
     </message>
     <message>
         <source>Import</source>
@@ -7729,6 +8096,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>deleted</source>
         <translation>eliminato</translation>
+    </message>
+    <message>
+        <source>Auto Switch Filter</source>
+        <translation>Cambio automatico del filtro</translation>
     </message>
     <message>
         <source>copy</source>
@@ -8254,6 +8625,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Marcatore mancante?</translation>
     </message>
     <message>
+        <source>LTE</source>
+        <translation>LTE</translation>
+    </message>
+    <message>
+        <source>NR</source>
+        <translation>NR</translation>
+    </message>
+    <message>
         <source>C-RNTI</source>
         <translation>C-RNTI</translation>
     </message>
@@ -8272,6 +8651,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>UEId</source>
         <translation>UEId</translation>
+    </message>
+    <message>
+        <source>RAT</source>
+        <translation>RAT</translation>
     </message>
     <message>
         <source>UL Frames</source>
@@ -8497,9 +8880,69 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <source>Browse…</source>
         <translation>Sfoglia...</translation>
     </message>
+    <message>
+        <source>PACKETS</source>
+        <translation>PACCHETTI</translation>
+    </message>
+    <message>
+        <source>EVENTS</source>
+        <translation>EVENTI</translation>
+    </message>
+    <message>
+        <source>BYTES</source>
+        <translation>BYTE</translation>
+    </message>
+    <message>
+        <source>BITS</source>
+        <translation>BIT</translation>
+    </message>
+    <message>
+        <source>COUNT FRAMES</source>
+        <translation>NUMERO FRAME</translation>
+    </message>
+    <message>
+        <source>COUNT FIELDS</source>
+        <translation>NUMERO CAMPI</translation>
+    </message>
+    <message>
+        <source>SUM</source>
+        <translation>SOMMA</translation>
+    </message>
+    <message>
+        <source>MAX</source>
+        <translation>MAX</translation>
+    </message>
+    <message>
+        <source>MIN</source>
+        <translation>MIN</translation>
+    </message>
+    <message>
+        <source>AVERAGE</source>
+        <translation>MEDIA</translation>
+    </message>
+    <message>
+        <source>THROUGHPUT</source>
+        <translation>THROUGHPUT</translation>
+    </message>
+    <message>
+        <source>LOAD</source>
+        <translation>CARICO</translation>
+    </message>
+    <message>
+        <source>Left</source>
+        <translation>Sinistra</translation>
+    </message>
+    <message>
+        <source>Center</source>
+        <translation>Centro</translation>
+    </message>
+    <message>
+        <source>Right</source>
+        <translation>Destra</translation>
+    </message>
 </context>
 <context>
-    <name>QObject::QObject</name>
+    <name>QObject::QObject::QObject</name>
     <message>
         <source>CCCH</source>
         <translation>CCCH</translation>
@@ -8597,6 +9040,13 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>milliseconds</source>
         <translation>millisecondi</translation>
+    </message>
+</context>
+<context>
+    <name>ResizeHeaderView</name>
+    <message>
+        <source>Resize all %1 to contents</source>
+        <translation>Ridimensiona tutte le %1 al contenuto</translation>
     </message>
 </context>
 <context>
@@ -8715,6 +9165,14 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Indirizzi risolti</translation>
     </message>
     <message>
+        <source>Copy</source>
+        <translation>Copia</translation>
+    </message>
+    <message>
+        <source>Save as…</source>
+        <translation>Salva come...</translation>
+    </message>
+    <message>
         <source># Resolved addresses found in %1</source>
         <translation># Trovati indirizzi risolti in %1</translation>
     </message>
@@ -8725,6 +9183,61 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation># Commenti
 #
 # </translation>
+    </message>
+</context>
+<context>
+    <name>ResolvedAddressesView</name>
+    <message>
+        <source>as Plain Text</source>
+        <translation>come testo semplice</translation>
+    </message>
+    <message>
+        <source>Copy selected rows</source>
+        <translation>Copia le righe selezionate</translation>
+    </message>
+    <message>
+        <source>Copy table</source>
+        <translation>Copia la tabella</translation>
+    </message>
+    <message>
+        <source>as CSV</source>
+        <translation>come CSV</translation>
+    </message>
+    <message>
+        <source>as JSON</source>
+        <translation>come JSON</translation>
+    </message>
+    <message>
+        <source>Save selected rows as…</source>
+        <translation>Salva le righe selezionate come...</translation>
+    </message>
+    <message>
+        <source>Save table as…</source>
+        <translation>Salva la tabella come...</translation>
+    </message>
+    <message>
+        <source>Save Resolved Addresses As…</source>
+        <translation>Salva gli indirizzi risolti come...</translation>
+    </message>
+    <message>
+        <source>Plain text (*.txt)</source>
+        <translation>Testo semplice (*.txt)</translation>
+    </message>
+    <message>
+        <source>CSV Document (*.csv)</source>
+        <translation>Documento CSV (*.csv)</translation>
+    </message>
+    <message>
+        <source>JSON Document (*.json)</source>
+        <translation>Documento JSON (*.json)</translation>
+    </message>
+    <message>
+        <source>Warning</source>
+        <translation>Avviso</translation>
+    </message>
+    <message>
+        <source>Unable to save %1: %2</source>
+        <translation>Impossibile salvare %1: %2</translation>
     </message>
 </context>
 <context>
@@ -10402,6 +10915,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Byte del pacchetto</translation>
     </message>
     <message>
+        <source>&lt;b&gt;Options:&lt;/b&gt;</source>
+        <translation>&lt;b&gt;Opzioni:&lt;/b&gt;</translation>
+    </message>
+    <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search for strings containing narrow (UTF-8 and ASCII) or wide (UTF-16) characters.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Cerca le stringhe che contengono i caratteri ridotti (UTF-8 e ASCII) o allargati (UTF-16).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
@@ -10420,6 +10937,18 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Case sensitive</source>
         <translation>Distingui maiuscole</translation>
+    </message>
+    <message>
+        <source>Backwards</source>
+        <translation>Indietro</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search for a subsequent occurrence in the current packet before advancing to the next packet.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Cerca un&apos;occorrenza successiva nel pacchetto corrente prima di passare al pacchetto successivo.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+    </message>
+    <message>
+        <source>Multiple occurrences</source>
+        <translation>Occorrenze multiple</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search for data using display filter syntax (e.g. ip.addr==10.1.1.1), a hexadecimal string (e.g. fffffda5), a plain string (e.g. My String) or a regular expression (e.g. colou?r).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
@@ -10457,6 +10986,22 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Invalid filter.</source>
         <translation>Filtro non valido.</translation>
+    </message>
+    <message>
+        <source>Event List</source>
+        <translation>Elenco eventi</translation>
+    </message>
+    <message>
+        <source>Event Details</source>
+        <translation>Dettagli evento</translation>
+    </message>
+    <message>
+        <source>Event Bytes</source>
+        <translation>Byte evento</translation>
+    </message>
+    <message>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Search the Info column of the event list (summary pane), decoded event display labels (tree view pane) or the ASCII-converted event data (hex view pane).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt; Cerca nella colonna Info dell&apos;elenco degli eventi (pannello di riepilogo), etichette di visualizzazione degli eventi decodificati (pannello della vista ad albero) o i dati dell&apos;evento convertiti in ASCII (pannello della vista esadecimale).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>That filter doesn&apos;t test anything.</source>
@@ -10902,6 +11447,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Trova:</translation>
     </message>
     <message>
+        <source>Case sensitive</source>
+        <translation>Distingui maiuscole</translation>
+    </message>
+    <message>
         <source>Find &amp;Next</source>
         <translation>Trova &amp;successivo</translation>
     </message>
@@ -10997,14 +11546,22 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Salva come...</translation>
     </message>
     <message>
+        <source>Decoded as %1.</source>
+        <translation>Decodificato come %1.</translation>
+    </message>
+    <message>
         <source>Save Selected Packet Bytes As…</source>
         <translation>Salva byte del pacchetto selezionato come...</translation>
     </message>
+    <message>
+        <source>compressed %1</source>
+        <translation>compressi %1</translation>
+    </message>
     <message numerus="yes">
-        <source>Displaying %Ln byte(s).</source>
+        <source>Using %Ln byte(s).</source>
         <translation>
-            <numerusform>Visualizzazione di %Ln byte.</numerusform>
-            <numerusform>Visualizzazione di %Ln byte.</numerusform>
+            <numerusform>Utilizzo di %Ln byte.</numerusform>
+            <numerusform>Utilizzo di %Ln byte.</numerusform>
         </translation>
     </message>
     <message>
@@ -11103,6 +11660,10 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     <message>
         <source>Display filter:</source>
         <translation>Filtro di visualizzazione:</translation>
+    </message>
+    <message>
+        <source>Strip Headers</source>
+        <translation>Rimuovi intestazioni</translation>
     </message>
 </context>
 <context>
@@ -11328,7 +11889,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>drags</source>
-        <translation>trascinamenti</translation>
+        <translation>trascina</translation>
     </message>
     <message>
         <source>Select using the mouse button.</source>
@@ -11336,7 +11897,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>zooms</source>
-        <translation>zoom</translation>
+        <translation>ingrandisce</translation>
     </message>
     <message>
         <source>Display Round Trip Time vs Sequence Number</source>
@@ -11915,7 +12476,7 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
     </message>
     <message>
         <source>Time shifting is not available while capturing packets.</source>
-        <translation>Il spostamento temporale non è disponibile durante l&apos;acquisizione dei pacchetti.</translation>
+        <translation>Lo spostamento temporale non è disponibile durante la cattura dei pacchetti.</translation>
     </message>
 </context>
 <context>
@@ -12072,22 +12633,20 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Crea una nuova voce.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <oldsource>Remove this profile.</oldsource>
-        <translation>Rimuovi questa voce.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation>Rimuovi le voci selezionate.</translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <oldsource>Copy this profile.</oldsource>
-        <translation>Copia questa voce.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation>Copia le voci selezionate.</translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Sposta su la voce.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation>Sposta le voci selezionate in alto.</translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Sposta giù la voce.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation>Sposta le voci selezionate in basso.</translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12113,20 +12672,20 @@ Ad esempio, usa 1 ora per fare in modo che un nuovo file sia creato ogni ora.</t
         <translation>Crea una nuova voce.</translation>
     </message>
     <message>
-        <source>Remove this entry.</source>
-        <translation>Rimuovi questa voce.</translation>
+        <source>Remove the selected entry(ies).</source>
+        <translation>Rimuovi le voci selezionate.</translation>
     </message>
     <message>
-        <source>Copy this entry.</source>
-        <translation>Copia questa voce.</translation>
+        <source>Copy the selected entry(ies).</source>
+        <translation>Copia le voci selezionate.</translation>
     </message>
     <message>
-        <source>Move entry up.</source>
-        <translation>Sposta su la voce.</translation>
+        <source>Move the selected entry(ies) up.</source>
+        <translation>Sposta le voci selezionate in alto.</translation>
     </message>
     <message>
-        <source>Move entry down.</source>
-        <translation>Sposta giù la voce.</translation>
+        <source>Move the selected entry(ies) down.</source>
+        <translation>Sposta le voci selezionate in basso.</translation>
     </message>
     <message>
         <source>Clear all entries.</source>
@@ -12497,8 +13056,16 @@ a:hover {
         <translation>Stai annusando la colla che tiene insieme Internet con Wireshark</translation>
     </message>
     <message>
+        <source>You are sniffing the glue that holds your system together using Logray </source>
+        <translation>Questo è il collante che tiene insieme il tuo sistema usando Logray</translation>
+    </message>
+    <message>
         <source>You are running Wireshark </source>
         <translation>Stai eseguendo Wireshark </translation>
+    </message>
+    <message>
+        <source>You are running Logray </source>
+        <translation>Stai eseguendo Logray</translation>
     </message>
     <message>
         <source> You receive automatic updates.</source>
@@ -12777,14 +13344,6 @@ a:hover {
         <translation>File non trovati</translation>
     </message>
     <message>
-        <source>&amp;Contents</source>
-        <translation>&amp;Contenuti</translation>
-    </message>
-    <message>
-        <source>Wireshark Filter</source>
-        <translation>Filtro di Wireshark</translation>
-    </message>
-    <message>
         <source>TShark</source>
         <translation>TShark</translation>
     </message>
@@ -13050,10 +13609,6 @@ a:hover {
         <translation>Barra degli strumenti wireless</translation>
     </message>
     <message>
-        <source>Help contents</source>
-        <translation>Contenuti della guida</translation>
-    </message>
-    <message>
         <source>FAQs</source>
         <translation>FAQ</translation>
     </message>
@@ -13174,11 +13729,6 @@ a:hover {
         <translation>Vai al pacchetto precedente</translation>
     </message>
     <message>
-        <source>&amp;Mark/Unmark Packet(s)</source>
-        <oldsource>&amp;Mark/Unmark Packet</oldsource>
-        <translation>&amp;Marca/Deseleziona pacchetto</translation>
-    </message>
-    <message>
         <source>Mark All Displayed</source>
         <translation>Marca tutti i visualizzati</translation>
     </message>
@@ -13205,11 +13755,6 @@ a:hover {
     <message>
         <source>Go to the previous marked packet</source>
         <translation>Val al prossimo pacchetto marchiato</translation>
-    </message>
-    <message>
-        <source>&amp;Ignore/Unignore Packet(s)</source>
-        <oldsource>&amp;Ignore/Unignore Packet</oldsource>
-        <translation>&amp;Ignora/Considera pacchetto</translation>
     </message>
     <message>
         <source>Ignore All Displayed</source>
@@ -13652,10 +14197,6 @@ a:hover {
         <translation>Ripristina disposizione</translation>
     </message>
     <message>
-        <source>Reset appearance layout to default size</source>
-        <translation>Ripristina la disposizione dell&apos;aspetto alla dimensione predefinita</translation>
-    </message>
-    <message>
         <source>Seconds Since First Captured Packet</source>
         <translation>Secondi dal primo pacchetto catturato</translation>
     </message>
@@ -13816,20 +14357,28 @@ a:hover {
         <translation>Blocchi di indirizzi MAC</translation>
     </message>
     <message>
-        <source>TLS Keylog Launcher</source>
-        <translation>Esecutore Keylog TLS</translation>
-    </message>
-    <message>
-        <source>Release Notes</source>
-        <translation>Note di rilascio</translation>
-    </message>
-    <message>
         <source>&amp;Options…</source>
         <translation>&amp;Opzioni...</translation>
     </message>
     <message>
+        <source>&amp;3GPP Uu</source>
+        <translation>&amp;3GPP Uu</translation>
+    </message>
+    <message>
         <source>&amp;Wireless</source>
         <translation>&amp;Wireless</translation>
+    </message>
+    <message>
+        <source>&amp;User&apos;s Guide</source>
+        <translation>Manuale &amp;utente</translation>
+    </message>
+    <message>
+        <source>Wireshark User&apos;s Guide</source>
+        <translation>Manuale utente di Wireshark</translation>
+    </message>
+    <message>
+        <source>Display Filters</source>
+        <translation>Filtri di visualizzazione</translation>
     </message>
     <message>
         <source>Capture &amp;Filters…</source>
@@ -13876,8 +14425,16 @@ a:hover {
         <translation>Tro&amp;va precedente</translation>
     </message>
     <message>
+        <source>&amp;Mark/Unmark Selected</source>
+        <translation>&amp;Marca/Deseleziona selezionati</translation>
+    </message>
+    <message>
         <source>Mark or unmark each selected packet</source>
         <translation>Marca o rimuovi ogni pacchetto selezionato</translation>
+    </message>
+    <message>
+        <source>&amp;Ignore/Unignore Selected</source>
+        <translation>&amp;Ignora/considera selezionati</translation>
     </message>
     <message>
         <source>Ignore or unignore each selected packet</source>
@@ -13920,12 +14477,32 @@ a:hover {
         <translation>Throughput TCP</translation>
     </message>
     <message>
+        <source>General</source>
+        <translation>Generale</translation>
+    </message>
+    <message>
+        <source>Query-Response</source>
+        <translation>Query-Risposta</translation>
+    </message>
+    <message>
+        <source>DNS Query-Response Statistics</source>
+        <translation>Statistiche Query-Risposta DNS</translation>
+    </message>
+    <message>
         <source>Request Sequences</source>
         <translation>Sequenze richiesta</translation>
     </message>
     <message>
         <source>HTTP Request Sequences</source>
         <translation>Sequenze richiesta HTTP</translation>
+    </message>
+    <message>
+        <source>E2AP</source>
+        <translation>E2AP</translation>
+    </message>
+    <message>
+        <source>E2AP Messages</source>
+        <translation>Messaggi E2AP</translation>
     </message>
     <message>
         <source>Decode &amp;As…</source>
@@ -13986,6 +14563,10 @@ a:hover {
     <message>
         <source>Normal Size</source>
         <translation>Dimensione normale</translation>
+    </message>
+    <message>
+        <source>Reset layout to default size</source>
+        <translation>Ripristina la disposizione alla dimensione predefinita </translation>
     </message>
     <message>
         <source>Resize Columns</source>
@@ -14246,6 +14827,14 @@ a:hover {
         <translation>Vai al pacchetto referenziato dal campo selezionato.</translation>
     </message>
     <message>
+        <source>TLS Keylog Launcher</source>
+        <translation>Esecutore Keylog TLS</translation>
+    </message>
+    <message>
+        <source>Release Notes</source>
+        <translation>Note di rilascio</translation>
+    </message>
+    <message>
         <source>&amp;VoIP Calls</source>
         <translation>Chiamate &amp;VoIP</translation>
     </message>
@@ -14276,10 +14865,6 @@ a:hover {
     <message>
         <source>&amp;GSM</source>
         <translation>&amp;GSM</translation>
-    </message>
-    <message>
-        <source>&amp;LTE</source>
-        <translation>&amp;LTE</translation>
     </message>
     <message>
         <source>&amp;MTP3</source>
@@ -14564,6 +15149,10 @@ a:hover {
         <source>Quit &amp;without Saving</source>
         <oldsource>Quit without Saving</oldsource>
         <translation>Esci senza sal&amp;vare</translation>
+    </message>
+    <message>
+        <source>USB CDC Data</source>
+        <translation>Dati USB CDC</translation>
     </message>
     <message>
         <source>There is no &quot;rtp.ssrc&quot; field in this version of Wireshark.</source>

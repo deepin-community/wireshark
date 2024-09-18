@@ -38,7 +38,6 @@ set(LOGRAY_NSIS_GENERATED_FILES ${LOGRAY_NSIS_GENERATED_FILES} PARENT_SCOPE)
 
 set(LOGRAY_NSIS_FILES
 	logray.nsi
-	uninstall-logray.nsi
 	logray-common.nsh
 	servicelib.nsh
 	NpcapPage.ini
@@ -53,7 +52,7 @@ set(LOG_PROGRAM_NAME ${LOG_PROJECT_NAME})
 file(TO_NATIVE_PATH "${CMAKE_SOURCE_DIR}" TOP_SRC_DIR)
 # STAGING_DIR depends on the build configuration so we pass it
 # on the command line below.
-file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/docbook" DOCBOOK_DIR)
+file(TO_NATIVE_PATH "${CMAKE_BINARY_DIR}/doc" DOC_DIR)
 set (MMDBRESOLVE_EXE ${MAXMINDDB_FOUND})
 
 # To do:
@@ -153,11 +152,11 @@ if (BUILD_wireshark)
 			set(_all_manifest_contents "${_all_manifest_contents}File \"\${STAGING_DIR}\\${_dll}\"\n")
 		endforeach()
 		set(_all_manifest_contents "${_all_manifest_contents}!endif\n")
-		foreach(_dll ${CARES_DLL} ${PCRE2_RELEASE_DLL} ${GCRYPT_DLLS}
+		foreach(_dll ${AMRNB_DLL} ${CARES_DLL} ${PCRE2_RELEASE_DLL} ${GCRYPT_DLLS}
 				${GNUTLS_DLLS} ${KERBEROS_DLLS} ${LIBSSH_DLLS} ${LUA_DLL}
-				${LZ4_DLL} ${MINIZIP_DLL} ${NGHTTP2_DLL} ${NGHTTP3_DLL} ${SBC_DLL} ${SMI_DLL}
+				${LZ4_DLL} ${MINIZIP_DLL} ${MINIZIPNG_DLLS} ${NGHTTP2_DLL} ${NGHTTP3_DLL} ${SBC_DLL} ${SMI_DLL}
 				${SNAPPY_DLL} ${SPANDSP_DLL} ${BCG729_DLL} ${LIBXML2_DLLS} ${WINSPARKLE_DLL}
-				${ZLIB_DLL} ${BROTLI_DLLS} ${ZSTD_DLL} ${ILBC_DLL} ${OPUS_DLL}
+				${ZLIB_DLL} ${ZLIBNG_DLL} ${BROTLI_DLLS} ${ZSTD_DLL} ${ILBC_DLL} ${OPUS_DLL}
 				${SPEEXDSP_DLL}
 				# Needed for mmdbresolve
 				${MAXMINDDB_DLL}
@@ -202,11 +201,11 @@ if (BUILD_logray)
 		set(_all_manifest_contents "${_all_manifest_contents}File \"\${STAGING_DIR}\\${_dll}\"\n")
 	endforeach()
 	set(_all_manifest_contents "${_all_manifest_contents}!endif\n")
-	foreach(_dll ${CARES_DLL} ${PCRE2_RELEASE_DLL} ${GCRYPT_DLLS}
+	foreach(_dll ${AMRNB_DLL} ${CARES_DLL} ${PCRE2_RELEASE_DLL} ${GCRYPT_DLLS}
 			${GNUTLS_DLLS} ${KERBEROS_DLLS} ${LIBSSH_DLLS} ${LUA_DLL}
-			${LZ4_DLL} ${NGHTTP2_DLL} ${NGHTTP3_DLL} ${SBC_DLL} ${SMI_DLL} ${SNAPPY_DLL}
-			${SPANDSP_DLL} ${BCG729_DLL} ${LIBXML2_DLLS} ${WINSPARKLE_DLL}
-			${ZLIB_DLL} ${BROTLI_DLLS} ${ZSTD_DLL} ${ILBC_DLL} ${OPUS_DLL}
+			${LZ4_DLL} ${MINIZIP_DLL} ${MINIZIPNG_DLLS} ${NGHTTP2_DLL} ${NGHTTP3_DLL} ${SBC_DLL} ${SMI_DLL}
+			${SNAPPY_DLL} ${SPANDSP_DLL} ${BCG729_DLL} ${LIBXML2_DLLS} ${WINSPARKLE_DLL}
+			${ZLIB_DLL} ${ZLIBNG_DLL} ${BROTLI_DLLS} ${ZSTD_DLL} ${ILBC_DLL} ${OPUS_DLL}
 			${SPEEXDSP_DLL}
 			# Needed for mmdbresolve
 			${MAXMINDDB_DLL}
@@ -228,31 +227,6 @@ set(NSIS_OPTIONS
 	-V2
 	PARENT_SCOPE
 )
-
-# We want to sign all of the executables that we ship in the official
-# installers. This means that uninstall-wireshark.exe must be built
-# separately AND that building the installer itself won't overwrite
-# uninstall-wireshark.exe
-macro( ADD_NSIS_UNINSTALLER_TARGETS )
-	set (_nsis_source_dir ${CMAKE_SOURCE_DIR}/packaging/nsis )
-	set (_nsis_binary_dir ${CMAKE_BINARY_DIR}/packaging/nsis )
-
-	#
-	# XXX - if we're not building Wireshark, we can't build
-	# anything, so there's nothing to uninstall.
-	#
-	if(BUILD_logray)
-		add_custom_command(OUTPUT ${DATAFILE_DIR}/uninstall-logray.exe
-			DEPENDS ${_nsis_source_dir}/uninstall-logray.nsi
-				${_nsis_source_dir}/logray-common.nsh
-			COMMAND ${MAKENSIS_EXECUTABLE} ${NSIS_OPTIONS}
-				uninstall-logray.nsi
-			COMMAND ${POWERSHELL_COMMAND} "${_nsis_source_dir}/makeUninstall.ps1" ${DATAFILE_DIR}/uninstall_logray_installer.exe
-			COMMAND ${CMAKE_COMMAND} -E remove ${DATAFILE_DIR}/uninstall_logray_installer.exe
-			WORKING_DIRECTORY ${_nsis_source_dir}
-		)
-	endif()
-endmacro( ADD_NSIS_UNINSTALLER_TARGETS )
 
 macro( ADD_NSIS_PACKAGE_TARGETS )
 	set (_nsis_source_dir ${CMAKE_SOURCE_DIR}/packaging/nsis )
@@ -312,8 +286,9 @@ macro( ADD_NSIS_PACKAGE_TARGETS )
 			DEPENDS
 				${WIRESHARK_NSIS_FILES}
 				copy_data_files
-				user_guide_html
 				faq_html
+				user_guide_html
+				release_notes_html
 		)
 		set_target_properties(wireshark_nsis_prep PROPERTIES
 			FOLDER "Packaging"
@@ -383,8 +358,6 @@ macro( ADD_NSIS_PACKAGE_TARGETS )
 endmacro( ADD_NSIS_PACKAGE_TARGETS )
 
 set(CLEAN_FILES
-	#NEWS.txt
-	#user-guide.chm
 	${DATAFILE_DIR}/uninstall-wireshark.exe
 	wireshark-${VERSION}-${WIRESHARK_TARGET_PLATFORM}.exe
 	wireshark-config.nsh

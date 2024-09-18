@@ -25,6 +25,7 @@
 
 #include "epan/address.h"
 #include "epan/addr_resolv.h"
+#include "epan/prefs.h"
 #include "epan/strutil.h"
 
 #include <wsutil/filesystem.h>
@@ -79,8 +80,8 @@ get_args_as_string(int argc, char **argv, int optindex)
 
 /* Compute the difference between two seconds/microseconds time stamps. */
 void
-compute_timestamp_diff(gint *diffsec, gint *diffusec,
-    guint32 sec1, guint32 usec1, guint32 sec2, guint32 usec2)
+compute_timestamp_diff(int *diffsec, int *diffusec,
+    uint32_t sec1, uint32_t usec1, uint32_t sec2, uint32_t usec2)
 {
   if (sec1 == sec2) {
     /* The seconds part of the first time is the same as the seconds
@@ -123,8 +124,8 @@ compute_timestamp_diff(gint *diffsec, gint *diffusec,
 
 /* Remove any %<interface_name> from an IP address. */
 static char *sanitize_filter_ip(char *hostname) {
-    gchar *end;
-    gchar *ret;
+    char *end;
+    char *ret;
 
     ret = g_strdup(hostname);
     if (!ret)
@@ -147,9 +148,9 @@ static char *sanitize_filter_ip(char *hostname) {
    SESSIONNAME (terminal server): <remote name>
  */
 
-const gchar *get_conn_cfilter(void) {
+const char *get_conn_cfilter(void) {
     static GString *filter_str = NULL;
-    gchar *env, **tokens;
+    char *env, **tokens;
     char *lastp, *lastc, *p;
     char *pprotocol = NULL;
     char *phostname = NULL;
@@ -330,10 +331,10 @@ const gchar *get_conn_cfilter(void) {
     return filter_str->str;
 }
 
-gboolean display_is_remote(void)
+bool display_is_remote(void)
 {
-    static gboolean remote_display_checked;
-    static gboolean is_remote;
+    static bool remote_display_checked;
+    static bool is_remote;
 
     if (!remote_display_checked) {
         is_remote = (strlen(get_conn_cfilter()) > 0);
@@ -342,7 +343,7 @@ gboolean display_is_remote(void)
 }
 
 // MUST be UTF-8
-static char *last_open_dir = NULL;
+static char *last_open_dir;
 
 const char *
 get_last_open_dir(void)
@@ -354,7 +355,7 @@ void
 set_last_open_dir(const char *dirname)
 {
     size_t len;
-    gchar *new_last_open_dir;
+    char *new_last_open_dir;
 
     if (dirname && dirname[0]) {
         len = strlen(dirname);
@@ -377,14 +378,41 @@ const char *
 get_open_dialog_initial_dir(void)
 {
     const char *initial_dir;
-    /*
-     * If we have a "last directory in which a file was opened", use
-     * that.
-     *
-     * If not, use the user's personal data file directory.
-     */
-    initial_dir = get_last_open_dir();
-    if (initial_dir == NULL)
-        initial_dir = get_persdatafile_dir();
+
+    switch (prefs.gui_fileopen_style) {
+
+    case FO_STYLE_LAST_OPENED:
+        /* The user has specified that we should start out in the last directory
+           we looked in.
+
+           If we have a "last directory in which a file was opened", use that.
+
+           If not, use the user's personal data file directory. */
+        /* This is now the default behaviour in file_selection_new() */
+        initial_dir = get_last_open_dir();
+        if (initial_dir == NULL)
+            initial_dir = get_persdatafile_dir();
+        break;
+
+    case FO_STYLE_SPECIFIED:
+        /* The user has specified that we should always start out in a
+           specified directory; if they've specified that directory,
+           start out by showing the files in that dir, otherwise use
+           the user's personal data file directory. */
+        if (prefs.gui_fileopen_dir[0] != '\0')
+            initial_dir = prefs.gui_fileopen_dir;
+        else
+            initial_dir = get_persdatafile_dir();
+        break;
+
+    case FO_STYLE_CWD:
+        initial_dir = get_current_working_dir();
+        break;
+
+    default:
+        ws_assert_not_reached();
+        initial_dir = NULL;
+        break;
+    }
     return initial_dir;
 }

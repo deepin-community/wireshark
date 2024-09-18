@@ -167,21 +167,21 @@ class TestDissectGprpc:
                 '-d', 'tcp.port==44363,http2',
                 '-2', # make http2.body.reassembled.in available
                 '-Y', # Case1: In frame28, one http DATA contains 4 completed grpc messages (json data seq=1,2,3,4).
-                      '(frame.number == 28 && grpc && json.value.number == "1" && json.value.number == "2"'
-                      ' && json.value.number == "3" && json.value.number == "4" && http2.body.reassembled.in == 45) ||'
+                      '(frame.number == 28 && grpc && json.value.number == 1 && json.value.number == 2'
+                      ' && json.value.number == 3 && json.value.number == 4 && http2.body.reassembled.in == 45) ||'
                       # Case2: In frame28, last grpc message (the 5th) only has 4 bytes, which need one more byte
                       # to be a message head. a completed message is reassembled in frame45. (json data seq=5)
-                      '(frame.number == 45 && grpc && http2.body.fragment == 28 && json.value.number == "5"'
+                      '(frame.number == 45 && grpc && http2.body.fragment == 28 && json.value.number == 5'
                       ' && http2.body.reassembled.in == 61) ||'
                       # Case3: In frame45, one http DATA frame contains two partial fragment, one is part of grpc
                       # message of previous http DATA (frame28), another is first part of grpc message of next http
                       # DATA (which will be reassembled in next http DATA frame61). (json data seq=6)
-                      '(frame.number == 61 && grpc && http2.body.fragment == 45 && json.value.number == "6") ||'
+                      '(frame.number == 61 && grpc && http2.body.fragment == 45 && json.value.number == 6) ||'
                       # Case4: A big grpc message across frame100, frame113, frame126 and finally reassembled in frame139.
                       '(frame.number == 100 && grpc && http2.body.reassembled.in == 139) ||'
                       '(frame.number == 113 && !grpc && http2.body.reassembled.in == 139) ||'
                       '(frame.number == 126 && !grpc && http2.body.reassembled.in == 139) ||'
-                      '(frame.number == 139 && grpc && json.value.number == "9") ||'
+                      '(frame.number == 139 && grpc && json.value.number == 9) ||'
                       # Case5: An large grpc message of 200004 bytes.
                       '(frame.number == 164 && grpc && grpc.message_length == 200004)',
             ), encoding='utf-8', env=test_env)
@@ -197,12 +197,12 @@ class TestDissectGprpc:
                 '-r', capture_file('grpc_person_search_protobuf_with_image-missing_headers.pcapng.gz'),
                 '-o', 'uat:protobuf_search_paths: "{}","{}"'.format(well_know_types_dir, 'FALSE'),
                 '-o', 'uat:protobuf_search_paths: "{}","{}"'.format(user_defined_types_dir, 'TRUE'),
-                '-o', 'uat:http2_fake_headers: "{}","{}","{}","{}","{}","{}"'.format(
-                            '50051','3','IN',':path','/tutorial.PersonSearchService/Search','TRUE'),
-                '-o', 'uat:http2_fake_headers: "{}","{}","{}","{}","{}","{}"'.format(
-                            '50051','0','IN','content-type','application/grpc','TRUE'),
-                '-o', 'uat:http2_fake_headers: "{}","{}","{}","{}","{}","{}"'.format(
-                            '50051','0','OUT','content-type','application/grpc','TRUE'),
+                '-o', 'uat:http2_fake_headers: "{}","{}","{}","{}","{}","{}","{}"'.format(
+                            '50051','3','IN',':path','/tutorial.PersonSearchService/Search','FALSE', 'TRUE'),
+                '-o', 'uat:http2_fake_headers: "{}","{}","{}","{}","{}","{}","{}"'.format(
+                            '50051','0','IN','content-type','application/grpc','FALSE','TRUE'),
+                '-o', 'uat:http2_fake_headers: "{}","{}","{}","{}","{}","{}","{}"'.format(
+                            '50051','0','OUT','content-type','application/grpc','FALSE','TRUE'),
                 '-d', 'tcp.port==50051,http2',
                 '-2',
                 '-Y', 'protobuf.field.value.string == "Jason" || protobuf.field.value.string == "Lily"',
@@ -665,23 +665,28 @@ class TestDissectTcp:
         lines = stdout.split('\n')
         # 2 - start of OoO MSP
         assert '2\t6\t[TCP Previous segment not captured]' in lines[1]
-        assert '[TCP segment of a reassembled PDU]' in lines[1]
+        assert '[TCP segment of a reassembled PDU]' in lines[1] or '[TCP PDU reassembled in' in lines[1]
+
         # H - first time that the start of the MSP is delivered
         assert '3\t6\t[TCP Out-Of-Order]' in lines[2]
-        assert '[TCP segment of a reassembled PDU]' in lines[2]
+        assert '[TCP segment of a reassembled PDU]' in lines[2] or '[TCP PDU reassembled in' in lines[2]
+
         # H - first retransmission. Because this is before the reassembly
         # completes we can add it to the reassembly
         assert '4\t6\t[TCP Retransmission]' in lines[3]
-        assert '[TCP segment of a reassembled PDU]' in lines[3]
+        assert '[TCP segment of a reassembled PDU]' in lines[3] or '[TCP PDU reassembled in' in lines[3]
+
         # 1 - continue reassembly
         assert '5\t6\t[TCP Out-Of-Order]' in lines[4]
-        assert '[TCP segment of a reassembled PDU]' in lines[4]
+        assert '[TCP segment of a reassembled PDU]' in lines[4] or '[TCP PDU reassembled in' in lines[4]
+
         # 3 - finish reassembly
         assert '6\t\tPUT /0 HTTP/1.1' in lines[5]
+
         # H - second retransmission. This is after the reassembly completes
-        # so we do not add it to the ressembly (but throw a ReassemblyError.)
+        # so we do not add it to the reassembly (but throw a ReassemblyError.)
         assert '7\t\t' in lines[6]
-        assert '[TCP segment of a reassembled PDU]' not in lines[6]
+        assert '[TCP segment of a reassembled PDU]' not in lines[6] and '[TCP PDU reassembled in' not in lines[6]
 
     def test_tcp_reassembly_more_data_1(self, cmd_tshark, capture_file, test_env):
         '''
@@ -818,7 +823,7 @@ class TestDissectQuic:
         # multiple packets, fragmented in multiple out of order packets,
         # retried, retried with overlap from the original packets, and retried
         # with one of the original packets missing (but all data there.)
-        # Include -zexpert just to be sure that nothing Warn or higher occured.
+        # Include -zexpert just to be sure that nothing Warn or higher occurred.
         # Note level expert infos may be expected with the overlaps and
         # retransmissions.
         stdout = subprocess.check_output([cmd_tshark,

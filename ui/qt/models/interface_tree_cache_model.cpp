@@ -32,7 +32,7 @@ InterfaceTreeCacheModel::InterfaceTreeCacheModel(QObject *parent) :
     sourceModel = new InterfaceTreeModel(parent);
 
     QIdentityProxyModel::setSourceModel(sourceModel);
-    storage = new QMap<int, QMap<InterfaceTreeColumns, QVariant> *>();
+    storage = new QMap<int, QSharedPointer<QMap<InterfaceTreeColumns, QVariant> > >();
 
     checkableColumns << IFTREE_COL_HIDDEN << IFTREE_COL_PROMISCUOUSMODE;
 #ifdef HAVE_PCAP_CREATE
@@ -67,8 +67,7 @@ void InterfaceTreeCacheModel::reset(int row)
 {
     if (row < 0)
     {
-        delete storage;
-        storage = new QMap<int, QMap<InterfaceTreeColumns, QVariant> *>();
+        storage->clear();
     }
     else
     {
@@ -90,7 +89,7 @@ void InterfaceTreeCacheModel::saveNewDevices()
         interface_t *device = const_cast<interface_t *>(&(*it));
         bool useDevice = false;
 
-        QMap<InterfaceTreeColumns, QVariant> * dataField = storage->value(idx, 0);
+        QSharedPointer<QMap<InterfaceTreeColumns, QVariant> > dataField = storage->value(idx, 0);
         /* When devices are being added, they are added using generic values. So only devices
          * whose data have been changed should be used from here on out. */
         if (dataField != 0)
@@ -124,7 +123,6 @@ void InterfaceTreeCacheModel::saveNewDevices()
 
         /* All entries of this new devices have been considered */
         storage->remove(idx);
-        delete dataField;
     }
 
     newDevices.clear();
@@ -159,7 +157,7 @@ void InterfaceTreeCacheModel::save()
             continue;
 
         /* Try to load a saved value row for this index */
-        QMap<InterfaceTreeColumns, QVariant> * dataField = storage->value(idx, 0);
+        QSharedPointer<QMap<InterfaceTreeColumns, QVariant> > dataField = storage->value(idx, 0);
 
         /* Handle the storing of values for this device here */
         if (dataField)
@@ -177,7 +175,8 @@ void InterfaceTreeCacheModel::save()
 
                 if (col == IFTREE_COL_HIDDEN)
                 {
-                    device->hidden = saveValue.toBool();
+                    /* Hidden is de-selection, therefore inverted logic here */
+                    device->hidden = (saveValue == Qt::Unchecked);
                 }
                 else if (device->if_info.type == IF_EXTCAP)
                 {
@@ -420,12 +419,12 @@ bool InterfaceTreeCacheModel::setData(const QModelIndex &index, const QVariant &
         {
             QVariant saveValue = value;
 
-            QMap<InterfaceTreeColumns, QVariant> * dataField = 0;
+            QSharedPointer<QMap<InterfaceTreeColumns, QVariant> > dataField = nullptr;
             /* obtain the list of already stored changes for this row. If none exist
              * create a new storage row for this entry */
-            if ((dataField = storage->value(row, 0)) == 0)
+            if ((dataField = storage->value(row, 0)) == nullptr)
             {
-                dataField = new QMap<InterfaceTreeColumns, QVariant>();
+                dataField = QSharedPointer<QMap<InterfaceTreeColumns, QVariant> >(new QMap<InterfaceTreeColumns, QVariant>);
                 storage->insert(row, dataField);
             }
 
@@ -452,8 +451,8 @@ QVariant InterfaceTreeCacheModel::data(const QModelIndex &index, int role) const
         if (((role == Qt::DisplayRole || role == Qt::EditRole) && editableColumns.contains(col)) ||
                 (role == Qt::CheckStateRole && checkableColumns.contains(col)) )
         {
-            QMap<InterfaceTreeColumns, QVariant> * dataField = 0;
-            if ((dataField = storage->value(row, 0)) != 0)
+            QSharedPointer<QMap<InterfaceTreeColumns, QVariant> > dataField = nullptr;
+            if ((dataField = storage->value(row, 0)) != nullptr)
             {
                 if (dataField->contains(col))
                 {
@@ -492,8 +491,8 @@ QVariant InterfaceTreeCacheModel::data(const QModelIndex &index, int role) const
                         col == IFTREE_COL_DESCRIPTION)
                 {
 
-                    QMap<InterfaceTreeColumns, QVariant> * dataField = 0;
-                    if ((dataField = storage->value(row, 0)) != 0 &&
+                    QSharedPointer<QMap<InterfaceTreeColumns, QVariant> > dataField = nullptr;
+                    if ((dataField = storage->value(row, 0)) != nullptr &&
                             dataField->contains(IFTREE_COL_PIPE_PATH))
                     {
                         return dataField->value(IFTREE_COL_PIPE_PATH, QVariant());
@@ -524,6 +523,17 @@ QVariant InterfaceTreeCacheModel::data(const QModelIndex &index, int role) const
 
     return QVariant();
 }
+
+#ifdef HAVE_PCAP_REMOTE
+bool InterfaceTreeCacheModel::isRemote(const QModelIndex &index) const
+{
+    const interface_t *device = lookup(index);
+    if (device != nullptr && device->remote_opts.src_type == CAPTURE_IFREMOTE) {
+        return true;
+    }
+    return false;
+}
+#endif
 
 #ifdef HAVE_LIBPCAP
 QModelIndex InterfaceTreeCacheModel::index(int row, int column, const QModelIndex &parent) const

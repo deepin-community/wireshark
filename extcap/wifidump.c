@@ -63,7 +63,7 @@ enum {
 	OPT_REMOTE_COUNT
 };
 
-static struct ws_option longopts[] = {
+static const struct ws_option longopts[] = {
 	EXTCAP_BASE_OPTIONS,
 	{ "help", ws_no_argument, NULL, OPT_HELP},
 	{ "version", ws_no_argument, NULL, OPT_VERSION},
@@ -724,7 +724,7 @@ int main(int argc, char *argv[])
 		}
 		remote_center_frequency = center_freq(remote_channel_frequency, remote_channel_width);
 		filter = concat_filters(extcap_conf->capture_filter, remote_filter);
-		ssh_params->debug = extcap_conf->debug;
+		ssh_params_set_log_level(ssh_params, extcap_conf->debug);
 		ret = ssh_open_remote_connection(ssh_params, remote_capture_functions,
 			remote_interface, remote_channel_frequency, remote_channel_width, remote_center_frequency,
 			filter, count, extcap_conf->fifo);

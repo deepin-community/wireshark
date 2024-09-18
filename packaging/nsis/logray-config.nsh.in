@@ -22,9 +22,11 @@
 
 #cmakedefine MMDBRESOLVE_EXE @MMDBRESOLVE_EXE@
 
-# Skip the User's Guide until we have one of our own.
-#cmakeundefine DOCBOOK_DIR
+# Skip the User's Guide and FAQ until we have one of our own.
+#cmakeundefine DOC_DIR
 
 #cmakedefine SMI_DIR "@SMI_DIR@"
 
 #cmakedefine QT_DIR "@QT_DIR@"
+
+#cmakedefine ENABLE_SIGNED_NSIS

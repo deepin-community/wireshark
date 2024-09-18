@@ -237,6 +237,23 @@ class TestSharkd:
             },
         ))
 
+    def test_sharkd_req_frames_comments(self, check_sharkd_session, capture_file):
+        check_sharkd_session((
+            {"jsonrpc":"2.0", "id":1, "method":"load",
+             "params":{"file": capture_file('comments.pcapng')}
+             },
+            {"jsonrpc":"2.0", "id":2, "method":"frames","params":{"filter":"frame.number==3||frame.number==4||frame.number==5"}},
+        ), (
+            {"jsonrpc":"2.0","id":1,"result":{"status":"OK"}},
+            {"jsonrpc":"2.0","id":2,"result":
+                [
+                    {"c":["3","0.610021","::","ff02::1:ffdc:6277","ICMPv6","78","Neighbor Solicitation for fe80::c2c1:c0ff:fedc:6277"],"num":3,"ct":True,"comments":["hello hello"],"bg":"fce0ff","fg":"12272e"},
+                    {"c":["4","0.760023","::","ff02::1:ffdc:6277","ICMPv6","78","Neighbor Solicitation for fec0::c2c1:c0ff:fedc:6277"],"num":4,"ct":True,"comments":["goodbye goodbye"],"bg":"fce0ff","fg":"12272e"},
+                    {"c":["5","0.802338","10.0.0.1","224.0.0.251","MDNS","138","Standard query response 0x0000 A, cache flush 10.0.0.1 PTR, cache flush Cisco29401.local NSEC, cache flush Cisco29401.local"],"num":5,"bg":"daeeff","fg":"12272e"}
+                ],
+             },
+        ))
+
     def test_sharkd_req_tap_invalid(self, check_sharkd_session, capture_file):
         # XXX Unrecognized taps result in an empty line, modify
         #     run_sharkd_session such that checking for it is possible.
@@ -1194,10 +1211,16 @@ class TestSharkd:
             {"jsonrpc":"2.0", "id":3, "method":"iograph",
             "params":{"graph0": "garbage graph name"}
             },
+            {"jsonrpc":"2.0", "id":4, "method":"iograph",
+             "params":{"graph0": "max:udp.length", "filter0": "udp.length", "interval": 0}},
+            {"jsonrpc":"2.0", "id":5, "method":"iograph",
+             "params":{"graph0": "max:udp.length", "filter0": "udp.length", "interval_units": "garbage units"}},
         ), (
             {"jsonrpc":"2.0","id":1,"result":{"status":"OK"}},
             {"jsonrpc":"2.0","id":2,"error":{"code":-32600,"message":"Mandatory parameter graph0 is missing"}},
             {"jsonrpc":"2.0","id":3,"result":{"iograph": []}},
+            {"jsonrpc":"2.0","id":4,"error":{"code":-32600,"message":"The value for interval must be a positive integer"}},
+            {"jsonrpc":"2.0","id":5,"error":{"code":-7003,"message":"Invalid interval_units parameter: 'garbage units', must be 's', 'ms' or 'us'"}},
         ))
 
     def test_sharkd_req_iograph_basic(self, check_sharkd_session, capture_file):
@@ -1205,20 +1228,41 @@ class TestSharkd:
             {"jsonrpc":"2.0", "id":1, "method":"load",
             "params":{"file": capture_file('dhcp.pcap')}
             },
-            {"jsonrpc":"2.0", "id":1, "method":"iograph",
+            {"jsonrpc":"2.0", "id":2, "method":"iograph",
             "params":{"graph0": "max:udp.length", "filter0": "udp.length"}
             },
-            {"jsonrpc":"2.0", "id":2, "method":"iograph",
+            {"jsonrpc":"2.0", "id":3, "method":"iograph",
             "params":{"graph0": "packets", "graph1": "bytes"}
             },
-            {"jsonrpc":"2.0", "id":3, "method":"iograph",
+            {"jsonrpc":"2.0", "id":4, "method":"iograph",
             "params":{"graph0": "packets", "filter0": "garbage filter"}
             },
+            {"jsonrpc":"2.0", "id":5, "method":"iograph",
+             "params":{"graph0": "packets", "graph1": "bytes", "interval": 1, "interval_units": "us"}
+             },
+            {"jsonrpc":"2.0", "id":6, "method":"iograph",
+             "params":{"graph0": "packets", "graph1": "bytes", "interval": 1, "interval_units": "ms"}
+             },
+            {"jsonrpc":"2.0", "id":7, "method":"iograph",
+             "params":{"graph0": "packets", "graph1": "bytes", "interval": 1, "interval_units": "s"}
+             },
         ), (
             {"jsonrpc":"2.0","id":1,"result":{"status":"OK"}},
-            {"jsonrpc":"2.0","id":1,"result":{"iograph": [{"items": [308.000000]}]}},
-            {"jsonrpc":"2.0","id":2,"result":{"iograph": [{"items": [4.000000]}, {"items": [1312.000000]}]}},
-            {"jsonrpc":"2.0","id":3,"error":{"code":-6001,"message":"Filter \"garbage filter\" is invalid - \"filter\" was unexpected in this context."}},
+            {"jsonrpc":"2.0","id":2,"result":{"iograph": [{"items": [308.000000]}]}},
+            {"jsonrpc":"2.0","id":3,"result":{"iograph": [{"items": [4.000000]}, {"items": [1312.000000]}]}},
+            {"jsonrpc":"2.0","id":4,"error":{"code":-6001,"message":"Filter \"garbage filter\" is invalid - \"filter\" was unexpected in this context."}},
+            {"jsonrpc":"2.0","id":5,"result":{"iograph": [
+                {"items": [1.0, '127', 1.0, '1118f', 1.0, '112c9', 1.0]},
+                {"items": [314.0, '127', 342.0, '1118f', 314.0, '112c9', 342.0]},
+            ]}},
+            {"jsonrpc":"2.0","id":6,"result":{"iograph": [
+                {"items": [2.0, '46', 2.0]},
+                {"items": [656.0, '46', 656.0]},
+            ]}},
+            {"jsonrpc":"2.0","id":7,"result":{"iograph": [
+                {"items": [4.0]},
+                {"items": [1312.0]},
+            ]}},
         ))
 
     def test_sharkd_req_intervals_bad(self, check_sharkd_session, capture_file):

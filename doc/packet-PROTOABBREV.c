@@ -53,15 +53,15 @@ void proto_reg_handoff_PROTOABBREV(void);
 void proto_register_PROTOABBREV(void);
 
 /* Initialize the protocol and registered fields */
-static int proto_PROTOABBREV = -1;
-static int hf_FIELDABBREV = -1;
-static expert_field ei_PROTOABBREV_EXPERTABBREV = EI_INIT;
+static int proto_PROTOABBREV;
+static int hf_FIELDABBREV;
+static expert_field ei_PROTOABBREV_EXPERTABBREV;
 
 static dissector_handle_t PROTOABBREV_handle;
 static dissector_handle_t PROTOABBREV_tls_handle;
 
 /* Global sample preference ("controls" display of numbers) */
-static bool pref_hex = false;
+static bool pref_hex;
 /* Global sample port preference - real port preferences should generally
  * default to "" (for a range) or 0 (for a single uint) unless there is an
  * IANA-registered (or equivalent) port for your protocol. */
@@ -72,7 +72,7 @@ static unsigned tls_port_pref = PROTOABBREV_TLS_PORT;
 static range_t *tcp_port_range = PROTOABBREV_TCP_PORTS;
 
 /* Initialize the subtree pointers */
-static int ett_PROTOABBREV = -1;
+static int ett_PROTOABBREV;
 
 /* A sample #define of the minimum length (in bytes) of the protocol data.
  * If data is received with fewer than this many bytes it is rejected by

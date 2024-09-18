@@ -44,8 +44,8 @@ GIT_ABBREV_LENGTH = 12
 # If the text "$Format" is still present, it means that
 # git archive did not replace the $Format string, which
 # means that this not a git archive.
-GIT_EXPORT_SUBST_H = '2acd1a854babc4caae980ef9ed79ad36b6bc0362'
-GIT_EXPORT_SUBST_D = 'tag: wireshark-4.2.6, tag: v4.2.6, refs/merge-requests/16375/head, refs/keep-around/2acd1a854babc4caae980ef9ed79ad36b6bc0362'
+GIT_EXPORT_SUBST_H = '009a163470b581c7d3ee66d89c819cef1f9e50fe'
+GIT_EXPORT_SUBST_D = 'tag: wireshark-4.4.0, tag: v4.4.0, refs/merge-requests/17013/head, refs/keep-around/009a163470b581c7d3ee66d89c819cef1f9e50fe'
 IS_GIT_ARCHIVE = not GIT_EXPORT_SUBST_H.startswith('$Format')
 
 
@@ -94,7 +94,7 @@ def update_debian_changelog(src_dir, repo_data):
         changelog_contents = fh.read()
 
     CHANGELOG_PATTERN = r"^.*"
-    text_replacement = f"wireshark ({repo_data['version_major']}.{repo_data['version_minor']}.{repo_data['version_patch']}{repo_data['package_string']}) unstable; urgency=low"
+    text_replacement = f"wireshark ({repo_data['version_major']}.{repo_data['version_minor']}.{repo_data['version_patch']}{repo_data['package_string']}) UNRELEASED; urgency=low"
     # Note: Only need to replace the first line, so we don't use re.MULTILINE or re.DOTALL
     new_changelog_contents = re.sub(CHANGELOG_PATTERN, text_replacement, changelog_contents)
     with open(deb_changelog_filepath, mode='w', encoding='utf-8') as fh:
@@ -110,9 +110,9 @@ def create_version_file(version_f, repo_data):
 
 
 def update_attributes_asciidoc(src_dir, repo_data):
-    # Read docbook/attributes.adoc, then write it back out with an updated
+    # Read doc/attributes.adoc, then write it back out with an updated
     # wireshark-version replacement line.
-    asiidoc_filepath = os.path.join(src_dir, "docbook", "attributes.adoc")
+    asiidoc_filepath = os.path.join(src_dir, "doc", "attributes.adoc")
     with open(asiidoc_filepath, encoding='utf-8') as fh:
         asciidoc_contents = fh.read()
 
@@ -129,8 +129,8 @@ def update_attributes_asciidoc(src_dir, repo_data):
 
 def update_docinfo_asciidoc(src_dir, repo_data):
     doc_paths = []
-    doc_paths += [os.path.join(src_dir, 'docbook', 'wsdg_src', 'developer-guide-docinfo.xml')]
-    doc_paths += [os.path.join(src_dir, 'docbook', 'wsug_src', 'user-guide-docinfo.xml')]
+    doc_paths += [os.path.join(src_dir, 'doc', 'wsdg_src', 'developer-guide-docinfo.xml')]
+    doc_paths += [os.path.join(src_dir, 'doc', 'wsug_src', 'user-guide-docinfo.xml')]
 
     for doc_path in doc_paths:
         with open(doc_path, encoding='utf-8') as fh:
@@ -184,33 +184,44 @@ def update_versioned_files(src_dir, set_version, repo_data):
 def generate_version_h(repo_data):
     # Generate new contents of version.h from repository data
 
+    num_commits_line = '#define VCS_NUM_COMMITS "0"\n'
+
+    commit_id_line = '/* #undef VCS_COMMIT_ID */\n'
+
     if not repo_data.get('enable_vcsversion'):
-        return "/* #undef VCSVERSION */\n"
+        return '/* #undef VCS_VERSION */\n' + num_commits_line + commit_id_line
+
+    if repo_data.get('num_commits'):
+        num_commits_line = f'#define VCS_NUM_COMMITS "{int(repo_data["num_commits"])}"\n'
+
+    if repo_data.get('commit_id'):
+        commit_id_line = f'#define VCS_COMMIT_ID "{repo_data["commit_id"]}"'
 
     if repo_data.get('git_description'):
         # Do not bother adding the git branch, the git describe output
         # normally contains the base tag and commit ID which is more
         # than sufficient to determine the actual source tree.
-        return f'#define VCSVERSION "{repo_data["git_description"]}"\n'
+        return f'#define VCS_VERSION "{repo_data["git_description"]}"\n' + num_commits_line + commit_id_line
 
     if repo_data.get('last_change') and repo_data.get('num_commits'):
         version_string = f"v{repo_data['version_major']}.{repo_data['version_minor']}.{repo_data['version_patch']}"
-        vcs_line = f'#define VCSVERSION "{version_string}-Git-{repo_data["num_commits"]}"\n'
-        return vcs_line
+        vcs_line = f'#define VCS_VERSION "{version_string}-Git-{repo_data["num_commits"]}"\n'
+        return vcs_line + num_commits_line + commit_id_line
 
     if repo_data.get('commit_id'):
-        vcs_line = f'#define VCSVERSION "Git commit {repo_data["commit_id"]}"\n'
-        return vcs_line
+        vcs_line = f'#define VCS_VERSION "Git commit {repo_data["commit_id"]}"\n'
+        return vcs_line + num_commits_line + commit_id_line
 
-    vcs_line = '#define VCSVERSION "Git Rev Unknown from unknown"\n'
-    return vcs_line
+    vcs_line = '#define VCS_VERSION "Git Rev Unknown from unknown"\n'
+
+    return vcs_line + num_commits_line + commit_id_line
 
 
 def print_VCS_REVISION(version_file, repo_data, set_vcs):
     # Write the version control system's version to $version_file.
     # Don't change the file if it is not needed.
     #
-    # XXX - We might want to add VCSVERSION to CMakeLists.txt so that it can
+    # XXX - We might want to add VCS_VERSION to CMakeLists.txt so that it can
     # generate vcs_version.h independently.
 
     new_version_h = generate_version_h(repo_data)
@@ -418,7 +429,7 @@ def read_repo_info(src_dir, tagged_version_extra, untagged_version_extra):
 def main():
     parser = argparse.ArgumentParser(description='Wireshark file and package versions')
     action_group = parser.add_mutually_exclusive_group()
-    action_group.add_argument('--set-version', '-v', metavar='<x.y.z>', type=parse_versionstring, help='Set the major, minor, and patch versions in the top-level CMakeLists.txt, docbook/attributes.adoc, packaging/debian/changelog, and the CMakeLists.txt for all libraries to the provided version number')
+    action_group.add_argument('--set-version', '-v', metavar='<x.y.z>', type=parse_versionstring, help='Set the major, minor, and patch versions in the top-level CMakeLists.txt, doc/attributes.adoc, packaging/debian/changelog, and the CMakeLists.txt for all libraries to the provided version number')
     action_group.add_argument('--set-release', '-r', action='store_true', help='Set the extra release information in the top-level CMakeLists.txt based on either default or command-line specified options.')
     setrel_group = parser.add_argument_group()
     setrel_group.add_argument('--tagged-version-extra', '-t', default="", help="Extra version information format to use when a tag is found. No format \
