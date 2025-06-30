@@ -5138,15 +5138,21 @@ nas_emm_detach_req_DL(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint3
 static void
 nas_emm_detach_req(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint32_t offset, unsigned len)
 {
+    unsigned ul_lv_len;
+
     if (pinfo->link_dir == P2P_DIR_UL) {
         nas_emm_detach_req_UL(tvb, tree, pinfo, offset, len);
         return;
-    }else if (pinfo->link_dir == P2P_DIR_DL) {
+    } else if (pinfo->link_dir == P2P_DIR_DL) {
         nas_emm_detach_req_DL(tvb, tree, pinfo, offset, len);
         return;
     }
 
-    if (len >= 8) {
+    if (len >= 2) {
+        /* Check UL mandatory DE_EMM_EPS_MID length */
+        ul_lv_len = tvb_get_uint8(tvb, offset + 1);
+    }
+    if (len >= 8 && ul_lv_len == (len - 2)) {
         nas_emm_detach_req_UL(tvb, tree, pinfo, offset, len);
     } else {
         nas_emm_detach_req_DL(tvb, tree, pinfo, offset, len);
@@ -5425,7 +5431,7 @@ nas_emm_sec_mode_comp(tvbuff_t *tvb, proto_tree *tree, packet_info *pinfo, uint3
     /* 66   UE radio capability ID UE radio capability ID 9.9.3.60 O   TLV  3-n */
     ELEM_OPT_TLV(0x66, NAS_5GS_PDU_TYPE_MM, DE_NAS_5GS_MM_UE_RADIO_CAP_ID, NULL);
     /* 67   UE coarse location information UE coarse location information 9.9.3.72 O   TLV  8 */
-    ELEM_OPT_TLV(0x66, NAS_5GS_PDU_TYPE_MM, DE_EMM_UE_COARSE_LOC_INFO, NULL);
+    ELEM_OPT_TLV(0x67, NAS_PDU_TYPE_EMM, DE_EMM_UE_COARSE_LOC_INFO, NULL);
 
     EXTRANEOUS_DATA_CHECK(curr_len, 0, pinfo, &ei_nas_eps_extraneous_data);
 }
@@ -7632,7 +7638,7 @@ proto_register_nas_eps(void)
         NULL, HFILL }
     },
     { &hf_nas_eps_emm_tai_tac,
-        { "Tracking area code(TAC)","nas-eps.emm.tai_tac",
+        { "Tracking area code (TAC)","nas-eps.emm.tai_tac",
         FT_UINT16, BASE_DEC,  NULL, 0x0,
         NULL, HFILL }
     },
@@ -8504,22 +8510,22 @@ proto_register_nas_eps(void)
         NULL, HFILL }
     },
     { &hf_nas_eps_esm_embr_ul,
-        { "Maximum bit rate for uplink(ext)","nas-eps.esm.embr_ul",
+        { "Maximum bit rate for uplink (ext)","nas-eps.esm.embr_ul",
         FT_UINT8,BASE_DEC, NULL, 0x0,
         NULL, HFILL }
     },
     { &hf_nas_eps_esm_embr_dl,
-        { "Maximum bit rate for downlink(ext)","nas-eps.esm.embr_dl",
+        { "Maximum bit rate for downlink (ext)","nas-eps.esm.embr_dl",
         FT_UINT8,BASE_DEC, NULL, 0x0,
         NULL, HFILL }
     },
     { &hf_nas_eps_esm_egbr_ul,
-        { "Guaranteed bit rate for uplink(ext)","nas-eps.esm.egbr_ul",
+        { "Guaranteed bit rate for uplink (ext)","nas-eps.esm.egbr_ul",
         FT_UINT8,BASE_DEC, NULL, 0x0,
         NULL, HFILL }
     },
     { &hf_nas_eps_esm_egbr_dl,
-        { "Guaranteed bit rate for downlink(ext)","nas-eps.esm.egbr_dl",
+        { "Guaranteed bit rate for downlink (ext)","nas-eps.esm.egbr_dl",
         FT_UINT8,BASE_DEC, NULL, 0x0,
         NULL, HFILL }
     },

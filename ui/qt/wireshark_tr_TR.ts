@@ -4228,6 +4228,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Boşluk</translation>
     </message>
     <message>
+        <source>Legend</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle legend</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Zoom In X Axis</source>
         <translation>X Eksenini Yakınlaştır</translation>
     </message>
@@ -5107,8 +5115,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Desteklenen alanlar data, dir, time, seqno</translation>
     </message>
     <message>
-        <source>Missing capturing group data (use (?</source>
-        <translation>Eksik yakalama grubu verileri (kullanın (?</translation>
+        <source>Missing capturing group data (use (?&lt;data&gt;(...)) )</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Import From Hex Dump</source>

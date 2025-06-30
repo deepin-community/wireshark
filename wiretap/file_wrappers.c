@@ -1163,8 +1163,8 @@ lz4_fill_out_buffer(FILE_T state)
             return false;
         }
 
-        state->in.next  += inBufSize;
-        state->in.avail -= inBufSize;
+        state->in.next  += (unsigned)inBufSize;
+        state->in.avail -= (unsigned)inBufSize;
 
         if (compressedSize == 0) {
             /* End of Frame */
@@ -1234,12 +1234,12 @@ lz4_fill_out_buffer(FILE_T state)
             state->err_info = LZ4F_getErrorName(ret);
             return false;
         }
-        state->in.next  += inBufSize;
-        state->in.avail -= inBufSize;
+        state->in.next  += (unsigned)inBufSize;
+        state->in.avail -= (unsigned)inBufSize;
         compressedSize -= inBufSize;
 
-        state->out.next += outBufSize;
-        state->out.avail += outBufSize;
+        state->out.next += (unsigned)outBufSize;
+        state->out.avail += (unsigned)outBufSize;
     } while (compressedSize != 0);
 
     state->out.next  = state->out.buf;
@@ -1407,8 +1407,8 @@ check_for_lz4_compression(FILE_T state)
          * block size is bigger than state->size. Also we could fail
          * on unknown values?
          */
-        state->in.avail -= inBufSize;
-        state->in.next += inBufSize;
+        state->in.avail -= (unsigned)inBufSize;
+        state->in.next += (unsigned)inBufSize;
 
         fast_seek_header(state, state->raw_pos - state->in.avail, state->pos, LZ4);
         state->compression = LZ4;
@@ -2103,12 +2103,13 @@ file_seek(FILE_T file, int64_t offset, int whence, int *err)
         case LZ4:
             /* If the frame information seems to have changed (i.e., we fast
              * seeked into a different frame that also has different flags
-             * and options), then reset the context and re-read it.
+             * and options) or if the frame has linked blocks, then reset
+             * the context and re-read it.
              * Unfortunately the API doesn't provide a method to set the
              * context options explicitly based on an already read
              * LZ4F_frameInfo_t.
              */
-            if (memcmp(&file->lz4_info, &here->data.lz4.lz4_info, sizeof(LZ4F_frameInfo_t)) != 0) {
+            if ((here->data.lz4.lz4_info.blockMode != LZ4F_blockIndependent) || (memcmp(&file->lz4_info, &here->data.lz4.lz4_info, sizeof(LZ4F_frameInfo_t)) != 0)) {
 #if LZ4_VERSION_NUMBER >= 10800
                 LZ4F_resetDecompressionContext(file->lz4_dctx);
 #else /* LZ4_VERSION_NUMBER >= 10800 */
@@ -2961,6 +2962,11 @@ lz4wfile_fdopen(int fd)
     memset(&state->lz4_prefs, 0, sizeof(LZ4F_preferences_t));
     /* Use the same prefs as the lz4 command line utility defaults. */
     state->lz4_prefs.frameInfo.blockMode = LZ4F_blockIndependent; /* Allows fast seek */
+    /* We could use LZ4F_blockLinked but start a new frame every so often
+     * in order to allow fast seek. (Or implement fast seek for linked
+     * blocks via dictionary loading.) Linked blocks have better compression
+     * when blocks are small, as happens when flushing during live capture.
+     */
     state->lz4_prefs.frameInfo.contentChecksumFlag = 1;
     state->lz4_prefs.frameInfo.blockSizeID = LZ4F_max4MB;
     /* XXX - What should we set state->lz4_prefs.compressionLevel to?
@@ -2988,7 +2994,7 @@ static bool
 lz4_write_out(LZ4WFILE_T state, size_t len)
 {
     if (len > 0) {
-        ssize_t got = ws_write(state->fd, state->out, len);
+        ssize_t got = ws_write(state->fd, state->out, (unsigned)len);
         if (got < 0) {
             state->err = errno;
             return false;

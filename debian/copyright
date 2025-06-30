@@ -43,6 +43,7 @@ Copyright: 2009 Martin Sin <martin.sin@zshk.cz>
            2010 Free Software Foundation, Inc
            2009-2010 Clytie Siddall <clytie@riverland.net.au>
            2023 Atila KOÇ <koc@artielektronik.com.tr>
+           2025 Carles Pina i Estany <carles@pina.cat>
 License: GPL-2+
 
 Files: resources/freedesktop/org.wireshark.*.metainfo.xml

@@ -4259,6 +4259,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>スペース</translation>
     </message>
     <message>
+        <source>Legend</source>
+        <translation>凡例</translation>
+    </message>
+    <message>
+        <source>Toggle legend</source>
+        <translation>凡例の表示を切り替える</translation>
+    </message>
+    <message>
         <source>Zoom In X Axis</source>
         <translation>X軸をズーム</translation>
     </message>
@@ -5138,8 +5146,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>サポートされているフィールドは data, dir, time, seqno です</translation>
     </message>
     <message>
-        <source>Missing capturing group data (use (?</source>
-        <translation>キャプチャグループデータが不明（使用中？）</translation>
+        <source>Missing capturing group data (use (?&lt;data&gt;(...)) )</source>
+        <translation>キャプチャグループデータが欠けています ( (?&lt;data&gt;(...))を使用してください )</translation>
     </message>
     <message>
         <source>Import From Hex Dump</source>

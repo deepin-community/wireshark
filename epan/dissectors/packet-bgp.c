@@ -47,7 +47,8 @@
  * RFC8669 Segment Routing Prefix Segment Identifier Extensions for BGP
  * http://www.iana.org/assignments/bgp-parameters/ (last updated 2012-04-26)
  * RFC8538 Notification Message Support for BGP Graceful Restart
- * draft-ietf-bess-evpn-igmp-mld-proxy-03
+ * RFC9251 Internet Group Management Protocol (IGMP) and Multicast Listener
+ *         Discovery (MLD) Proxies for Ethernet VPN (EVPN)
  * draft-ietf-idr-tunnel-encaps-15
  * draft-ietf-idr-segment-routing-te-policy-08
  * draft-yu-bess-evpn-l2-attributes-04
@@ -451,7 +452,7 @@ static dissector_handle_t bgp_handle;
 #define BGP_EXT_COM_STYPE_AS4_S_AS      0x09    /* Source AS [RFC6514] */
 #define BGP_EXT_COM_STYPE_AS4_CIS_V     0x10    /* Cisco VPN Identifier [Eric_Rosen] */
 #define BGP_EXT_COM_STYPE_AS4_RT_REC    0x13    /* Route-Target Record [draft-ietf-bess-service-chaining] */
-#define BGP_EXT_COM_STYPE_AS2_RT_EC     0x15    /* RT-derived-EC [draft-zzhang-idr-rt-derived-community] */
+#define BGP_EXT_COM_STYPE_AS4_RT_EC     0x15    /* RT-derived-EC [draft-zzhang-idr-rt-derived-community] */
 
 /* Non-Transitive Four-Octet AS-Specific Extended Community Sub-Types */
 
@@ -855,7 +856,10 @@ static dissector_handle_t bgp_handle;
 #define LINK_STATE_LINK_NLRI                    2
 #define LINK_STATE_IPV4_TOPOLOGY_PREFIX_NLRI    3
 #define LINK_STATE_IPV6_TOPOLOGY_PREFIX_NLRI    4
+#define LINK_STATE_SR_POLICY_CANDIDATE_PATH     5
 #define LINK_STATE_SRV6_SID_NLRI                6
+#define LINK_STATE_STUB_LINK_NLRI               7
+
 
 /* Link-State NLRI Protocol-ID values */
 #define BGP_LS_NLRI_PROTO_ID_UNKNOWN       0
@@ -1678,7 +1682,7 @@ static const value_string bgpext_com_stype_tr_as4[] = {
     { BGP_EXT_COM_STYPE_AS4_S_AS,     "Source AS" },
     { BGP_EXT_COM_STYPE_AS4_CIS_V,    "Cisco VPN Identifier" },
     { BGP_EXT_COM_STYPE_AS4_RT_REC,   "Route-Target Record"},
-    { BGP_EXT_COM_STYPE_AS4_RT_REC,   "RT-derived-EC" },
+    { BGP_EXT_COM_STYPE_AS4_RT_EC,    "RT-derived-EC" },
     { 0, NULL}
 };
 
@@ -1777,7 +1781,6 @@ static const value_string bgpext_com_tunnel_type[] = {
 };
 
 static const value_string bgpext_com_stype_ntr_opaque[] = {
-    { BGP_EXT_COM_STYPE_OPA_COST,       "Cost" },
     { BGP_EXT_COM_STYPE_OPA_OR_VAL_ST,  "BGP Origin Validation state" },
     { BGP_EXT_COM_STYPE_OPA_COST,       "Cost Community" },
     { BGP_EXT_COM_STYPE_OPA_RT,         "Route Target" },
@@ -2012,9 +2015,6 @@ static const value_string capability_vals[] = {
     { BGP_CAPABILITY_LONG_LIVED_GRACEFUL_RESTART,   "Long-Lived Graceful Restart (LLGR) Capability" },
     { BGP_CAPABILITY_CP_ORF,                        "CP-ORF Capability" },
     { BGP_CAPABILITY_FQDN,                          "FQDN Capability" },
-    { BGP_CAPABILITY_ROUTE_REFRESH_CISCO,           "Route refresh capability (Cisco)" },
-    { BGP_CAPABILITY_ORF_CISCO,                     "Cooperative route filtering capability (Cisco)" },
-    { BGP_CAPABILITY_MULTISESSION_CISCO,            "Multisession BGP Capability (Cisco)" },
     { BGP_CAPABILITY_BFD_STRICT,                    "BFD Strict-Mode capability" },
     { BGP_CAPABILITY_SOFT_VERSION,                  "Software Version Capability" },
     { BGP_CAPABILITY_PATHS_LIMIT,                   "PATHS-LIMIT Capability" },
@@ -2066,46 +2066,48 @@ static const value_string mcast_vpn_route_type[] = {
 
 /* NLRI type value_string as defined in idr-ls */
 static const value_string bgp_ls_nlri_type_vals[] = {
-        { LINK_STATE_LINK_NLRI,                 "Link NLRI" },
-        { LINK_STATE_NODE_NLRI,                 "Node NLRI" },
-        { LINK_STATE_IPV4_TOPOLOGY_PREFIX_NLRI, "IPv4 Topology Prefix NLRI" },
-        { LINK_STATE_IPV6_TOPOLOGY_PREFIX_NLRI, "IPv6 Topology Prefix NLRI" },
-        { LINK_STATE_SRV6_SID_NLRI,             "SRv6 SID NLRI" },
-        {0, NULL },
+    { LINK_STATE_NODE_NLRI,                 "Node NLRI" },
+    { LINK_STATE_LINK_NLRI,                 "Link NLRI" },
+    { LINK_STATE_IPV4_TOPOLOGY_PREFIX_NLRI, "IPv4 Topology Prefix NLRI" },
+    { LINK_STATE_IPV6_TOPOLOGY_PREFIX_NLRI, "IPv6 Topology Prefix NLRI" },
+    { LINK_STATE_SR_POLICY_CANDIDATE_PATH,  "ST Policy Candidate Path NLRI" },
+    { LINK_STATE_SRV6_SID_NLRI,             "SRv6 SID NLRI" },
+    { LINK_STATE_STUB_LINK_NLRI,            "Stub Link NLRI" },
+    { 0, NULL },
 };
 
 /* Link-State NLRI Protocol-ID value strings */
 static const value_string link_state_nlri_protocol_id_values[] = {
-        {BGP_LS_NLRI_PROTO_ID_UNKNOWN, "Unknown" },
-        {BGP_LS_NLRI_PROTO_ID_IS_IS_LEVEL_1, "IS-IS Level 1"},
-        {BGP_LS_NLRI_PROTO_ID_IS_IS_LEVEL_2, "IS-IS Level 2"},
-        {BGP_LS_NLRI_PROTO_ID_OSPF_V2, "OSPFv2"},
-        {BGP_LS_NLRI_PROTO_ID_DIRECT, "Direct"},
-        {BGP_LS_NLRI_PROTO_ID_STATIC, "Static"},
-        {BGP_LS_NLRI_PROTO_ID_OSPF_V3, "OSPFv3"},
-        {BGP_LS_NLRI_PROTO_ID_BGP, "BGP"},
-        {BGP_LS_NLRI_PROTO_ID_RSVP_TE, "RSVP-TE" },
-        {BGP_LS_NLRI_PROTO_ID_SEGMENT_ROUTING, "Segment Routing" },
-        {0, NULL},
+    { BGP_LS_NLRI_PROTO_ID_UNKNOWN,         "Unknown" },
+    { BGP_LS_NLRI_PROTO_ID_IS_IS_LEVEL_1,   "IS-IS Level 1"},
+    { BGP_LS_NLRI_PROTO_ID_IS_IS_LEVEL_2,   "IS-IS Level 2"},
+    { BGP_LS_NLRI_PROTO_ID_OSPF_V2,         "OSPFv2"},
+    { BGP_LS_NLRI_PROTO_ID_DIRECT,          "Direct"},
+    { BGP_LS_NLRI_PROTO_ID_STATIC,          "Static"},
+    { BGP_LS_NLRI_PROTO_ID_OSPF_V3,         "OSPFv3"},
+    { BGP_LS_NLRI_PROTO_ID_BGP,             "BGP"},
+    { BGP_LS_NLRI_PROTO_ID_RSVP_TE,         "RSVP-TE" },
+    { BGP_LS_NLRI_PROTO_ID_SEGMENT_ROUTING, "Segment Routing" },
+    { 0, NULL},
 };
 
 /* Link-State routing universes */
 static const val64_string link_state_nlri_routing_universe_values[] = {
-        {BGP_LS_NLRI_ROUTING_UNIVERSE_LEVEL_3, "L3 packet topology" },
-        {BGP_LS_NLRI_ROUTING_UNIVERSE_LEVEL_1, "L1 optical topology"},
-        {0, NULL}
+    { BGP_LS_NLRI_ROUTING_UNIVERSE_LEVEL_3, "L3 packet topology" },
+    { BGP_LS_NLRI_ROUTING_UNIVERSE_LEVEL_1, "L1 optical topology"},
+    { 0, NULL}
 };
 
 /* Link state prefix NLRI OSPF Route Type */
 static const value_string link_state_prefix_descriptors_ospf_route_type[] = {
-        {BGP_LS_PREFIX_OSPF_ROUTE_TYPE_UNKNOWN,     "Unknown" },
-        {BGP_LS_PREFIX_OSPF_ROUTE_TYPE_INTRA_AREA,  "Intra-Area"},
-        {BGP_LS_PREFIX_OSPF_ROUTE_TYPE_INTER_AREA,  "Inter Area"},
-        {BGP_LS_PREFIX_OSPF_ROUTE_TYPE_EXTERNAL_1,  "External 1"},
-        {BGP_LS_PREFIX_OSPF_ROUTE_TYPE_EXTERNAL_2,  "External 2"},
-        {BGP_LS_PREFIX_OSPF_ROUTE_TYPE_NSSA_1,      "NSSA 1"},
-        {BGP_LS_PREFIX_OSPF_ROUTE_TYPE_NSSA_2,      "NSSA 2"},
-        {0, NULL}
+    { BGP_LS_PREFIX_OSPF_ROUTE_TYPE_UNKNOWN,     "Unknown" },
+    { BGP_LS_PREFIX_OSPF_ROUTE_TYPE_INTRA_AREA,  "Intra-Area"},
+    { BGP_LS_PREFIX_OSPF_ROUTE_TYPE_INTER_AREA,  "Inter Area"},
+    { BGP_LS_PREFIX_OSPF_ROUTE_TYPE_EXTERNAL_1,  "External 1"},
+    { BGP_LS_PREFIX_OSPF_ROUTE_TYPE_EXTERNAL_2,  "External 2"},
+    { BGP_LS_PREFIX_OSPF_ROUTE_TYPE_NSSA_1,      "NSSA 1"},
+    { BGP_LS_PREFIX_OSPF_ROUTE_TYPE_NSSA_2,      "NSSA 2"},
+    { 0 , NULL}
 };
 
 /* Link state Flex Algo Metric Type: draft-ietf-lsr-flex-algo-17 */
@@ -2150,7 +2152,7 @@ static const value_string flowspec_nlri_opvaluepair_type[] = {
     { BGPNLRI_FSPEC_PCK_LEN,  "Packet Length filter" },
     { BGPNLRI_FSPEC_DSCP,     "DSCP marking filter" },
     { BGPNLRI_FSPEC_FRAGMENT, "IP fragment filter" },
-    {0, NULL },
+    { 0, NULL },
 };
 
 /* Subtype Route Refresh, draft-ietf-idr-bgp-enhanced-route-refresh-02 */
@@ -2535,6 +2537,8 @@ static int hf_bgp_evpn_nlri_ipv6_gtw;
 static int hf_bgp_evpn_nlri_igmp_mc_or_length;
 static int hf_bgp_evpn_nlri_igmp_mc_or_addr_ipv4;
 static int hf_bgp_evpn_nlri_igmp_mc_or_addr_ipv6;
+static int hf_bgp_evpn_nlri_igmp_mc_reserved;
+static int hf_bgp_evpn_nlri_igmp_mc_max_resp_time;
 static int hf_bgp_evpn_nlri_igmp_mc_flags;
 static int hf_bgp_evpn_nlri_igmp_mc_flags_v1;
 static int hf_bgp_evpn_nlri_igmp_mc_flags_v2;
@@ -4509,7 +4513,7 @@ decode_sr_policy_nlri(proto_tree *tree, tvbuff_t *tvb, int offset, uint16_t afi)
        proto_tree_add_item(tree, hf_bgp_sr_policy_nlri_endpoint_v4, tvb, offset, 4, ENC_BIG_ENDIAN);
        return 13;
    } else {
-       proto_tree_add_item(tree, hf_bgp_sr_policy_nlri_endpoint_v6, tvb, offset, 4, ENC_NA);
+       proto_tree_add_item(tree, hf_bgp_sr_policy_nlri_endpoint_v6, tvb, offset, 16, ENC_NA);
        return 25;
    }
 }
@@ -7214,7 +7218,7 @@ static int decode_evpn_nlri(proto_tree *tree, tvbuff_t *tvb, int offset, packet_
           +--------------------------------------------------+
           |  RD (8 octets)                                   |
           +--------------------------------------------------+
-          | Ethernet Segment Identifier (10 octets)          |
+          |  Ethernet Segment Identifier (10 octets)         |
           +--------------------------------------------------+
           |  Ethernet Tag ID  (4 octets)                     |
           +--------------------------------------------------+
@@ -7229,6 +7233,32 @@ static int decode_evpn_nlri(proto_tree *tree, tvbuff_t *tvb, int offset, packet_
           |  Originator Router Length (1 octet)              |
           +--------------------------------------------------+
           |  Originator Router Address (variable)            |
+          +--------------------------------------------------+
+          |  Flags (1 octet)                                 |
+          +--------------------------------------------------+
+
+          +--------------------------------------------------+
+          |  RD (8 octets)                                   |
+          +--------------------------------------------------+
+          |  Ethernet Segment Identifier (10 octets)         |
+          +--------------------------------------------------+
+          |  Ethernet Tag ID  (4 octets)                     |
+          +--------------------------------------------------+
+          |  Multicast Source Length (1 octet)               |
+          +--------------------------------------------------+
+          |  Multicast Source Address (variable)             |
+          +--------------------------------------------------+
+          |  Multicast Group Length (1 octet)                |
+          +--------------------------------------------------+
+          |  Multicast Group Address (Variable)              |
+          +--------------------------------------------------+
+          |  Originator Router Length (1 octet)              |
+          +--------------------------------------------------+
+          |  Originator Router Address (variable)            |
+          +--------------------------------------------------+
+          |  Reserved (4 octets)                             |
+          +--------------------------------------------------+
+          |  Maximum Response Time (1 octet)                 |
           +--------------------------------------------------+
           |  Flags (1 octet)                                 |
           +--------------------------------------------------+
@@ -7273,6 +7303,22 @@ static int decode_evpn_nlri(proto_tree *tree, tvbuff_t *tvb, int offset, packet_
                  reader_offset += 16;
                  break;
         }
+
+        if (route_type == EVPN_IGMP_LEAVE_ROUTE) {
+            proto_tree_add_item(prefix_tree, hf_bgp_evpn_nlri_igmp_mc_reserved, tvb,
+                                reader_offset, 4, ENC_NA);
+            reader_offset += 4;
+
+            /* Maximum Response Time, per RFC2236 (IGMPv2)
+             * XXX - What if this is the max response time from RFC3376 (IGMPv3)?
+             */
+            uint8_t tsecs = tvb_get_uint8(tvb, offset);
+            proto_tree_add_uint_format_value(prefix_tree, hf_bgp_evpn_nlri_igmp_mc_max_resp_time, tvb,
+                                             reader_offset, 1, tsecs, "%.1f sec (0x%02x)", tsecs*0.1, tsecs);
+
+            reader_offset += 1;
+        }
+
         if (reader_offset - start_offset < nlri_len) {
             proto_tree_add_bitmask(prefix_tree, tvb, reader_offset, hf_bgp_evpn_nlri_igmp_mc_flags,
                                    ett_bgp_evpn_nlri_mc, evpn_nlri_igmp_mc_flags, ENC_BIG_ENDIAN);
@@ -14170,6 +14216,12 @@ proto_register_bgp(void)
       { &hf_bgp_evpn_nlri_igmp_mc_or_addr_ipv6,
        { "Originator Router Address IPv6", "bgp.evpn.nlri.or_addr_ipv6", FT_IPv6,
           BASE_NONE, NULL, 0x0, NULL, HFILL}},
+      { &hf_bgp_evpn_nlri_igmp_mc_reserved,
+       { "Reserved", "bgp.evpn.nlri.igmp_mc_reserved", FT_BYTES,
+          BASE_NONE, NULL, 0x0, NULL, HFILL}},
+      { &hf_bgp_evpn_nlri_igmp_mc_max_resp_time,
+       { "Max. response time", "bgp.evpn.nlri.igmp_mc_max_resp_time", FT_UINT8,
+          BASE_DEC, NULL, 0x0, NULL, HFILL}},
       { &hf_bgp_evpn_nlri_igmp_mc_flags,
        { "Flags", "bgp.evpn.nlri.igmp_mc_flags", FT_UINT8,
           BASE_HEX, NULL, 0x0, NULL, HFILL}},

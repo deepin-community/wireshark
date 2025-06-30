@@ -25172,9 +25172,9 @@ dissect_nr_rrc_AbsoluteTimeInfo_r16(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_
     const char *str, *hf_str;
     proto_tree *subtree;
     subtree = proto_item_add_subtree(actx->created_item, ett_nr_rrc_absTimeInfo);
-    str = tvb_bcd_dig_to_str(actx->pinfo->pool, abs_time_info_tvb, 0, 6, NULL, false);
-    hf_str = wmem_strdup_printf(actx->pinfo->pool, "%c%c-%c%c-%c%c %c%c:%c%c:%c%c", str[0], str[1],
-                        str[2], str[3], str[4], str[5], str[6], str[7], str[8], str[9], str[10], str[11]);
+    str = tvb_bcd_dig_to_str_be(actx->pinfo->pool, abs_time_info_tvb, 0, 6, NULL, false);
+    hf_str = wmem_strdup_printf(actx->pinfo->pool, "%c%c-%c%c-%c%c %c%c:%c%c:%c%c", str[0], str[1], str[2],
+                                str[3], str[4], str[5], str[6], str[7], str[8], str[9], str[10], str[11]);
     proto_tree_add_string(subtree, hf_nr_rrc_absolute_time, abs_time_info_tvb, 0, 6, hf_str);
   }
 
@@ -34453,7 +34453,7 @@ static const per_sequence_t SIB11_r16_sequence[] = {
 
 static int
 dissect_nr_rrc_SIB11_r16(tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
-  col_append_str(actx->pinfo->cinfo, COL_INFO, "SIB11");
+  col_append_str(actx->pinfo->cinfo, COL_INFO, "SIB11 ");
 
   offset = dissect_per_sequence(tvb, offset, actx, tree, hf_index,
                                    ett_nr_rrc_SIB11_r16, SIB11_r16_sequence);

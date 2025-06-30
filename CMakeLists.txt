@@ -57,7 +57,7 @@ endif()
 # Updated by tools/make-version.py
 set(PROJECT_MAJOR_VERSION 4)
 set(PROJECT_MINOR_VERSION 4)
-set(PROJECT_PATCH_VERSION 0)
+set(PROJECT_PATCH_VERSION 7)
 set(PROJECT_BUILD_VERSION 0)
 set(PROJECT_VERSION_EXTENSION "")
 
@@ -94,6 +94,23 @@ if(USE_MSYSTEM)
 else()
 	find_package(Python3 3.6 REQUIRED)
 endif()
+
+# Strawberry is a web browser away from being its own operating system. Find
+# Perl before finding anything else so that we can avoid building with any of
+# of Strawberry's components.
+find_package(Perl)
+if(WIN32 AND PERL_EXECUTABLE)
+	string(TOLOWER ${PERL_EXECUTABLE} lower_perl)
+	if (${lower_perl} MATCHES "^.:/strawberry/")
+		string(REGEX REPLACE "^(.:/[^/]+).*" "\\1" strawberry_prefix ${PERL_EXECUTABLE})
+		# CMAKE_IGNORE_PREFIX_PATH must be an exact installation prefix.
+		list(APPEND CMAKE_IGNORE_PREFIX_PATH "${strawberry_prefix}/c")
+		message(STATUS "Added ${strawberry_prefix}/c to CMAKE_IGNORE_PREFIX_PATH")
+		unset(lower_perl)
+		unset(strawberry_prefix)
+	endif()
+endif()
+
 
 # Set a default build type if none was specified
 set(_default_build_type "RelWithDebInfo")
@@ -576,8 +593,11 @@ if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
 		add_definitions("/D_BIND_TO_CURRENT_CRT_VERSION=1")
 	endif()
 
+	# TODO: Re-enable /W3. It was disabled for a year and some warnings crept
+	# in that will fail with /Wx.
 	set(LOCAL_CFLAGS
 		/MP
+		/W2
 	)
 
 	set(WS_LINK_FLAGS "/LARGEADDRESSAWARE /MANIFEST:NO /INCREMENTAL:NO /RELEASE")
@@ -1254,7 +1274,6 @@ if (CARES_VERSION VERSION_GREATER_EQUAL "1.28.0")
 	add_compile_definitions(CARES_NO_DEPRECATED)
 endif ()
 find_package(LEX REQUIRED)
-find_package(Perl)
 reset_find_package(PCRE2 PCRE2_DEBUG_LIBRARY)
 find_package(PCRE2 REQUIRED)
 
@@ -1301,8 +1320,8 @@ if(BUILD_wireshark OR BUILD_logray)
 				Widgets
 				Concurrent
 				Core5Compat
-				DBus
 			OPTIONAL_COMPONENTS
+				DBus
 				Multimedia
 		)
 	else(USE_qt6)
@@ -1460,7 +1479,7 @@ ws_find_package(OPUS ENABLE_OPUS HAVE_OPUS)
 
 if (BUILD_logray)
 	# libsinsp+libscap, required for falco-bridge
-	ws_find_package(Sinsp ENABLE_SINSP HAVE_SINSP)
+	ws_find_package(Sinsp ENABLE_SINSP HAVE_SINSP "0.17.1")
 endif()
 
 # CMake 3.9 and below used 'LIBXML2_LIBRARIES' as the name of the cache entry
@@ -3105,6 +3124,7 @@ if(BUILD_tshark)
 		caputils
 		wiretap
 		epan
+		iface_monitor
 		wsutil
 		${APPLE_CORE_FOUNDATION_LIBRARY}
 		${APPLE_SYSTEM_CONFIGURATION_LIBRARY}
@@ -4325,6 +4345,7 @@ endif()
 add_custom_target(test
 	COMMAND ${CMAKE_COMMAND} -E env PYTHONIOENCODING=UTF-8
 		${Python3_EXECUTABLE} -m pytest
+		${TEST_EXTRA_ARGS}
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 	DEPENDS test-programs
 	USES_TERMINAL

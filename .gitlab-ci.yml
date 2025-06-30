@@ -242,7 +242,7 @@ workflow:
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja
     - ninja test-programs
-    - pytest
+    - pytest --disable-capture
   after_script:
     # The cache should be large enough to be useful but it shouldn't take
     # too long to restore+save each run.
@@ -292,8 +292,8 @@ Source Package:
     - cd build
     - ninja release_notes
     - WIRESHARK_VERSION=$(< wireshark_version.txt)
-    - cp -v doc/release-notes.html ../release-notes-${WIRESHARK_VERSION}.html
-    - cp -v doc/release-notes.txt ../release-notes-${WIRESHARK_VERSION}.txt
+    - cp -v doc/release-notes.html ../wireshark-release-notes-${WIRESHARK_VERSION}.html
+    - cp -v doc/release-notes.txt ../wireshark-release-notes-${WIRESHARK_VERSION}.txt
   after_script:
     # - ccache --max-size $( du --summarize --block-size=1M "$CI_PROJECT_DIR/build" | awk '{printf ("%dM", $1 * 1.5)}' )
     - if [ "$CI_JOB_STATUS" != "success" ]; then exit 0 ; fi
@@ -301,12 +301,12 @@ Source Package:
     - stat --format="%n %s bytes" wireshark-*.tar.*
     - for digest in sha512 sha256 sha1 ; do openssl $digest wireshark-*.tar.* ; done
     - if [ -n "$MC_DESTINATION_DIST" ] ; then mc --quiet cp wireshark-*.tar.* "$MC_DESTINATION_DIST/" ; fi
-    - if [ -n "$MC_DESTINATION_RELEASE" ] ; then mc --quiet cp release-notes-*.{txt,html} "$MC_DESTINATION_RELEASE/" ; fi
+    - if [ -n "$MC_DESTINATION_RELEASE" ] ; then mc --quiet cp wireshark-release-notes-*.{txt,html} "$MC_DESTINATION_RELEASE/" ; fi
   artifacts:
     paths:
       - wireshark-*.tar.*
-      - release-notes-*.html
-      - release-notes-*.txt
+      - wireshark-release-notes-*.html
+      - wireshark-release-notes-*.txt
 
 # Job to generate packages for Debian stable
 Debian Stable APT Package:
@@ -451,35 +451,33 @@ Windows x64 Package:
     - cd build
   script:
     - C:\Windows\py.exe ..\tools\make-version.py --set-release --version-file=wireshark_version.txt ..
-    - cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DBUILD_logray=on -DBUILD_falcodump=on -DENABLE_SIGNED_NSIS=on ..
+    - cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DENABLE_SIGNED_NSIS=on ..
     - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.sln
     - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
     - msbuild /verbosity:minimal /maxcpucount wireshark_nsis_prep.vcxproj
-    - msbuild /verbosity:minimal /maxcpucount logray_nsis_prep.vcxproj
     - msbuild /verbosity:minimal /maxcpucount wireshark_wix_prep.vcxproj
     - C:\gitlab-builds\bin\sign-files.ps1 -Recurse -Path run\RelWithDebInfo
     - msbuild /verbosity:minimal wireshark_nsis.vcxproj
-    - msbuild /verbosity:minimal logray_nsis.vcxproj
     # No need for explicit signing of NSIS installer here. The signing is done by makensis.
     - msbuild /verbosity:minimal wireshark_wix.vcxproj
     - C:\gitlab-builds\bin\sign-files.ps1 -Path packaging\wix\Wireshark-*.msi
     - msbuild /verbosity:minimal wireshark_portableapps.vcxproj
     - C:\gitlab-builds\bin\sign-files.ps1 -Path packaging\portableapps\WiresharkPortable*.exe
-    - $plugins = Get-ChildItem run\RelWithDebInfo\plugins\*\*.dll ; signtool verify /q /pa /all run\RelWithDebInfo\*.exe run\RelWithDebInfo\extcap\wireshark\*.exe $plugins run\RelWithDebInfo\libwireshark.dll run\RelWithDebInfo\libwiretap.dll run\RelWithDebInfo\libwsutil.dll packaging\nsis\Wireshark-*-x64.exe packaging\nsis\Logray-*-x64.exe packaging\wix\Wireshark-*-x64.msi packaging\portableapps\WiresharkPortable??_*.paf.exe
+    - $plugins = Get-ChildItem run\RelWithDebInfo\plugins\*\*.dll ; signtool verify /q /pa /all run\RelWithDebInfo\*.exe run\RelWithDebInfo\extcap\wireshark\*.exe $plugins run\RelWithDebInfo\libwireshark.dll run\RelWithDebInfo\libwiretap.dll run\RelWithDebInfo\libwsutil.dll packaging\wix\Wireshark-*-x64.msi packaging\portableapps\WiresharkPortable??_*.paf.exe
     - msbuild /verbosity:minimal pdb_zip_package.vcxproj
     - C:\gitlab-builds\bin\mse-scan.ps1
     - run\RelWithDebInfo\tshark --version
-    - $packages = Get-ChildItem "packaging\nsis\Wireshark-*-x64.exe", "packaging\nsis\Logray-*-x64.exe", "packaging\wix\Wireshark-*-x64.msi", "packaging\portableapps\WiresharkPortable??_*.paf.exe", "Wireshark-pdb-*x64.zip"
+    - $packages = Get-ChildItem "packaging\nsis\Wireshark-*-x64.exe", "packaging\wix\Wireshark-*-x64.msi", "packaging\portableapps\WiresharkPortable??_*.paf.exe", "Wireshark-pdb-*x64.zip"
     - foreach ($package in $packages) { Write-Host $package.name $(Get-Filehash -Algorithm SHA256 $package).Hash $package.length "bytes" }
     - if (Test-Path env:MC_DESTINATION_WINDOWS_X64) { C:\gitlab-builds\bin\mc --quiet cp $packages "$env:MC_DESTINATION_WINDOWS_X64/" }
     - $nsisSha256 = (Get-FileHash -Algorithm SHA256 .\packaging\nsis\Wireshark-*-x64.exe).Hash
     - $wiresharkVersion = Get-Content .\wireshark_version.txt
-    - Set-Content -Path release-info-$($wiresharkVersion)-windows-x64.ini -Value ("[DEFAULT]`nnsis_sha256 = $nsisSha256")
-    - if (Test-Path env:MC_DESTINATION_RELEASE) { C:\gitlab-builds\bin\mc --quiet cp release-info-$($wiresharkVersion)-windows-x64.ini "$env:MC_DESTINATION_RELEASE/" }
+    - Set-Content -Path wireshark-release-info-$($wiresharkVersion)-windows-x64.ini -Value ("[DEFAULT]`nnsis_sha256 = $nsisSha256")
+    - if (Test-Path env:MC_DESTINATION_RELEASE) { C:\gitlab-builds\bin\mc --quiet cp wireshark-release-info-$($wiresharkVersion)-windows-x64.ini "$env:MC_DESTINATION_RELEASE/" }
     - C:\Windows\py.exe -m pytest
   artifacts:
     paths:
-      - build/release-info-*.ini
+      - build/wireshark-release-info-*.ini
 
 Windows Arm64 Package:
   extends: .build-windows
@@ -497,31 +495,31 @@ Windows Arm64 Package:
     - cd build
   script:
     - C:\Windows\py.exe ..\tools\make-version.py --set-release --version-file=wireshark_version.txt ..
-    - cmake -G "Visual Studio 17 2022" -A arm64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DBUILD_logray=on -DBUILD_falcodump=on -DENABLE_SIGNED_NSIS=on ..
+    - cmake -G "Visual Studio 17 2022" -A arm64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DENABLE_SIGNED_NSIS=on ..
     - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.sln
     - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
     - msbuild /verbosity:minimal /maxcpucount wireshark_nsis_prep.vcxproj
-    - msbuild /verbosity:minimal /maxcpucount logray_nsis_prep.vcxproj
     - C:\gitlab-builds\bin\sign-files.ps1 -Recurse -Path run\RelWithDebInfo
     - msbuild /verbosity:minimal wireshark_nsis.vcxproj
-    - msbuild /verbosity:minimal logray_nsis.vcxproj
-    - $plugins = Get-ChildItem run\RelWithDebInfo\plugins\*\*.dll ; signtool verify /q /pa /all run\RelWithDebInfo\*.exe run\RelWithDebInfo\extcap\wireshark\*.exe $plugins run\RelWithDebInfo\libwireshark.dll run\RelWithDebInfo\libwiretap.dll run\RelWithDebInfo\libwsutil.dll packaging\nsis\Wireshark-*-arm64.exe packaging\nsis\Logray-*-arm64.exe
+    - $plugins = Get-ChildItem run\RelWithDebInfo\plugins\*\*.dll ; signtool verify /q /pa /all run\RelWithDebInfo\*.exe run\RelWithDebInfo\extcap\wireshark\*.exe $plugins run\RelWithDebInfo\libwireshark.dll run\RelWithDebInfo\libwiretap.dll run\RelWithDebInfo\libwsutil.dll packaging\nsis\Wireshark-*-arm64.exe
     - msbuild /verbosity:minimal pdb_zip_package.vcxproj
     - C:\gitlab-builds\bin\mse-scan.ps1
     - run\RelWithDebInfo\tshark --version
-    - $packages = Get-ChildItem "packaging\nsis\Wireshark-*-arm64.exe", "packaging\nsis\Logray-*-arm64.exe", "Wireshark-pdb-*arm64.zip"
+    - $packages = Get-ChildItem "packaging\nsis\Wireshark-*-arm64.exe", "Wireshark-pdb-*arm64.zip"
     - foreach ($package in $packages) { Write-Host $package.name $(Get-Filehash -Algorithm SHA256 $package).Hash $package.length "bytes" }
     - if (Test-Path env:MC_DESTINATION_WINDOWS_ARM64) { C:\gitlab-builds\bin\mc --quiet cp $packages "$env:MC_DESTINATION_WINDOWS_ARM64/" }
     - $nsisSha256 = (Get-FileHash -Algorithm SHA256 .\packaging\nsis\Wireshark-*-arm64.exe).Hash
     - $wiresharkVersion = Get-Content .\wireshark_version.txt
-    - Set-Content -Path release-info-$($wiresharkVersion)-windows-arm64.ini -Value ("[DEFAULT]`nnsis_sha256 = $nsisSha256")
-    - if (Test-Path env:MC_DESTINATION_RELEASE) { C:\gitlab-builds\bin\mc --quiet cp release-info-$($wiresharkVersion)-windows-arm64.ini "$env:MC_DESTINATION_RELEASE/" }
+    - Set-Content -Path wireshark-release-info-$($wiresharkVersion)-windows-arm64.ini -Value ("[DEFAULT]`nnsis_sha256 = $nsisSha256")
+    - if (Test-Path env:MC_DESTINATION_RELEASE) { C:\gitlab-builds\bin\mc --quiet cp wireshark-release-info-$($wiresharkVersion)-windows-arm64.ini "$env:MC_DESTINATION_RELEASE/" }
     - C:\Windows\py.exe -m pytest
   artifacts:
     paths:
-      - build/release-info-*.ini
+      - build/wireshark-release-info-*.ini
 
-Windows MinGW-w64 Package:
+# Fedora doesn't appear to have checks in place to ensure that their MinGW Qt
+# packages work, so disable the MinGW builds for now.
+.Windows MinGW-w64 Package:
   extends: .build-mingw
   rules: !reference [.if-w-w-only-merged]
   script:
@@ -545,45 +543,41 @@ macOS Arm Package:
   retry: 1
   script:
     - export CMAKE_PREFIX_PATH=/usr/local/Qt-$MACOS_QT6_LTS_VERSION
+    # Not needed for Falco libs 0.19?
+    - export CXXFLAGS="-isystem /usr/local/include/falcosecurity"
     - export PATH="$PATH:$HOME/bin"
     - mkdir build
     - cd build
     - ../tools/make-version.py --set-release --version-file=wireshark_version.txt ..
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
-    - cmake -DENABLE_CCACHE=ON -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64 -DBUILD_logray=on -DBUILD_falcodump=on -DFALCO_PLUGINS=/usr/local/lib/falco-plugins/libcloudtrail.so -DTEST_EXTRA_ARGS=--enable-release -G Ninja ..
+    - cmake -DENABLE_CCACHE=ON -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64 -DTEST_EXTRA_ARGS=--enable-release -G Ninja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja
     - codesign-prep
     - security find-identity -v -s "$CODE_SIGN_IDENTITY"
     - ninja wireshark_dmg
-    - ninja logray_dmg
     - cd run
     - xcrun notarytool submit Wireshark?[1-9]*.dmg --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_PWD" --wait --timeout 10m
     - xcrun stapler staple Wireshark?[1-9]*.dmg
-    - xcrun notarytool submit Logray?[0-9]*.dmg --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_PWD" --wait --timeout 10m
-    - xcrun stapler staple Logray?[0-9]*.dmg
-    - spctl --assess --type open --context context:primary-signature --verbose=2 Wireshark?[1-9]*.dmg Logray?[0-9]*.dmg
-    - stat -f "%N %z bytes" Wireshark*.dmg Logray*.dmg
-    - for digest in sha512 sha256 sha1 ; do openssl $digest Wireshark*.dmg Logray*.dmg ; done
+    - spctl --assess --type open --context context:primary-signature --verbose=2 Wireshark?[1-9]*.dmg
+    - stat -f "%N %z bytes" Wireshark*.dmg
+    - for digest in sha512 sha256 sha1 ; do openssl $digest Wireshark*.dmg ; done
     - |
       if [ -n "$S3_DESTINATION_MACOS_ARM64" ] ; then
         aws s3 cp Wireshark?[1-9]*Arm*.dmg "$S3_DESTINATION_MACOS_ARM64/"
         aws s3 cp Wireshark?dSYM*Arm*.dmg "$S3_DESTINATION_MACOS_ARM64/"
-        aws s3 cp Logray?[0-9]*Arm*.dmg "$S3_DESTINATION_MACOS_ARM64/"
-        aws s3 cp Logray?dSYM*Arm*.dmg "$S3_DESTINATION_MACOS_ARM64/"
       fi
     - SPARKLE_SIGNATURE=$( age --decrypt --identity="$MACOS_AGE_IDENTITY" "$MACOS_SPARKLE_BLOB" | /usr/local/Sparkle-2.2.2/bin/sign_update --ed-key-file - Wireshark?[1-9]*.dmg )
     - $CI_PROJECT_DIR/build/run/tshark --version
     - DMG_SHA256=$( shasum --algorithm 256 Wireshark?[1-9]*.dmg | awk '{print $1}' )
     - WIRESHARK_VERSION=$(< ../wireshark_version.txt)
-    - printf '[DEFAULT]\nsparkle_signature = %s\ndmg_sha256 = %s\n' "$SPARKLE_SIGNATURE" "$DMG_SHA256" > release-info-${WIRESHARK_VERSION}-macos-arm64.ini
-    - if [[ -n "$S3_DESTINATION_RELEASE" ]] ; then aws s3 cp release-info-${WIRESHARK_VERSION}-macos-arm64.ini "$S3_DESTINATION_RELEASE/" ; fi
+    - printf '[DEFAULT]\nsparkle_signature = %s\ndmg_sha256 = %s\n' "$SPARKLE_SIGNATURE" "$DMG_SHA256" > wireshark-release-info-${WIRESHARK_VERSION}-macos-arm64.ini
+    - if [[ -n "$S3_DESTINATION_RELEASE" ]] ; then aws s3 cp wireshark-release-info-${WIRESHARK_VERSION}-macos-arm64.ini "$S3_DESTINATION_RELEASE/" ; fi
     - cd ..
-    - ninja test-programs
-    - python3 -m pytest
+    - ninja test
   artifacts:
     paths:
-      - build/run/release-info-*.ini
+      - build/run/wireshark-release-info-*.ini
   needs: []
 
 macOS Intel Package:
@@ -596,44 +590,41 @@ macOS Intel Package:
   retry: 1
   script:
     - export CMAKE_PREFIX_PATH=/usr/local/Qt-$MACOS_QT6_LTS_VERSION
+    # Not needed for Falco libs 0.19?
+    - export CXXFLAGS="-isystem /usr/local/include/falcosecurity"
     - export PATH="$PATH:$HOME/bin"
     - mkdir build
     - cd build
     - ../tools/make-version.py --set-release --version-file=wireshark_version.txt ..
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
-    - cmake -DENABLE_CCACHE=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DBUILD_logray=on -DBUILD_falcodump=on -DFALCO_PLUGINS=/usr/local/lib/falco-plugins/libcloudtrail.so -DTEST_EXTRA_ARGS=--enable-release -G Ninja ..
+    - cmake -DENABLE_CCACHE=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DTEST_EXTRA_ARGS=--enable-release -G Ninja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja
     - codesign-prep
     - security find-identity -v -s "$CODE_SIGN_IDENTITY"
     - ninja wireshark_dmg
-    - ninja logray_dmg
     - cd run
     - xcrun notarytool submit Wireshark?[1-9]*.dmg --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_PWD" --wait --timeout 10m
-    - xcrun notarytool submit Logray?[0-9]*.dmg --apple-id "$MACOS_NOTARIZATION_APPLE_ID" --team-id "$MACOS_NOTARIZATION_TEAM_ID" --password "$MACOS_NOTARIZATION_PWD" --wait --timeout 10m
-    - xcrun stapler staple Logray?[0-9]*.dmg
-    - spctl --assess --type open --context context:primary-signature --verbose=2 Wireshark?[1-9]*.dmg Logray?[0-9]*.dmg
-    - stat -f "%N %z bytes" Wireshark*.dmg Logray*.dmg
-    - for digest in sha512 sha256 sha1 ; do openssl $digest Wireshark*.dmg Logray*.dmg ; done
+    - xcrun stapler staple Wireshark?[1-9]*.dmg
+    - spctl --assess --type open --context context:primary-signature --verbose=2 Wireshark?[1-9]*.dmg
+    - stat -f "%N %z bytes" Wireshark*.dmg
+    - for digest in sha512 sha256 sha1 ; do openssl $digest Wireshark*.dmg ; done
     - |
       if [ -n "$S3_DESTINATION_MACOS_INTEL64" ] ; then
         aws s3 cp Wireshark?[1-9]*Intel*.dmg "$S3_DESTINATION_MACOS_INTEL64/"
         aws s3 cp Wireshark?dSYM*Intel*.dmg "$S3_DESTINATION_MACOS_INTEL64/"
-        aws s3 cp Logray?[0-9]*Intel*.dmg "$S3_DESTINATION_MACOS_INTEL64/"
-        aws s3 cp Logray?dSYM*Intel*.dmg "$S3_DESTINATION_MACOS_INTEL64/"
       fi
     - SPARKLE_SIGNATURE=$( age --decrypt --identity="$MACOS_AGE_IDENTITY" "$MACOS_SPARKLE_BLOB" | /usr/local/Sparkle-2.2.2/bin/sign_update --ed-key-file - Wireshark?[1-9]*.dmg )
     - $CI_PROJECT_DIR/build/run/tshark --version
     - DMG_SHA256=$( shasum --algorithm 256 Wireshark?[1-9]*.dmg | awk '{print $1}' )
     - WIRESHARK_VERSION=$(< ../wireshark_version.txt)
-    - printf '[DEFAULT]\nsparkle_signature = %s\ndmg_sha256 = %s\n' "$SPARKLE_SIGNATURE" "$DMG_SHA256" > release-info-${WIRESHARK_VERSION}-macos-intel64.ini
-    - if [[ -n "$S3_DESTINATION_RELEASE" ]] ; then aws s3 cp release-info-${WIRESHARK_VERSION}-macos-intel64.ini "$S3_DESTINATION_RELEASE/" ; fi
+    - printf '[DEFAULT]\nsparkle_signature = %s\ndmg_sha256 = %s\n' "$SPARKLE_SIGNATURE" "$DMG_SHA256" > wireshark-release-info-${WIRESHARK_VERSION}-macos-intel64.ini
+    - if [[ -n "$S3_DESTINATION_RELEASE" ]] ; then aws s3 cp wireshark-release-info-${WIRESHARK_VERSION}-macos-intel64.ini "$S3_DESTINATION_RELEASE/" ; fi
     - cd ..
-    - ninja test-programs
-    - python3 -m pytest
+    - ninja test
   artifacts:
     paths:
-      - build/run/release-info-*.ini
+      - build/run/wireshark-release-info-*.ini
   needs: []
 
 # Build the User's Guide and Developer's Guide
@@ -689,9 +680,11 @@ Commit Check:
   variables:
     GITLAB_REPO: "$CI_MERGE_REQUEST_PROJECT_URL"
   script:
-    # glab depends on a valid GITALB_TOKEN variable. It will fail when run under outside projects.
-    - if ! command -V glab 2> /dev/null ; then (cd /tmp ; curl -JLO https://gitlab.com/gitlab-org/cli/-/releases/v1.34.0/downloads/glab_1.34.0_Linux_x86_64.deb ; dpkg --install /tmp/glab_1.34.0_Linux_x86_64.deb ) ; fi
-    - glab auth status
+    # Adding notes (comments) to a merge request depends on a valid GitLab CI_JOB_TOKEN
+    # variable. Trying to do so will fail when run under outside projects until
+    # https://gitlab.com/gitlab-org/gitlab/-/issues/464591 is fixed.
+    - glab auth status || true
+    - glab auth status 2>&1 | grep 'Logged in to gitlab.com as' > /dev/null || echo "Unable to post merge request comments from $CI_PROJECT_PATH"
     - >
       if [[ $NUM_COMMITS > 1 ]] ; then
         MESSAGE="ℹ️ This merge request has more than one commit. Please squash any trivial ones:
@@ -782,7 +775,9 @@ Ubuntu GCC Build:
     paths:
       - gcc_report.html
 
-Fedora MinGW Build:
+# Fedora doesn't appear to have checks in place to ensure that their MinGW Qt
+# packages work, so disable the MinGW builds for now.
+.Fedora MinGW Build:
   extends: .build-mingw
   rules: !reference [.if-merge-request]
   needs: [ 'Commit Check' ]
@@ -887,7 +882,7 @@ macOS Build:
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja
     - ninja test-programs
-    - pytest
+    - pytest --disable-capture
   needs: [ 'Commit Check' ]
 
 # Build all doxygen docs

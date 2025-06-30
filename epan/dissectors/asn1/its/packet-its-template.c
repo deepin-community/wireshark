@@ -119,6 +119,8 @@ static dissector_handle_t its_handle;
 
 static expert_field ei_its_no_sub_dis;
 
+static bool wrappedcontainers_as_extended;
+
 // TAP
 static int its_tap;
 
@@ -141,6 +143,7 @@ static int proto_its_mapemv1;
 static int proto_its_mapem;
 static int proto_its_spatemv1;
 static int proto_its_spatem;
+static int proto_its_cpmv1;
 static int proto_its_cpm;
 static int proto_its_imzm;
 static int proto_its_vam;
@@ -760,6 +763,82 @@ dsrc_delta_time_fmt(char *s, uint32_t v)
   }
 }
 
+static void
+cpm_general_confidence_fmt(gchar* s, guint32 v)
+{
+    if (v == 0) {
+        snprintf(s, ITEM_LABEL_LENGTH, "unknown (%u)", v);
+    }
+    else if (v == 101) {
+        snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%u)", v);
+    }
+    else {
+        snprintf(s, ITEM_LABEL_LENGTH, "%u%% (%u)", v, v);
+    }
+}
+
+static void
+cpm_distance_value_fmt(gchar* s, guint32 v)
+{
+    gint32 sv = (gint32)v;
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", sv * 0.01, sv);
+}
+
+static void
+cpm_distance_confidence_fmt(gchar* s, guint32 v)
+{
+    if (v == 102) {
+        snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+    }
+    else if (v == 101) {
+        snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+    }
+    else {
+        snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", v * 0.01, v);
+    }
+}
+
+static void
+cpm_speed_value_ext_fmt(gchar* s, guint32 v)
+{
+    gint32 sv = (gint32)v;
+    if (sv == 0) {
+        snprintf(s, ITEM_LABEL_LENGTH, "standstill (%d)", sv);
+    }
+    else if (sv == 16383) {
+        snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", sv);
+    }
+    else {
+        double vms = sv * 0.01;
+        snprintf(s, ITEM_LABEL_LENGTH, "%.2fm/s = %.1fkm/h (%d)",
+            vms, vms * 3.6, sv);
+    }
+}
+
+static void
+cpm_cartesian_angle_value_fmt(gchar* s, guint32 v)
+{
+    if (v == 3601) {
+        snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+    }
+    else {
+        snprintf(s, ITEM_LABEL_LENGTH, "%.1f° (%d)", v * 0.1, v);
+    }
+}
+
+static void
+cpm_angle_confidence_fmt(gchar* s, guint32 v)
+{
+    if (v == 127) {
+        snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+    }
+    else if (v == 126) {
+        snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+    }
+    else {
+        snprintf(s, ITEM_LABEL_LENGTH, "%.1f° (%d)", v * 0.1, v);
+    }
+}
 
 static void
 cpm_object_dimension_value_fmt(char *s, uint32_t v)
@@ -767,17 +846,17 @@ cpm_object_dimension_value_fmt(char *s, uint32_t v)
   snprintf(s, ITEM_LABEL_LENGTH, "%.1fm (%d)", v * 0.1, v);
 }
 
-//static void
-//cpm_object_dimension_confidence_fmt(char *s, uint32_t v)
-//{
-//  if (v == 102) {
-//    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
-//  } else if (v == 101) {
-//    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
-//  } else {
-//    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", v * 0.01, v);
-//  }
-//}
+static void
+cpm_object_dimension_confidence_fmt(char *s, uint32_t v)
+{
+  if (v == 32) {
+    snprintf(s, ITEM_LABEL_LENGTH, "unavailable (%d)", v);
+  } else if (v == 31) {
+    snprintf(s, ITEM_LABEL_LENGTH, "outOfRange (%d)", v);
+  } else {
+    snprintf(s, ITEM_LABEL_LENGTH, "%.2fm (%d)", v * 0.01, v);
+  }
+}
 
 static int
 dissect_its_PDU(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void *data)
@@ -928,6 +1007,7 @@ void proto_register_its(void)
     };
 
     expert_module_t* expert_its;
+    module_t* its_module;
 
     proto_its = proto_register_protocol("Intelligent Transport Systems", "ITS", "its");
 
@@ -965,6 +1045,7 @@ void proto_register_its(void)
     proto_its_rtcmem = proto_register_protocol_in_name_only("ITS message - RTCMEM", "RTCMEM", "its.message.rtcmem", proto_its, FT_BYTES);
     proto_its_evcsn = proto_register_protocol_in_name_only("ITS message - EVCSN", "EVCSN", "its.message.evcsn", proto_its, FT_BYTES);
     proto_its_tistpg = proto_register_protocol_in_name_only("ITS message - TISTPG", "TISTPG", "its.message.tistpg", proto_its, FT_BYTES);
+    proto_its_cpmv1 = proto_register_protocol_in_name_only("ITS message - CPMv1", "CPMvi", "its.message.cpmv1", proto_its, FT_BYTES);
     proto_its_cpm = proto_register_protocol_in_name_only("ITS message - CPM", "CPM", "its.message.cpm", proto_its, FT_BYTES);
     proto_its_vam = proto_register_protocol_in_name_only("ITS message - VAM", "VAM", "its.message.vam", proto_its, FT_BYTES);
     proto_its_imzm = proto_register_protocol_in_name_only("ITS message - IMZM", "IMZM", "its.message.imzm", proto_its, FT_BYTES);
@@ -980,6 +1061,14 @@ void proto_register_its(void)
     register_decode_as(&its_da);
 
     its_tap = register_tap("its");
+
+    its_module = prefs_register_protocol(proto_its,
+        proto_reg_handoff_its);
+
+    prefs_register_bool_preference(its_module, "wrappedcontainers_as_extended",
+        "Dissect WrappedCpmContainers as extendable",
+        "Some asn1 compilers generates code as if WrappedCpmContainers was extensible(Wrong)",
+        &wrappedcontainers_as_extended);
 }
 
 #define BTP_SUBDISS_SZ 2
@@ -1000,8 +1089,9 @@ void proto_register_its(void)
 #define ITS_RTCMEM_PROT_VERv1 1
 #define ITS_RTCMEM_PROT_VER 2
 #define ITS_TIS_TPG_PROT_VER 1
+#define ITS_CPM_PROT_VERv1 1
 #define ITS_CPM_PROT_VER 2
-#define ITS_VAM_PROT_VER 2
+#define ITS_VAM_PROT_VER 3
 #define ITS_IMZM_PROT_VER 2
 
 void proto_reg_handoff_its(void)
@@ -1037,6 +1127,7 @@ void proto_reg_handoff_its(void)
     dissector_add_uint("its.msg_id", (ITS_RTCMEM_PROT_VER << 16) + ITS_RTCMEM,      create_dissector_handle(dissect_dsrc_RTCMcorrections_PDU, proto_its_rtcmem));
     dissector_add_uint("its.msg_id", ITS_EVCSN,                                     create_dissector_handle( dissect_evcsn_EVChargingSpotNotificationPOIMessage_PDU, proto_its_evcsn ));
     dissector_add_uint("its.msg_id", (ITS_TIS_TPG_PROT_VER << 16) + ITS_RFU2,       create_dissector_handle( dissect_tistpg_TisTpgTransaction_PDU, proto_its_tistpg ));
+    dissector_add_uint("its.msg_id", (ITS_CPM_PROT_VERv1 << 16) + ITS_CPM,          create_dissector_handle(dissect_cpmv1_CollectivePerceptionMessagev1_PDU, proto_its_cpmv1));
     dissector_add_uint("its.msg_id", (ITS_CPM_PROT_VER << 16) + ITS_CPM,            create_dissector_handle(dissect_cpm_CpmPayload_PDU, proto_its_cpm));
     dissector_add_uint("its.msg_id", (ITS_IMZM_PROT_VER << 16) + ITS_IMZM,          create_dissector_handle(dissect_imzm_InterferenceManagementZoneMessage_PDU, proto_its_imzm));
     dissector_add_uint("its.msg_id", (ITS_VAM_PROT_VER << 16) + ITS_VAM,            create_dissector_handle(dissect_vam_VruAwareness_PDU, proto_its_vam));

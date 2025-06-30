@@ -1,0 +1,165 @@
+# Wireshark package's debconf template translation template
+# Copyright (C) 2019 Balint Reczey <balint.reczey@canonical.com>
+# This file is distributed under the same license as the wireshark package.
+# SPDX-License-Identifier: GPL-2.0-or-later
+# poc senderi <pocsenderi@protonmail.com>, 2024.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: wireshark\n"
+"Report-Msgid-Bugs-To: wireshark@packages.debian.org\n"
+"POT-Creation-Date: 2019-09-13 00:04+0200\n"
+"PO-Revision-Date: 2024-08-28 17:52+0200\n"
+"Last-Translator: poc senderi <pocsenderi@protonmail.com>\n"
+"Language-Team: Catalan <debian-l10n-catalan@lists.debian.org>\n"
+"Language: ca\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.4.2\n"
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid "Should non-superusers be able to capture packets?"
+msgstr "Els usuaris no privilegiats haurien de poder capturar paquets?"
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid ""
+"Dumpcap can be installed in a way that allows members of the \"wireshark\" "
+"system group to capture packets. This is recommended over the alternative "
+"of running Wireshark/Tshark directly as root, because less of the code will "
+"run with elevated privileges."
+msgstr ""
+"El «dumpcap» es pot instal·lar de manera que permeti capturar paquets als "
+"membres del grup de sistema «wireshark». Això és el que es recomana en "
+"front de l'alternativa d'executar Wireshark/Tshark directament com a "
+"«root», perquè menys codi s'executarà amb privilegis elevats."
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid ""
+"For more detailed information please see /usr/share/doc/wireshark-common/"
+"README.Debian.gz once the package is installed."
+msgstr ""
+"Per obtenir informació més detallada, consulteu /usr/share/doc/wireshark-"
+"common/README.Debian.gz un cop el paquet estigui instal·lat."
+
+#. Type: boolean
+#. Description
+#: ../templates:2001
+msgid ""
+"Enabling this feature may be a security risk, so it is disabled by default. "
+"If in doubt, it is suggested to leave it disabled."
+msgstr ""
+"Habilitar aquesta característica pot suposar un risc per a la seguretat, de "
+"manera que està desactivada per defecte. En cas de dubte, se suggereix "
+"deixar-la deshabilitada."
+
+#. Type: error
+#. Description
+#: ../templates:3001
+msgid "Creating the wireshark system group failed"
+msgstr "Ha fallat la creació del grup de sistema «wireshark»"
+
+#. Type: error
+#. Description
+#: ../templates:3001
+msgid ""
+"The wireshark group does not exist, and creating it failed, so Wireshark "
+"cannot be configured to capture traffic as an unprivileged user."
+msgstr ""
+"El grup «wireshark» no existeix, i la seva creació ha fallat, de manera que "
+"el Wireshark no es pot configurar per capturar trànsit com a usuari no "
+"privilegiat."
+
+#. Type: error
+#. Description
+#: ../templates:3001
+msgid ""
+"Please create the wireshark system group and try configuring wireshark-"
+"common again."
+msgstr ""
+"Creeu el grup de sistema «wireshark» i torneu a provar de configurar "
+"«wireshark-common»."
+
+#. Type: error
+#. Description
+#: ../templates:4001
+msgid "The wireshark group is a system group"
+msgstr "El grup «wireshark» és un grup de sistema"
+
+#. Type: error
+#. Description
+#: ../templates:4001
+msgid ""
+"The wireshark group exists as a user group, but the preferred configuration "
+"is for it to be created as a system group."
+msgstr ""
+"El grup «wireshark» existeix com a grup d'usuaris, però la configuració "
+"preferida és que es creï com a grup de sistema."
+
+#. Type: error
+#. Description
+#: ../templates:4001
+msgid ""
+"As a result, purging wireshark-common will not remove the wireshark group, "
+"but everything else should work properly."
+msgstr ""
+"Com a resultat, al purgar el «wireshark-common» no s'eliminarà el grup "
+"«wireshark», però tota la resta hauria de funcionar correctament."
+
+#. Type: error
+#. Description
+#: ../templates:5001
+msgid "Setting capabilities for dumpcap failed"
+msgstr "Ha fallat l'establiment de les capacitats per al «dumpcap»"
+
+#. Type: error
+#. Description
+#: ../templates:5001
+msgid ""
+"The attempt to use Linux capabilities to grant packet-capturing privileges "
+"to the dumpcap binary failed. Instead, it has had the set-user-id bit set."
+msgstr ""
+"Ha fallat l'intent d'utilitzar capacitats de Linux per a concedir "
+"privilegis de captura de paquets al binari del «dumpcap». En lloc d'això, "
+"s'ha establert el bit «set-user-id»."
+
+#. Type: error
+#. Description
+#: ../templates:6001
+msgid "Removal of the wireshark group failed"
+msgstr "Ha fallat l'eliminació del grup «wireshark»"
+
+#. Type: error
+#. Description
+#: ../templates:6001
+msgid ""
+"When the wireshark-common package is configured to allow non-superusers to "
+"capture packets the postinst script of wireshark-common creates the "
+"wireshark group as a system group."
+msgstr ""
+"Quan el paquet «wireshark-common» està configurat per permetre capturar "
+"paquets als usuaris no privilegiats, l'script «postinst» de «wireshark-"
+"common» crea el grup «wireshark» com a grup del sistema."
+
+#. Type: error
+#. Description
+#: ../templates:6001
+msgid ""
+"However, on this system the wireshark group is a user group instead of "
+"being a system group, so purging wireshark-common did not remove it."
+msgstr ""
+"No obstant això, en aquest sistema el grup «wireshark» és un grup d'usuaris "
+"en comptes de ser un grup de sistema, de manera que al purgar el «wireshark-"
+"common» no l'ha eliminat."
+
+#. Type: error
+#. Description
+#: ../templates:6001
+msgid "If the group is no longer needed, please remove it manually."
+msgstr "Si el grup ja no és necessari, elimineu-lo manualment."

@@ -430,6 +430,7 @@ libwireshark.so.18 libwireshark18 #MINVER#
  dissect_nttime_hyper@Base 4.4.0
  dissect_nttime_hyper_1sec@Base 4.4.0
  dissect_oer_IA5String@Base 3.1.0
+ dissect_oer_UTF8String@Base 4.4.5
  dissect_oer_bit_string@Base 2.9.0
  dissect_oer_boolean@Base 3.1.0
  dissect_oer_choice@Base 2.9.0
@@ -439,6 +440,7 @@ libwireshark.so.18 libwireshark18 #MINVER#
  dissect_oer_constrained_sequence_of@Base 2.9.0
  dissect_oer_enumerated@Base 2.9.0
  dissect_oer_integer@Base 2.9.0
+ dissect_oer_integer_64b@Base 4.4.6
  dissect_oer_null@Base 2.9.0
  dissect_oer_object_identifier@Base 4.2.0~rc3
  dissect_oer_octet_string@Base 2.9.0
@@ -450,6 +452,7 @@ libwireshark.so.18 libwireshark18 #MINVER#
  dissect_per_IA5String@Base 1.9.1
  dissect_per_NumericString@Base 1.9.1
  dissect_per_PrintableString@Base 1.9.1
+ dissect_per_UTF8String@Base 4.4.5
  dissect_per_VisibleString@Base 1.9.1
  dissect_per_bit_string@Base 1.9.1
  dissect_per_bit_string_containing_pdu_new@Base 1.9.1
@@ -478,6 +481,7 @@ libwireshark.so.18 libwireshark18 #MINVER#
  dissect_per_sequence_eag@Base 1.9.1
  dissect_per_sequence_of@Base 1.9.1
  dissect_per_set_of@Base 1.9.1
+ dissect_per_size_constrained_type@Base 4.4.5
  dissect_q931_bearer_capability_ie@Base 1.9.1
  dissect_q931_high_layer_compat_ie@Base 1.9.1
  dissect_q932_Address@Base 2.5.0
@@ -874,6 +878,7 @@ libwireshark.so.18 libwireshark18 #MINVER#
  fvalue_set_ipv4@Base 4.4.0
  fvalue_set_ipv6@Base 4.4.0
  fvalue_set_protocol@Base 4.4.0
+ fvalue_set_protocol_length@Base 4.4.2
  fvalue_set_sinteger64@Base 4.4.0
  fvalue_set_sinteger@Base 4.4.0
  fvalue_set_strbuf@Base 4.4.0

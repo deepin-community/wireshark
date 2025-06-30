@@ -2247,8 +2247,8 @@ static const value_string ff_fst_action_flags[] = {
 static const value_string ff_robust_av_streaming_action_flags[] = {
   {ROBUST_AV_STREAMING_SCS_REQUEST,          "SCS Request"},
   {ROBUST_AV_STREAMING_SCS_RESPONSE,         "SCS Response"},
-  {ROBUST_AV_STREAMING_GROUP_MEMBERSHIP_REQ, "Group Membership  Request"},
-  {ROBUST_AV_STREAMING_GROUP_MEMBERSHIP_RSP, "SCS Request"},
+  {ROBUST_AV_STREAMING_GROUP_MEMBERSHIP_REQ, "Group Membership Request"},
+  {ROBUST_AV_STREAMING_GROUP_MEMBERSHIP_RSP, "Group Membership Response"},
   {ROBUST_AV_STREAMING_MSCS_REQUEST,         "MSCS Request"},
   {ROBUST_AV_STREAMING_MSCS_RESPONSE,        "MSCS Response"},
   {0x00, NULL}
@@ -2632,7 +2632,7 @@ static const value_string ba_action_codes[] = {
   {BA_NDP_ADD_BLOCK_ACK_RESPONSE, "NDP ADDBA Response"},
   {BA_NDP_DELETE_BLOCK_ACK,       "NDP DELBA"},
   {BA_BAT_ADD_BLOCK_ACK_REQUEST,  "BAT ADDBA Request"},
-  {BA_BAT_ADD_BLOCK_ACK_RESPONSE, "BAT ADDBA Request"},
+  {BA_BAT_ADD_BLOCK_ACK_RESPONSE, "BAT ADDBA Response"},
   {BA_BAT_DELETE_BLOCK_ACK,       "BAT DELBA"},
   {0x00, NULL}
 };
@@ -3447,8 +3447,8 @@ static const value_string prot_s1g_action_vals[] = {
 static const value_string twt_neg_type_vals[] = {
   {0x0, "Individual TWT"},
   {0x1, "Wake TBTT"},
-  {0x2, "Broadcast TWT"},
-  {0x3, "Broadcast TWT"},
+  {0x2, "Broadcast TWT schedule, TWT element in broadcast management frame"},
+  {0x3, "Broadcast TWT schedule, TWT element in unicast management frame"},
   {0,   NULL},
 };
 
@@ -8515,6 +8515,7 @@ static int ett_pol_resp_cont_tree;
 static expert_field ei_ieee80211_bad_length;
 static expert_field ei_ieee80211_inv_val;
 static expert_field ei_ieee80211_vht_tpe_pwr_info_count;
+static expert_field ei_ieee80211_vht_tpe_pwr_info_unit;
 static expert_field ei_ieee80211_ff_query_response_length;
 static expert_field ei_ieee80211_ff_anqp_nai_realm_eap_len;
 static expert_field ei_hs20_anqp_nai_hrq_length;
@@ -10414,7 +10415,20 @@ static const value_string nai_realm_encoding_vals[] = {
 
 static const range_string oper_class_rvals[] = {
   {   0,   0, "Unknown" }, /* 0 should not be used */
-  {   1,  80, "Reserved" },
+  {   1,  65, "Reserved" },
+  {  66,  66, "0.863 GHz, 1 MHz Spacing" },
+  {  67,  67, "0.863 GHz, 2 MHz Spacing" },
+  {  68,  68, "0.902 GHz, 1 MHz Spacing" },
+  {  69,  69, "0.902 GHz, 2 MHz Spacing" },
+  {  70,  70, "0.902 GHz, 4 MHz Spacing" },
+  {  71,  71, "0.902 GHz, 8 MHz Spacing" },
+  {  72,  72, "0.902 GHz, 16 MHz Spacing" },
+  {  73,  73, "0.9165 GHz, 1 MHz Spacing" },
+  {  74,  74, "0.9175 GHz, 1 MHz Spacing" },
+  {  75,  75, "0.9175 GHz, 2 MHz Spacing" },
+  {  76,  76, "0.9175 GHz, 4 Spacing" },
+  {  77,  77, "0.9014 GHz, 1 MHz Spacing" },
+  {  78,  80, "Reserved" },
   {  81,  81, "2.407 GHz, Channels 1-13, 25 MHz Spacing" },
   {  82,  82, "2.414 GHz, Channel 14, 25 MHz Spacing" },
   {  83,  83, "2.407 GHz, Channels 1-9, 40 MHz Spacing" },
@@ -10435,9 +10449,7 @@ static const range_string oper_class_rvals[] = {
   { 109, 109, "4.0 GHz, Channels 184, 188, 192, and 196, 20 MHz Spacing" },
   { 110, 110, "4.0 GHz, Channels 183-189, 10 MHz Spacing" },
   { 111, 111, "4.0025 GHz, Channels 182-189, 5 MHz Spacing" },
-  { 112, 112, "5.0 GHz, Channels 8, 12, and 16, 20 MHz Spacing" },
-  { 113, 113, "5.0 GHz, Channels 7-11, 10 MHz Spacing" },
-  { 114, 114, "5.0 GHz, Channels 6-11, 5 MHz Spacing" },
+  { 112, 114, "Reserved" },
   { 115, 115, "5.0 GHz, Channels 36, 40, 44, and 48, 20 MHz Spacing" },
   { 116, 116, "5.0 GHz, Channels 36 and 44, 40 MHz Spacing" },
   { 117, 117, "5.0 GHz, Channels 40 and 48, 40 MHz Spacing" },
@@ -10451,7 +10463,25 @@ static const range_string oper_class_rvals[] = {
   { 125, 125, "5.0 GHz, Channels 149, 153, 157, 161, 165, and 169, 20 MHz Spacing" },
   { 126, 126, "5.0 GHz, Channels 149 and 157, 40 MHz Spacing" },
   { 127, 127, "5.0 GHz, Channels 153 and 161, 40 MHz Spacing" },
-  { 128, 191, "Reserved" },
+  { 128, 128, "5.0 GHz, Channel center frequency index 42, 58, 106, 122, 138 and 155, 80 MHz Spacing" },
+  { 129, 129, "5.0 GHz, Channel center frequency index 50 and 114, 160 MHz Spacing" },
+  { 130, 130, "5.0 GHz, Channel center frequency index 42, 58, 106, 122, 138 and 155, 80 MHz Spacing, 80+" },
+  { 131, 131, "5.950 GHz, Channels 1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81, 85, 89, 93, 97, 101, 105, 109, 113, 117, 121, 125, 129, 133, 137, 141, 145, 149, 153, 157, 161, 165, 169, 173, 177, 181, 185, 189, 193, 197, 201, 205, 209, 213, 217, 221, 225, 229, and 233, 20 MHz Spacing" },
+  { 132, 132, "5.950 GHz, Channel center frequency index 3, 11, 19, 27, 35, 43, 51, 59, 67, 75, 83, 91, 99, 107, 115, 123, 131, 139, 147, 155, 163, 171, 179, 187, 195, 203, 211, 219, and 227, 40 MHz Spacing" },
+  { 133, 133, "5.950 GHz, Channel center frequency index 7, 23, 39, 55, 71, 87, 103, 119, 135, 151, 167, 183, 199, and 215, 80 MHz Spacing" },
+  { 134, 134, "5.950 GHz, Channel center frequency index 15, 47, 79, 111, 143, 175, and 207, 160 MHz Spacing" },
+  { 135, 135, "5.950 GHz, Channel center frequency index 7, 23, 39, 55, 71, 87, 103, 119, 135, 151, 167, 183, 199, and 215, 80 MHz Spacing, 80+" },
+  { 136, 136, "5.925 GHz, Channel center frequency index 2, 20 MHz Spacing" },
+  { 137, 137, "5.925 GHz, Channel center frequency index 31, 63, 95, 127, 159, and 191, 320 MHz Spacing" },
+  { 138, 179, "Reserved" },
+  { 180, 180, "56.16 GHz, Channels 1, 2, 3, 4, 5, and 6, 2160 MHz Spacing" },
+  { 181, 181, "56.16 GHz, Channels 2 and 3, 2160 MHz Spacing" },
+  { 182, 182, "56.70 GHz, Channels 35, 36, 37, and 38, 1080 MHz Spacing" },
+  { 183, 183, "42.66 GHz, Channels 1, 2, 3, 4, 5, 6, 7, and 8, 540 MHz Spacing" },
+  { 184, 184, "47.52 GHz, Channels 9 and 10, 540 MHz Spacing" },
+  { 185, 185, "42.93 GHz, Channels 11, 12, 13, and 14, 1080 MHz Spacing" },
+  { 186, 186, "47.79 GHz, Channel 15, 1080 MHz Spacing" },
+  { 187, 191, "Reserved" },
   { 192, 254, "Vendor-Specific" },
 
   { 255, 255, "Reserved" },
@@ -21162,8 +21192,8 @@ dissect_vendor_ie_sgdsn(proto_item *item _U_, proto_tree *ietree,
       case SGDSN_ALTITUDE_ABS:
       case SGDSN_ALTITUDE_REL:
         if (tlv_len == 2) {
-          uint32_t value;
-          proto_tree_add_item_ret_uint(tree, hf_ieee80211_vs_sgdsn_altitude, tvb, offset, 2, ENC_NA, &value);
+          int32_t value;
+          proto_tree_add_item_ret_int(tree, hf_ieee80211_vs_sgdsn_altitude, tvb, offset, 2, ENC_NA, &value);
           proto_item_append_text(tree, ": %d m", value);
         } else {
           expert_add_info_format(pinfo, tree, &ei_ieee80211_tag_length, "Value length must be 4");
@@ -22385,7 +22415,7 @@ dissect_vht_tx_pwr_envelope(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   int tag_len = tvb_reported_length(tvb);
   ieee80211_tagged_field_data_t* field_data = (ieee80211_tagged_field_data_t*)data;
   int offset = 0;
-  proto_item *tx_pwr_item, *ti;
+  proto_item *tx_pwr_item, *ti, *unit_ti;
   proto_tree *tx_pwr_info_tree;
   uint8_t opt_ie_cnt=0;
   uint8_t i;
@@ -22402,14 +22432,18 @@ dissect_vht_tx_pwr_envelope(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
   tx_pwr_info_tree =  proto_item_add_subtree(tx_pwr_item, ett_vht_tpe_info_tree);
 
   ti = proto_tree_add_item(tx_pwr_info_tree, hf_ieee80211_vht_tpe_pwr_info_count, tvb, offset, 1, ENC_LITTLE_ENDIAN);
-  proto_tree_add_item(tx_pwr_info_tree, hf_ieee80211_vht_tpe_pwr_info_unit, tvb, offset, 1, ENC_LITTLE_ENDIAN);
+  unit_ti = proto_tree_add_item(tx_pwr_info_tree, hf_ieee80211_vht_tpe_pwr_info_unit, tvb, offset, 1, ENC_LITTLE_ENDIAN);
   proto_tree_add_item(tx_pwr_info_tree, hf_ieee80211_vht_tpe_pwr_info_category, tvb, offset, 1, ENC_LITTLE_ENDIAN);
 
   opt_ie_cnt = tvb_get_uint8(tvb, offset) & 0x07;
 
   offset += 1;
 
-  if (mtpi == 1 || mtpi == 3) { /* Is it a power spectral density? */
+  switch (mtpi) {
+
+  case 1:
+  case 3:
+    /* Is it a power spectral density? */
     /* Handle the zero case */
     if (opt_ie_cnt == 0) {
       proto_tree_add_item(tree, hf_ieee80211_vht_tpe_any_bw_psd, tvb, offset,
@@ -22446,7 +22480,10 @@ dissect_vht_tx_pwr_envelope(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                           tvb, offset, 1, ENC_NA);
       offset += 1;
     }
-  } else {
+    break;
+
+  case 0:
+  case 2:
     /* Power Constraint info is mandatory only for 20MHz, others are optional*/
     /* Power is expressed in terms of 0.5dBm from -64 to 63 and is encoded
      * as 8-bit 2's compliment */
@@ -22474,6 +22511,10 @@ dissect_vht_tx_pwr_envelope(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
         break;
       }
     }
+    break;
+  default:
+    /* Reserved in 802.11ax-2021. 802.11be? */
+    expert_add_info(pinfo, unit_ti, &ei_ieee80211_vht_tpe_pwr_info_unit);
   }
 
   return offset;
@@ -26602,7 +26643,7 @@ dissect_a_control_om(proto_tree *tree, tvbuff_t *tvb, int offset,
   uint32_t bits _U_, uint32_t start_bit)
 {
   proto_tree *om_tree = NULL;
-  unsigned the_bits = (tvb_get_letohl(tvb, offset) >> start_bit) & 0x0000003FF;
+  unsigned the_bits = (tvb_get_letohl(tvb, offset) >> start_bit) & 0x00000FFF;
 
   /*
    * We isolated the bits and moved them to the bottom ... so display them
@@ -28568,17 +28609,14 @@ dissect_multi_link(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
   proto_tree_add_uint(tree, hf_index, tvb, 0, 0, elt);
 
   if (elt) {
-    char link_id_list[128];
-    int i, ret, n = 0;
-    for (i = 0; i < elt; i++) {
+    wmem_strbuf_t *link_id_list = wmem_strbuf_new_sized(pinfo->pool, elt * 2);
+    for (int i = 0; i < elt; i++) {
       if (local_link_ids[i] != -1) {
-        ret = snprintf(link_id_list + n, 128 - n,
-                         (i == 0) ? "%d" : "_%d", local_link_ids[i]);
-        n += ret;
+        wmem_strbuf_append_printf(link_id_list, (i == 0) ? "%d" : "_%d", local_link_ids[i]);
       }
     }
     proto_tree_add_string(tree, hf_ieee80211_eht_multi_link_link_id_list, tvb,
-                          0, 0, link_id_list);
+                          0, 0, link_id_list->str);
   }
 }
 
@@ -36861,14 +36899,14 @@ dissect_ieee80211_block_ack_details(tvbuff_t *tvb, packet_info *pinfo _U_,
       ba_bitmap_tree = proto_item_add_subtree(ba_bitmap_item,
                           ett_block_ack_bitmap);
       for (i = 0; i < (bytes * 8); i += 64) {
-        bmap = tvb_get_letoh64(tvb, offset);
+        bmap = tvb_get_letoh64(tvb, offset + i/8);
         for (f = 0; f < 64; f++) {
           if (bmap & (UINT64_C(1) << f))
             continue;
           proto_tree_add_uint_format_value(ba_bitmap_tree,
                           hf_ieee80211_block_ack_bitmap_missing_frame,
-                          tvb, offset + (f/8), 1, ssn + f, "%u",
-                          (ssn + f) & 0x0fff);
+                          tvb, offset + ((f + i)/8), 1, ssn + f + i, "%u",
+                          (ssn + f + i) & 0x0fff);
         }
       }
       offset += bytes;
@@ -44714,7 +44752,7 @@ proto_register_ieee80211(void)
 
     {&hf_ieee80211_tag_addba_ext_reserved,
       {"Reserved", "wlan.addba.reserved",
-       FT_UINT8, BASE_HEX, NULL, 0xF8,
+       FT_UINT8, BASE_HEX, NULL, 0x18,
        NULL, HFILL }},
 
     {&hf_ieee80211_tag_addba_ext_buffer_size,
@@ -53694,7 +53732,7 @@ proto_register_ieee80211(void)
 
     {&hf_ieee80211_vs_sgdsn_altitude,
      {"Altitude", "wlan.vs.sgdsn.tag.altitude",
-      FT_UINT16, BASE_DEC, NULL, 0,
+      FT_INT16, BASE_DEC, NULL, 0,
       NULL, HFILL }},
 
     {&hf_ieee80211_vs_sgdsn_speed,
@@ -57539,11 +57577,11 @@ proto_register_ieee80211(void)
 
     {&hf_ieee80211_he_operation_6ghz_control_regulatory_info,
      {"Regulatory Info", "wlan.ext_tag.he_operation.6ghz.control.regulatory_info",
-      FT_UINT8, BASE_DEC, NULL, 0x38, NULL, HFILL }},
+      FT_UINT8, BASE_DEC, NULL, 0x78, NULL, HFILL }},
 
     {&hf_ieee80211_he_operation_6ghz_control_reserved,
      {"Reserved", "wlan.ext_tag.he_operation.6ghz.control.reserved",
-      FT_UINT8, BASE_HEX, NULL, 0xC0, NULL, HFILL }},
+      FT_UINT8, BASE_HEX, NULL, 0x80, NULL, HFILL }},
 
     {&hf_ieee80211_he_operation_6ghz_channel_center_freq_0,
      {"Channel Center Frequency Segment 0", "wlan.ext_tag.he_operation.6ghz.chan_center_freq_seg_0",
@@ -58366,7 +58404,7 @@ proto_register_ieee80211(void)
       FT_BOOLEAN, 16, NULL, 0x0080, NULL, HFILL }},
 
     {&hf_ieee80211_eht_multi_link_control_mld_capa,
-     {"MDL Capabilities Present",
+     {"MLD Capabilities Present",
       "wlan.eht.multi_link.control.basic.mld_capabilities_present",
       FT_BOOLEAN, 16, NULL, 0x0100, NULL, HFILL }},
 
@@ -60289,6 +60327,10 @@ proto_register_ieee80211(void)
     { &ei_ieee80211_vht_tpe_pwr_info_count,
       { "wlan.vht.tpe.pwr_info.count.invalid", PI_MALFORMED, PI_ERROR,
         "Max Tx Pwr Count is Incorrect, should be 0-7", EXPFILL }},
+
+    { &ei_ieee80211_vht_tpe_pwr_info_unit,
+      { "wlan.vht.tpe.pwr_info.unit.unknown", PI_UNDECODED, PI_WARN,
+        "Unknown Max Tx Pwr Unit Interpretation (not interpreted)", EXPFILL }},
 
     { &ei_ieee80211_missing_data,
       { "ieee80211.missing_data", PI_MALFORMED, PI_WARN,

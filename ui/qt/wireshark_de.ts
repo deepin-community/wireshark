@@ -4277,6 +4277,14 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Space</translation>
     </message>
     <message>
+        <source>Legend</source>
+        <translation>Legende</translation>
+    </message>
+    <message>
+        <source>Toggle legend</source>
+        <translation>Legende umschalten</translation>
+    </message>
+    <message>
         <source>Zoom In X Axis</source>
         <translation>X-Achse vergrößern</translation>
     </message>
@@ -5156,8 +5164,8 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
         <translation>Unterstützte Felder sind data, dir, time, seqno</translation>
     </message>
     <message>
-        <source>Missing capturing group data (use (?</source>
-        <translation>Gruppierungskonstrukt für Daten fehlt (bitte (? verwenden</translation>
+        <source>Missing capturing group data (use (?&lt;data&gt;(...)) )</source>
+        <translation>Fehlende Erfassungsgruppen-Daten (verwende (?&lt;data&gt;(...)) )</translation>
     </message>
     <message>
         <source>Import From Hex Dump</source>
@@ -13679,7 +13687,7 @@ a:hover {
     </message>
     <message>
         <source>Export Specified Packets…</source>
-        <translation>Spezielle Pakete exportieren...</translation>
+        <translation>Ausgewählte Pakete exportieren...</translation>
     </message>
     <message>
         <source>Export Packet &amp;Bytes…</source>

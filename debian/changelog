@@ -1,3 +1,96 @@
+wireshark (4.4.7-1) unstable; urgency=medium
+
+  * Upload to unstable (Closes: #1107515)
+
+ -- Balint Reczey <balint@balintreczey.hu>  Tue, 10 Jun 2025 16:45:06 +0200
+
+wireshark (4.4.7-0exp1) experimental; urgency=medium
+
+  * New upstream version
+    - security fixes:
+      * Dissection engine crash (CVE-2025-5601)
+  * Target experimental due to the freeze
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 05 Jun 2025 12:47:45 +0200
+
+wireshark (4.4.6-2) unstable; urgency=medium
+
+  * debian/control.in: Make libwireshark-dev depend on libgio-2.0-dev
+    (Closes: #1082040)
+  * debian/control: Fix indentation of qt6-qpa-plugins dependency
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 17 Apr 2025 22:48:31 +0200
+
+wireshark (4.4.6-1) unstable; urgency=medium
+
+  [ Pedro Ribeiro ]
+  * Update Portuguese debconf translation (Closes: #1100069)
+
+  [ Balint Reczey ]
+  * libwireshark-dev: Depend on libgio-2.0-dev (Closes: #1082040)
+  * Always build-depend on libssh-dev, even in backports (Closes: #1102441)
+  * New upstream version
+  * Update symbols
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 17 Apr 2025 09:49:50 +0200
+
+wireshark (4.4.5-1) unstable; urgency=medium
+
+  * New upstream version
+  * Update symbols
+
+ -- Balint Reczey <balint@balintreczey.hu>  Tue, 25 Feb 2025 19:50:16 +0100
+
+wireshark (4.4.4-1) unstable; urgency=medium
+
+  [ Carles Pina i Estany ]
+  * Added po-debconf Catalan translation
+
+  [ Balint Reczey ]
+  * Ship Appstream metadata in wireshark instead of libwireshark-data.
+    This couples the metadata with the desktop file that makes sense
+    and also makes the AppStream generator happy. (Closes: #1094397)
+  * New upstream version:
+    - security fixes:
+      - Bundle Protocol and CBOR dissector crash (CVE-2025-1492)
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 20 Feb 2025 13:08:13 +0100
+
+wireshark (4.4.3-1) unstable; urgency=medium
+
+  * debian/rules: Make wireshark depend on qt6-qpa-plugins, too.
+    Those plugins were part of qt5-base and the VNC plugin is needed to run
+    Wireshark in VNC.
+  * New upstream version
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 09 Jan 2025 12:33:19 +0100
+
+wireshark (4.4.2-1) unstable; urgency=medium
+
+  * Use esnacc instead of snacc in asn2deb (Closes: #1085567)
+  * New upstream version:
+    - security fixes:
+      - FiveCo RAP dissector infinite loop
+      - ECMP dissector crash
+  * Update symbols files
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 21 Nov 2024 15:43:30 +0100
+
+wireshark (4.4.1-1) unstable; urgency=medium
+
+  [ Balint Reczey ]
+  * New upstream version:
+    - security fixes:
+      - AppleTalk and RELOAD Framing dissector crashes (CVE-2024-9781)
+      - ITS dissector crash (CVE-2024-9780)
+  * Drop mismatched and obsolete Lintian override for ipaddr.so
+  * Drop obsolete unused Lintian overrides left from the t64 transition
+
+  [ Andika Triwidada ]
+  * Indonesian debconf translation update (Closes: #1084491)
+
+ -- Balint Reczey <balint@balintreczey.hu>  Thu, 10 Oct 2024 15:35:16 +0200
+
 wireshark (4.4.0-1) unstable; urgency=medium
 
   * Upload to unstable (Closes :#1080298)
