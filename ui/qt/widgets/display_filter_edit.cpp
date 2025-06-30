@@ -676,7 +676,9 @@ void DisplayFilterEdit::applyDisplayFilter()
 void DisplayFilterEdit::updateClearButton()
 {
     setDefaultPlaceholderText();
-    clear_button_->setVisible(!text().isEmpty());
+    if (clear_button_) {
+        clear_button_->setVisible(!text().isEmpty());
+    }
     alignActionButtons();
 }
 
@@ -875,6 +877,13 @@ void DisplayFilterEdit::createFilterTextDropMenu(QDropEvent *event, bool prepare
 void DisplayFilterEdit::displayFilterExpression()
 {
     DisplayFilterExpressionDialog *dfe_dialog = new DisplayFilterExpressionDialog(this);
+    // Setting the modality also sets the parent of a GeometryStateDialog
+    // and is necessary if our current window is modal. Don't do it for the
+    // main window, where a user might want to change the current dissection
+    // tree while building an expression.
+    if (!mainApp->mainWindow()->isActiveWindow()) {
+        dfe_dialog->setWindowModality(Qt::WindowModal);
+    }
 
     connect(dfe_dialog, &DisplayFilterExpressionDialog::insertDisplayFilter,
             this, &DisplayFilterEdit::insertFilter);

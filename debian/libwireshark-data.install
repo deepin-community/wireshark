@@ -1,4 +1,3 @@
 debian/maxmind_db_paths /usr/share/wireshark
 usr/share/doc/wireshark
-usr/share/metainfo
 usr/share/wireshark

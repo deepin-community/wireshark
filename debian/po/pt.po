@@ -1,14 +1,14 @@
 # Portuguese wireshark debconf translation
 # Copyright (C) 2009, the wireshark authors
 # This file is distributed under the same license as the wireshark package.
-# 2010,2017 Pedro Ribeiro <p.m42.ribeiro@gmail.com>.
+# 2010,2017,2025 Pedro Ribeiro <p.m42.ribeiro@gmail.com>.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: wireshark 2.4.1-1\n"
+"Project-Id-Version: wireshark 4.4.5-1\n"
 "Report-Msgid-Bugs-To: wireshark@packages.debian.org\n"
-"POT-Creation-Date: 2017-08-07 00:07-0400\n"
-"PO-Revision-Date: 2017-09-06 21:26+0100\n"
+"POT-Creation-Date: 2019-09-13 00:04+0200\n"
+"PO-Revision-Date: 2025-03-09 15:30+0100\n"
 "Last-Translator: Pedro Ribeiro <p.m42.ribeiro@gmail.com>\n"
 "Language-Team: Portuguese <traduz@debianpt.org>\n"
 "Language: pt\n"
@@ -40,12 +40,15 @@ msgstr ""
 #. Type: boolean
 #. Description
 #: ../templates:2001
+#| msgid ""
+#| "For more detailed information please see /usr/share/doc/wireshark-common/"
+#| "README.Debian."
 msgid ""
 "For more detailed information please see /usr/share/doc/wireshark-common/"
-"README.Debian."
+"README.Debian.gz once the package is installed."
 msgstr ""
 "Para informação mais detalhada, leia por favor /usr/share/doc/wireshark-"
-"common/README.Debian."
+"common/README.Debian.gz após a instalação do pacote."
 
 #. Type: boolean
 #. Description

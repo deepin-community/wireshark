@@ -1301,7 +1301,16 @@ mk_length(dfilter_t *df, dfvm_value_t *from_arg, dfvm_value_t *to_arg)
 static const char *
 try_value_string(const header_field_info *hfinfo, fvalue_t *fv_num, char *buf)
 {
+	/* Note: The return value might be a pointer to buf (e.g., in the case
+	 * of BASE_CUSTOM). */
 	uint64_t val;
+
+	/* We checked this in the semantic check, but unfortunately there are
+	 * abbreviations shared by incompatible fields so we have to make sure.
+	 */
+	if (!ftype_can_val_to_uinteger64(hfinfo->type)) {
+		return NULL;
+	}
 
 	/* XXX - What about BASE_UNIT_STRING? Should we guarantee that we
 	 * don't get here for unit strings in semcheck.c (currently we
@@ -1314,6 +1323,18 @@ try_value_string(const header_field_info *hfinfo, fvalue_t *fv_num, char *buf)
 	/* XXX We should find or create instead a suitable function in proto.h
 	 * to perform this mapping. hf_try_val[64]_to_str are similar, though
 	 * don't handle BASE_CUSTOM but do handle BASE_UNIT_STRING */
+
+	if (hfinfo->type == FT_FRAMENUM) {
+		/* FT_FRAMENUM can be converted to an integer (and is compatible
+		 * with the integer types), but if it has an hfinfo->strings it
+		 * is not a value_string and will crash if treated as one.
+		 * Handle the corner case of a FT_FRAMENUM field registered with
+		 * the same abbreviation as a field with a value string.
+		 * (FT_PROTOCOL is caught above because it cannot be converted
+		 * to an integer.)
+		 */
+		return NULL;
+	}
 
 	if (hfinfo->display & BASE_RANGE_STRING) {
 		return try_rval_to_str((uint32_t)val, hfinfo->strings);
@@ -1335,6 +1356,13 @@ try_value_string(const header_field_info *hfinfo, fvalue_t *fv_num, char *buf)
 			((custom_fmt_func_64_t)hfinfo->strings)(buf, val);
 		else
 			ws_assert_not_reached();
+		/* XXX - This is ok because the caller immediately calls
+		 * fvalue_set_string on the return value, which copies it,
+		 * before the buffer passes out of scope. It might be safer
+		 * to declare the buffer on the stack here and have this
+		 * function return the fvalue_t* or NULL.
+		 */
+		return buf;
 	}
 	else {
 		return try_val_to_str((uint32_t)val, hfinfo->strings);

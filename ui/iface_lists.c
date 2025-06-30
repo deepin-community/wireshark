@@ -192,6 +192,12 @@ scan_local_interfaces_filtered(GList * allowed_types, void (*update_cb)(void))
             }
         }
         if (if_info->caps != NULL) {
+            /*
+             * XXX - We might have capabilities for the wrong monitor mode.
+             * Note that for a current device, the monitor mode setting in
+             * global_capture_opts.all_ifaces is *not* immediately written
+             * to prefs if the Capture Options dialog is still open.
+             */
             continue;
         }
         if_cap_query = g_new(if_cap_query_t, 1);
@@ -401,6 +407,23 @@ scan_local_interfaces_filtered(GList * allowed_types, void (*update_cb)(void))
             device.monitor_mode_supported = caps->can_set_rfmon;
             if (device.monitor_mode_enabled) {
                 lt_list = caps->data_link_types_rfmon;
+            }
+
+            if (lt_list == NULL) {
+                /* No failure in retrieving caps, but we have the wrong type.
+                 * We need to do a query for link-layer for the correct monitor
+                 * mode.
+                 */
+                ws_debug("%s missing correct link-layer type for monitor_mode %u",
+                    if_info->name, monitor_mode);
+                /* On Linux, if libpcap has been compiled with libnl support, this
+                 * can cause an infinite loop because of creating a new interface.
+                 */
+                caps = capture_get_if_capabilities(if_info->name, monitor_mode, NULL, NULL, NULL, update_cb);
+                if (caps) {
+                    g_hash_table_replace(capability_hash, g_strdup(if_info->name), caps);
+                    lt_list = (device.monitor_mode_enabled) ? caps->data_link_types_rfmon : caps->data_link_types;
+                }
             }
 #endif
             /*
@@ -613,7 +636,7 @@ update_local_interfaces(void)
 
     for (i = 0; i < global_capture_opts.all_ifaces->len; i++) {
         device = &g_array_index(global_capture_opts.all_ifaces, interface_t, i);
-        device->if_info.type = capture_dev_user_linktype_find(device->name);
+        device->active_dlt = capture_dev_user_linktype_find(device->name);
         g_free(device->display_name);
         descr = capture_dev_user_descr_find(device->name);
         device->display_name = get_iface_display_name(descr, &device->if_info);

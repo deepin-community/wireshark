@@ -440,6 +440,9 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
 
     ui->enableLegendCheckBox->setChecked(prefs.gui_io_graph_enable_legend ? true : false);
 
+    ui->actionLegend->setChecked(prefs.gui_io_graph_enable_legend);
+    connect(ui->actionLegend, &QAction::triggered, this, &IOGraphDialog::actionLegendTriggered);
+
     stat_timer_ = new QTimer(this);
     connect(stat_timer_, SIGNAL(timeout()), this, SLOT(updateStatistics()));
     stat_timer_->start(stat_update_interval_);
@@ -505,6 +508,7 @@ IOGraphDialog::IOGraphDialog(QWidget &parent, CaptureFile &cf, QString displayFi
     ctx_menu_.addAction(ui->actionDragZoom);
     ctx_menu_.addAction(ui->actionToggleTimeOrigin);
     ctx_menu_.addAction(ui->actionCrosshairs);
+    ctx_menu_.addAction(ui->actionLegend);
     set_action_shortcuts_visible_in_context_menu(ctx_menu_.actions());
 
     iop->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -1889,6 +1893,9 @@ void IOGraphDialog::on_enableLegendCheckBox_toggled(bool checked)
 
     prefs_main_write();
 
+    // We connect to the "triggered" signal for the QAction, which is
+    // not emitted when setChecked() is called.
+    ui->actionLegend->setChecked(checked);
     ui->ioPlot->legend->layer()->replot();
 }
 
@@ -2052,6 +2059,11 @@ void IOGraphDialog::buttonBoxClicked(QAbstractButton *button)
     default:
         break;
     }
+}
+
+void IOGraphDialog::actionLegendTriggered(bool checked)
+{
+    ui->enableLegendCheckBox->setChecked(checked);
 }
 
 void IOGraphDialog::makeCsv(QTextStream &stream) const
@@ -2608,24 +2620,19 @@ void IOGraph::recalcGraphData(capture_file *cap_file)
          * just to make sure average on leftmost and rightmost displayed
          * values is as reliable as possible
          */
-        uint64_t warmup_interval = 0;
+        unsigned warmup_interval = 0;
 
-//        for (; warmup_interval < first_interval; warmup_interval += interval_) {
-//            mavg_cumulated += get_it_value(io, i, (int)warmup_interval/interval_);
-//            mavg_in_average_count++;
-//            mavg_left++;
-//        }
-        mavg_cumulated += getItemValue((int)warmup_interval/interval_, cap_file);
+        mavg_cumulated += getItemValue((int)warmup_interval, cap_file);
         mavg_in_average_count++;
-        for (warmup_interval = interval_;
-            ((warmup_interval < (0 + (moving_avg_period_ / 2) * (uint64_t)interval_)) &&
-             (warmup_interval <= (cur_idx_ * (uint64_t)interval_)));
-             warmup_interval += interval_) {
+        for (warmup_interval = 1;
+            (warmup_interval < moving_avg_period_ / 2) &&
+             (warmup_interval <= (unsigned)cur_idx_);
+             warmup_interval += 1) {
 
-            mavg_cumulated += getItemValue((int)warmup_interval / interval_, cap_file);
+            mavg_cumulated += getItemValue((int)warmup_interval, cap_file);
             mavg_in_average_count++;
         }
-        mavg_to_add = (unsigned int)warmup_interval;
+        mavg_to_add = warmup_interval;
     }
 
     double ts_offset = startOffset();
@@ -2639,13 +2646,13 @@ void IOGraph::recalcGraphData(capture_file *cap_file)
                 if (mavg_left > moving_avg_period_ / 2) {
                     mavg_left--;
                     mavg_in_average_count--;
-                    mavg_cumulated -= getItemValue((int)mavg_to_remove / interval_, cap_file);
-                    mavg_to_remove += interval_;
+                    mavg_cumulated -= getItemValue(mavg_to_remove, cap_file);
+                    mavg_to_remove += 1;
                 }
-                if (mavg_to_add <= (unsigned int) cur_idx_ * interval_) {
+                if (mavg_to_add <= (unsigned int) cur_idx_) {
                     mavg_in_average_count++;
-                    mavg_cumulated += getItemValue((int)mavg_to_add / interval_, cap_file);
-                    mavg_to_add += interval_;
+                    mavg_cumulated += getItemValue(mavg_to_add, cap_file);
+                    mavg_to_add += 1;
                 }
             }
             if (mavg_in_average_count > 0) {

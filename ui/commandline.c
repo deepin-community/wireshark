@@ -89,7 +89,7 @@ commandline_print_usage(bool for_help_option) {
 #endif
 #ifdef CAN_SET_CAPTURE_BUFFER_SIZE
     fprintf(output, "  -B <buffer size>, --buffer-size <buffer size>\n");
-    fprintf(output, "                           size of kernel buffer (def: %dMB)\n", DEFAULT_CAPTURE_BUFFER_SIZE);
+    fprintf(output, "                           size of kernel buffer in MiB (def: %dMiB)\n", DEFAULT_CAPTURE_BUFFER_SIZE);
 #endif
     fprintf(output, "  -y <link type>, --linktype <link type>\n");
     fprintf(output, "                           link layer type (def: first appropriate)\n");
@@ -102,8 +102,8 @@ commandline_print_usage(bool for_help_option) {
     fprintf(output, "Capture display:\n");
     fprintf(output, "  -k                       start capturing immediately (def: do nothing)\n");
     fprintf(output, "  -S                       update packet display when new packets are captured\n");
-    fprintf(output, "  --update-interval        interval between updates with new packets (def: %dms)\n", DEFAULT_UPDATE_INTERVAL);
     fprintf(output, "  -l                       turn on automatic scrolling while -S is in use\n");
+    fprintf(output, "  --update-interval        interval between updates with new packets, in milliseconds (def: %dms)\n", DEFAULT_UPDATE_INTERVAL);
     fprintf(output, "Capture stop conditions:\n");
     fprintf(output, "  -c <packet count>        stop after n packets (def: infinite)\n");
     fprintf(output, "  -a <autostop cond.> ..., --autostop <autostop cond.> ...\n");
@@ -144,7 +144,7 @@ commandline_print_usage(bool for_help_option) {
     fprintf(output, "                           enable dissection of proto_name\n");
     fprintf(output, "  --disable-protocol <proto_name>\n");
     fprintf(output, "                           disable dissection of proto_name\n");
-    fprintf(output, "  --only-protocols <proto_name>\n");
+    fprintf(output, "  --only-protocols <protocols>\n");
     fprintf(output, "                           Only enable dissection of these protocols, comma\n");
     fprintf(output, "                           separated. Disable everything else\n");
     fprintf(output, "  --disable-all-protocols\n");
@@ -801,7 +801,10 @@ void commandline_other_options(int argc, char *argv[], bool opt_reset)
 
 /* Local function used by commandline_options_drop */
 static int cl_find_custom(const void *elem_data, const void *search_data) {
-    return memcmp(elem_data, search_data, strlen((char *)search_data));
+    const char *prefix = (const char *)search_data;
+    const char *opt_and_val = (const char *)elem_data;
+
+    return strncmp(opt_and_val, prefix, strlen(prefix));
 }
 
 /* Drop any options the user specified on the command line with `-o`
@@ -845,6 +848,43 @@ void commandline_options_reapply(void) {
         if (errmsg != NULL) {
             g_free(errmsg);
             errmsg = NULL;
+        }
+    }
+}
+
+void commandline_options_apply_extcap(void) {
+    char *errmsg = NULL;
+    GSList *entry = NULL;
+    char *pref_arg;
+
+    if (prefs.capture_no_extcap)
+        return;
+
+    for (entry = global_commandline_info.user_opts; entry != NULL; entry = g_slist_next(entry)) {
+        pref_arg = (char *)entry->data;
+        if (g_str_has_prefix(pref_arg, "extcap.")) {
+            switch (prefs_set_pref(pref_arg, &errmsg)) {
+                case PREFS_SET_OK:
+                    break;
+                case PREFS_SET_SYNTAX_ERR:
+                    cmdarg_err("Invalid -o flag \"%s\"%s%s", pref_arg,
+                            errmsg ? ": " : "", errmsg ? errmsg : "");
+                    g_free(errmsg);
+                    exit_application(1);
+                    break;
+                case PREFS_SET_NO_SUCH_PREF:
+                    cmdarg_err("-o flag \"%s\" specifies unknown preference/recent value",
+                               pref_arg);
+                    exit_application(1);
+                    break;
+                case PREFS_SET_OBSOLETE:
+                    cmdarg_err("-o flag \"%s\" specifies obsolete preference",
+                               pref_arg);
+                    exit_application(1);
+                    break;
+                default:
+                    ws_assert_not_reached();
+            }
         }
     }
 }

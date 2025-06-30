@@ -480,22 +480,20 @@ bool TrafficDataFilterProxy::lessThan(const QModelIndex &source_left, const QMod
                 qint64 lpart = subnet.indexOf("/");
                 ws_in4_addr ip4addr;
 
-                if(ws_inet_pton4(subnet.left(lpart).toUtf8().data(), &ip4addr)) {
+                if(ws_inet_pton4(subnet.left(int(lpart)).toUtf8().data(), &ip4addr)) {
                     quint32 valA = g_ntohl(ip4addr);
                     quint32 valB = model->data(source_right, ATapDataModel::DATA_IPV4_INTEGER).value<quint32>();
                     result = valA < valB;
-                    identical = valA == valB;
                 }
                 // else: never supposed to happen
             } else if ( (addressTypeA == AT_IPv4) && (addressTypeB == AT_STRINGZ) ) {
                 QString subnet = datB.toString();
                 qint64 lpart = subnet.indexOf("/");
                 ws_in4_addr ip4addr;
-                if(ws_inet_pton4(subnet.left(lpart).toUtf8().data(), &ip4addr)) {
+                if(ws_inet_pton4(subnet.left(int(lpart)).toUtf8().data(), &ip4addr)) {
                     quint32 valA = model->data(source_left, ATapDataModel::DATA_IPV4_INTEGER).value<quint32>();
                     quint32 valB = g_ntohl(ip4addr);
                     result = valA < valB;
-                    identical = valA == valB;
                 }
                 // else: never supposed to happen
             } else {
@@ -718,7 +716,7 @@ QMenu * TrafficTree::createActionSubMenu(FilterAction::Action cur_action, QModel
 
     QMenu * subMenu = new QMenu(FilterAction::actionName(cur_action));
     subMenu->setEnabled(_tapEnabled);
-    foreach (FilterAction::ActionType at, FilterAction::actionTypes()) {
+    foreach (FilterAction::ActionType at, FilterAction::actionTypes(cur_action)) {
         if (isConversation && conv_item) {
             QMenu *subsubmenu = subMenu->addMenu(FilterAction::actionTypeName(at));
 
@@ -819,6 +817,23 @@ void TrafficTree::resizeAction()
 {
     for (int col = 0; col < model()->columnCount(); col++)
         resizeColumnToContents(col);
+}
+
+void TrafficTree::widenColumnToContents(int col)
+{
+    if (!model())
+        return;
+
+    if (col < 0 || col >= model()->columnCount())
+        return;
+
+    int content_width = sizeHintForColumn(col);
+    if (!isHeaderHidden()) {
+        content_width = qMax(content_width, header()->sectionSizeHint(col));
+    }
+    if (content_width > columnWidth(col)) {
+        setColumnWidth(col, content_width);
+    }
 }
 
 void TrafficTree::toggleSaveRawAction()

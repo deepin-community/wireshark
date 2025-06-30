@@ -452,7 +452,7 @@ print_usage(FILE *output)
 #endif
 #ifdef CAN_SET_CAPTURE_BUFFER_SIZE
     fprintf(output, "  -B <buffer size>, --buffer-size <buffer size>\n");
-    fprintf(output, "                           size of kernel buffer (def: %dMB)\n", DEFAULT_CAPTURE_BUFFER_SIZE);
+    fprintf(output, "                           size of kernel buffer in MiB (def: %dMiB)\n", DEFAULT_CAPTURE_BUFFER_SIZE);
 #endif
     fprintf(output, "  -y <link type>, --linktype <link type>\n");
     fprintf(output, "                           link layer type (def: first appropriate)\n");
@@ -461,8 +461,9 @@ print_usage(FILE *output)
     fprintf(output, "  -L, --list-data-link-types\n");
     fprintf(output, "                           print list of link-layer types of iface and exit\n");
     fprintf(output, "  --list-time-stamp-types  print list of timestamp types for iface and exit\n");
-    fprintf(output, "  --update-interval        interval between updates with new packets (def: %dms)\n", DEFAULT_UPDATE_INTERVAL);
     fprintf(output, "\n");
+    fprintf(output, "Capture display:\n");
+    fprintf(output, "  --update-interval        interval between updates with new packets, in milliseconds (def: %dms)\n", DEFAULT_UPDATE_INTERVAL);
     fprintf(output, "Capture stop conditions:\n");
     fprintf(output, "  -c <packet count>        stop after n packets (def: infinite)\n");
     fprintf(output, "  -a <autostop cond.> ..., --autostop <autostop cond.> ...\n");
@@ -639,7 +640,7 @@ glossary_option_help(void)
     fprintf(output, "  -G elastic-mapping       dump ElasticSearch mapping file\n");
     fprintf(output, "  -G enterprises           dump IANA Private Enterprise Number (PEN) table\n");
     fprintf(output, "  -G fieldcount            dump count of header fields and exit\n");
-    fprintf(output, "  -G fields [prefix]       dump fields glossary and exit\n");
+    fprintf(output, "  -G fields,[prefix]       dump fields glossary and exit\n");
     fprintf(output, "  -G ftypes                dump field type basic and descriptive names\n");
     fprintf(output, "  -G heuristic-decodes     dump heuristic dissector tables\n");
     fprintf(output, "  -G manuf                 dump ethernet manufacturer tables\n");
@@ -1136,14 +1137,8 @@ main(int argc, char *argv[])
     while ((opt = ws_getopt_long(argc, argv, optstring, long_options, NULL)) != -1) {
         switch (opt) {
             case LONGOPT_GLOBAL_PROFILE:
-                {
-                    char *global_dir;
-
-                    global_dir = get_global_profiles_dir();
-                    set_persconffile_dir(global_dir);
-                    g_free(global_dir);
+                    set_persconffile_dir(get_datafile_dir());
                     break;
-                }
             default:
                 break;
         }
@@ -1344,16 +1339,17 @@ main(int argc, char *argv[])
                 goto clean_exit;
             }
             else if (strcmp(argv[2], "fields") == 0) {
-                if (argc >= 4) {
-                    bool matched = proto_registrar_dump_field_completions(argv[3]);
-                    if (!matched) {
-                        cmdarg_err("No field or protocol begins with \"%s\"", argv[3]);
-                        exit_status = EXIT_FAILURE;
-                        goto clean_exit;
-                    }
-                }
-                else {
-                    proto_registrar_dump_fields();
+                epan_load_settings();
+                proto_registrar_dump_fields();
+            }
+            else if (strncmp(argv[2], "fields,", strlen("fields,")) == 0) {
+                epan_load_settings();
+                char* prefix = argv[2] + strlen("fields,");
+                bool matched = proto_registrar_dump_field_completions(prefix);
+                if (!matched) {
+                    cmdarg_err("No field or protocol begins with \"%s\"", prefix);
+                    exit_status = EXIT_FAILURE;
+                    goto clean_exit;
                 }
             }
             else if (strcmp(argv[2], "folders") == 0) {
@@ -3896,6 +3892,7 @@ process_cap_file_single_pass(capture_file *cf, wtap_dumper *pdh,
     epan_dissect_t *edt = NULL;
     int64_t         data_offset;
     pass_status_t   status = PASS_SUCCEEDED;
+    bool            visible = false;
 
     wtap_rec_init(&rec);
     ws_buffer_init(&buf, 1514);
@@ -3939,7 +3936,7 @@ process_cap_file_single_pass(capture_file *cf, wtap_dumper *pdh,
            ("print_packet_info" is true) and we're in verbose mode
            ("packet_details" is true). But if we specified certain fields with
            "-e", we'll prime those directly later. */
-        bool visible = print_packet_info && print_details && output_fields_num_fields(output_fields) == 0;
+        visible = print_packet_info && print_details && output_fields_num_fields(output_fields) == 0;
         edt = epan_dissect_new(cf->epan, create_proto_tree, visible);
     }
 
@@ -3969,7 +3966,7 @@ process_cap_file_single_pass(capture_file *cf, wtap_dumper *pdh,
 
         ws_debug("tshark: processing packet #%d", framenum);
 
-        reset_epan_mem(cf, edt, create_proto_tree, print_packet_info && print_details);
+        reset_epan_mem(cf, edt, create_proto_tree, visible);
 
         if (process_packet_single_pass(cf, edt, data_offset, &rec, &buf, tap_flags)) {
             /* Either there's no read filtering or this packet passed the
@@ -5064,7 +5061,7 @@ tshark_cmdarg_err_cont(const char *msg_format, va_list ap)
 static void
 reset_epan_mem(capture_file *cf,epan_dissect_t *edt, bool tree, bool visual)
 {
-    if (!epan_auto_reset || (cf->count < epan_auto_reset_count))
+    if (!epan_auto_reset || (cf->count < epan_auto_reset_count) || !edt)
         return;
 
     fprintf(stderr, "resetting session.\n");

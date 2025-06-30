@@ -19,12 +19,15 @@ BEGIN
 
 IMPORTS
 
-ItsPduHeader, MessageRateHz, MessageSegmentationInfo, OrdinalNumber1B,  ReferencePosition, StationType, TimestampIts
-FROM ETSI-ITS-CDD {itu-t (0) identified-organization (4) etsi (0) itsDomain (5) wg1 (1) ts (102894) cdd (2) major-version-3 (3) minor-version-1 (1)}
+MessageRateHz, ItsPduHeader, MessageSegmentationInfo, TimestampIts
+FROM ETSI-ITS-CDD {itu-t (0) identified-organization (4) etsi (0) itsDomain (5) wg1 (1) 102894 cdd (2) major-version-4 (4) minor-version-1 (1)}
+
+OrdinalNumber1B,  ReferencePosition, StationType
+FROM ETSI-ITS-CDDv1 {itu-t (0) identified-organization (4) etsi (0) itsDomain (5) wg1 (1) ts (102894) cdd (2) major-version-3 (3) minor-version-1 (1)}
 --WITH SUCCESSORS
 
 OriginatingRsuContainer, OriginatingVehicleContainer
-FROM CPM-OriginatingStationContainers {itu-t (0) identified-organization (4) etsi (0) itsDomain (5) wg1 (1) ts (103324) originatingStationContainers (2) major-version-1 (1) minor-version-1(1)}
+FROM CPM-OriginatingStationContainersv1 {itu-t (0) identified-organization (4) etsi (0) itsDomain (5) wg1 (1) ts (103324) originatingStationContainers (2) major-version-1 (1) minor-version-1(1)}
 --WITH SUCCESSORS
 
 SensorInformationContainer
@@ -89,8 +92,14 @@ WrappedCpmContainer ::= SEQUENCE {
    containerData   CPM-CONTAINER-ID-AND-TYPE.&Type( {CpmContainers}{@containerId} )
 }
 
+-- asn2wr script generates C code marking this list as extensible
+-- However, further constraining the field with WITH COMPONENT(S)
+-- removes this bit. To fix this, the flag is explicitly removed.
+-- As this seems to be a problem for ITS implementations a prefernce is introduced
+-- to decode the faulty implementation.
 
-WrappedCpmContainers::= SEQUENCE SIZE(1..8,...) OF WrappedCpmContainer 
+-- WrappedCpmContainers::= SEQUENCE SIZE(1..8,...) OF WrappedCpmContainer 
+WrappedCpmContainers::= SEQUENCE SIZE(1..8) OF WrappedCpmContainer 
 
 ConstraintWrappedCpmContainers ::= WrappedCpmContainers
 --    ((WITH COMPONENT (WITH COMPONENTS {..., containerId (ALL EXCEPT 1)})) |

@@ -8423,9 +8423,6 @@ cigi4_add_tree(tvbuff_t *tvb, packet_info *pinfo, proto_tree *cigi_tree)
         } else if ( packet_id == CIGI4_PACKET_ID_LINE_OF_SIGHT_RESPONSE ) {
             hf_cigi4_packet = hf_cigi3_line_of_sight_response;
             packet_length = CIGI4_PACKET_SIZE_LINE_OF_SIGHT_RESPONSE;
-        } else if ( packet_id == CIGI4_PACKET_ID_LINE_OF_SIGHT_RESPONSE ) {
-            hf_cigi4_packet = hf_cigi3_line_of_sight_response;
-            packet_length = CIGI4_PACKET_SIZE_LINE_OF_SIGHT_RESPONSE;
         } else if ( packet_id == CIGI4_PACKET_ID_LINE_OF_SIGHT_EXTENDED_RESPONSE ) {
             hf_cigi4_packet = hf_cigi3_line_of_sight_extended_response;
             packet_length = CIGI4_PACKET_SIZE_LINE_OF_SIGHT_EXTENDED_RESPONSE;
@@ -9691,6 +9688,11 @@ proto_register_cigi(void)
 
 
         /* CIGI4 Articulated Part Control */
+        { &hf_cigi4_articulated_part_control_part_enable_flags,
+            { "Request Flags", "cigi.art_part_control.flags",
+                FT_UINT8, BASE_HEX, NULL, 0x0,
+                NULL, HFILL }
+        },
 
         /* CIGI3 Short Articulated Part Control */
         { &hf_cigi3_short_articulated_part_control,

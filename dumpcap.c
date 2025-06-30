@@ -35,6 +35,8 @@
 
 #include <wsutil/array.h>
 #include <wsutil/cmdarg_err.h>
+#include <wsutil/report_message.h>
+#include <wsutil/failure_message_simple.h>
 #include <wsutil/strtoi.h>
 #include <cli_main.h>
 #include <wsutil/version_info.h>
@@ -109,6 +111,7 @@
 
 #ifdef _WIN32
 #include "wsutil/win32-utils.h"
+#include "wsutil/console_win32.h"
 #ifdef DEBUG_DUMPCAP
 #include <conio.h>          /* _getch() */
 #endif
@@ -452,7 +455,7 @@ print_usage(FILE *output)
     fprintf(output, "\n");
     fprintf(output, "Capture interface:\n");
     fprintf(output, "  -i <interface>, --interface <interface>\n");
-    fprintf(output, "                           name or idx of interface (def: first non-loopback),\n"
+    fprintf(output, "                           name or idx of interface (def: first non-loopback)\n"
 #ifdef HAVE_PCAP_REMOTE
                     "                           or for remote capturing, use one of these formats:\n"
                     "                               rpcap://<host>/<interface>\n"
@@ -488,7 +491,7 @@ print_usage(FILE *output)
     fprintf(output, "  -L, --list-data-link-types\n");
     fprintf(output, "                           print list of link-layer types of iface and exit\n");
     fprintf(output, "  --list-time-stamp-types  print list of timestamp types for iface and exit\n");
-    fprintf(output, "  --update-interval        interval between updates with new packets (def: %dms)\n", DEFAULT_UPDATE_INTERVAL);
+    fprintf(output, "  --update-interval        interval between updates with new packets, in milliseconds (def: %dms)\n", DEFAULT_UPDATE_INTERVAL);
     fprintf(output, "  -d                       print generated BPF code for capture filter\n");
     fprintf(output, "  -k <freq>,[<type>],[<center_freq1>],[<center_freq2>]\n");
     fprintf(output, "                           set channel on wifi interface\n");
@@ -2992,7 +2995,9 @@ pcapng_pipe_dispatch(loop_data *ld, capture_src *pcap_src, char *errmsg, size_t 
              *
              * Continue the read process.
              */
-            pcapng_read_shb(pcap_src, errmsg, errmsgl);
+            if (pcapng_read_shb(pcap_src, errmsg, errmsgl)) {
+                break;
+            }
             return 1;
         }
 
@@ -5247,6 +5252,14 @@ main(int argc, char *argv[])
     /* Initialize log handler early so we can have proper logging during startup. */
     ws_log_init_with_writer("dumpcap", dumpcap_log_writer, vcmdarg_err);
 
+#ifdef _WIN32
+    /* If running as a capture child, under no circumstances attempt to wait
+     * for the user to press a key before detaching from a console. */
+    if (capture_child) {
+        set_console_wait(false);
+    }
+#endif
+
     /* Early logging command-line initialization. */
     ws_log_parse_args(&argc, argv, vcmdarg_err, 1);
 
@@ -5461,6 +5474,8 @@ main(int argc, char *argv[])
     /*   Set euid/egid = ruid/rgid to remove suid privileges    */
     relinquish_privs_except_capture();
 #endif
+
+    init_report_failure_message_simple("dumpcap");
 
     /* Set the initial values in the capture options. This might be overwritten
        by the command line parameters. */
@@ -5783,6 +5798,12 @@ main(int argc, char *argv[])
             for (GList *if_entry = if_list; if_entry != NULL; if_entry = g_list_next(if_entry)) {
                 if_info = (if_info_t *)if_entry->data;
 
+                /*
+                 * XXX - If on the command line we had the options -i <interface> -I,
+                 * we should retrieve the link-types for the interface in monitor mode.
+                 * We've already copied that information to global_capture_opts, but
+                 * the below statement wipes it away.
+                 */
                 interface_opts = interface_opts_from_if_info(&global_capture_opts, if_info);
 
                 if_info->caps = get_if_capabilities(interface_opts, &open_status, &open_status_str);

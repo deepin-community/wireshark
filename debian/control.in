@@ -38,7 +38,7 @@ Build-Depends: @QT_BUILD_DEPS@,
                libsbc-dev,
                libnghttp2-dev,
                libnghttp3-dev,
-               @LIBSSH_DEV@,
+               libssh-dev,
                liblz4-dev,
                libsnappy-dev,
                libzstd-dev,
@@ -88,7 +88,9 @@ Depends: ${shlibs:Depends},
 Recommends: @QT_RECOMMENDS@
 Conflicts: wireshark-qt (<< 4.4~),
         wireshark-gtk (<< 3.0.0~)
-Replaces: wireshark-qt (<< 4.4~),
+Breaks: libwireshark-data (<< 4.4.3-2~)
+Replaces: libwireshark-data (<< 4.4.3-2~),
+          wireshark-qt (<< 4.4~),
           wireshark-gtk (<< 3.0.0~)
 Description: network traffic analyzer - graphical interface
  Wireshark is a network "sniffer" - a tool that captures and analyzes
@@ -115,10 +117,9 @@ Depends: ${misc:Depends},
          ${shlibs:Depends},
          omniidl,
          libpcap0.8-dev,
-         libglib2.0-dev,
          ${python3:Depends},
          python3-ply,
-         snacc,
+         esnacc,
          libwireshark-dev,
          libwiretap-dev
 Description: network traffic analyzer - development tools
@@ -202,6 +203,7 @@ Package: libwireshark-dev
 Architecture: any
 Section: libdevel
 Depends: ${misc:Depends},
+         libglib2.0-dev,
          libwsutil-dev,
          libwiretap-dev,
          libwireshark18 (= ${binary:Version})

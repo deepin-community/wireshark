@@ -10,7 +10,7 @@
 include /usr/share/dpkg/pkg-info.mk
 
 QT6_BUILD_DEPS = qt6-5compat-dev, qt6-base-dev, qt6-base-dev-tools, qt6-multimedia-dev, qt6-tools-dev
-QT6_DEPS = libqt6svg6
+QT6_DEPS = libqt6svg6,\n         qt6-qpa-plugins
 QT6_RECOMMENDS = libqt6multimedia6
 QT5_BUILD_DEPS = qtbase5-dev, qtbase5-dev-tools, qtbase5-dev-tools, qtmultimedia5-dev, qttools5-dev
 QT5_DEPS = libqt5svg5
@@ -24,11 +24,6 @@ CONTROL_IN_SED_CMD := $(CONTROL_IN_SED_CMD)s/@QT_BUILD_DEPS@/$(QT6_BUILD_DEPS)/;
 endif
 ifneq ($(filter focal,$(DEB_DISTRIBUTION)),)
 CONTROL_IN_SED_CMD := $(CONTROL_IN_SED_CMD)s/^ *libbcg729-dev/\# libbcg729-dev/;s/^ *libnghttp3-dev/\# libnghttp3-dev/;
-endif
-ifneq ($(filter noble oracular unstable sid testing trixie UNRELEASED,$(DEB_DISTRIBUTION)),)
-CONTROL_IN_SED_CMD := $(CONTROL_IN_SED_CMD)s/@LIBSSH_DEV@/libssh-dev/;
-else
-CONTROL_IN_SED_CMD := $(CONTROL_IN_SED_CMD)s/@LIBSSH_DEV@/libssh-gcrypt-dev/;
 endif
 
 # This has to be exported to make some magic below work.

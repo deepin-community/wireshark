@@ -111,6 +111,7 @@ compatible_ftypes(ftenum_t a, ftenum_t b)
 		case FT_IEEE_11073_FLOAT:
 		case FT_IPv4:
 		case FT_IPv6:
+		case FT_GUID:
 			return a == b;
 
 		case FT_FLOAT:		/* XXX - should be able to compare with INT */
@@ -126,14 +127,13 @@ compatible_ftypes(ftenum_t a, ftenum_t b)
 		case FT_ETHER:
 		case FT_BYTES:
 		case FT_UINT_BYTES:
-		case FT_GUID:
 		case FT_OID:
 		case FT_VINES:
 		case FT_FCWWN:
 		case FT_REL_OID:
 		case FT_SYSTEM_ID:
 
-			return (b == FT_ETHER || b == FT_BYTES || b == FT_UINT_BYTES || b == FT_GUID || b == FT_OID || b == FT_VINES || b == FT_FCWWN || b == FT_REL_OID || b == FT_SYSTEM_ID);
+			return (b == FT_ETHER || b == FT_BYTES || b == FT_UINT_BYTES || b == FT_OID || b == FT_VINES || b == FT_FCWWN || b == FT_REL_OID || b == FT_SYSTEM_ID);
 
 		case FT_UINT8:
 		case FT_UINT16:
@@ -397,7 +397,15 @@ mk_uint64_fvalue(uint64_t val)
  * If the mapping number<->string is unique convert the string to a number
  * by inverting the value string function.
  * Otherwise we compile it as a string and map the field value at runtime
- * to a string for the comparison. */
+ * to a string for the comparison.
+ *
+ * XXX - This should check all hfinfo with the same abbreviation, not just the
+ * last registered. If there are multiple fields registered, then all the fields
+ * must map the same number (and only that number) to the string in order for
+ * optimizing into a number test to be valid (see #19111). Otherwise, we should
+ * allow the string match if it at least one field with the same abbreviation has
+ * a value string with that string as an entry.
+ */
 static enum mk_result
 mk_fvalue_from_val_string(dfwork_t *dfw, header_field_info *hfinfo, const char *s, stnode_t *st)
 {
@@ -607,7 +615,6 @@ is_bytes_type(enum ftenum type)
 		case FT_BYTES:
 		case FT_UINT_BYTES:
 		case FT_IPv6:
-		case FT_GUID:
 		case FT_OID:
 		case FT_REL_OID:
 		case FT_SYSTEM_ID:
@@ -623,6 +630,7 @@ is_bytes_type(enum ftenum type)
 		case FT_RELATIVE_TIME:
 		case FT_IPv4:
 		case FT_IPXNET:
+		case FT_GUID:
 		case FT_STRING:
 		case FT_STRINGZ:
 		case FT_UINT_STRING:
@@ -1039,10 +1047,6 @@ check_relation_LHS_FIELD(dfwork_t *dfw, stnode_op_t st_op,
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
 	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
-	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
@@ -1106,10 +1110,6 @@ check_relation_LHS_FVALUE(dfwork_t *dfw, stnode_op_t st_op,
 			FAIL(dfw, st_arg2, "%s (type=%s) cannot participate in specified comparison.",
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
-	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
@@ -1236,10 +1236,6 @@ check_relation_LHS_SLICE(dfwork_t *dfw, stnode_op_t st_op _U_,
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
 	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
-	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
@@ -1272,7 +1268,7 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, stnode_op_t st_op _U_,
 
 		if (!compatible_ftypes(ftype1, ftype2)) {
 			FAIL(dfw, st_arg2, "Function %s and %s are not of compatible types.",
-					sttype_function_name(st_arg2), stnode_todisplay(st_arg2));
+					sttype_function_name(st_arg1), stnode_todisplay(st_arg2));
 		}
 		/* Do this check even though you'd think that if
 		 * they're compatible, then can_func() would pass. */
@@ -1349,10 +1345,6 @@ check_relation_LHS_FUNCTION(dfwork_t *dfw, stnode_op_t st_op _U_,
 			FAIL(dfw, st_arg2, "%s (type=%s) cannot participate in specified comparison.",
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
-	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
@@ -1455,10 +1447,6 @@ check_relation_LHS_ARITHMETIC(dfwork_t *dfw, stnode_op_t st_op _U_,
 			FAIL(dfw, st_arg2, "%s (type=%s) cannot participate in specified comparison.",
 					stnode_todisplay(st_arg2), ftype_pretty_name(ftype2));
 		}
-	}
-	else if (type2 == STTYPE_UNPARSED) {
-		resolve_unparsed(dfw, st_arg2, true);
-		ASSERT_STTYPE_NOT_REACHED(type2);
 	}
 	else {
 		ASSERT_STTYPE_NOT_REACHED(type2);
@@ -1638,6 +1626,7 @@ check_relation_in(dfwork_t *dfw, stnode_t *st_node _U_,
 	nodelist = stnode_data(st_arg2);
 	while (nodelist) {
 		node_left = nodelist->data;
+		resolve_unparsed(dfw, node_left, false);
 
 		/* Don't let a range on the RHS affect the LHS field. */
 		if (stnode_type_id(node_left) == STTYPE_SLICE) {
@@ -1649,6 +1638,7 @@ check_relation_in(dfwork_t *dfw, stnode_t *st_node _U_,
 		ws_assert(nodelist);
 		node_right = nodelist->data;
 		if (node_right) {
+			resolve_unparsed(dfw, node_right, false);
 			check_relation_LHS_FIELD(dfw, STNODE_OP_GE, ftype_can_cmp,
 					false, st_node, st_arg1, node_left);
 			check_relation_LHS_FIELD(dfw, STNODE_OP_LE, ftype_can_cmp,

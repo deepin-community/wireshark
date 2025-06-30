@@ -4294,6 +4294,14 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Пробел</translation>
     </message>
     <message>
+        <source>Legend</source>
+        <translation>Легенда</translation>
+    </message>
+    <message>
+        <source>Toggle legend</source>
+        <translation>Переключить легенду</translation>
+    </message>
+    <message>
         <source>Zoom In X Axis</source>
         <translation>Увеличить масштаб по оси X</translation>
     </message>
@@ -5173,8 +5181,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation>Поддерживаемые поля: data, dir, time, seqno</translation>
     </message>
     <message>
-        <source>Missing capturing group data (use (?</source>
-        <translation>Отсутствуют данные группы захвата (use (?</translation>
+        <source>Missing capturing group data (use (?&lt;data&gt;(...)) )</source>
+        <translation>Отсутствующие данные о группе захвата (используйте (?&lt;data&gt;(...)))</translation>
     </message>
     <message>
         <source>Import From Hex Dump</source>

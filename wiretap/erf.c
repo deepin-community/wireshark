@@ -2977,7 +2977,7 @@ static int populate_interface_info(erf_t *erf_priv, wtap *wth, union wtap_pseudo
     if_info->set_flags.fcs_len = 1;
   }
 
-  if (state->if_map->module_snaplen != (uint32_t) -1 && !if_info->set_flags.snaplen) {
+  if (state->if_map->module_snaplen != (uint32_t) -1 && !if_info->set_flags.snaplen && tag.value) {
     int_data_mand->snap_len = pntoh32(tag.value);
     if_info->set_flags.snaplen = 1;
   }
@@ -3224,8 +3224,8 @@ static int populate_summary_info(erf_t *erf_priv, wtap *wth, union wtap_pseudo_h
 {
   struct erf_meta_read_state state = {0};
   struct erf_meta_read_state *state_post = NULL;
-  uint64_t host_id;
-  uint8_t source_id;
+  uint64_t host_id = 0;
+  uint8_t source_id = 0;
   GList *post_list = NULL;
   GList *item = NULL;
 

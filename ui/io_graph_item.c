@@ -144,6 +144,8 @@ double get_io_graph_item(const io_graph_item_t *items_, io_graph_item_unit_t val
     const io_graph_item_t *item;
     uint32_t   interval;
 
+    ws_return_val_if(idx < 0, 0);
+
     item = &items_[idx];
 
     // Basic units
@@ -188,10 +190,10 @@ double get_io_graph_item(const io_graph_item_t *items_, io_graph_item_unit_t val
             value = item->double_tot;
             break;
         case IOG_ITEM_UNIT_CALC_MAX:
-            value = item->int_max;
+            value = (double)item->int_max;
             break;
         case IOG_ITEM_UNIT_CALC_MIN:
-            value = item->int_min;
+            value = (double)item->int_min;
             break;
         case IOG_ITEM_UNIT_CALC_THROUGHPUT:
             value = item->double_tot*(8*1000000/interval_);
@@ -221,10 +223,10 @@ double get_io_graph_item(const io_graph_item_t *items_, io_graph_item_unit_t val
             value = item->double_tot;
             break;
         case IOG_ITEM_UNIT_CALC_MAX:
-            value = item->uint_max;
+            value = (double)item->uint_max;
             break;
         case IOG_ITEM_UNIT_CALC_MIN:
-            value = item->uint_min;
+            value = (double)item->uint_min;
             break;
         case IOG_ITEM_UNIT_CALC_THROUGHPUT:
             value = item->double_tot*(8*1000000/interval_);
