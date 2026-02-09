@@ -32,6 +32,7 @@
 #include <wsutil/unicode-utils.h>
 
 #include <ftypes/ftypes.h>
+#include <ftypes/ftypes-int.h>
 
 #include "packet.h"
 #include "exceptions.h"
@@ -6267,7 +6268,7 @@ proto_tree_add_mac48_detail(const mac_hf_list_t *list_specific,
 			    int idx, tvbuff_t *tvb,
 			    proto_tree *tree, int offset)
 {
-	const uint8_t  addr[6];
+	uint8_t  addr[6];
 	const char    *addr_name  = NULL;
 	const char    *oui_name   = NULL;
 	proto_item    *addr_item  = NULL;
@@ -9758,8 +9759,8 @@ proto_register_subtree_array(int * const *indices, const int num_indices)
 static void
 mark_truncated(char *label_str, size_t name_pos, const size_t size)
 {
-	static const char  trunc_str[] = " [" UTF8_HORIZONTAL_ELLIPSIS "]";
-	const size_t       trunc_len = sizeof(trunc_str)-1;
+	static const char  trunc_str[] = " [" UTF8_HORIZONTAL_ELLIPSIS "] ";
+	const size_t       trunc_len = sizeof(trunc_str)-2; /* Default do not include the trailing space. */
 	char              *last_char;
 
 	/* ..... field_name: dataaaaaaaaaaaaa
@@ -9773,8 +9774,12 @@ mark_truncated(char *label_str, size_t name_pos, const size_t size)
 
 	if (name_pos < size - trunc_len) {
 		memmove(label_str + name_pos + trunc_len, label_str + name_pos, size - name_pos - trunc_len);
-		memcpy(label_str + name_pos, trunc_str, trunc_len);
-
+		if (name_pos == 0) {
+			/* Copy the trunc_str after the first byte, so that we don't have a leading space in the label. */
+			memcpy(label_str, trunc_str + 1, trunc_len);
+		} else {
+			memcpy(label_str + name_pos, trunc_str, trunc_len);
+		}
 		/* in general, label_str is UTF-8
 		   we can truncate it only at the beginning of a new character
 		   we go backwards from the byte right after our buffer and
@@ -12162,11 +12167,7 @@ construct_match_selected_string(const field_info *finfo, epan_dissect_t *edt,
 				char **filter)
 {
 	const header_field_info *hfinfo;
-	char		  *ptr;
-	int		   buf_len;
-	int		   i;
 	int		   start, length, length_remaining;
-	uint8_t		   c;
 
 	if (!finfo)
 		return false;
@@ -12282,22 +12283,9 @@ construct_match_selected_string(const field_info *finfo, epan_dissect_t *edt,
 
 			if (filter != NULL) {
 				start = finfo->start;
-				buf_len = 32 + length * 3;
-				*filter = (char *)wmem_alloc0(NULL, buf_len);
-				ptr = *filter;
-
-				ptr += snprintf(ptr, buf_len-(ptr-*filter),
-					"frame[%d:%d] == ", finfo->start, length);
-				for (i=0; i<length; i++) {
-					c = tvb_get_uint8(finfo->ds_tvb, start);
-					start++;
-					if (i == 0 ) {
-						ptr += snprintf(ptr, buf_len-(ptr-*filter), "%02x", c);
-					}
-					else {
-						ptr += snprintf(ptr, buf_len-(ptr-*filter), ":%02x", c);
-					}
-				}
+				char *str = bytes_to_dfilter_repr(NULL, tvb_get_ptr(finfo->ds_tvb, start, length), length);
+				*filter = wmem_strdup_printf(NULL, "frame[%d:%d] == %s", finfo->start, length, str);
+				wmem_free(NULL, str);
 			}
 			break;
 
@@ -13375,7 +13363,7 @@ proto_tree_add_bits_ret_val(proto_tree *tree, const int hfindex, tvbuff_t *tvb,
 	if ((item = _proto_tree_add_bits_ret_val(tree, hfindex, tvb,
 						 bit_offset, no_of_bits,
 						 return_value, encoding))) {
-		FI_SET_FLAG(PNODE_FINFO(item), FI_BITS_OFFSET(bit_offset));
+		FI_SET_FLAG(PNODE_FINFO(item), FI_BITS_OFFSET(bit_offset&0x7));
 		FI_SET_FLAG(PNODE_FINFO(item), FI_BITS_SIZE(no_of_bits));
 	}
 	return item;
@@ -13507,7 +13495,7 @@ proto_tree_add_bits_format_value(proto_tree *tree, const int hfindex,
 	if ((item = _proto_tree_add_bits_format_value(tree, hfindex,
 						      tvb, bit_offset, no_of_bits,
 						      value_ptr, encoding, value_str))) {
-		FI_SET_FLAG(PNODE_FINFO(item), FI_BITS_OFFSET(bit_offset));
+		FI_SET_FLAG(PNODE_FINFO(item), FI_BITS_OFFSET(bit_offset&0x7));
 		FI_SET_FLAG(PNODE_FINFO(item), FI_BITS_SIZE(no_of_bits));
 	}
 	return item;

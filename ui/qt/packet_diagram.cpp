@@ -251,8 +251,12 @@ public:
         }
         paintLabel(painter, label, scaled_tr_);
 
-        if (layout_->showFields()) {
-            label = finfo_->toString();
+        if (layout_->showFields() && finfo_->headerInfo().type != FT_NONE) {
+            if (representation_.isEmpty()) {
+                label = finfo_->toString();
+            } else {
+                label = representation_;
+            }
             paintLabel(painter, label, scaled_tr_.adjusted(0, scaled_tr_.height(), 0, scaled_tr_.height()));
         }
     }

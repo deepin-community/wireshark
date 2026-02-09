@@ -837,6 +837,13 @@
         <source>Start / elapsed:</source>
         <translation>Start / passerat:</translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation>
+            <numerusform>%Ln dygn</numerusform>
+            <numerusform>%Ln dygn</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Automatically detect file type</source>
         <translation>Detektera automatiskt filtyp</translation>
@@ -1048,6 +1055,13 @@
     <message>
         <source>Elapsed</source>
         <translation>Förflutet</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation>
+            <numerusform>%Ln dygn</numerusform>
+            <numerusform>%Ln dygn</numerusform>
+        </translation>
     </message>
     <message>
         <source>Section %1</source>
@@ -15305,10 +15319,10 @@ a:hover {
         <translation>Ta bort paketkommentarer</translation>
     </message>
     <message numerus="yes">
-        <source>Delete comments from %n packet(s)</source>
-        <translation>
-            <numerusform>Ta bort kommentarer från %n paket</numerusform>
-            <numerusform>Ta bort kommentarer från %n paket</numerusform>
+        <source>Delete comments from %Ln packet(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>

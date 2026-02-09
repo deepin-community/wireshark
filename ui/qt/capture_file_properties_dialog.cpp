@@ -227,9 +227,9 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
             /* elapsed seconds */
             QString elapsed_str;
             unsigned int elapsed_time = (unsigned int)summary.elapsed_time;
-            if (elapsed_time/86400)
-            {
-                elapsed_str = QString("%1 days ").arg(elapsed_time / 86400);
+            unsigned int days = elapsed_time / 86400;
+            if (days) {
+                elapsed_str = tr("%Ln day(s)", "", days) + " ";
             }
 
             elapsed_str += QString("%1:%2:%3")
@@ -342,7 +342,7 @@ QString CaptureFilePropertiesDialog::summaryToHtml()
             if (iface.drops_known) {
                 interface_drops = QString("%1 (%2%)").arg(iface.drops).arg(QString::number(
                     /* MSVC cannot convert from unsigned __int64 to float, so first convert to signed __int64 */
-                    summary.packet_count ? (100.0 * (int64_t)iface.drops)/summary.packet_count : 0, 'f', 1));
+                    summary.packet_count ? (100.0 * (int64_t)iface.drops)/(summary.packet_count + iface.drops) : 0, 'f', 1));
             }
 
             /* Capture filter */

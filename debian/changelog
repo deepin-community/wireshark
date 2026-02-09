@@ -1,3 +1,23 @@
+wireshark (4.4.13-0+deb13u1) trixie-security; urgency=medium
+
+  * Team upload.
+  * New upstream version 4.4.13-0+deb13u1
+    - CVE-2025-9817: SSH dissector crash
+    - CVE-2025-11626: MONGO dissector infinite loop
+    - CVE-2025-13499: Kafka dissector crash
+    - CVE-2025-13945: HTTP3 dissector crash
+    - CVE-2025-13946: MEGACO dissector infinite loop
+    - CVE-2026-0959: IEEE 802.11 protocol dissector crash
+    - CVE-2026-0960: HTTP3 protocol dissector infinite loop
+    - CVE-2026-0961: BLF file parser crash
+    - CVE-2026-0962: SOME/IP-SD protocol dissector crash
+  * d/libwsutil16.symbols: Update to reflect New Upstream version
+  * d/patches:
+    - 0001-tools-Use-esnacc-instead...patch: Drop patch merged upstream
+    - 0001-wsutil-Restore-removed-ws_base32_decode.patch: New patch
+
+ -- Matheus Polkorny <mpolkorny@gmail.com>  Fri, 30 Jan 2026 11:29:15 -0300
+
 wireshark (4.4.7-1) unstable; urgency=medium
 
   * Upload to unstable (Closes: #1107515)

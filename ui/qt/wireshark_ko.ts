@@ -836,6 +836,12 @@
         <source>Start / elapsed:</source>
         <translation>시작/경과:</translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
+    </message>
     <message>
         <source>Automatically detect file type</source>
         <translation>파일 형식을 자동으로 감지</translation>
@@ -1041,6 +1047,12 @@
     <message>
         <source>Elapsed</source>
         <translation>경과 시간</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
     </message>
     <message>
         <source>Section %1</source>
@@ -15268,9 +15280,9 @@ a:hover {
         <translation>패킷 주석 삭제</translation>
     </message>
     <message numerus="yes">
-        <source>Delete comments from %n packet(s)</source>
-        <translation>
-            <numerusform>패킷 %n개에서 주석 삭제</numerusform>
+        <source>Delete comments from %Ln packet(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>

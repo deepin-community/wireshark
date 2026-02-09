@@ -1401,6 +1401,9 @@ static int oap_1_tree_add_interface(proto_tree *tree, tvbuff_t *tvb, int offset)
 
     registry = tvb_get_uint8(tvb, offset);
     len = registry & 0x03;
+    /* XXX - The DOF specifications indicate "len [bits] equal to 0 is invalid"
+     * Why is a length of 16 bytes used in that case, and why is it handled
+     * differently in InterfaceID_ToString? */
     if (len == 0)
         len = 16;
     else
@@ -1412,18 +1415,9 @@ static int oap_1_tree_add_interface(proto_tree *tree, tvbuff_t *tvb, int offset)
 
 static int oap_1_tree_add_binding(proto_tree *tree, packet_info *pinfo, tvbuff_t *tvb, int offset)
 {
-    uint8_t len;
   /*  uint8_t cl; */
 
-    len = tvb_get_uint8(tvb, offset);
-    len = len & 0x03;
-    if (len == 0)
-        len = 16;
-    else
-        len = 1 << (len - 1);
-
-    proto_tree_add_item(tree, hf_oap_1_interfaceid, tvb, offset, 1 + len, ENC_NA);
-    offset += 1 + len;
+    offset = oap_1_tree_add_interface(tree, tvb, offset);
 
 #if 0 /* this seems to be dead code - check! */
     cl = tvb_get_uint8(tvb, offset);
@@ -3549,9 +3543,8 @@ static unsigned addr_port_key_hash_fn(const void *key)
     {
         unsigned hash = 5381;
         const uint8_t *str = (const uint8_t *)addr_key->addr.data;
-        uint8_t i;
 
-        for (i = 0; i < addr_key->addr.len; i++)
+        for (int i = 0; i < addr_key->addr.len; i++)
             hash = ((hash << 5) + hash) + str[i]; /* hash * 33 + c */
 
         result += hash;
@@ -4149,6 +4142,8 @@ static uint32_t InterfaceID_ToString(const uint8_t *iid, char *pBuf)
     unsigned iid_len = iid[0] & 0x03;
     unsigned i;
 
+    /* XXX - The handling for iid_len 0 is not the same as in
+     * oap_1_tree_add_interface. */
     if (iid_len == 3)
         iid_len = 4;
 
@@ -4261,7 +4256,7 @@ static const char* dof_iid_create_standard_string(uint32_t bufferSize, const uin
     pRetval = (char *)wmem_alloc(wmem_packet_scope(), len + 1);
     if (pRetval)
     {
-        InterfaceID_ToString(pIIDBuffer, pRetval);
+        len = InterfaceID_ToString(pIIDBuffer, pRetval);
         pRetval[len] = 0;
     }
 

@@ -217,6 +217,7 @@ libwsutil.so.16 libwsutil16 #MINVER#
  nstime_copy@Base 1.12.0~rc1
  nstime_delta@Base 1.12.0~rc1
  nstime_hash@Base 4.1.0
+ nstime_is_negative@Base 4.4.13
  nstime_is_unset@Base 1.12.0~rc1
  nstime_is_zero@Base 1.12.0~rc1
  nstime_set_unset@Base 1.12.0~rc1

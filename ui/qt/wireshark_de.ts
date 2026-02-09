@@ -837,6 +837,13 @@
         <source>Start / elapsed:</source>
         <translation>Start / vergangen:</translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation>
+            <numerusform>%Ln Tag</numerusform>
+            <numerusform>%Ln Tage</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Automatically detect file type</source>
         <translation>Dateityp automatisch erkennen</translation>
@@ -1048,6 +1055,13 @@
     <message>
         <source>Elapsed</source>
         <translation>Zeitspanne</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation>
+            <numerusform>%Ln Tag</numerusform>
+            <numerusform>%Ln Tage</numerusform>
+        </translation>
     </message>
     <message>
         <source>Section %1</source>
@@ -2173,7 +2187,7 @@ Um zum Beispiel eine neue Datei zu jeder vollen Stunde zu haben, 1 Stunde angebe
     </message>
     <message>
         <source>…as Go literal</source>
-        <translation>als Go Literal</translation>
+        <translation>...als Go Literal</translation>
     </message>
     <message>
         <source>Copy packet bytes as Go literal.</source>
@@ -15305,7 +15319,7 @@ a:hover {
         <translation>Paketkommentare löschen</translation>
     </message>
     <message numerus="yes">
-        <source>Delete comments from %n packet(s)</source>
+        <source>Delete comments from %Ln packet(s)</source>
         <translation>
             <numerusform>Kommentar von %n Paket löschen</numerusform>
             <numerusform>Kommentare von %n Paketen löschen</numerusform>

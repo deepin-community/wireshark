@@ -837,6 +837,13 @@
         <source>Start / elapsed:</source>
         <translation>Début / écoulé :</translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
     <message>
         <source>Automatically detect file type</source>
         <translation>Détecter automatiquement le type de fichier</translation>
@@ -1048,6 +1055,13 @@
     <message>
         <source>Elapsed</source>
         <translation>Temps écoulé</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
     <message>
         <source>Section %1</source>
@@ -7942,9 +7956,9 @@ Pas exemple, inquiquez 1 heure pour avoir un nouveau fichier créé toutes les h
     </message>
     <message numerus="yes">
         <source>%Ln Selected Personal Profile(s)...</source>
-        <translation>
-            <numerusform>%Ln Profil Personnel Sélectionné...</numerusform>
-            <numerusform>%Ln Profils Personnels Sélectionnés...</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -15303,10 +15317,10 @@ a:hover {
         <translation>Supprimer les commentaires du paquet</translation>
     </message>
     <message numerus="yes">
-        <source>Delete comments from %n packet(s)</source>
-        <translation>
-            <numerusform>Supprimer les commentaires de %n paquet(s)</numerusform>
-            <numerusform>Supprimer les commentaires de %n paquet(s)</numerusform>
+        <source>Delete comments from %Ln packet(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>

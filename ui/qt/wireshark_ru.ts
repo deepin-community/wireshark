@@ -838,6 +838,14 @@
         <source>Start / elapsed:</source>
         <translation>Старт / прошло:</translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
     <message>
         <source>Automatically detect file type</source>
         <translation>Автоматически определить тип файла</translation>
@@ -1055,6 +1063,14 @@
     <message>
         <source>Elapsed</source>
         <translation>Прошло</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
     </message>
     <message>
         <source>Section %1</source>
@@ -7967,10 +7983,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message numerus="yes">
         <source>%Ln Selected Personal Profile(s)...</source>
-        <translation>
-            <numerusform>%Ln Выбранный персональный профиль...</numerusform>
-            <numerusform>%Ln Выбранный персональный профиля...</numerusform>
-            <numerusform>%Ln Выбранный персональный профилей...</numerusform>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -15342,11 +15358,11 @@ a:hover {
         <translation>Удалить комментарии к пакету</translation>
     </message>
     <message numerus="yes">
-        <source>Delete comments from %n packet(s)</source>
-        <translation>
-            <numerusform>Удалить комментарии из %n пакета(ов)</numerusform>
-            <numerusform>Удалить комментарии из %n пакета(ов)</numerusform>
-            <numerusform>Удалить комментарии из %n пакета(ов)</numerusform>
+        <source>Delete comments from %Ln packet(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
     <message>

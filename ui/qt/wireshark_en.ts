@@ -837,6 +837,13 @@
         <source>Start / elapsed:</source>
         <translation type="unfinished"></translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation>
+            <numerusform>%Ln day</numerusform>
+            <numerusform>%Ln days</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Automatically detect file type</source>
         <translation type="unfinished"></translation>
@@ -1048,6 +1055,13 @@
     <message>
         <source>Elapsed</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation>
+            <numerusform>%Ln day</numerusform>
+            <numerusform>%Ln days</numerusform>
+        </translation>
     </message>
     <message>
         <source>Section %1</source>
@@ -7881,8 +7895,8 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message numerus="yes">
         <source>%Ln Selected Personal Profile(s)...</source>
         <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+            <numerusform>%Ln Selected Personal Profile...</numerusform>
+            <numerusform>%Ln Selected Personal Profiles...</numerusform>
         </translation>
     </message>
     <message>
@@ -15142,10 +15156,10 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <source>Delete comments from %n packet(s)</source>
+        <source>Delete comments from %Ln packet(s)</source>
         <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+            <numerusform>Delete comments from %Ln packet</numerusform>
+            <numerusform>Delete comments from %Ln packets</numerusform>
         </translation>
     </message>
     <message>

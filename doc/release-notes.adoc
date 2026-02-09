@@ -22,47 +22,61 @@ If you or your organization would like to contribute or become a sponsor, please
 
 The following vulnerabilities have been fixed:
 
-* wssalink:2025-02[] {notable}
-Dissection engine crash.
-wsbuglink:20509[].
-cveidlink:2025-5601[].
-// Fixed in master: 5321308630
-// Fixed in release-4.4: 29a4f378ab
-// Fixed in release-4.2: 8c186dbb38
+* wssalink:2026-01[] {notable}
+BLF file parser crash.
+wsbuglink:20880[].
+// cveidlink:2026-xxx[].
+// Fixed in master: 516ba22c34
+// Fixed in release-4.6: 4d879508dc
+// Fixed in release-4.4: c99f118869
 // CVSS AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
-// CWE-120
-// * Fuzz job crash: fuzz-2025-04-25-7554.pcap. wsbuglink:20509[].
+// CWE-787
+// * Out-of-bounds heap write in blf_pull_logcontainer_into_memory. wsbuglink:20880[].
 
-// * wssalink:2025-03[] {notable}
+* wssalink:2026-02[] {notable}
+IEEE 802.11 dissector crash.
+wsbuglink:20939[].
+// cveidlink:2026-xxx[].
+// Fixed in master: 4b48ee36f1
+// Fixed in release-4.2: e3ea9fb6e7
+// Fixed in release-4.0: 5bfd4035f5
+// CVSS AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
+// CWE-787
+// * OSS-Fuzz 474458885: Stack-buffer-overflow in dissect_multi_link. wsbuglink:20939[].
+
+* wssalink:2026-03[] {notable}
+SOME/IP-SD dissector crash.
+wsbuglink:20945[].
+// cveidlink:2026-xxx[].
+// Fixed in master: xxx
+// Fixed in release-4.6: xxx
+// Fixed in release-4.4: xxx
+// CVSS AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
+// CWE-787
+// * SOME/IP-SD buffer overflow. wsbuglink:20945[].
+
+// * wssalink:2026-04[] {notable}
 // Foo dissector {crash,infinite loop,memory leak}.
 // wsbuglink:xxx[].
-// cveidlink:2025-xxx[].
+// cveidlink:2026-xxx[].
 // Fixed in master: xxx
+// Fixed in release-4.6: xxx
 // Fixed in release-4.4: xxx
-// Fixed in release-4.2: xxx
 // CVSS AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H
 // CWE-824
 
 The following bugs have been fixed:
 
-//The following bugs have been fixed:
 //* wsbuglink:5000[]
 //* wsbuglink:6000[Wireshark bug]
 //* cveidlink:2014-2486[]
-//* Wireshark took a bite out of each of your freshly baked muffins until it found the perfect one.
+//* Wireshark took a bite out of each of your freshly baked muffins until it found the perfect one. {notable}
 
-* Wireshark does not correctly decode LIN "go to sleep" in TECMP and CMP. wsbuglink:20463[].
-* Dissector bug, Protocol CIGI. wsbuglink:20496[].
-* Green power packets are not dissected when proto_version == ZBEE_VERSION_GREEN_POWER. wsbuglink:20497[].
-* Packet diagrams misalign or drop bitfields. wsbuglink:20507[]. {notable}
-* Corruption when setting heuristic dissector table UI name from Lua. wsbuglink:20523[]. {notable}
-* LDAP dissector incorrectly displays filters with singleton "&" wsbuglink:20527[]. {notable}
-* WebSocket per-message compression extentions: fail to decompress server messages (from the 2nd) due to parameter handling. wsbuglink:20531[].
-* The LL_PERIODIC_SYNC_WR_IND packet is not properly dissected (packet-btle.c) wsbuglink:20554[].
+* Bug in decoding 5G NAS message - Extended CAG information list IE. wsbuglink:20946[].
 
 // == Known Bugs
 
-=== New and Updated Features
+// === New and Updated Features
 
 // === Removed Features and Support
 
@@ -75,36 +89,32 @@ There are no new protocols in this release.
 === Updated Protocol Support
 
 // Add one protocol per line between the -- delimiters.
-// ag -A1 '(define PSNAME|proto_register_protocol[^_])' $(git diff --name-only v4.4.7.. | ag packet- | sort -u)
+// rg -A1 '(define PSNAME|proto_register_protocol[^_])' $(git diff --name-only v4.4.12.. | rg packet- | sort -u)
 [commaize]
 --
-AT
-BT LE LL
-CIGI
-LDAP
-LIN
-Logcat Text
-genl
-net_dm
-netfilter
-nvme
-SSH
-TCPCL
-TLS
-WebSocket
-ZigBee
-ZigBee ZCL
+DCT2000
+H.248
+H.265
+IDN
+IEEE 802.11
+NAS-5GS
+QUIC
+SOME/IP-SD
+Thrift
 --
 
 === New and Updated Capture File Support
 
-There is no new or updated capture file support in this release.
+// There is no new or updated capture file support in this release.
 // Add one file type per line between the -- delimiters.
-// [commaize]
-// --
-// --
+[commaize]
+--
+BLF
+NetScreen
+Viavi Observer
+--
 
-=== Updated File Format Decoding Support
+=== New and Updated File Format Decoding Support
 
 There is no updated file format support in this release.
 // Add one file type per line between the -- delimiters.
@@ -119,6 +129,99 @@ There is no updated file format support in this release.
 // === Major API Changes
 
 == Prior Versions
+
+Wireshark 4.4.12 included the following changes.
+See the
+https://www.wireshark.org/docs/relnotes/wireshark-4.4.12.html[release notes]
+for details:
+
+* wssalink:2025-07[] {notable}
+HTTP3 dissector crash.
+wsbuglink:20860[].
+cveidlink:2025-13945[].
+
+* wssalink:2025-08[] {notable}
+MEGACO dissector infinite loop.
+wsbuglink:20884[].
+cveidlink:2025-13945[].
+
+* ws_base32_decode should be named *_encode ? wsbuglink:20754[].
+* Stack buffer overflow in wiretap/ber.c (ber_open) wsbuglink:20878[].
+* Fuzz job crash: fuzz-2025-11-30-12266121180.pcap. wsbuglink:20883[].
+* Missing data in pinfo->cinfo in HomePlug message CM_ATTEN_CHAR.IND. wsbuglink:20893[].
+
+Wireshark 4.4.11 included the following changes.
+See the
+https://www.wireshark.org/docs/relnotes/wireshark-4.4.11.html[release notes]
+for details:
+
+* wssalink:2025-06[] Kafka dissector crash. wsbuglink:20823[].
+
+* L2CAP dissector doesn't understand retransmission mode. wsbuglink:2241[].
+* DNS HIP dissector labels PK algorithm as HIT length. wsbuglink:20768[].
+* TLS Abbreviated Handshake Using New Session Ticket. wsbuglink:20802[].
+* Apply As Filter for field with FT_NONE and BASE_NONE for a single byte does not use the hex value. wsbuglink:20818[].
+* TCP dissector creates invalid packet diagram. wsbuglink:20820[].
+* Support UTF-16 strings in the IsoBus dissector for the string operations. wsbuglink:20845[].
+* Fuzz job issue: fuzz-2025-11-12-12064814316.pcap. wsbuglink:20852[].
+
+Wireshark 4.4.10 included the following changes.
+See the
+https://www.wireshark.org/docs/relnotes/wireshark-4.4.10.html[release notes]
+for details:
+
+* Using wslog parameters in command line applications leads to freeing invalid memory. wsbuglink:20500[].
+* On macOS a lower resolution Wireshark icon is displayed in the App Switcher and Launchpad. sbuglink:20544[]. {notable}
+// misdissection, but no crash.
+* Fuzz job crash: fuzz-2025-08-06-10932469456.pcap. wsbuglink:20666[].
+* Encoding on NAS5GS- NASDL Transport Message-Multiple Container contains inconsistencies. wsbuglink:20679]. {notable}
+* Bad resolver in Delegated Credential (RFC 9345) of TLS 1.3 CertificateRequest message. wsbuglink:20728]. {notable}
+* Fuzz job UTF-8 encoding issue: fuzz-2025-10-03-11586692659.pcap. wsbuglink:20744[].
+
+Wireshark 4.4.9 included the following changes.
+See the
+https://www.wireshark.org/docs/relnotes/wireshark-4.4.9.html[release notes]
+for details:
+
+* RDM Product Detail List ID Disect incorrect. wsbuglink:20612[].
+* SCCP LUDT segmentation decoding fails. wsbuglink:20647[].
+* Ciscodump fails to start capture on Cisco IOS. wsbuglink:20655[]. {notable}
+* [BACnet] WritePropertyMultiple closing context tag 1 not showing. wsbuglink:20665[].
+* Bug in LZ77 decoder; reads a 16-bit length when it should read a 32-bit length. wsbuglink:20671[].
+
+Wireshark 4.4.8 included the following changes.
+See the
+https://www.wireshark.org/docs/relnotes/wireshark-4.4.8.html[release notes]
+for details:
+
+* Renegotiated DTLS session is not being decrypted. wsbuglink:20362[].
+* Wireshark is completely stuck in initialization because androiddump recv() is blocked. wsbuglink:20526[].
+* Fuzz job UTF-8 encoding issue: fuzz-2025-06-20-7318.pcap. wsbuglink:20585[].
+* Crash when showing packet in new window after reloading Lua plugins with a certain gui.column.format preference. wsbuglink:20588[].
+* Bug in UDS dissector with Service ReadDataByPeriodicIdentifier Response. wsbuglink:20589[].
+* Packet diagram doesn't show non-standard field value representations. wsbuglink:20590[].
+* Packet diagram shows representation twice when field type is FT_NONE. wsbuglink:20601[].
+* application/x-www-form-urlencoded key parsed incorrectly following a name-value byte sequence with no '=' wsbuglink:20615[].
+* DNP3 time stamp was unable to work after epoch time(year 2038) wsbuglink:20618[].
+
+Wireshark 4.4.7 included the following changes.
+See the
+https://www.wireshark.org/docs/relnotes/wireshark-4.4.7.html[release notes]
+for details:
+
+* wssalink:2025-02[]
+Dissection engine crash.
+wsbuglink:20509[].
+cveidlink:2025-5601[].
+
+* Wireshark does not correctly decode LIN "go to sleep" in TECMP and CMP. wsbuglink:20463[].
+* Dissector bug, Protocol CIGI. wsbuglink:20496[].
+* Green power packets are not dissected when proto_version == ZBEE_VERSION_GREEN_POWER. wsbuglink:20497[].
+* Packet diagrams misalign or drop bitfields. wsbuglink:20507[].
+* Corruption when setting heuristic dissector table UI name from Lua. wsbuglink:20523[].
+* LDAP dissector incorrectly displays filters with singleton "&" wsbuglink:20527[].
+* WebSocket per-message compression extentions: fail to decompress server messages (from the 2nd) due to parameter handling. wsbuglink:20531[].
+* The LL_PERIODIC_SYNC_WR_IND packet is not properly dissected (packet-btle.c) wsbuglink:20554[].
 
 Wireshark 4.4.6 included the following changes.
 See the
@@ -346,8 +449,8 @@ https://gitlab.com/wireshark/wireshark/-/issues[the issue tracker].
 You can learn protocol analysis and meet Wireshark’s developers at
 https://sharkfest.wireshark.org[SharkFest].
 
-// Official Wireshark training and certification are available from
-// https://www.wiresharktraining.com/[Wireshark University].
+Official Wireshark training and certification are available from
+https://www.wireshark.org/certifications[the Wireshark Foundation].
 
 == Getting Certified
 

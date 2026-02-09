@@ -1,0 +1,141 @@
+From: Balint Reczey <balint@balintreczey.hu>
+Date: Fri, 5 Dec 2025 12:30:10 +0100
+Subject: wsutil: Restore removed ws_base32_decode() to fix ABI breakage
+
+(cherry picked from commit e502c94a5df9a0575ebc568051eb85e106e2725f)
+
+Conflicts:
+	wsutil/CMakeLists.txt
+---
+ wsutil/CMakeLists.txt                             |  2 ++
+ ui/cli/tap-exportobject.h => wsutil/base32.c      | 30 ++++++++++-------------
+ wsutil/{wmem/wmem_allocator_simple.h => base32.h} | 24 ++++++++++--------
+ 3 files changed, 29 insertions(+), 27 deletions(-)
+ copy ui/cli/tap-exportobject.h => wsutil/base32.c (52%)
+ copy wsutil/{wmem/wmem_allocator_simple.h => base32.h} (51%)
+
+diff --git a/wsutil/CMakeLists.txt b/wsutil/CMakeLists.txt
+index 6e002d2..bee0923 100644
+--- a/wsutil/CMakeLists.txt
++++ b/wsutil/CMakeLists.txt
+@@ -82,6 +82,7 @@ set(WSUTIL_PUBLIC_HEADERS
+ 	802_11-utils.h
+ 	adler32.h
+ 	array.h
++	base32.h
+ 	bits_count_ones.h
+ 	bits_ctz.h
+ 	bitswap.h
+@@ -157,6 +158,7 @@ set(WSUTIL_PUBLIC_HEADERS
+ set(WSUTIL_COMMON_FILES
+ 	802_11-utils.c
+ 	adler32.c
++	base32.c
+ 	bitswap.c
+ 	buffer.c
+ 	clopts_common.c
+diff --git a/ui/cli/tap-exportobject.h b/wsutil/base32.c
+similarity index 52%
+copy from ui/cli/tap-exportobject.h
+copy to wsutil/base32.c
+index 9c279d0..6e9b558 100644
+--- a/ui/cli/tap-exportobject.h
++++ b/wsutil/base32.c
+@@ -1,4 +1,5 @@
+-/** @file
++/* base32.c
++ * Stub for removed base-32 conversion
+  *
+  * Wireshark - Network traffic analyzer
+  * By Gerald Combs <gerald@wireshark.org>
+@@ -7,25 +8,20 @@
+  * SPDX-License-Identifier: GPL-2.0-or-later
+  */
+ 
+-#ifndef __TAP_EXPORT_OBJECT_H__
+-#define __TAP_EXPORT_OBJECT_H__
++#include "config.h"
++#include "base32.h"
+ 
+-#ifdef __cplusplus
+-extern "C" {
+-#endif /* __cplusplus */
++#include <string.h>
+ 
+-void eo_list_object_types(void);
+-
+-/* will be called by main each time a --export-objects option is found */
+-bool eo_tap_opt_add(const char *ws_optarg);
+-
+-void start_exportobjects(void);
+-
+-#ifdef __cplusplus
++int ws_base32_decode(uint8_t* output, const uint32_t outputLength,
++						const uint8_t* in, const uint32_t inputLength)
++{
++	(void)output;
++	(void)outputLength;
++	(void)in;
++	(void)inputLength;
++	return -1;
+ }
+-#endif /* __cplusplus */
+-
+-#endif /* __TAP_EXPORT_OBJECT_H__ */
+ 
+ /*
+  * Editor modelines  -  https://www.wireshark.org/tools/modelines.html
+diff --git a/wsutil/wmem/wmem_allocator_simple.h b/wsutil/base32.h
+similarity index 51%
+copy from wsutil/wmem/wmem_allocator_simple.h
+copy to wsutil/base32.h
+index a843525..b77f785 100644
+--- a/wsutil/wmem/wmem_allocator_simple.h
++++ b/wsutil/base32.h
+@@ -1,7 +1,5 @@
+ /** @file
+- *
+- * Definitions for the Wireshark Memory Manager Simple Allocator
+- * Copyright 2012, Evan Huus <eapache@gmail.com>
++ * Base-32 conversion
+  *
+  * Wireshark - Network traffic analyzer
+  * By Gerald Combs <gerald@wireshark.org>
+@@ -9,24 +7,30 @@
+  *
+  * SPDX-License-Identifier: GPL-2.0-or-later
+  */
++#ifndef __BASE32_H__
++#define __BASE32_H__
+ 
+-#ifndef __WMEM_ALLOCATOR_SIMPLE_H__
+-#define __WMEM_ALLOCATOR_SIMPLE_H__
+-
+-#include "wmem_core.h"
++#include <wireshark.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+ #endif /* __cplusplus */
+ 
+-void
+-wmem_simple_allocator_init(wmem_allocator_t *allocator);
++/** Returned by base32_decode() if the input is not valid base32. */
++#define Base32_BAD_INPUT -1
++#define Base32_TOO_BIG -2
++
++/* Always return -1. The functionality has been removed due to a possible licensing
++ * issue, but the symbol is kept to not break the ABI. */
++WS_DLL_PUBLIC
++int ws_base32_decode(uint8_t* output, const uint32_t outputLength,
++						const uint8_t* in, const uint32_t inputLength);
+ 
+ #ifdef __cplusplus
+ }
+ #endif /* __cplusplus */
+ 
+-#endif /* __WMEM_ALLOCATOR_SIMPLE_H__ */
++#endif /* __BASE32_H__ */
+ 
+ /*
+  * Editor modelines  -  https://www.wireshark.org/tools/modelines.html

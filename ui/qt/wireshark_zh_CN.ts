@@ -836,6 +836,12 @@
         <source>Start / elapsed:</source>
         <translation>开始/经过：</translation>
     </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
+    </message>
     <message>
         <source>Automatically detect file type</source>
         <translation>自动检测文件类型</translation>
@@ -1021,6 +1027,12 @@
     <message>
         <source>Elapsed</source>
         <translation>经过时间</translation>
+    </message>
+    <message numerus="yes">
+        <source>%Ln day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
     </message>
     <message>
         <source>Section %1</source>
@@ -15164,7 +15176,7 @@ a:hover {
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <source>Delete comments from %n packet(s)</source>
+        <source>Delete comments from %Ln packet(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
         </translation>
