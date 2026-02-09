@@ -22,8 +22,6 @@ variables:
   GIT_DEPTH: "1"
   GIT_FETCH_EXTRA_FLAGS: "--depth=5000"
   CCACHE_DIR: "${CI_PROJECT_DIR}/ccache"
-  # Preferred version of clang available on wireshark-ubuntu-dev
-  CLANG_VERSION: "18"
   # The Qt versions that we ship in our offical installers. Must match
   # windows-qt6-lts-version and macos-qt6-lts-version in
   # doc/wsdg_src/developer-guide.adoc in master.
@@ -337,6 +335,7 @@ Debian Stable APT Test:
   image: registry.gitlab.com/wireshark/wireshark-containers/debian-stable-dev
   stage: test
   script:
+    - DEBIAN_FRONTEND=noninteractive apt-get update
     - DEBIAN_FRONTEND=noninteractive apt-get install ./debian-packages/*.deb -y
     - tshark --version
   after_script:
@@ -368,29 +367,30 @@ Fedora RPM Package:
 #     - tshark --version
 #  needs: [ 'Fedora RPM Package' ]
 
-openSUSE 15.5 RPM Package:
+openSUSE 15.6 RPM Package:
   extends: .build-rpm
-  image: registry.gitlab.com/wireshark/wireshark-containers/opensuse-15.5-dev
+  image: registry.gitlab.com/wireshark/wireshark-containers/opensuse-15.6-dev
   script:
+    - source /gcc-latest.env
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
-    - cmake -G Ninja -DUSE_qt6=OFF ..
+    - cmake -G Ninja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja wireshark_rpm
 
-openSUSE 15.5 RPM Test:
+openSUSE 15.6 RPM Test:
   extends: .test-rpm
-  image: registry.gitlab.com/wireshark/wireshark-containers/opensuse-15.5-dev
+  image: registry.gitlab.com/wireshark/wireshark-containers/opensuse-15.6-dev
   script:
     - zypper --no-gpg-checks --no-remote install -y build/packaging/rpm/RPMS/x86_64/*.rpm
     - tshark --version
-  needs: [ 'openSUSE 15.5 RPM Package' ]
+  needs: [ 'openSUSE 15.6 RPM Package' ]
 
 Rocky Linux 9 RPM Package:
   extends: .build-rpm
   image: registry.gitlab.com/wireshark/wireshark-containers/rockylinux-9-dev
   script:
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
-    - cmake -G Ninja -DUSE_qt6=OFF ..
+    - cmake -G Ninja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja wireshark_rpm
 
@@ -495,7 +495,7 @@ Windows Arm64 Package:
     - cd build
   script:
     - C:\Windows\py.exe ..\tools\make-version.py --set-release --version-file=wireshark_version.txt ..
-    - cmake -G "Visual Studio 17 2022" -A arm64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DENABLE_SIGNED_NSIS=on ..
+    - cmake -G "Visual Studio 17 2022" -A arm64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DENABLE_SIGNED_NSIS=on -DQT_HOST_PATH="C:\Qt\$($env:WINDOWS_QT6_LTS_VERSION)\msvc2019_64" ..
     - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.sln
     - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
     - msbuild /verbosity:minimal /maxcpucount wireshark_nsis_prep.vcxproj
@@ -541,6 +541,11 @@ macOS Arm Package:
   tags:
     - wireshark-macos-arm-package
   retry: 1
+  before_script:
+    - export PATH="/Library/Frameworks/Python.framework/Versions/3.13/bin:$PATH:$HOME/bin"
+    - python3 -m venv $CI_PROJECT_DIR/.venv
+    - source $CI_PROJECT_DIR/.venv/bin/activate
+    - pip3 install pytest pytest-xdist
   script:
     - export CMAKE_PREFIX_PATH=/usr/local/Qt-$MACOS_QT6_LTS_VERSION
     # Not needed for Falco libs 0.19?
@@ -589,6 +594,7 @@ macOS Intel Package:
     - wireshark-macos-intel-package
   retry: 1
   script:
+    - sudo --non-interactive sntp -s -S time.apple.com || true
     - export CMAKE_PREFIX_PATH=/usr/local/Qt-$MACOS_QT6_LTS_VERSION
     # Not needed for Falco libs 0.19?
     - export CXXFLAGS="-isystem /usr/local/include/falcosecurity"

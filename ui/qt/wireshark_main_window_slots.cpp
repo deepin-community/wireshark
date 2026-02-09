@@ -1201,7 +1201,7 @@ void WiresharkMainWindow::setEditCommentsMenu()
     }
     if (selectedRows().count() > 1) {
         main_ui_->menuPacketComment->addSeparator();
-        action = main_ui_->menuPacketComment->addAction(tr("Delete comments from %n packet(s)", nullptr, static_cast<int>(selectedRows().count())));
+        action = main_ui_->menuPacketComment->addAction(tr("Delete comments from %Ln packet(s)", "", static_cast<int>(selectedRows().count())));
         connect(action, &QAction::triggered, this, &WiresharkMainWindow::deleteCommentsFromPackets);
     }
 }
@@ -1586,10 +1586,8 @@ void WiresharkMainWindow::fieldsChanged()
 
     emit checkDisplayFilter();
 
-    if (have_custom_cols(&CaptureFile::globalCapFile()->cinfo)) {
-        // Recreate packet list columns according to new/changed/deleted fields
-        packet_list_->fieldsChanged(CaptureFile::globalCapFile());
-    }
+    // Recreate packet list columns according to new/changed/deleted fields
+    packet_list_->fieldsChanged(CaptureFile::globalCapFile());
 
     emit reloadFields();
 }

@@ -1,3 +1,3 @@
-0001-tools-Use-esnacc-instead-of-snacc-in-asn2deb.patch
 09_idl2wrs.patch
 0004-Use-packaged-JS-and-CSS-resources-instead-of-pulling.patch
+0001-wsutil-Restore-removed-ws_base32_decode.patch

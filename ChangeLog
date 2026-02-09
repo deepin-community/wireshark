@@ -1,683 +1,362 @@
-commit 8d76b890ea
+commit 44ddc25520
 Author: Gerald Combs <gerald@wireshark.org>
-Date:   Tue Jun 3 18:34:33 2025 -0700
+Date:   Tue Jan 13 14:47:31 2026 -0800
 
-    Prep for 4.4.7
+    Prep for 4.4.13 [skip ci]
 
-commit 46aafd4cad
+commit 825b83e1ed
 Author: Gerald Combs <gerald@wireshark.org>
-Date:   Mon Jun 2 13:58:14 2025 -0700
+Date:   Mon Jan 12 17:01:48 2026 -0800
 
-    Docs: Add a "notable" attribute
+    SOME/IP-SD: Fix a buffer overflow
 
-    The new (2025) site redesign includes release note highlights on the
-    download page. Add a way to inject a "notable" HTML comment so that we
-    can automate the highlights section.
+    Make sure we don't write past the end of our option port array. Make our
+    option count unsigned.
 
-    (cherry picked from commit f642f1f5c8d6a952d7babece8b146aa92bd74db9)
+    Fixes #20945
 
-commit c6e0fca175
-Author: Gerald Combs <gerald@wireshark.org>
-Date:   Tue Jun 3 08:48:00 2025 -0700
+    (cherry picked from commit 55ec8b3db4968c97115f014fb5974206cdf57454)
 
-    Logcat Text: Add a pointer check
+    Conflicts:
+            epan/dissectors/packet-someip-sd.c
 
-    (cherry picked from commit f871fd40727788ceea3346d07dc9bfe75c2f8d1c)
+commit e8f38ce4c6
+Author: Pascal Quantin <pascal@wireshark.org>
+Date:   Tue Jan 13 09:16:09 2026 +0100
 
-commit e7c41e99a4
-Author: Gerald Combs <gerald@wireshark.org>
-Date:   Mon Jun 2 13:15:26 2025 -0700
+    NAS 5GS: fix extended CAG information list dissection
 
-    capinfos: Fix a memory leak found by scan-build
+    Some bits were inverted. Fixes #20946
 
-    (cherry picked from commit 599a88e9002ec195104dc849ef8750a7fee19eae)
+    (cherry picked from commit f3ef7faabddbaaab92406461dd65b149227f0db0)
 
-commit 3b6a55b5d3
-Author: Gerald Combs <gerald@wireshark.org>
-Date:   Sun Jun 1 09:16:45 2025 +0000
+    Conflicts:
+            epan/dissectors/packet-nas_5gs.c
 
-    [Automatic update for 2025-06-01]
-
-    Update manuf, services enterprise numbers, translations, and other items.
-
-commit 87445394a9
+commit f31123dcdb
 Author: John Thacker <johnthacker@gmail.com>
-Date:   Sat May 31 16:08:34 2025 +0000
+Date:   Mon Jan 12 15:28:22 2026 +0000
 
-    SSH: Fix use of wmem_map_lookup_extended
+    QUIC: Update reassembly ID for a new MSP
 
-    A void* pointer can be larger than an integer, so writing to it in
-    the current manner is unsafe (and can cause a segfault with the sftp
-    sample file.)
+    When a QUIC frame has more than one MSP, the reassembly id for the
+    second MSP has to be used when adding or looking it up, instead of
+    the original reassembly id of the first MSP.
 
-    Fixup b69cd1333c94112292cdd4d2be5c07147000df9b
+    Fixes reassembly of the file in #20944 in most cases, outside of issues
+    with out of order UDP packets / QUIC packets.
 
-    (cherry picked from commit ca99001705cb35a01db6383fc0c2b8640fab9d18)
+    (cherry picked from commit 562c3c070c6f58d01904d42338489b1a64ad7655)
 
     Co-authored-by: John Thacker <johnthacker@gmail.com>
 
-commit df01747b37
+commit 5bfd4035f5
+Author: John Thacker <johnthacker@gmail.com>
+Date:   Sun Jan 11 03:11:02 2026 +0000
+
+    ieee80211: Avoid using a fixed array for multi-link per-STA subelements
+
+    Since this processes to the end of the TVB, there might be more than 16.
+    Simplify the logic and only test for a set link_id in one place. This
+    also gets rid of a possible use of an uninitialized value on error.
+
+    Fix #20939, OSS-Fuzz 474458885
+
+    (cherry picked from commit 4b48ee36f1829d6d3d009bf9871af523ce8e3ace)
+
+    Co-authored-by: John Thacker <johnthacker@gmail.com>
+
+commit afda96c2dd
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Sun Jan 11 10:17:56 2026 +0000
+
+    [Automatic update for 2026-01-11]
+
+    Update manuf, services enterprise numbers, translations, and other items.
+
+commit b5ae6aaa25
+Author: John Thacker <johnthacker@gmail.com>
+Date:   Tue Jan 6 12:17:20 2026 -0500
+
+    IDN: Use the 0 array index to avoid a buffer overrun
+
+    Instead of starting a loop variable at 1 and ignoring index 0 of the
+    precision array, start at 0 and test with less than. This fixes a
+    buffer overrun.
+
+    Add some comments.
+
+    Fix #20936
+
+    (backported from commit 06a915ef8c901e9d0eaf55cde4bd50cdbbe5696c)
+
+commit e5065834c3
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Sun Jan 4 10:17:28 2026 +0000
+
+    [Automatic update for 2026-01-04]
+
+    Update manuf, services enterprise numbers, translations, and other items.
+
+commit 3c049ad03d
+Author: John Thacker <johnthacker@gmail.com>
+Date:   Sat Jan 3 13:23:51 2026 +0000
+
+    QCustomPlot: Qt 6.9 deprecation of QImage::mirrored
+
+    QImage::mirrored(bool, bool) has been replaced with
+    QImage::flipped(Qt::Orientations) in Qt 6.9, and it warns
+    when using the former. Scheduled for deprecation in Qt 6.13.
+
+    This can be seen in the Fedora package CI pipelines.
+
+    (cherry picked from commit b9427cf48111e6466935442c97695be941132a0f)
+
+    Co-authored-by: John Thacker <johnthacker@gmail.com>
+
+commit 63030db97c
+Author: John Thacker <johnthacker@gmail.com>
+Date:   Sat Jan 3 12:57:39 2026 +0000
+
+    H.248: Fix a NULL pointer dereference
+
+    dissect_ber_octet_string can return a non-NULL 0 zero length tvb.
+    The code here checks for a zero length, but doesn't assign anything
+    to curr_info.term->buffer or curr_info.term->str in the zero-length
+    case, unlike in the NULL tvb case, where a zero length is also
+    assigned.
+
+    Use the same default values for the zero-length tvb case.
+
+    Fixes a NULL pointer dereference in #20932
+
+    (cherry picked from commit 2988e4b91c5a44445abbe6815b7b66995774c912)
+
+    Co-authored-by: John Thacker <johnthacker@gmail.com>
+
+commit 0cfb509d28
 Author: Stig Bjørlykke <stig@bjorlykke.org>
-Date:   Thu May 29 21:04:41 2025 +0200
+Date:   Thu Jan 1 11:03:48 2026 +0000
 
-    Qt: Avoid crash in extcap multiselect
+    Happy New Year 2026
 
-    Add a sanity check to avoid extcap multiselect with no items to
-    crash when doing a restore to default values.
-
-    (cherry picked from commit 814529c4b8bce3eee7c6aa0dd9c5b8e2f38955b8)
-
-commit 66f2a007df
-Author: Stig Bjørlykke <stig@bjorlykke.org>
-Date:   Fri May 30 08:15:41 2025 +0000
-
-    Qt: Add plural translations
-
-    Add plural translations in extcap options dialog.
-
-    (cherry picked from commit 34a354e3c7ea594a6b2c89e397b1e6ef9b045216)
+    (cherry picked from commit 6fd52d7432accfb0a491f479c0181abdc381859a)
 
     Co-authored-by: Stig Bjørlykke <stig@bjorlykke.org>
 
-commit f3ae4b0f93
+commit 303efedef2
 Author: John Thacker <johnthacker@gmail.com>
-Date:   Wed May 28 15:57:32 2025 +0000
+Date:   Sun Dec 28 21:40:23 2025 +0000
 
-    btle: Fix LL_PERIODIC_SYNC_WR_IND dissection
+    thrift: Check for failure in dissect_thrift_t_map
 
-    dissect_periodic_sync_ind() returns the new offset, not bytes dissected.
+    dissect_thrift_t_field_header can return a failure value that
+    needs to be checked here as done elseewhere in the dissector.
 
-    Fixup bf7b3ee3537842c96d0e021200751c137d69c882
+    Coverity CID 1677843
 
-    Fix #20554
-
-    (cherry picked from commit 1d9b026fdbdad7c6fb93c65f432b61b5c7d00c7b)
+    (cherry picked from commit 5d3b200a7a42a99d9ee1ad759a461d2e52e77b93)
 
     Co-authored-by: John Thacker <johnthacker@gmail.com>
 
-commit 05f3c73c17
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Mon May 26 22:46:13 2025 +0000
-
-    TLS: fix ordering as per draft-kwiatkowski-tls-ecdhe-mlkem-03
-
-    draft-kwiatkowski-tls-ecdhe-mlkem-03 has decided to use
-    X25519MLKEM768 instead of MLKEM768X25519 based on
-    consensus.
-
-    Sign-off-by: Loganaden Velvindron <logan@cyberstorm.mu>
-    Sign-off-by: Jaykishan Mutkawoa <jay@cyberstorm.mu>
-    Sign-off-by: Kavish Nadan <kn@cyberstorm.mu>
-
-    (cherry picked from commit d24b1b08f51ce740aacd26537af131bed374e751)
-
-    Co-authored-by: Loganaden Velvindron <loganaden@gmail.com>
-
-commit 9aa29666cd
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Mon May 26 21:43:14 2025 +0000
-
-    TLS: Add upcoming SecP384r1MLKEM1024 as per draft-kwiatkowski-tls-ecdhe-mlkem-03
-
-    Signed-off-by: Loganaden Velvindron <logan@cyberstorm.mu>
-    Signed-off-by: Jaykishan Mutkawoa <jay@cyberstorm.mu>
-    Signed-off-by: Kavish Nadan <kn@cyberstorm.mu>
-
-    (cherry picked from commit f96900098bba7398d2fa91e6e916a3002ed460b1)
-
-    Co-authored-by: Loganaden Velvindron <loganaden@gmail.com>
-
-commit 37d12dac02
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Mon May 26 21:18:17 2025 +0000
-
-    TLS: Switch from X25519MLKEM768 to MLKEM768X25519 as per upcoming I-D update.
-
-    https://github.com/post-quantum-cryptography/draft-kwiatkowski-tls-ecdhe-mlkem/pull/26
-    Signed-off-by: Loganaden Velvindron <logan@cyberstorm.mu>
-    Signed-off-by: Jaykishan Mutkawoa <jay@cyberstorm.mu>
-    Signed-off-by: Kavish Nadan <kn@cyberstorm.mu>
-
-    (cherry picked from commit 89b152be8f54ee5ca19f96c0627de7f599d23b40)
-
-    Co-authored-by: Loganaden Velvindron <loganaden@gmail.com>
-
-commit 7e9a97dcf7
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Mon May 26 20:32:50 2025 +0000
-
-    TLS: Add support for FIPS KEM as per draft-connolly-tls-mlkem-key-agreement-03.
-
-    (cherry picked from commit 65b82d780b958429bc336f90a67d7cb74c2637b8)
-
-    4f953f39 TLS: Add support for FIPS KEM as per draft-connolly-tls-mlkem-key-agreement-03.
-    75b4718b TLS: remove KEX that collide with FIPS KEM and IANA assigned values
-    7971487b TLS: Remove whitespace.
-    83a24bfa Remove whitespaces
-
-    Co-authored-by: Loganaden Velvindron <loganaden@gmail.com>
-
-commit d8755566ab
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Mon May 26 19:37:45 2025 +0000
-
-    TLS: Add ML-KEM (FIPS 203) to TLS Supported Groups
-
-    Update TLS supported groups for newly IANA assigned values for ML-KEM
-    post quantum cryptography KEM. See:
-
-        https://datatracker.ietf.org/doc/draft-kwiatkowski-tls-ecdhe-mlkem/02/
-        https://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml#tls-parameters-8
-        https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.203.pdf
-
-    Move the various unofficial testing values (which are not ordered,
-    if we ever want to make this an extended value string) to the end
-    of the value string for now.
-
-    Ping #19914
-
-    (cherry picked from commit 07e88d6a6701f60e1e0231fd531d1ee95c70ac64)
-
-    Co-authored-by: John Thacker <johnthacker@gmail.com>
-
-commit c86ce2c44e
+commit bfe9d00e0b
 Author: Gerald Combs <gerald@wireshark.org>
-Date:   Sun May 25 09:15:47 2025 +0000
+Date:   Sun Dec 28 10:17:29 2025 +0000
 
-    [Automatic update for 2025-05-25]
+    [Automatic update for 2025-12-28]
 
     Update manuf, services enterprise numbers, translations, and other items.
 
-commit e4d6e96543
-Author: Stig Bjørlykke <stig@bjorlykke.org>
-Date:   Thu May 22 06:50:06 2025 +0000
-
-    tls: Fill Info column for Certificate Fragment
-
-    Fill Info column and use correct protocol name on the record tree
-    item when having a single Certificate Fragment.
-
-    (cherry picked from commit badf2f8c4b2a9c3955fcd28b3ca12fd5c4df7a2b)
-
-    Co-authored-by: Stig Bjørlykke <stig@bjorlykke.org>
-
-commit a5a42c6e47
-Author: Stig Bjørlykke <stig@bjorlykke.org>
-Date:   Tue May 20 13:06:45 2025 +0000
-
-    at: Add Info column separator before gsm_sim
-
-    Add a separator between the AT command the gsm_sim data
-    in the Info column.
-
-    (cherry picked from commit b737ee7e254875e482db18e8d8d366531e441dac)
-
-    Co-authored-by: Stig Bjørlykke <stig@bjorlykke.org>
-
-commit 4ab18ec05b
-Author: Gerald Combs <gerald@wireshark.org>
-Date:   Sun May 18 09:27:28 2025 +0000
-
-    [Automatic update for 2025-05-18]
-
-    Update manuf, services enterprise numbers, translations, and other items.
-
-    TLS CT Log IDs failed.
-
-commit 6f505acaf7
+commit f21c559d0d
 Author: John Thacker <johnthacker@gmail.com>
-Date:   Sat May 17 11:08:03 2025 +0000
+Date:   Sat Dec 27 20:44:12 2025 +0000
 
-    NVMe: Add missing reserved bits to Arbitration Feature
+    DCT2000: Fix uninitialized variable
 
-    See NVMe specification 5.14.1.1 Arbitration, Figure 110.
-    https://www.nvmexpress.org/wp-content/uploads/NVM-Express-1_2a.pdf
+    In the unlikely case of a frame going from IPv4 to IPv6, fix the
+    test of which address length is checked in one place.
 
-    This missing causes an unregistered hfindex error. Note that
-    the method of using arrays of hfs here causes the tools to fail
-    to notice this.
+    Coverity CID 1677954
 
-    Also fix an encoding of a different FT_BYTES reserved field to
-    satisfy the commit check.
-
-    Fix #20539
-
-    (cherry picked from commit 2294a9f8b2999dd7e9ddfe573cd1ed72a11423de)
+    (cherry picked from commit 8aec610670a1f2b8fdf1b9a6b5059719edd3fbcc)
 
     Co-authored-by: John Thacker <johnthacker@gmail.com>
 
-commit 9073517878
+commit b15e208cd6
 Author: John Thacker <johnthacker@gmail.com>
-Date:   Fri May 16 12:43:51 2025 +0000
+Date:   Tue Dec 23 16:00:07 2025 +0000
 
-    Update GPL copies for FSF no longer having an address
+    dfilter: Convert FT_SCALAR to FT_UINT64 for non Number types
 
-    As of September 1, 2024, the FSF has gone fully remote and no longer
-    has an office[1] and has updated the GPL text[2] to point people to their
-    websites instead of their former mailing address.
+    Character constants, and literals and strings (the latter two if
+    there's a value string) can be converted to FT_INT64 but not
+    FT_DOUBLE. So if a FT_SCALAR is requested, try to convert to
+    FT_INT64. This prevents some crashes with filters that try to
+    divide a FT_ABSOLUTE_TIME or FT_RELATIVE_TIME by character constants,
+    literals, or strings:
 
-    1 - https://www.fsf.org/about/contact/
+    frame.time_relative > ${frame.time_relative} / 0.:5
+    frame.time_relative > ${frame.time_relative} / "foo"
+    frame.time_relative > ${frame.time_relative} / '\x47'
 
-    2 - https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+    Before:
+            [(none) ERROR] epan/ftypes/ftypes.c:503 -- fvalue_new(): assertion failed: ftype < FT_NUM_TYPES
 
-    (cherry picked from commit 614add27f29269e681e4d32138bea4951985fe0a)
+    [Compiled in Debug mode; a different error if compiled in Release mode
+    where asserts are not compiled in]
 
-    Co-authored-by: John Thacker <johnthacker@gmail.com>
+    for all three.
 
-commit df6c3bdc84
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Fri May 16 11:57:18 2025 +0000
-
-    TCPCL: Cast to avoid MSVC enum warning
-
-    MS Visual Studio 17.14.0 warns (C5287) about operations with two
-    enumeration constants (even if there is no enumeration variable
-    involved). Work around it so the code will compile without error.
-
-    (cherry picked from commit b06cf777c7fb1ac7b5413fcd74e2da5cf887f5aa)
-
-    Co-authored-by: John Thacker <johnthacker@gmail.com>
-
-commit 70f499fa80
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Fri May 16 02:42:52 2025 +0000
-
-    netlink: Fix a few enum types
-
-    Fix a few cases where something is being cast to the wrong enum type.
-    MS Visual Studio 17.14.0 seems to give C5286 warnings on these.
-
-    (cherry picked from commit 5eac2708f6115cc489280c32ef4f15bfa6e4a7ea)
-
-    Co-authored-by: John Thacker <johnthacker@gmail.com>
-
-commit 2a474fa11a
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Wed May 14 02:42:59 2025 +0000
-
-    tap-iostat: Fix a possible floating point exception crash
-
-    The -z io,stat tap does not necessarily have a comma after
-    the interval value (in the default case of no filter, only
-    counting frames and bytes).
-
-    g_strstr_len, like strstr and strchr, does not return a pointer
-    to the null terminator when it fails to find a value. Since it
-    returns a NULL pointer (numeric value 0), this can cause invl_len
-    to be assigned to a large negative number in the case of
-
-    tshark -z io,stat,1.00
-
-    or similar. Since strchrnul is a GNU extension, implement the logic
-    using strpbrk and strcspn. Also make the intermediate variable
-    unsigned, since it's assigned to an unsigned variable.
-
-    (cherry picked from commit 2544a1251b09c9b9790ab3febc3849b9d084b879)
-
-    Co-authored-by: John Thacker <johnthacker@gmail.com>
-
-commit 6d32dd8234
-Author: Gerald Combs <gerald@wireshark.org>
-Date:   Sun May 11 09:27:16 2025 +0000
-
-    [Automatic update for 2025-05-11]
-
-    Update manuf, services enterprise numbers, translations, and other items.
-
-commit 970b967f3f
-Author: Guy Harris <gharris@sonic.net>
-Date:   Fri May 9 21:01:43 2025 +0000
-
-    cpu_info: improve the CPU name when running under Rosetta 2.
-
-    Add a routine to determine whether you're running x86-64 code under
-    Rosetta 2 on an ARM64 machine and, if you are, note after the CPU name -
-    which will refer to the Apple silicon CPU name - that the program is
-    running under Rosetta (so that the mention of SSE 4.2, which Rosetta 2
-    supports, doesn't look as if Arm have their own "SSE" extension).
-
-    See #17294 comment
-    https://gitlab.com/wireshark/wireshark/-/issues/17294#note_2491249686
-    *et seq*.
-
-    This could, in principle, be extended to handle Microsoft's x86-64 ->
-    ARM64 translator and any other such translators, if there's a way to
-    detect from within the Matrix that you're in the Matrix.
-
-    (cherry picked from commit 8007321b3cfc73a9557192fd3e257b5deb1eb4e3)
-
-    Co-authored-by: Guy Harris <gharris@sonic.net>
-
-commit 8e5587de17
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Thu May 8 10:57:37 2025 +0000
-
-    merge: Avoid passing NULL for a filename into the error report routines
-
-    If we're writing a temporary filename or to standard out, then
-    out_filename can be NULL. Restore the behavior of writing the actual
-    temporary filename instead of NULL, and avoid some
-    [GLib CRITICAL] -- g_filename_display_basename: assertion 'filename != NULL' failed
-    warnings.
-
-    Note that ui/failure_message.c expects to be passed "-" for standard
-    output.
-
-    Fixup fe4852caaed5484f87a6bc2e873fa258c597f5fb
-
-    (cherry picked from commit 12ef3395e9e0fd16968b4aa3960e5fa738de1bdd)
-
-    Co-authored-by: John Thacker <johnthacker@gmail.com>
-
-commit f7688e71ac
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Wed May 7 15:36:11 2025 +0000
-
-    WebSocket: fix {server,client}_* parameter handling
-
-    Swap the order that is used by Wireshark. E.g. before this change
-    Wireshark uses server_no_context_takeover for client-sent packets, and
-    after for server-sent ones.
-
-    Fixes #20531
-
-    (cherry picked from commit 453f35c3661c34567df73c9e6d854932d238f66d)
-
-    Co-authored-by: Peng-Yu Chen <pengyu@libstarrify.so>
-
-commit b6f01b5868
-Author: Jaap Keuter <jaap.keuter@xs4all.nl>
-Date:   Sun May 4 16:01:00 2025 +0000
-
-    LDAP: Don't leave out filter elements
-
-    Commit b501e15fe98 introduced pretty dissection of LDAP search filters.
-    In some case this drops non-essential parts of the expression. In order
-    to adhere to the mantra: show it as it is, do not exclude these parts.
-
-    Closes #20527
-
-    (cherry picked from commit b00a6851299371fa5760a1e6e9b53d8e09d6741f)
-
-    Co-authored-by: Jaap Keuter <jaap.keuter@xs4all.nl>
-
-commit 5ea497ce9f
-Author: Gerald Combs <gerald@wireshark.org>
-Date:   Sun May 4 09:28:02 2025 +0000
-
-    [Automatic update for 2025-05-04]
-
-    Update manuf, services enterprise numbers, translations, and other items.
-
-commit 1a5e189320
-Author: Guy Harris <gharris@sonic.net>
-Date:   Wed Apr 30 20:34:21 2025 +0000
-
-    wslua: Fix use-after-free of heuristic DissectorTable name
-
-    `DissectorTable.heuristic_new` currently sets the table's uiname to a
-    string owned by Lua's garbage collector, resulting in a use-after-free
-    and corrupted display name when Lua moves or frees the string.
-
-    Same fix as in 26aac7c230914e504e812ead56e840e9fb5091a4, but for
-    `heuristic_new` instead of `new`.
-
-    Fixes #20523.
-
-    (cherry picked from commit 66760b97127888e074a0108a56c6018efbda84b7)
-
-    Co-authored-by: Rhys-T <27541776-Rhys-T@users.noreply.gitlab.com>
-
-commit df70036080
-Author: Dr. Lars Völker <lars.voelker@technica-engineering.de>
-Date:   Mon Apr 28 16:28:13 2025 +0200
-
-    LIN: Fixing sleep decode error
-
-    LIN encodes "go to sleep" frames by using ID 0x3C and setting first byte
-    to 0x00. This patches allows to detect this correctly.
-
-    This is for LIN messages not transported over TECMP and ASAM CMP but
-    written directly to file (e.g., pcapng).
-
-    Closes: #20463
-
-commit d61865d13f
-Author: Gerald Combs <gerald@wireshark.org>
-Date:   Sun Apr 27 09:28:34 2025 +0000
-
-    [Automatic update for 2025-04-27]
-
-    Update manuf, services enterprise numbers, translations, and other items.
-
-commit 8d7eb373b2
-Author: Guy Harris <gharris@sonic.net>
-Date:   Sat Apr 26 19:45:34 2025 +0000
-
-    Zigbee Smart Energy: fix effective time field.
-
-    This appears to be a copy-and-pasteo from the previous reserved field.
-    Give it the right name and don't give it a bitmask.
-
-    (cherry picked from commit cc1b3f3a2fc438b9c9d11cd52af842ea7cbb04d9)
-
-    Co-authored-by: Guy Harris <gharris@sonic.net>
-
-commit 29a4f378ab
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Sat Apr 26 10:00:59 2025 +0000
-
-    column: Do not allow fence to go beyond column size when prepending
-
-    When moving the fence location forward when prepending, ensure
-    that it does not go past the end of the buffer.
-
-    Also get rid of unnecessary branching and strlen calls.
-
-    Fix #20509
-
-    (cherry picked from commit 53213086304caa3dfbdd7dc39c2668a3aea1a5c0)
-
-    Co-authored-by: John Thacker <johnthacker@gmail.com>
-
-commit 6ae2887abc
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Fri Apr 25 13:36:58 2025 +0000
-
-    dfilter: Fix possible segfaults around dup'ing (XOR and multiple relations)
-
-    Both xor and multiple relation tests call stnode_dup, and they
-    can be called on sets and character constants. If a node doesn't
-    have a dup function, then a shallow copy of the data is performed.
-
-    That doesn't work for the nodes whose data is a pointer (XXX -
-    charconst shouldn't need to be a pointer, it's maximum size is
-    a gunichar / uint32_t, so GUINT_TO_POINTER style tricks could
-    work). For the internal PCRE type (and probably FTYPE), those
-    aren't created until all the dup'ing is done, so they're probably
-    ok technically, though it's easy enough to implement the ftype
-    one. (PCRE requires a change in regex.h)
-
-    A set node needs to have its nodelist duplicated in a similar
-    manner as a function node.
-
-    The following two filter tests segfault or assert before this
-    change but now work (and do not leak with ASAN):
-
-    dftest 'wlan ^^ ip.proto in {"udp", "tcp"}'
-
+    After:
+    $ ./run/dftest $(cat bad-filter-crash2)
     Filter:
-     wlan ^^ ip.proto in {"udp", "tcp"}
+     frame.time_relative > ${frame.time_relative} / "foo"
 
-    Syntax tree:
-     0 TEST_AND:
-       1 TEST_OR:
-         2 FIELD(wlan <FT_PROTOCOL>)
-         2 TEST_IN:
-           3 FIELD(ip.proto <FT_UINT8>)
-           3 SET(#2):
-             4 FVALUE(17 <FT_UINT64>)
-             4 FVALUE(6 <FT_UINT64>)
-       1 TEST_NOT:
-         2 TEST_AND:
-           3 FIELD(wlan <FT_PROTOCOL>)
-           3 TEST_IN:
-             4 FIELD(ip.proto <FT_UINT8>)
-             4 SET(#2):
-               5 FVALUE(17 <FT_UINT64>)
-               5 FVALUE(6 <FT_UINT64>)
+    Error: Signed integer (64 bits) cannot be converted from a string ("foo").
+      frame.time_relative > ${frame.time_relative} / "foo"
+                                                     ^~~~~
+
+    for the first two and success for the third:
+
+    ./run/dftest $(cat bad-filter-crash3)
+    Filter:
+     frame.time_relative > ${frame.time_relative} / '\x47'
 
     Instructions:
-     0000 CHECK_EXISTS     wlan
-     0001 IF_TRUE_GOTO     9
-     0002 READ_TREE        ip.proto         -> R0
-     0003 IF_FALSE_GOTO    18
-     0004 SET_ADD          17
-     0005 SET_ADD          6
-     0006 SET_ANY_IN       R0
-     0007 SET_CLEAR
-     0008 IF_FALSE_GOTO    18
-     0009 CHECK_EXISTS     wlan
-     0010 IF_FALSE_GOTO    17
-     0011 READ_TREE        ip.proto         -> R0
-     0012 IF_FALSE_GOTO    17
-     0013 SET_ADD          17
-     0014 SET_ADD          6
-     0015 SET_ANY_IN       R0
-     0016 SET_CLEAR
-     0017 NOT
-     0018 RETURN
+     0000 READ_TREE        frame.time_relative -> R0
+     0001 IF_FALSE_GOTO    6
+     0002 READ_REFERENCE   ${frame.time_relative} -> R1
+     0003 IF_FALSE_GOTO    6
+     0004 DIVIDE           R1 / 71          -> R2
+     0005 ANY_GT           R0 > R2
+     0006 RETURN
 
-    and
+    The error messages are perhaps not ideal, but this is better than
+    crashing.
 
-    dftest -s "tcp.srcport <= '\x50' < tcp.dstport"
-    Filter:
-     tcp.srcport <= '\x50' < tcp.dstport
-
-    Syntax tree:
-     0 TEST_AND:
-       1 TEST_LE:
-         2 FIELD(tcp.srcport <FT_UINT16>)
-         2 FVALUE(80 <FT_UINT16>)
-       1 TEST_LT:
-         2 FVALUE(80 <FT_UINT16>)
-         2 FIELD(tcp.dstport <FT_UINT16>)
-
-    Instructions:
-     0000 READ_TREE        tcp.srcport      -> R0
-     0001 IF_FALSE_GOTO    7
-     0002 ANY_LE           R0 <= 80
-     0003 IF_FALSE_GOTO    7
-     0004 READ_TREE        tcp.dstport      -> R1
-     0005 IF_FALSE_GOTO    7
-     0006 ANY_LT           80 < R1
-     0007 RETURN
-
-    (cherry picked from commit f5e14b6dc97554f6674ad44e472d1e5a2c1984ee)
+    (cherry picked from commit 86e6a478b071b068f718742bdfa57eb72e9d5b4d)
 
     Co-authored-by: John Thacker <johnthacker@gmail.com>
 
-commit dbde8f0d0b
-Author: Jaap Keuter <jaap.keuter@xs4all.nl>
-Date:   Fri Apr 25 17:19:40 2025 +0000
-
-    epan: Allow field_info to contain full 64 bit width offset
-
-    Part of the flags field in the field_info structure is being used to
-    record how many bits the field actually covers and what its offset
-    from the start of the field is. However, while there are enough bits
-    allocated for a 64 bit width field, the offset only allows for eight.
-    Therefore only an offset within a byte can be given. The start of the
-    field is not adjusted if the offset overflows a byte.
-
-    Keeping all things equal, and since there is enough room left in this
-    flags field, extend the offset part of the flags field to accommodate
-    64 bit offsets.
-
-    Fixes #20507
-
-    (cherry picked from commit b0d9cba7217eb41477c553eb055d83a88c1ab369)
-
-    Co-authored-by: Jaap Keuter <jaap.keuter@xs4all.nl>
-
-commit 40c5e1574c
-Author: Stig Bjørlykke <stig@bjorlykke.org>
-Date:   Wed Apr 23 19:41:47 2025 +0000
-
-    nas_eps: Add space in hf names
-
-    Add a space before parenthesis in hf names.
-
-    (cherry picked from commit a5d8b9577960ee54d5f49b7f7aad1f294fc069d7)
-
-    Co-authored-by: Stig Bjørlykke <stig@bjorlykke.org>
-
-commit cdf69e769d
-Author: Guy Harris <gharris@sonic.net>
-Date:   Thu Apr 24 00:48:12 2025 +0000
-
-    epan: Fix ENC_TIME_ZBEE_ZCL calculation
-
-    The Zigbee ZCL Epoch is *after* the UN*X epoch, which means, given
-    that all the epoch delta #defines in wsutil/epochs.h are unsigned,
-    that the delta needs to be *added* to a time in seconds since the
-    Zigbee ZCL Epoch to give a time in seconds since the UN*X epoch.
-    This is the opposite operation for all the other epoch deltas in
-    epochs.h, which refer to epoch absolute times *before* the UN*X epoch.
-
-    Note the correct operation is done in the various Zigbee dissectors
-    already; the problem is only in epan/proto.c
-
-    Verified with the sample capture in #14138
-
-    Fixup 00e069e6cd9d72e79f207bbb5ddc6901c6e14420
-
-    (cherry picked from commit 9fa0d9a8f7d7261e656088cde9cad0759f6a99f0)
-
-    Co-authored-by: John Thacker <johnthacker@gmail.com>
-
-commit 6374338fbc
+commit 251d065a8c
 Author: John Thacker <johnthacker@gmail.com>
-Date:   Mon Apr 21 10:36:53 2025 +0000
+Date:   Mon Dec 22 00:28:43 2025 +0000
 
-    ZigBee: Pass data pointer to ZigBee Green Power
+    H.265: Fix unintentional integer truncation
 
-    After commit f3bf4969e5c22ef56dd243c42e12da49a09df315 the ZigBee Green
-    Power dissector now expects to be passed the ieee802154_packet in
-    the void * data pointer. Do so from dissect_zbee_nwk()
+    Rec. ITU-T H.265 5.2 Arithmetic operators
 
-    Fix #20497
+            / Integer division with truncation of the result toward zero.
+            ÷ Used to denote division in mathematical equations where no
+                    truncation or rounding is intended
 
-    (cherry picked from commit c6f73d5fbcf94a9d6211b046ec8b8991e483fc11)
+    7.4.3.2.1 General sequence parameter set RBSP semantics
 
-    Co-authored-by: John Thacker <johnthacker@gmail.com>
+            PicWidthInCtbsY = Ceil( pic_width_in_luma_samples ÷ CtbSizeY ) (7-15)
+            PicHeightInCtbsY = Ceil( pic_height_in_luma_samples ÷ CtbSizeY ) (7-17)
 
-commit c2fb9dbdee
-Author: John Thacker <johnthacker@gmail.com>
-Date:   Sun Apr 20 15:18:44 2025 +0000
+    As this indicates that no truncation or rounding is intended, cast to double
+    first to avoid integer truncation.
 
-    CIGI: Register a field
+    Coverity CID 1450796
 
-    Register a field that is never registered.
-
-    Fix #20496
-
-    (cherry picked from commit 05781c50dd8e4f4ebff6f970cd9fde3c592dc568)
+    (cherry picked from commit 34a022afe8f88b3ea282a38428be10fd0fc7bbef)
 
     Co-authored-by: John Thacker <johnthacker@gmail.com>
 
-commit fbd49787ea
+commit 8dbc762c70
 Author: Gerald Combs <gerald@wireshark.org>
-Date:   Sun Apr 20 09:26:53 2025 +0000
+Date:   Sun Dec 21 10:17:24 2025 +0000
 
-    [Automatic update for 2025-04-20]
+    [Automatic update for 2025-12-21]
 
     Update manuf, services enterprise numbers, translations, and other items.
 
-commit 2167e12fc6
+commit 82ef856b14
+Author: John Thacker <johnthacker@gmail.com>
+Date:   Sat Dec 20 11:51:44 2025 +0000
+
+    Qt: Fix QCustomPlot adaptive sampling in one more place
+
+    The fix in 92e652ebfaa65fc31747cf1036fa4ca6832d4527 made two correct
+    changes in one branch but missed one of the changes in the second
+    branch. Make a change to avoid a possibility of dividing by zero.
+
+    (cherry picked from commit 74f51240d0af7c262e26a0776cdcb98e3ed7a6c5)
+
+    Co-authored-by: John Thacker <johnthacker@gmail.com>
+
+commit 43e159aa5c
+Author: John Thacker <johnthacker@gmail.com>
+Date:   Sun Dec 14 16:00:37 2025 +0000
+
+    netscreen: Fix return value of parse_netscreen_packet in one case
+
+    Commit 6a140eca7b78b230f1f90a739a32257476513c78 changed a return
+    value from an int, with -1 representing failure, to a boolean, but
+    -1 is still returned in one place.
+
+    Thanks to Fatih Çelik for reporting this.
+
+    (cherry picked from commit d801ac3b780c809b859cde019cd196e5dad95aa4)
+
+    Co-authored-by: John Thacker <johnthacker@gmail.com>
+
+commit 9e851855ee
 Author: Gerald Combs <gerald@wireshark.org>
-Date:   Wed Apr 16 11:11:46 2025 -0700
+Date:   Sun Dec 14 10:17:42 2025 +0000
 
-    Version: 4.4.6 → 4.4.7
+    [Automatic update for 2025-12-14]
 
-    [skip ci]
+    Update manuf, services enterprise numbers, translations, and other items.
+
+commit 6290eabc5b
+Author: John Thacker <johnthacker@gmail.com>
+Date:   Mon Dec 8 13:31:55 2025 +0000
+
+    observer: Fix saving files
+
+    The tlv_time_info struct does not need to contain the type and length
+    fields, which are already contained in the tlv_header struct. They
+    are never initialized, and their size is erroneously used to increase
+    the TLV size indicated in the TLV header that is written before the
+    extra type and length fields. This causes any file written by libwiretap
+    to fail to open, with a message like:
+
+            The file "observer_bad.bfr" appears to be damaged or corrupt.
+            (Observer: bad record (time information TLV length 12 != 8))
+
+    Cf. with the other tlv value structures, like tlv_network_load,
+    tlv_wireless_info, and tlv_capture_start_stop, none of which contain
+    the T or L from the TLV, just the V.
+
+    Fix writing Network Instruments/JDSU/Viavi Observer files
+
+    Coverity CID 1499434
+
+    (cherry picked from commit 7ce96f017a72299f92e175a7732532382f4951ca)
+
+    Co-authored-by: John Thacker <johnthacker@gmail.com>
+
+commit 4810187195
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Sun Dec 7 10:17:29 2025 +0000
+
+    [Automatic update for 2025-12-07]
+
+    Update manuf, services enterprise numbers, translations, and other items.
+
+commit 17d44bba93
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Fri Dec 5 12:30:48 2025 -0800
+
+    Add back "BLF: Validate length of uncompressed segments."
+
+    This reverts commit a76a30a5b099db5e104bd2e25c1bce2e6e8dd250, which
+    reverted c99f1188693ddad1e6ff0244ca0cd095619bdda7.
+
+commit 316ae7383f
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Fri Dec 5 12:26:47 2025 -0800
+
+    Version: 4.4.12 → 4.4.13 [skip ci]
