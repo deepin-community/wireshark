@@ -1,3 +1,11 @@
+wireshark (4.4.13-0+deb13u1deepin1) unstable; urgency=medium
+
+  * Fix CVE-2026-3203
+    - RF4CE Profile dissector crash
+    - Upstream fix: https://gitlab.com/wireshark/wireshark/-/commit/d487e0e
+
+ -- lichenggang <lichenggang@uniontech.com>  Wed, 22 Apr 2026 18:18:25 +0800
+
 wireshark (4.4.13-0+deb13u1) trixie-security; urgency=medium
 
   * Team upload.
