@@ -1,10 +1,13 @@
-wireshark (4.4.13-0+deb13u1deepin1) unstable; urgency=medium
+wireshark (4.4.14-0+deb13u1) trixie; urgency=medium
 
-  * Fix CVE-2026-3203
-    - RF4CE Profile dissector crash
-    - Upstream fix: https://gitlab.com/wireshark/wireshark/-/commit/d487e0e
+  * Non-maintainer upload.
+  * New upstream release.
+    - CVE-2026-3201: USB HID dissector memory exhaustion
+    - CVE-2026-3203: RF4CE Profile dissector crash
+    - Drop 0001-wsutil-Restore-removed-ws_base32_decode.patch,
+      applied upstream.
 
- -- lichenggang <lichenggang@uniontech.com>  Wed, 22 Apr 2026 18:18:25 +0800
+ -- Adrian Bunk <bunk@debian.org>  Sun, 01 Mar 2026 18:46:20 +0200
 
 wireshark (4.4.13-0+deb13u1) trixie-security; urgency=medium
 
