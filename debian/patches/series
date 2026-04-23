@@ -1,4 +1,2 @@
 09_idl2wrs.patch
 0004-Use-packaged-JS-and-CSS-resources-instead-of-pulling.patch
-0001-wsutil-Restore-removed-ws_base32_decode.patch
-CVE-2026-3203.patch

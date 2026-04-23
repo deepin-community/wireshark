@@ -44,8 +44,8 @@ GIT_ABBREV_LENGTH = 12
 # If the text "$Format" is still present, it means that
 # git archive did not replace the $Format string, which
 # means that this not a git archive.
-GIT_EXPORT_SUBST_H = 'a997d82a4239e452657a74db424551528ef37eb4'
-GIT_EXPORT_SUBST_D = 'tag: v4.4.13, refs/keep-around/a997d82a4239e452657a74db424551528ef37eb4'
+GIT_EXPORT_SUBST_H = '2e231b8d9926750a68f69a0ed5f80af3cacfe9c3'
+GIT_EXPORT_SUBST_D = 'tag: v4.4.14, refs/merge-requests/23702/head, refs/keep-around/2e231b8d9926750a68f69a0ed5f80af3cacfe9c3'
 IS_GIT_ARCHIVE = not GIT_EXPORT_SUBST_H.startswith('$Format')
 
 
