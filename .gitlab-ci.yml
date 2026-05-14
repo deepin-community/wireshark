@@ -281,7 +281,6 @@ Source Package:
   rules: !reference [.if-merged]
   script:
     - ../tools/make-version.py --set-release --version-file=wireshark_version.txt ..
-    - ../tools/update-appdata.py
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
     - cmake -G Ninja $CMAKE_ARGS ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
@@ -440,6 +439,8 @@ Windows x64 Package:
   rules: !reference [.if-w-w-only-merged]
   tags:
     - wireshark-windows-x64-package
+  environment:
+    name: windows-package
   before_script:
     - $env:WIRESHARK_BASE_DIR = "C:\Development"
     - $env:Configuration = "RelWithDebInfo"
@@ -484,6 +485,8 @@ Windows Arm64 Package:
   rules: !reference [.if-w-w-only-merged]
   tags:
     - wireshark-windows-arm64-package
+  environment:
+    name: windows-package
   before_script:
     - $env:WIRESHARK_BASE_DIR = "C:\Development"
     - $env:Configuration = "RelWithDebInfo"
@@ -538,19 +541,27 @@ macOS Arm Package:
   rules: !reference [.if-w-w-only-merged]
   variables:
     CODE_SIGN_IDENTITY: "Wireshark Foundation"
+    WIRESHARK_BASE_DIR: "$CI_PROJECT_DIR/../wireshark-third-party"
   tags:
     - wireshark-macos-arm-package
+  environment:
+    name: macos-package
   retry: 1
   before_script:
     - export PATH="/Library/Frameworks/Python.framework/Versions/3.13/bin:$PATH:$HOME/bin"
-    - python3 -m venv $CI_PROJECT_DIR/.venv
+    - python3 -m venv --clear $CI_PROJECT_DIR/.venv
     - source $CI_PROJECT_DIR/.venv/bin/activate
-    - pip3 install pytest pytest-xdist
+    - pip3 install awscli dmgbuild pyobjc-framework-Quartz pytest pytest-xdist
   script:
-    - export CMAKE_PREFIX_PATH=/usr/local/Qt-$MACOS_QT6_LTS_VERSION
-    # Not needed for Falco libs 0.19?
-    - export CXXFLAGS="-isystem /usr/local/include/falcosecurity"
-    - export PATH="$PATH:$HOME/bin"
+    - if [[ $MACOS_REINSTALL_THIRD_PARTY == true ]] ; then rm -rf "$WIRESHARK_BASE_DIR" ; fi
+    - if [ ! -d $WIRESHARK_BASE_DIR ] ; then mkdir $WIRESHARK_BASE_DIR ; fi
+    - if [ ! -d "$WIRESHARK_BASE_DIR/Qt" ] ; then mkdir "$WIRESHARK_BASE_DIR/Qt" ; fi
+    - if [ ! -d "$WIRESHARK_BASE_DIR/Qt/$MACOS_QT6_LTS_VERSION/macos/lib/QtCore.framework" ] ; then
+        pip3 install aqtinstall ;
+        aqt install-qt --outputdir $WIRESHARK_BASE_DIR/Qt mac desktop $MACOS_QT6_LTS_VERSION clang_64 --modules qt5compat qtmultimedia --timeout 10 ;
+      fi
+    - export CMAKE_PREFIX_PATH="$WIRESHARK_BASE_DIR/Qt/$MACOS_QT6_LTS_VERSION/macos"
+    # - export PATH="$PATH:$HOME/bin"
     - mkdir build
     - cd build
     - ../tools/make-version.py --set-release --version-file=wireshark_version.txt ..
@@ -558,7 +569,7 @@ macOS Arm Package:
     - cmake -DENABLE_CCACHE=ON -DCMAKE_APPLE_SILICON_PROCESSOR=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64 -DTEST_EXTRA_ARGS=--enable-release -G Ninja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja
-    - codesign-prep
+    - base64 -d < $MACOS_CODESIGN_PREP_B64 | bash
     - security find-identity -v -s "$CODE_SIGN_IDENTITY"
     - ninja wireshark_dmg
     - cd run
@@ -592,12 +603,12 @@ macOS Intel Package:
     CODE_SIGN_IDENTITY: "Wireshark Foundation"
   tags:
     - wireshark-macos-intel-package
+  environment:
+    name: macos-package
   retry: 1
   script:
     - sudo --non-interactive sntp -s -S time.apple.com || true
     - export CMAKE_PREFIX_PATH=/usr/local/Qt-$MACOS_QT6_LTS_VERSION
-    # Not needed for Falco libs 0.19?
-    - export CXXFLAGS="-isystem /usr/local/include/falcosecurity"
     - export PATH="$PATH:$HOME/bin"
     - mkdir build
     - cd build
@@ -606,7 +617,7 @@ macOS Intel Package:
     - cmake -DENABLE_CCACHE=ON -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DTEST_EXTRA_ARGS=--enable-release -G Ninja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja
-    - codesign-prep
+    - base64 -d < $MACOS_CODESIGN_PREP_B64 | bash
     - security find-identity -v -s "$CODE_SIGN_IDENTITY"
     - ninja wireshark_dmg
     - cd run
@@ -808,7 +819,7 @@ Clang + Code Checks:
     - cd build
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
     # We don't have an "All options" job, so build fuzzshark and tfshark here.
-    - cmake -DENABLE_CHECKHF_CONFLICT=on -DCMAKE_EXPORT_COMPILE_COMMANDS=on -DCMAKE_C_CLANG_TIDY=clang-tidy-$CLANG_VERSION -DCMAKE_CXX_CLANG_TIDY=clang-tidy-$CLANG_VERSION -DBUILD_fuzzshark=ON -DBUILD_tfshark=On -DBUILD_logray=ON -DENABLE_DEBUG=ON -DENABLE_CCACHE=ON -DENABLE_WERROR=ON -G Ninja ..
+    - cmake -DENABLE_CHECKHF_CONFLICT=on -DCMAKE_EXPORT_COMPILE_COMMANDS=on -DCMAKE_C_CLANG_TIDY=clang-tidy-$CLANG_VERSION -DCMAKE_CXX_CLANG_TIDY=clang-tidy-$CLANG_VERSION -DBUILD_fuzzshark=ON -DBUILD_tfshark=On -DENABLE_DEBUG=ON -DENABLE_CCACHE=ON -DENABLE_WERROR=ON -G Ninja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - printf "\e[0Ksection_start:%s:asn1_section[collapsed=false]\r\e[0KRegenerating ASN.1 dissectors" "$( date +%s)"
     - ninja --quiet asn1

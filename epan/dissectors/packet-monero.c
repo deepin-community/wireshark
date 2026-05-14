@@ -193,7 +193,7 @@ get_varint(tvbuff_t *tvb, const int offset, uint8_t *length, uint64_t *ret)
 
 static int dissect_encoded_value(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, proto_item *ti, int offset, uint32_t type);
 
-// we are parsing generic data structures, recursion is a first class citizen here
+// we check for recursion limits due to nested structs
 // NOLINTNEXTLINE(misc-no-recursion)
 static int dissect_encoded_dictionary(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, int offset)
 {
@@ -234,7 +234,7 @@ static int dissect_encoded_dictionary(tvbuff_t *tvb, packet_info *pinfo _U_, pro
   return offset;
 }
 
-// we are parsing generic data structures, recursion is a first class citizen here
+// we check for recursion limits due to nested structs
 // NOLINTNEXTLINE(misc-no-recursion)
 static int dissect_encoded_value(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, proto_item *ti, int offset, uint32_t type)
 {
@@ -342,7 +342,9 @@ static int dissect_encoded_value(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tr
       struct_ti   = proto_tree_add_item(tree, hf_monero_payload_item_value_struct, tvb, offset, -1, ENC_NA);
       struct_tree = proto_item_add_subtree(struct_ti, ett_struct);
 
+      increment_dissection_depth_by_n(pinfo, 2);
       offset = dissect_encoded_dictionary(tvb, pinfo, struct_tree, offset);
+      decrement_dissection_depth_by_n(pinfo, 2);
       proto_item_set_end(struct_ti, tvb, offset);
       break;
 

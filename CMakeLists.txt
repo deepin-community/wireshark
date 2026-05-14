@@ -57,7 +57,7 @@ endif()
 # Updated by tools/make-version.py
 set(PROJECT_MAJOR_VERSION 4)
 set(PROJECT_MINOR_VERSION 4)
-set(PROJECT_PATCH_VERSION 14)
+set(PROJECT_PATCH_VERSION 15)
 set(PROJECT_BUILD_VERSION 0)
 set(PROJECT_VERSION_EXTENSION "")
 
@@ -4127,6 +4127,7 @@ set(SHARK_PUBLIC_HEADERS
 	cfile.h
 	cli_main.h
 	file.h
+	include/jtckdint.h
 	include/ws_attributes.h
 	include/ws_codepoints.h
 	include/ws_compiler_tests.h

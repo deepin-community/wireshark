@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-/* (last updated 2026-02-20) */
+/* (last updated 2026-04-24) */
 
 #include "config.h"
 
@@ -126,7 +126,7 @@ static const char * const table[] =
     "Micro Technology",                                                                   // 104
     "Process Software Corporation",                                                       // 105
     "EMC Data General Division",                                                          // 106
-    "Bull Company",                                                                       // 107
+    "Bull S.A.S.",                                                                        // 107
     "Broadcom Emulex Connectivity Division",                                              // 108
     "Warwick University Computing Services",                                              // 109
     "NetScout Systems, Inc.",                                                             // 110
@@ -4017,7 +4017,7 @@ static const char * const table[] =
     "VASCO Data Security International, Inc.",                                            // 3995
     "Open Systems AG",                                                                    // 3996
     "ImproWare AG",                                                                       // 3997
-    "Mediagroup Vtoroy",                                                                  // 3998
+    "VTOROY",                                                                             // 3998
     "dydx",                                                                               // 3999
     "Hi-net Research Group",                                                              // 4000
     "KADAK Products Ltd.",                                                                // 4001
@@ -11098,7 +11098,7 @@ static const char * const table[] =
     "Banesto S.A.",                                                                       // 11076
     "Andrej Ota",                                                                         // 11077
     "Centralworks LLC",                                                                   // 11078
-    "EIT Ltd",                                                                            // 11079
+    "Greg Malewski",                                                                      // 11079
     "Airwide Solutions",                                                                  // 11080
     "Hydrogen Line, Inc.",                                                                // 11081
     "Illinois Central College",                                                           // 11082
@@ -15691,7 +15691,7 @@ static const char * const table[] =
     "Lifecycle Software",                                                                 // 15669
     "The Internet Marketing Center",                                                      // 15670
     "Wardega Consulting",                                                                 // 15671
-    "Javno preduzece Posta Srbije",                                                       // 15672
+    "Posta Srbije d.o.o.",                                                                // 15672
     "Codeangels Solutions",                                                               // 15673
     "Valente CC",                                                                         // 15674
     "StoneDonut, LLC",                                                                    // 15675
@@ -19567,7 +19567,7 @@ static const char * const table[] =
     "Sony CISC",                                                                          // 19545
     "MELENTANE",                                                                          // 19546
     "Oplink Communications, Inc.",                                                        // 19547
-    "FROX communication",                                                                 // 19548
+    "FROX AG",                                                                            // 19548
     "Uni-Q Systems",                                                                      // 19549
     "an Academic Network at Sao Paulo (ANSP)",                                            // 19550
     "Thales Naval France",                                                                // 19551
@@ -25554,7 +25554,7 @@ static const char * const table[] =
     "BCA Services Ltd.",                                                                  // 25532
     "IdentityForge, LLC.",                                                                // 25533
     "Lusan Systems",                                                                      // 25534
-    "Klas Ltd.",                                                                          // 25535
+    "Anduril Voyager",                                                                    // 25535
     "Probaris Technologies, Inc.",                                                        // 25536
     "Thomas Friedl",                                                                      // 25537
     "GNU Telephony",                                                                      // 25538
@@ -26555,7 +26555,7 @@ static const char * const table[] =
     "Nurun inc.",                                                                         // 26533
     "think project! International",                                                       // 26534
     "OMNEX Control Systems ULC",                                                          // 26535
-    "Ringland Consulting LLC",                                                            // 26536
+    "Jim Ringland",                                                                       // 26536
     "Riorey Inc.",                                                                        // 26537
     "Duaxes Corporation",                                                                 // 26538
     "Ionoscape Associates",                                                               // 26539
@@ -30034,7 +30034,7 @@ static const char * const table[] =
     "ipoque GmbH",                                                                        // 30012
     "Den selvejende institution Paul Bargsøe Kollegiet",                                  // 30013
     "Pecsi Tudomanyegyetem Klinikai Kozpont",                                             // 30014
-    "KBC Bank",                                                                           // 30015
+    "KBC Global Services",                                                                // 30015
     "Anel-Elektronik AG",                                                                 // 30016
     "TAG Aviation",                                                                       // 30017
     "FusionIO",                                                                           // 30018
@@ -36833,7 +36833,7 @@ static const char * const table[] =
     "Consendo Systems A/S",                                                               // 36811
     "CSP, Inc.",                                                                          // 36812
     "SafeTek USA, LLC",                                                                   // 36813
-    "DEFFAYET",                                                                           // 36814
+    NULL,                                                                                 // 36814
     "Savings Society Inc",                                                                // 36815
     "Beijing Abloomy Technologies Co., Ltd",                                              // 36816
     "Bohemia Interactive Simulations",                                                    // 36817
@@ -41315,7 +41315,7 @@ static const char * const table[] =
     "Taylor Innovations, LLC",                                                            // 41293
     "Datafrog",                                                                           // 41294
     "Andalusia Group",                                                                    // 41295
-    "E-Gate Communications Inc.",                                                         // 41296
+    "EGATE Networks Inc.",                                                                // 41296
     "Nextech Co.,Ltd",                                                                    // 41297
     "BRGFrauengasse",                                                                     // 41298
     "Infodom d.o.o.",                                                                     // 41299
@@ -42900,7 +42900,7 @@ static const char * const table[] =
     "Credit-Moscow Bank",                                                                 // 42878
     "Sielaff GmbH & Co. KG",                                                              // 42879
     "Uwe Disch",                                                                          // 42880
-    "No Limit Network",                                                                   // 42881
+    "B2 Network",                                                                         // 42881
     "Jiangsu Fablesoft Co.,Ltd",                                                          // 42882
     "CARC (C-DOT Alcatel-Lucent Research Centre Pvt Ltd)",                                // 42883
     "Anderson Morgan Kelowna Inc.",                                                       // 42884
@@ -50052,7 +50052,7 @@ static const char * const table[] =
     "BENTELER Business Services GmbH",                                                    // 50030
     "Ring Central, Inc",                                                                  // 50031
     "City of Edmond",                                                                     // 50032
-    "IT-Solutions Nuernberg",                                                             // 50033
+    "AKITN Consulting",                                                                   // 50033
     "AR24 SAS",                                                                           // 50034
     "Identinetics IT-Services GmbH",                                                      // 50035
     "Cancer South Institute",                                                             // 50036
@@ -52351,7 +52351,7 @@ static const char * const table[] =
     "DSI DGAC",                                                                           // 52329
     "Chubb Systems Ltd",                                                                  // 52330
     "learntotechsolutions Limited",                                                       // 52331
-    "INTEGRITY Security Services LLC",                                                    // 52332
+    "OmniTrust Security LLC",                                                             // 52332
     "Banco de Credito del Peru",                                                          // 52333
     "Systematic Inc",                                                                     // 52334
     "Alignment Healthcare",                                                               // 52335
@@ -53210,7 +53210,7 @@ static const char * const table[] =
     "Queen Margaret's School",                                                            // 53188
     "Share IT Limited",                                                                   // 53189
     "LittleMouseCloud",                                                                   // 53190
-    "Telmex Colombia S.A.",                                                               // 53191
+    "Comcel S.A.",                                                                        // 53191
     "Socially Determined, Inc.",                                                          // 53192
     "UVEX WINTER HOLDING GmbH & Co. KG",                                                  // 53193
     "Goodbaby International",                                                             // 53194
@@ -59796,7 +59796,7 @@ static const char * const table[] =
     "Teyf Pardazan Spadana (TPS) Co.",                                                    // 59774
     "AB Gyllsjö Träindustri",                                                             // 59775
     "Webloom S.r.l.",                                                                     // 59776
-    "Martin Johansson",                                                                   // 59777
+    "Tidaholms kommun",                                                                   // 59777
     "Tiến Trần",                                                                          // 59778
     "INBOH DOOEL Skopje",                                                                 // 59779
     "PFALZKOM GmbH",                                                                      // 59780
@@ -61852,7 +61852,7 @@ static const char * const table[] =
     "Tinh Van Technologies JSC.",                                                         // 61830
     "MFK Burny",                                                                          // 61831
     "Alfavit",                                                                            // 61832
-    "Xiaojun Ben",                                                                        // 61833
+    "StarCharge",                                                                         // 61833
     "Venturus Centro de Inovacao Tecnologica",                                            // 61834
     "Otheda Limited",                                                                     // 61835
     "AtFocus",                                                                            // 61836
@@ -63188,7 +63188,7 @@ static const char * const table[] =
     "Scanvaegt Systems AB",                                                               // 63166
     "FUNDACIÓN CIVITANA",                                                                 // 63167
     "UnipartRail",                                                                        // 63168
-    "TEXAS DEPARTMENT OF DEVELOPMENT",                                                    // 63169
+    "Dev Recon Inc",                                                                      // 63169
     "XYC INDUSTRY CO.,LIMITED",                                                           // 63170
     "C4 Energi AB",                                                                       // 63171
     "Brueterei Weser-Ems GmbH & Co. KG",                                                  // 63172
@@ -65086,7 +65086,7 @@ static const char * const table[] =
     "WestJet Airline Ltd.",                                                               // 65064
     "Kelco Industries",                                                                   // 65065
     "yamanju LLC",                                                                        // 65066
-    "Alpha Software Dienstleistungs ASD GmbH",                                            // 65067
+    "Netcetera Software Services GmbH",                                                   // 65067
     "Institut Dr. Foerster GmbH & Co. KG",                                                // 65068
     "Meestgroup",                                                                         // 65069
     "Tida Skogsvård",                                                                     // 65070
@@ -65094,7 +65094,7 @@ static const char * const table[] =
     "Keyfactor Federal",                                                                  // 65072
     "GCVE",                                                                               // 65073
     "Writerslogic Inc",                                                                   // 65074
-    "Beijing Loong Network Technology Co., Ltd.",                                         // 65075
+    "Peking Loong Network Technology Co., Ltd.",                                          // 65075
     "Tonghua Dongchang Superzhao Information Technology Consulting Studio",               // 65076
     "Polytec GmbH",                                                                       // 65077
     "SATELCOM TELEKOMÜNİKASYON, BİLGİ VE İLETİŞİM TEKNOLOJİLERİ İTHALAT İHRACAT SANAYİ ANONİM ŞİRKETİ",// 65078
@@ -65181,7 +65181,7 @@ static const char * const table[] =
     "Roland Kistler",                                                                     // 65159
     "Aretiico, Inc.",                                                                     // 65160
     "Aveira Security Research",                                                           // 65161
-    "Povodi Moravy, statni podnik (Vltava river basin, state enterprise)",                // 65162
+    "Povodi Moravy, statni podnik (Morava river basin, state enterprise)",                // 65162
     "ToolsOnAir Broadcast Engineering GmbH",                                              // 65163
     "Sorbus ursina",                                                                      // 65164
     "Family Farm and Home, Inc.",                                                         // 65165
@@ -65197,7 +65197,483 @@ static const char * const table[] =
     "Scrive AB",                                                                          // 65175
     "DokiSpace",                                                                          // 65176
     "Secure Element Solutions, LLC",                                                      // 65177
-    "TruPoint Technology Services Ltd."                                                   // 65178
+    "TruPoint Technology Services Ltd.",                                                  // 65178
+    "Juan Ros Florenza",                                                                  // 65179
+    "Куприяшин Михаил Андреевич (Kupriyashin Mikhail Andreevich)",                        // 65180
+    "Kimble",                                                                             // 65181
+    "Nectek",                                                                             // 65182
+    "PRIVATECH Inc.",                                                                     // 65183
+    "Full Doors",                                                                         // 65184
+    "Vibeish Analytics",                                                                  // 65185
+    "Nissay Information Technology Cybersecurity Central Project",                        // 65186
+    "HARBOR HUMANITY TRUST",                                                              // 65187
+    "MAUSS BAU GmbH & Co. KG",                                                            // 65188
+    "Avenkor",                                                                            // 65189
+    "MiWire Group ApS",                                                                   // 65190
+    "Vakka-Suomen Puhelin Oy",                                                            // 65191
+    "Fredrik Wahlgren",                                                                   // 65192
+    "Куприяшин Михаил Андреевич (Kupriyashin Mikhail Andreevich)",                        // 65193
+    "Nexphoton",                                                                          // 65194
+    "IT:U interdisciplinary transformation university austria",                           // 65195
+    "Sage Networks",                                                                      // 65196
+    "Simsalasim Germany GmbH",                                                            // 65197
+    "VADES, LLC",                                                                         // 65198
+    "Hanåsa Sågverk Aktiebolag",                                                          // 65199
+    "coresdev, LLC",                                                                      // 65200
+    "LMI Technologies",                                                                   // 65201
+    "Dane",                                                                               // 65202
+    "楠泰科技（深圳）有限公司 (Nantech Technology (Shenzhen) Co., Ltd.)",                             // 65203
+    "JoLo Software",                                                                      // 65204
+    "Telepeer AB",                                                                        // 65205
+    "SkifteCentralen ApS",                                                                // 65206
+    "Seralto Bilgi Teknolojileri ve Guvenligi Ltd.",                                      // 65207
+    "Privatbrauerei Zwettl",                                                              // 65208
+    "Kenneth Mørch",                                                                      // 65209
+    "Monadnock Community Hospital",                                                       // 65210
+    "Saronic Technologies",                                                               // 65211
+    "KENTECH SECURITY LLC",                                                               // 65212
+    "TransItServiceLLC.com",                                                              // 65213
+    "TAURON Obsługa Klienta sp. z o.o.",                                                  // 65214
+    "MIS Security LLC",                                                                   // 65215
+    "Twisted Ceptors Corporation",                                                        // 65216
+    "Pond IoT",                                                                           // 65217
+    "Savannah Informatics Limited",                                                       // 65218
+    "Center for Ecological Research",                                                     // 65219
+    "ProSafety d.o.o.",                                                                   // 65220
+    "Universidade da Beira Interior",                                                     // 65221
+    "RT Medical Systems LTDA.",                                                           // 65222
+    "HAZON TECHNOLOGIES LIMITED",                                                         // 65223
+    "Metadata, SL",                                                                       // 65224
+    "K. N. Toosi University of Technology,",                                              // 65225
+    "Marquis Companies",                                                                  // 65226
+    "Uone Infotech Co.,LTD",                                                              // 65227
+    "Municipio de Juárez, Nuevo León",                                                    // 65228
+    "Univerzitná nemocnica Nemocnica svätého Michala, a.s.",                              // 65229
+    "Privasys Ltd",                                                                       // 65230
+    "Institut für Wissenschaft und Weisheit (IWW)",                                       // 65231
+    "Vital Tech Industria e Comercio Ltda",                                               // 65232
+    "Rip City Refrigeration",                                                             // 65233
+    "Seattle School District",                                                            // 65234
+    "Hudson River Trading",                                                               // 65235
+    "TSCP LLC",                                                                           // 65236
+    "Noser Engineering AG",                                                               // 65237
+    "LMD HITECH INDIA PRIVATE LIMITED",                                                   // 65238
+    "Hans-Joachim Knobloch",                                                              // 65239
+    "iSYS Software GmbH",                                                                 // 65240
+    "Arberlandkliniken Kommunalunternehmen",                                              // 65241
+    "NEPKI",                                                                              // 65242
+    "QFJ Home Network",                                                                   // 65243
+    "SC Smart Office SRL",                                                                // 65244
+    "Athena Networks",                                                                    // 65245
+    "Guardant Health",                                                                    // 65246
+    "Evorit",                                                                             // 65247
+    "William Harrison",                                                                   // 65248
+    "SZ Grid",                                                                            // 65249
+    "Christian Zietz",                                                                    // 65250
+    "SAXONIA Edelmetalle GmbH",                                                           // 65251
+    "Henke-Sass, Wolf GmbH",                                                              // 65252
+    "Advanced Fiber Resources Milan srl",                                                 // 65253
+    "Paceline Services",                                                                  // 65254
+    "北京泰斯汀通信技术有限公司 (Beijing Testing Technology Co., Ltd.)",                               // 65255
+    "Codibly S.A.",                                                                       // 65256
+    "Sheffield Children's NHS Foundation Trust",                                          // 65257
+    "11:11 Systems Inc.",                                                                 // 65258
+    "Bayer Radiology",                                                                    // 65259
+    "Base Power, Inc.",                                                                   // 65260
+    "Keeper Security, Inc",                                                               // 65261
+    "B&G Digital Services GmbH",                                                          // 65262
+    "Alfred Hochleithner e. U.",                                                          // 65263
+    "Shenzhen Enjoy Technology Co.,Ltd.",                                                 // 65264
+    "Jeremy Jay",                                                                         // 65265
+    "olstenwood logistic AB",                                                             // 65266
+    "XPC Corporation",                                                                    // 65267
+    "SHENZHEN FOCUSCOM TECHNOLOGIES CO.,LTD",                                             // 65268
+    "Autobahn Tank u Rast",                                                               // 65269
+    "extocode GmbH",                                                                      // 65270
+    "Convey Health Solutions",                                                            // 65271
+    "Philippine Society for Digital Health",                                              // 65272
+    "IMSENZ",                                                                             // 65273
+    "Projekt IP, sodobne IP komunikacije d.o.o.",                                         // 65274
+    "Hiab",                                                                               // 65275
+    "B2B Solutions Zrt.",                                                                 // 65276
+    "CORPORACIÓN EMPRESARIAL ALTRA S.L.",                                                 // 65277
+    "DANEXiS AG",                                                                         // 65278
+    "it@business GmbH & Co. KG",                                                          // 65279
+    "Juha mielonen",                                                                      // 65280
+    "Supertrace",                                                                         // 65281
+    "CHRISTIE OWEN & DAVIES LIMITED",                                                     // 65282
+    "Cantrell Cloud ES",                                                                  // 65283
+    "ram krishnan",                                                                       // 65284
+    "Altos Computing Inc.",                                                               // 65285
+    "Phison Electronics Corp.",                                                           // 65286
+    "Akarui Networks Private Limited",                                                    // 65287
+    "Suzhou Langkong Post-Quantum Technology Co., Ltd.（LK Quantum）",                      // 65288
+    "ZPPP-Blonie",                                                                        // 65289
+    "LaunchWindow Software Inc.",                                                         // 65290
+    "Konduit KYA",                                                                        // 65291
+    "Aleph Cloud (Aleph.im SAS)",                                                         // 65292
+    "SSC-Services GmbH",                                                                  // 65293
+    "Novatronic LLC",                                                                     // 65294
+    "Innovoris Labs IT srl",                                                              // 65295
+    "Netvio",                                                                             // 65296
+    "CAITEK for Information Systems",                                                     // 65297
+    "Exian Systems Limited",                                                              // 65298
+    "Grumpy Bastards",                                                                    // 65299
+    "LikeDotAudio",                                                                       // 65300
+    "Null Grid Ltd",                                                                      // 65301
+    "Linneman Labs",                                                                      // 65302
+    "Simgenet",                                                                           // 65303
+    "Institut Mallorqui Afers Socials",                                                   // 65304
+    "MIOS ELETTRONICA",                                                                   // 65305
+    "Tetranetics Private Limited",                                                        // 65306
+    "nfiniity GmbH",                                                                      // 65307
+    "Insky Communications Private Limited",                                               // 65308
+    "IHX(Thailand) Co., Ltd.",                                                            // 65309
+    "David Keller",                                                                       // 65310
+    "UANATACA ECUADOR S.A.",                                                              // 65311
+    "Persona Identities",                                                                 // 65312
+    "Zhongrui Green Energy Technology (Shenzhen) Co., Ltd.",                              // 65313
+    "IsoFind",                                                                            // 65314
+    "Transas Navigator Ltd.",                                                             // 65315
+    "CTHINGS.CO Sp. z o.o.",                                                              // 65316
+    "Foxway AB",                                                                          // 65317
+    "Chengdu Newglee Technology Co., LTD.",                                               // 65318
+    "Vardaan Electronics Industries Pvt. Ltd.",                                           // 65319
+    "Seminole County Public Schools",                                                     // 65320
+    "Exavision",                                                                          // 65321
+    "ServerForge LLC",                                                                    // 65322
+    "GCH Technologies Inc.",                                                              // 65323
+    "Kern County Sheriff's Office",                                                       // 65324
+    "NetCuras",                                                                           // 65325
+    "Azerconnect Group",                                                                  // 65326
+    "ATSN Ltd",                                                                           // 65327
+    "Multrees Investor Services",                                                         // 65328
+    "Hunt Electric",                                                                      // 65329
+    "Voltra",                                                                             // 65330
+    "XIPE Networks LLC",                                                                  // 65331
+    "Cohesive Database Synoptics",                                                        // 65332
+    "Sisgarbe - Solucoes De Informatica Lda",                                             // 65333
+    "easier.digital",                                                                     // 65334
+    "MEK, Inc",                                                                           // 65335
+    "AVISIA",                                                                             // 65336
+    "Stephan Harrer",                                                                     // 65337
+    "HPELab",                                                                             // 65338
+    "LotusFlare Inc",                                                                     // 65339
+    "New Use Energy Solutions",                                                           // 65340
+    "Claiborne County School District",                                                   // 65341
+    "Haerang Energy",                                                                     // 65342
+    "FLDG Holding SASU",                                                                  // 65343
+    "Dustin Ward",                                                                        // 65344
+    "Communications Regulatory Authority of Namibia",                                     // 65345
+    "Yaskawa America Inc.",                                                               // 65346
+    "Beijing Unihannto Technology Co., Ltd.",                                             // 65347
+    "Florian Sluiter",                                                                    // 65348
+    "Microgrid Energy Pty Ltd",                                                           // 65349
+    "Ruchi Telecom Private Limited",                                                      // 65350
+    "Sigalion",                                                                           // 65351
+    "Space-Tech LLC",                                                                     // 65352
+    "CEDIA",                                                                              // 65353
+    "TRAC Intermodal",                                                                    // 65354
+    "Apache Corporation",                                                                 // 65355
+    "Julian Pawlowski",                                                                   // 65356
+    "José Eliécer Loaiza Duque",                                                          // 65357
+    "Mark Nolan",                                                                         // 65358
+    "Rainer W. Gerling",                                                                  // 65359
+    "Point And Click Solutions, Inc",                                                     // 65360
+    "xSyLent",                                                                            // 65361
+    "Liujiacheng",                                                                        // 65362
+    "MerkleCerts",                                                                        // 65363
+    "Verific Design Automation, Inc.",                                                    // 65364
+    "SOI Asia",                                                                           // 65365
+    "Fast Module",                                                                        // 65366
+    "Numeracle, Inc.",                                                                    // 65367
+    "Jacobs.Tech",                                                                        // 65368
+    "Affinda Group",                                                                      // 65369
+    "Nexiom",                                                                             // 65370
+    "VietCA Technology JSC",                                                              // 65371
+    "Electron do Brasil Tecnologia Digital Ltda",                                         // 65372
+    "BK Tech Group AB",                                                                   // 65373
+    "Ampaura Australia",                                                                  // 65374
+    "PRZEDSIEBIORSTWO WIELOBRANZOWE CASTON SPOLKA Z OGRANICZONA ODPOWIEDZIALNOSCIA (Caston Multi-Branch Enterprise Limited Liability Company)",// 65375
+    "Famoco",                                                                             // 65376
+    "Compass Group North America",                                                        // 65377
+    "芯昇科技有限公司 Xinsheng Technology Co., Ltd",                                              // 65378
+    "LLC PF STIS",                                                                        // 65379
+    "Mark Mackenzie",                                                                     // 65380
+    "Michael Kirkpatrick",                                                                // 65381
+    "Water & Wastewater Technic WWT GmbH",                                                // 65382
+    "Endrit’s Digital Solutions e.K.",                                                    // 65383
+    "Association of Azerbaijani British Professionals",                                   // 65384
+    "FORITECH",                                                                           // 65385
+    "DAPsystems",                                                                         // 65386
+    "BEQ Manufacturier",                                                                  // 65387
+    "Viridi Parente, Inc.",                                                               // 65388
+    "Romagnole Produtos Elétricos SA (Filial Juiz de Fora)",                              // 65389
+    "Md Shahab Uddin",                                                                    // 65390
+    "Gouvernement du Togo",                                                               // 65391
+    "HALE electronic GmbH.",                                                              // 65392
+    "National Gas",                                                                       // 65393
+    "XIVAuth Project",                                                                    // 65394
+    "Indonesia Research and Education Network",                                           // 65395
+    "220NET",                                                                             // 65396
+    "Crosstech Solutions Group LLC",                                                      // 65397
+    "Altalink",                                                                           // 65398
+    "Honeywell Aerospace",                                                                // 65399
+    "Construction Company Facade Systems LLC",                                            // 65400
+    "Mosproject",                                                                         // 65401
+    "Yannick Schneider",                                                                  // 65402
+    "Starlink",                                                                           // 65403
+    "Horizon Credit Union",                                                               // 65404
+    "Console Now Inc.",                                                                   // 65405
+    "OpConnect Inc.",                                                                     // 65406
+    "Niklights",                                                                          // 65407
+    "AEWIN Technologies Co., Ltd.",                                                       // 65408
+    "Uniserv GmbH",                                                                       // 65409
+    "Defidev",                                                                            // 65410
+    "Salience Labs",                                                                      // 65411
+    "Chaos1",                                                                             // 65412
+    "DragonWave Technologies",                                                            // 65413
+    "福州高新区蔚蓝网络有限公司 (Fuzhou High-tech Zone Weilan Network Co., Ltd.)",                     // 65414
+    "Bergslagets Egendomar AB",                                                           // 65415
+    "After Hours Audio",                                                                  // 65416
+    "Pippin Technical Service",                                                           // 65417
+    "HIPOINT TECHNOLOGY CO., LTD",                                                        // 65418
+    "Serhii Parshyn",                                                                     // 65419
+    "Haoren Hu",                                                                          // 65420
+    "Pfano Kate",                                                                         // 65421
+    "SigmaMD",                                                                            // 65422
+    "Transumption Pte Ltd",                                                               // 65423
+    "Dermavision Solutions SL",                                                           // 65424
+    "Municipal institution City Institute",                                               // 65425
+    "SXarc",                                                                              // 65426
+    "Yu Energy",                                                                          // 65427
+    "m3g yazilim danismanlik tic. ltd. sti.",                                             // 65428
+    "Duix Tecnologia Industria e Comercio LTDA",                                          // 65429
+    "Carnival Corporation & PLC",                                                         // 65430
+    "Logipix",                                                                            // 65431
+    "LukuID Oy",                                                                          // 65432
+    "City of Orem, Utah",                                                                 // 65433
+    "Mark Purcell",                                                                       // 65434
+    "Paul Robinson",                                                                      // 65435
+    "MdProSoft",                                                                          // 65436
+    "Mikael Hansson Åkeri AB",                                                            // 65437
+    "Ram Jee Aryal (Independent Developer)",                                              // 65438
+    "Sherpa-IRS",                                                                         // 65439
+    "Signal24 LLC",                                                                       // 65440
+    "Wendy Labs, Inc.",                                                                   // 65441
+    "CV BİLİŞİM TEKNOLOJİ TİCARET LİMİTED ŞİRKETİ",                                       // 65442
+    "Horry County Government",                                                            // 65443
+    "ShenZhen Action Technologies Co., Ltd.",                                             // 65444
+    "Sirraya Labs",                                                                       // 65445
+    "OnLogic Inc",                                                                        // 65446
+    "Core Concept Collective",                                                            // 65447
+    "Augeral Pty Ltd",                                                                    // 65448
+    "ISTREAMS SOLUTIONS FZE",                                                             // 65449
+    "Devops-DB",                                                                          // 65450
+    "Stadtverwaltung Borken",                                                             // 65451
+    "Sallan yhteismetsä",                                                                 // 65452
+    "Weinholt Consulting AB",                                                             // 65453
+    "Swarco Futurit Verkehrssignalsysteme Ges.m.b.H.",                                    // 65454
+    "Denny Thomas",                                                                       // 65455
+    "SHI Lili",                                                                           // 65456
+    "SECORO INC",                                                                         // 65457
+    "Starnitzke Consulting GmbH",                                                         // 65458
+    "Salt Group",                                                                         // 65459
+    "d-Matrix",                                                                           // 65460
+    "Universidad Autónoma de Nayarit",                                                    // 65461
+    "Nymölla Skog AB",                                                                    // 65462
+    "PANTHEON.tech",                                                                      // 65463
+    "Granite Telecommunications LLC.",                                                    // 65464
+    "bosloven",                                                                           // 65465
+    "TELENICK",                                                                           // 65466
+    "nekohaxx",                                                                           // 65467
+    "SRNE Solar Co.,Ltd",                                                                 // 65468
+    "ArtSanEnerji",                                                                       // 65469
+    "TriCore Engineering UG (haftungsbeschränkt)",                                        // 65470
+    "Mobi Acquisition LLC",                                                               // 65471
+    "BYD Finland Oy",                                                                     // 65472
+    "DS Soft Olomouc, spol. s r.o.",                                                      // 65473
+    "CedarDB GmbH",                                                                       // 65474
+    "DESKO GmbH",                                                                         // 65475
+    "Ducati Motor Holding S.p.A",                                                         // 65476
+    "厦门汉印股份有限公司 (Xiamen Hanin Co., Ltd.)",                                                // 65477
+    "Rune Vikestad",                                                                      // 65478
+    "SmartSolo",                                                                          // 65479
+    "BitKiva",                                                                            // 65480
+    "FIRMA INTERSVYAZ LIMITED TRADE DEVELOPMENT",                                         // 65481
+    "Conekt.ai, Inc.",                                                                    // 65482
+    "天津外国语大学(Tianjin Foreign Studies University), TJFSU, TFSU",                           // 65483
+    "Nimbis Services, Inc.",                                                              // 65484
+    "LSW tech",                                                                           // 65485
+    "Sky Digital Co., Ltd.",                                                              // 65486
+    "Maryland Benefits DHS CJAMS",                                                        // 65487
+    "MIROSLAV VASILEV TZONKOV",                                                           // 65488
+    "Jerome Freeman",                                                                     // 65489
+    "AUTONOMY OF ZALESK TRUST",                                                           // 65490
+    "DABify Ltd",                                                                         // 65491
+    "ABPS Radio Network",                                                                 // 65492
+    "States of Jersey Police (SOJP)",                                                     // 65493
+    "KOEN Inc",                                                                           // 65494
+    "Nimbus Hrvatska d.o.o.",                                                             // 65495
+    "LAYER1",                                                                             // 65496
+    "GK FUTURE Inc.",                                                                     // 65497
+    "Vecto",                                                                              // 65498
+    "Gildas Le Drogoff",                                                                  // 65499
+    "Wolf Rosewood Media",                                                                // 65500
+    "Mpirical",                                                                           // 65501
+    "Techielab.ch",                                                                       // 65502
+    "Artsan Enerji static voltage stabilizer",                                            // 65503
+    "VWFNDR  CAMERA",                                                                     // 65504
+    "Tumee",                                                                              // 65505
+    "DOBE COMPUTING Co., Ltd.",                                                           // 65506
+    "Midwest Fastener Corp",                                                              // 65507
+    "Oregonians Credit Union",                                                            // 65508
+    "Santa Casa de Marilia",                                                              // 65509
+    "GIP RECIA",                                                                          // 65510
+    "James L Baker",                                                                      // 65511
+    "北京东方京海电子科技有限公司 (Beijing Dongfang Jinghai Electronic Technology Co., Ltd.)",          // 65512
+    "Alyiah Samara",                                                                      // 65513
+    "Charter Communications",                                                             // 65514
+    "TeX Users Group",                                                                    // 65515
+    "Bribus B.V.",                                                                        // 65516
+    "Construmart S.A.",                                                                   // 65517
+    "Pumatronix Equipamentos Eletronicos Ltda",                                           // 65518
+    "Informationsverarbeitung Leverkusen GmbH",                                           // 65519
+    "李刚 (Li Gang)",                                                                       // 65520
+    "Biobot Surgical Pte. Ltd.",                                                          // 65521
+    "CVC Co.,Ltd.",                                                                       // 65522
+    "惠州市博实结科技有限公司 (Huizhou Boshijie Technology Co., Ltd.)",                               // 65523
+    "Information Accessibility Institute",                                                // 65524
+    "SONACA S.A.",                                                                        // 65525
+    "Delos Cloud GmbH",                                                                   // 65526
+    "Zodiac",                                                                             // 65527
+    "CleverEnable",                                                                       // 65528
+    "Kitsos",                                                                             // 65529
+    "Vectanor",                                                                           // 65530
+    "烟台云电电子科技有限公司 (Yantai Yundian Electronics Technology Co., Ltd.)",                     // 65531
+    "Code 626, Inc.",                                                                     // 65532
+    "Scottish Power Energy Networks",                                                     // 65533
+    "Intersys Teknoloji Sanayi Ticaret A.Ş.",                                             // 65534
+    "Kuusamon yhteismetsä",                                                               // 65535
+    "Kemijärven yhteismetsä",                                                             // 65536
+    "Bilerro Solutions, S.L.U.",                                                          // 65537
+    "SEnergy IoT Pvt Ltd",                                                                // 65538
+    "Modern Urology, PLLC",                                                               // 65539
+    "Indra Heera Network Private Limited",                                                // 65540
+    "BRADIN",                                                                             // 65541
+    "广东TCL深蓝技术有限公司 (TCL Digital Power Co. Ltd)",                                          // 65542
+    "G-Wayz Productions LLC,",                                                            // 65543
+    "Digital Trust International",                                                        // 65544
+    "Christophe Wolfhugel",                                                               // 65545
+    "Testmar Muhendislik ve Dis Ticaret Ltd.",                                            // 65546
+    "HJ-Systems",                                                                         // 65547
+    "Energywave Technology Inc.",                                                         // 65548
+    "Energonix",                                                                          // 65549
+    "HePoJ BV",                                                                           // 65550
+    "Tindango",                                                                           // 65551
+    "Nay San",                                                                            // 65552
+    "Signaliks",                                                                          // 65553
+    "Maschinenfabrik Gustav Eirich GmbH & Co KG",                                         // 65554
+    "Hensoldt AG",                                                                        // 65555
+    "Replit",                                                                             // 65556
+    "Sarvis Health",                                                                      // 65557
+    "Indra Heera Technology LLP",                                                         // 65558
+    "University Hospital Southampton NHS Foundation Trust",                               // 65559
+    "Szpital Miejski w Rudzie Śląskiej Sp. z o.o.",                                       // 65560
+    "Luminary Health Data Inc",                                                           // 65561
+    "QNT Systemy Informatyczne Sp. z o.o.",                                               // 65562
+    "Wizmo, Inc.",                                                                        // 65563
+    "SkyFoundry",                                                                         // 65564
+    "Information Technology Orbit (Ito) B.V.",                                            // 65565
+    "JSC Smartcom",                                                                       // 65566
+    "Deutsche Rentenversicherung Oldenburg-Bremen",                                       // 65567
+    "Mosas Akilli Ulasim Teknolojileri A.S.",                                             // 65568
+    "河北高达智能装备股份有限公司",                                                                     // 65569
+    "LLC Sibneftekart",                                                                   // 65570
+    "Alliance For Empowerment Inc",                                                       // 65571
+    "Ylem",                                                                               // 65572
+    "Magma Studio Ltd",                                                                   // 65573
+    "ID10T Academy",                                                                      // 65574
+    "TatumSecurity",                                                                      // 65575
+    "National Institute of Public Health",                                                // 65576
+    "beSIGN",                                                                             // 65577
+    "Nordsnipe",                                                                          // 65578
+    "TV2 AS",                                                                             // 65579
+    "CME Technologies LLC",                                                               // 65580
+    "QuizBin",                                                                            // 65581
+    "Bjoern Meiér",                                                                       // 65582
+    "Helco Systems, LLC",                                                                 // 65583
+    "Yuanjia Liu",                                                                        // 65584
+    "Certus Limited",                                                                     // 65585
+    "Lanas ANZ",                                                                          // 65586
+    "OTA-NET",                                                                            // 65587
+    "9P2000.N Project",                                                                   // 65588
+    "Viking Electronics",                                                                 // 65589
+    "Stranto Business Solutions GmbH",                                                    // 65590
+    "Maritime Silk Road Time Center Co., Ltd.",                                           // 65591
+    "Jiangsu Xingwang Time-frequency Technology Co., Ltd.",                               // 65592
+    "ARNOLD Group",                                                                       // 65593
+    "SECLOUS GmbH",                                                                       // 65594
+    "TD Bank",                                                                            // 65595
+    "Chipus Microeletronica SA",                                                          // 65596
+    "Cascade Federal Credit Union",                                                       // 65597
+    "Alan Cui",                                                                           // 65598
+    "Breccia Infrastructure",                                                             // 65599
+    "Hangzhou Lititi Technology Co., Ltd",                                                // 65600
+    "HMN Tech Co., Ltd.",                                                                 // 65601
+    "ATMOCE Australia PTY LTD",                                                           // 65602
+    "Trexcel Corporation",                                                                // 65603
+    "Ericsson - IT Managed Services",                                                     // 65604
+    "OneWiseTech",                                                                        // 65605
+    "Gavin John",                                                                         // 65606
+    "Seaal",                                                                              // 65607
+    "NodeX",                                                                              // 65608
+    "NodeAI Diagnostics Corp.",                                                           // 65609
+    "Rootist, LLC",                                                                       // 65610
+    "Turaco Labs Ltd",                                                                    // 65611
+    "ZK-PKI",                                                                             // 65612
+    "SYSBRAN",                                                                            // 65613
+    "Eric Carrozzo",                                                                      // 65614
+    "Guangdong CASSTK Co., Ltd.",                                                         // 65615
+    "XDISC SA",                                                                           // 65616
+    "XIPE",                                                                               // 65617
+    "Carmentis SAS",                                                                      // 65618
+    "Opsens Solutions Inc",                                                               // 65619
+    "Spectronic Denmark A/S",                                                             // 65620
+    "Clever Cloud",                                                                       // 65621
+    "Axians HR",                                                                          // 65622
+    "PC-Wolf EDV-Service & -Notdienst",                                                   // 65623
+    "Ordr, Inc",                                                                          // 65624
+    "Valkyrie Bioscience",                                                                // 65625
+    "Vaunix Technology Corporation",                                                      // 65626
+    "Anthropic, PBC.",                                                                    // 65627
+    "Decentralized Quantum Key Management Infrastructure",                                // 65628
+    "xHSM",                                                                               // 65629
+    "Shenzhen Tocloud-iot technology Co.,Ltd",                                            // 65630
+    "Shenzhen Qin'an Technology Co., Ltd.",                                               // 65631
+    "Grupo Computación Modular Avanzada S.A.",                                            // 65632
+    "HBA International",                                                                  // 65633
+    "Swen Scholz",                                                                        // 65634
+    "Aplus Power Technology (Hangzhou) Co., Ltd.",                                        // 65635
+    "IOTRONICS",                                                                          // 65636
+    "Polska Agencja Rozwoju Przedsiębiorczości",                                          // 65637
+    "Port of Antwerp-Bruges",                                                             // 65638
+    "KatBox GmbH",                                                                        // 65639
+    "Sicoob Credicaf",                                                                    // 65640
+    "DENQEN engineering SRL",                                                             // 65641
+    "Stellar Quanta Labs",                                                                // 65642
+    "Tours-événements",                                                                   // 65643
+    "LeSecure",                                                                           // 65644
+    "American ID Group",                                                                  // 65645
+    "Desistec ingeniería y servicios Ltda.",                                              // 65646
+    "Hagbergs Skogstransport AB",                                                         // 65647
+    "City of Highland Village",                                                           // 65648
+    "CMCC OTT-CDN",                                                                       // 65649
+    "WORKBASE JOINT STOCK COMPANY",                                                       // 65650
+    "ITALGRANITI GROUP S.P.A.",                                                           // 65651
+    "SurrealDB Ltd",                                                                      // 65652
+    "ADK Hospital",                                                                       // 65653
+    "Georgia Farm Bureau Mutual Insurance Company"                                        // 65654
 };
 
 const char* global_enterprises_lookup(uint32_t value)
