@@ -440,7 +440,7 @@ json_prep(char* buf, const jsmntok_t* tokens, int count)
         {"iograph",    "filter9",        2, JSMN_STRING,       SHARKD_JSON_STRING,   SHARKD_OPTIONAL},
         {"load",       "file",           2, JSMN_STRING,       SHARKD_JSON_STRING,   SHARKD_MANDATORY},
         {"setcomment", "frame",          2, JSMN_PRIMITIVE,    SHARKD_JSON_UINTEGER, SHARKD_MANDATORY},
-        {"setcomment", "comment",        2, JSMN_STRING,       SHARKD_JSON_STRING,   SHARKD_OPTIONAL},
+        {"setcomment", "comment",        2, JSMN_STRING,       SHARKD_JSON_STRING,   SHARKD_MANDATORY},
         {"setconf",    "name",           2, JSMN_STRING,       SHARKD_JSON_STRING,   SHARKD_MANDATORY},
         {"setconf",    "value",          2, JSMN_UNDEFINED,    SHARKD_JSON_ANY,      SHARKD_MANDATORY},
         {"tap",        "tap0",           2, JSMN_STRING,       SHARKD_JSON_STRING,   SHARKD_MANDATORY},
@@ -1186,6 +1186,10 @@ sharkd_session_process_load(const char *buf, const jsmntok_t *tokens, int count)
                 );
         return;
     }
+
+    /* The open succeded, and any previous file was closed. Remove any filter
+     * results that refer to the previous file. */
+    g_hash_table_remove_all(filter_table);
 
     TRY
     {
@@ -4233,6 +4237,47 @@ struct sharkd_frame_request_data
 };
 
 static void
+sharkd_session_process_add_data_source(struct data_source *src, bool add_description)
+{
+    tvbuff_t *tvb;
+    unsigned length;
+
+    if (add_description) {
+        char *src_name = get_data_source_name(src);
+
+        sharkd_json_value_string("name", src_name);
+        wmem_free(NULL, src_name);
+    }
+
+    tvb = get_data_source_tvb(src);
+
+    TRY {
+        length = tvb_captured_length(tvb);
+
+        if (length != 0)
+        {
+            const unsigned char *cp = tvb_get_ptr(tvb, 0, length);
+
+            /* XXX pi.fd->encoding */
+            sharkd_json_value_base64("bytes", cp, length);
+        }
+        else
+        {
+            sharkd_json_value_base64("bytes", (const uint8_t*)"", 0);
+        }
+    } CATCH_BOUNDS_AND_DISSECTOR_ERRORS {
+        /* tvb_captured_length can throw DissectorError. With an
+         * offset of 0 and a length of the captured length, tvb_get_ptr
+         * can throw DissectorError or various bounds errors. We have
+         * to catch it so that the JSON is valid. */
+        sharkd_json_value_base64("bytes", (const uint8_t*)"", 0);
+    } CATCH_ALL {
+        ws_assert_not_reached();
+    }
+    ENDTRY;
+}
+
+static void
 sharkd_session_process_frame_cb(epan_dissect_t *edt, proto_tree *tree, struct epan_column_info *cinfo, const GSList *data_src, void *data)
 {
     packet_info *pi = &edt->pi;
@@ -4322,23 +4367,7 @@ sharkd_session_process_frame_cb(epan_dissect_t *edt, proto_tree *tree, struct ep
         struct data_source *src = (struct data_source *) data_src->data;
         bool ds_open = false;
 
-        tvbuff_t *tvb;
-        unsigned length;
-
-        tvb = get_data_source_tvb(src);
-        length = tvb_captured_length(tvb);
-
-        if (length != 0)
-        {
-            const unsigned char *cp = tvb_get_ptr(tvb, 0, length);
-
-            /* XXX pi.fd->encoding */
-            sharkd_json_value_base64("bytes", cp, length);
-        }
-        else
-        {
-            sharkd_json_value_base64("bytes", "", 0);
-        }
+        sharkd_session_process_add_data_source(src, ds_open);
 
         data_src = data_src->next;
         if (data_src)
@@ -4353,27 +4382,7 @@ sharkd_session_process_frame_cb(epan_dissect_t *edt, proto_tree *tree, struct ep
 
             json_dumper_begin_object(&dumper);
 
-            {
-                char *src_name = get_data_source_name(src);
-
-                sharkd_json_value_string("name", src_name);
-                wmem_free(NULL, src_name);
-            }
-
-            tvb = get_data_source_tvb(src);
-            length = tvb_captured_length(tvb);
-
-            if (length != 0)
-            {
-                const unsigned char *cp = tvb_get_ptr(tvb, 0, length);
-
-                /* XXX pi.fd->encoding */
-                sharkd_json_value_base64("bytes", cp, length);
-            }
-            else
-            {
-                sharkd_json_value_base64("bytes", "", 0);
-            }
+            sharkd_session_process_add_data_source(src, ds_open);
 
             json_dumper_end_object(&dumper);
 
@@ -5155,7 +5164,7 @@ sharkd_session_process_complete(char *buf, const jsmntok_t *tokens, int count)
  *
  * Input:
  *   (m) frame - frame number
- *   (o) comment - user comment
+ *   (m) comment - user comment
  *
  * Output object with attributes:
  *   (m) err   - error code: 0 succeed
@@ -5975,6 +5984,7 @@ sharkd_session_main(int mode_setting)
 
     dumper.output_file = stdout;
 
+    /* XXX - This could be a wmem_map_new_autoreset(wmem_epan_scope(), wmem_file_scope(),...) */
     filter_table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, sharkd_session_filter_free);
 
 #ifdef HAVE_MAXMINDDB

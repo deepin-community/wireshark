@@ -3544,12 +3544,10 @@ static uint8_t *rtps_decrypt_secure_payload(
     return NULL;
   }
 
-  secure_body_ptr = wmem_alloc0(allocator, secure_payload_len);
+  secure_body_ptr = tvb_memdup(allocator, tvb, offset, secure_payload_len);
   if (secure_body_ptr == NULL) {
     return NULL;
   }
-
-  tvb_memcpy(tvb, secure_body_ptr, offset, secure_payload_len);
 
   *error = rtps_util_decrypt_data(
       secure_body_ptr,
@@ -5707,6 +5705,7 @@ static int rtps_util_add_typecode(proto_tree *tree, tvbuff_t *tvb, packet_info *
   char         *indent_string;
   int           retVal;
   char          type_name[40];
+  size_t        bytesWritten;
 
     /* Structure of the typecode data:
      *  Offset   | Size  | Field                        | Notes
@@ -5865,7 +5864,10 @@ static int rtps_util_add_typecode(proto_tree *tree, tvbuff_t *tvb, packet_info *
 
         if (seq_max_len != -1) {
           /* We're dissecting a sequence of struct, bypass the seq definition */
-          snprintf(type_name, 40, "%s", struct_name);
+          bytesWritten = g_strlcpy(type_name, struct_name, sizeof(type_name));
+          if (bytesWritten >= sizeof(type_name)) {
+            ws_utf8_truncate(type_name, sizeof(type_name) - 1);
+          }
           break;
         }
 
@@ -6024,7 +6026,10 @@ static int rtps_util_add_typecode(proto_tree *tree, tvbuff_t *tvb, packet_info *
 
         if (seq_max_len != -1) {
           /* We're dissecting a sequence of struct, bypass the seq definition */
-          snprintf(type_name, 40, "%s", struct_name);
+          bytesWritten = g_strlcpy(type_name, struct_name, sizeof(type_name));
+          if (bytesWritten >= sizeof(type_name)) {
+            ws_utf8_truncate(type_name, sizeof(type_name) - 1);
+          }
           break;
         }
         /* Prints it */
@@ -6117,9 +6122,12 @@ static int rtps_util_add_typecode(proto_tree *tree, tvbuff_t *tvb, packet_info *
         LONG_ALIGN(offset);
         string_length = tvb_get_uint32(tvb, offset, encoding);
         offset += 4;
-        snprintf(type_name, 40, "%s<%d>",
-                (tk_id == RTI_CDR_TK_STRING) ? "string" : "wstring",
-                string_length);
+        bytesWritten = snprintf(type_name, sizeof(type_name), "%s<%d>",
+                       (tk_id == RTI_CDR_TK_STRING) ? "string" : "wstring",
+                       string_length);
+        if (bytesWritten >= sizeof(type_name)) {
+          ws_utf8_truncate(type_name, sizeof(type_name) - 1);
+        }
         break;
     }
 
@@ -6194,7 +6202,10 @@ static int rtps_util_add_typecode(proto_tree *tree, tvbuff_t *tvb, packet_info *
         offset += 4;
         alias_name = tvb_get_string_enc(wmem_packet_scope(), tvb, offset, alias_name_length, ENC_ASCII);
         offset = check_offset_addition(offset, alias_name_length, tree, NULL, tvb);
-        (void) g_strlcpy(type_name, alias_name, sizeof(type_name));
+        bytesWritten = g_strlcpy(type_name, alias_name, sizeof(type_name));
+        if (bytesWritten >= sizeof(type_name)) {
+          ws_utf8_truncate(type_name, sizeof(type_name) - 1);
+        }
         break;
     }
 
@@ -6229,7 +6240,10 @@ static int rtps_util_add_typecode(proto_tree *tree, tvbuff_t *tvb, packet_info *
         if (tk_id == RTI_CDR_TK_VALUE_PARAM) {
           type_id_name = "valueparam";
         }
-        snprintf(type_name, sizeof(type_name), "%s '%s'", type_id_name, value_name);
+        bytesWritten = snprintf(type_name, sizeof(type_name), "%s '%s'", type_id_name, value_name);
+        if (bytesWritten >= sizeof(type_name)) {
+          ws_utf8_truncate(type_name, sizeof(type_name) - 1);
+        }
         break;
     }
   } /* switch(tk_id) */
@@ -11512,12 +11526,7 @@ static void dissect_HEADER_EXTENSION(tvbuff_t* tvb, packet_info* pinfo, int offs
          * checksum field set to 0. To calculate the checksum of the RTPS message
          * we need to set those bytes to 0 in a separate buffer.
          */
-        tvb_zero_checksum = wmem_alloc0_array(wmem_packet_scope(), char, rtps_root->tvb_len);
-        tvb_memcpy(
-            rtps_root->tvb,
-            tvb_zero_checksum,
-            rtps_root->tvb_offset,
-            rtps_root->tvb_len);
+        tvb_zero_checksum = tvb_memdup(pinfo->pool, rtps_root->tvb, rtps_root->tvb_offset, rtps_root->tvb_len);
 
         /* Set checksum bytes to 0 */
         memset(tvb_zero_checksum + offset, 0, checksum_len);

@@ -1,3 +1,51 @@
+wireshark (4.4.15-0+deb13u1) trixie-security; urgency=medium
+
+  * Team upload.
+  * New upstream version 4.4.15 (Closes: #1135323)
+    - CVE-2026-7379: Memory leak in sharkd, allows DoS
+    - CVE-2026-7378: Crash in sharkd, allows DoS
+    - CVE-2026-7376: Crash in sharkd, allows DoS
+    - CVE-2026-7375: UDS Infinite loop, allows DoS
+    - CVE-2026-6870: GSM dissector crash leading to DoS
+    - CVE-2026-6869: WebSocket dissector crash leading to DoS
+    - CVE-2026-6868: HTTP dissector crash leading to DoS
+    - CVE-2026-6867: SMB2 dissector crash leading to DoS
+    - CVE-2026-6538: BEEP dissector crash leading to DoS
+    - CVE-2026-6537: ZigBee dissector crash leading to DoS
+    - CVE-2026-6535: zlib crash in Wireshark, allows DoS
+    - CVE-2026-6534: USB infinite loop, allows DoS
+    - CVE-2026-6533: LZ77 crash in Wireshark, allows DoS
+    - CVE-2026-6532: Kismet crash in Wireshark, allows DoS
+    - CVE-2026-6531: SANE Infinite loop, allows DoS
+    - CVE-2026-6530: DCP-ETSI crash in Wireshark, allows DoS
+    - CVE-2026-6529: iLBC crash in Wireshark, allows DoS
+    - CVE-2026-6527: ASN.1 crash in Wireshark, allows DoS
+    - CVE-2026-6524: MySQL crash in Wireshark, allows DoS
+    - CVE-2026-6523: GNW Infinite loop, allows DoS
+    - CVE-2026-6522: RPKI-Router Infinite loop, allows DoS
+    - CVE-2026-6521: OpenFlow v5 Infinite loop, allows DoS
+    - CVE-2026-6520: OpenFlow v6 Infinite loop, allows DoS
+    - CVE-2026-6519: MBIM Infinite loop, allows DoS
+    - CVE-2026-5657: iLBC crash in Wireshark, allows DoS
+    - CVE-2026-5656: Profile import path traversal DoS/RCE
+    - CVE-2026-5654: AMR-NB crash in Wireshark, allows DoS
+    - CVE-2026-5653: DCP-ETSI crash in Wireshark, allows DoS
+    - CVE-2026-5409: Monero crash in Wireshark, allows DoS
+    - CVE-2026-5408: BT-DHT crash in Wireshark, allows DoS
+    - CVE-2026-5407: SMB2 Infinite loop, allows DoS
+    - CVE-2026-5406: FC-SWILS crash in Wireshark, allows DoS
+    - CVE-2026-5405: RDP crash in Wireshark, allows DoS/RCE
+    - CVE-2026-5404: K12 RF5 parser crash DoS, allows DoS
+    - CVE-2026-5403: SBC crash in Wireshark, allows DoS/RCE
+    - CVE-2026-5401: AFP Spotlight crash in Wireshark, allows DoS
+    - CVE-2026-5299: ICMPv6 PvD crash in Wireshark, allows DoS
+  * d/gbp.conf: Update to trixie
+  * d/libwsutil16.symbols: Update symbols to reflect upstream
+  * d/libwireshark18.symbols: Update symbols to reflect upstream
+  * d/watch: Restrict to 4.4.x releases
+
+ -- Matheus Polkorny <mpolkorny@gmail.com>  Fri, 01 May 2026 17:07:33 -0300
+
 wireshark (4.4.14-0+deb13u1) trixie; urgency=medium
 
   * Non-maintainer upload.

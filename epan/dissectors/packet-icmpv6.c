@@ -2246,8 +2246,14 @@ static int dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, 
                     opt_offset += 16;
                 }
 
-                /* Options */
-                opt_offset = dissect_icmpv6_nd_opt(tvb, opt_offset, pinfo, icmp6opt_tree);
+                /* https://datatracker.ietf.org/doc/html/rfc8801#section-3.1-3.24
+                 * Zero or more RA options to be ignored by hosts that are not
+                 * PvD aware. */
+                if (opt_offset < offset + opt_len) {
+                    // Don't dissect options in the main body.
+                    opt_tvb = tvb_new_subset_length(tvb, opt_offset, offset + opt_len - opt_offset);
+                    opt_offset += dissect_icmpv6_nd_opt(opt_tvb, 0, pinfo, icmp6opt_tree);
+                }
 
                 break;
             }
@@ -2453,7 +2459,7 @@ static int dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, 
                 opt_offset += hai_len;
 
                 /* Padding... */
-                padd_length = opt_len - opt_offset;
+                padd_length = opt_len - (opt_offset - offset);
                 proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_padding, tvb, opt_offset, padd_length, ENC_NA);
                 opt_offset += padd_length;
 
@@ -2477,7 +2483,7 @@ static int dissect_icmpv6_nd_opt(tvbuff_t *tvb, int offset, packet_info *pinfo, 
                 opt_offset += mn_len;
 
                 /* Padding... */
-                padd_length = opt_len - opt_offset;
+                padd_length = opt_len - (opt_offset - offset);
                 proto_tree_add_item(icmp6opt_tree, hf_icmpv6_opt_padding, tvb, opt_offset, padd_length, ENC_NA);
                 opt_offset += padd_length;
 

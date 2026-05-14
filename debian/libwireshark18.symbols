@@ -286,6 +286,7 @@ libwireshark.so.18 libwireshark18 #MINVER#
  decode_zcl_time_in_minutes@Base 2.5.2
  decode_zcl_time_in_seconds@Base 2.5.2
  decrement_dissection_depth@Base 4.2.4
+ decrement_dissection_depth_by_n@Base 4.4.15
  delete_itu_tcap_subdissector@Base 1.9.1
  deregister_depend_dissector@Base 2.1.0
  deregister_dfilter_translator@Base 4.4.0
@@ -1113,6 +1114,7 @@ libwireshark.so.18 libwireshark18 #MINVER#
  in_cksum@Base 1.9.1
  in_cksum_ret_partial@Base 4.2.0
  increment_dissection_depth@Base 4.2.4
+ increment_dissection_depth_by_n@Base 4.4.15
  init_srt_table@Base 1.99.8
  init_srt_table_row@Base 1.99.8
  ip_checksum@Base 1.99.0
