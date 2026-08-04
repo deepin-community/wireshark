@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-/* (last updated 2026-04-24) */
+/* (last updated 2026-05-13) */
 
 #include "config.h"
 
@@ -20865,7 +20865,7 @@ static const char * const table[] =
     "Philipp Strozyk",                                                                    // 20843
     "L'OREAL",                                                                            // 20844
     "Linux Information Systems AG",                                                       // 20845
-    "SURFsara",                                                                           // 20846
+    "SURF B.V.",                                                                          // 20846
     "Atlas Development Corporation",                                                      // 20847
     "Zope Corporation",                                                                   // 20848
     "OMT Systems (Shenzhen) Limited",                                                     // 20849
@@ -31146,7 +31146,7 @@ static const char * const table[] =
     "ABF Baltic AS",                                                                      // 31124
     "Ressources Informatiques",                                                           // 31125
     "ASTELLIA",                                                                           // 31126
-    "Emerson Process Management",                                                         // 31127
+    "Emerson",                                                                            // 31127
     "Lead Tech Design",                                                                   // 31128
     "Alaska Satellite Facility",                                                          // 31129
     "Basho Technologies, Inc.",                                                           // 31130
@@ -37532,7 +37532,7 @@ static const char * const table[] =
     "SilentSystem",                                                                       // 37510
     "Future Dynamics Interstellar",                                                       // 37511
     "Systems Corps",                                                                      // 37512
-    "Citkomm",                                                                            // 37513
+    "Südwestfalen-IT (Zweckverband)",                                                     // 37513
     "Raphael Frasch GmbH",                                                                // 37514
     "Avajadi Solutions",                                                                  // 37515
     "Software Integration Development",                                                   // 37516
@@ -48320,7 +48320,7 @@ static const char * const table[] =
     "Health Choice Management Company",                                                   // 48298
     "Koninklijke Nederlandse Dambond",                                                    // 48299
     "ComSource s.r.o.",                                                                   // 48300
-    "NathanNet",                                                                          // 48301
+    "NatNet",                                                                             // 48301
     "Big Neptune",                                                                        // 48302
     "0x0f",                                                                               // 48303
     "American Financial Group Inc",                                                       // 48304
@@ -65550,7 +65550,7 @@ static const char * const table[] =
     "CleverEnable",                                                                       // 65528
     "Kitsos",                                                                             // 65529
     "Vectanor",                                                                           // 65530
-    "烟台云电电子科技有限公司 (Yantai Yundian Electronics Technology Co., Ltd.)",                     // 65531
+    "烟台云软电子有限公司 (Yantai Yunruan Electronics Co., Ltd.)",                                  // 65531
     "Code 626, Inc.",                                                                     // 65532
     "Scottish Power Energy Networks",                                                     // 65533
     "Intersys Teknoloji Sanayi Ticaret A.Ş.",                                             // 65534
@@ -65673,7 +65673,158 @@ static const char * const table[] =
     "ITALGRANITI GROUP S.P.A.",                                                           // 65651
     "SurrealDB Ltd",                                                                      // 65652
     "ADK Hospital",                                                                       // 65653
-    "Georgia Farm Bureau Mutual Insurance Company"                                        // 65654
+    "Georgia Farm Bureau Mutual Insurance Company",                                       // 65654
+    "Jonel Mawirat",                                                                      // 65655
+    "365id AB",                                                                           // 65656
+    "Ticnow Spa",                                                                         // 65657
+    "EMERALD ENERGY PTY LTD",                                                             // 65658
+    "China Broadcasting International Economic and Technical Cooperation Co., Ltd.",      // 65659
+    "SensNet",                                                                            // 65660
+    "DSMentoring",                                                                        // 65661
+    "KeyGrid",                                                                            // 65662
+    "The Joy of Engineering - Compelcon AB",                                              // 65663
+    "Bluedot Insight LLC",                                                                // 65664
+    "Shenzhen Xihe Future Technology Co., Ltd.",                                          // 65665
+    "Friendly Technologies LTD.",                                                         // 65666
+    "Shanghai YueJing Network Technology Co.,LTD",                                        // 65667
+    "Treuco AG",                                                                          // 65668
+    "ELEXTRA",                                                                            // 65669
+    "LANVIX, FZCO",                                                                       // 65670
+    "AMS Software Solutions, Inc.",                                                       // 65671
+    "Jonatan Miarecki",                                                                   // 65672
+    "High Ridge Services, Inc.",                                                          // 65673
+    "Czech Hydrometeorological Institute",                                                // 65674
+    "e-Xpert Solutions SA",                                                               // 65675
+    "Hirslanden AG",                                                                      // 65676
+    "enyo GmbH",                                                                          // 65677
+    "STACKDEEP.AI PRIVATE LIMITED",                                                       // 65678
+    "St. Paul's Hospital Millennium Medical College",                                     // 65679
+    "PEC Technology (Thailand)",                                                          // 65680
+    "InfoPro Solution CO., LTD.",                                                         // 65681
+    "Telovis Solutions (OPC) Private Limited",                                            // 65682
+    "Centric Limited",                                                                    // 65683
+    "Nordic Bio Power",                                                                   // 65684
+    "Nami.ai Pte. Ltd.",                                                                  // 65685
+    "kaSoft GmbH",                                                                        // 65686
+    "DELTA ELECTRONICS INDIA PRIVATE LIMITED",                                            // 65687
+    "Prolan Process Control Co.",                                                         // 65688
+    "University of Mohamed El Bachir El Ibrahimi Bodj Bou Arréridj",                      // 65689
+    "Spintronica LLC",                                                                    // 65690
+    "ATON",                                                                               // 65691
+    "Enschede.dev",                                                                       // 65692
+    "City of Federal Way",                                                                // 65693
+    "Swedish Microwave AB",                                                               // 65694
+    "OmniVision Technologies Inc",                                                        // 65695
+    "Andermatt Swiss Alps AG",                                                            // 65696
+    "atNorth ehf.",                                                                       // 65697
+    "Penny Plate, LLC",                                                                   // 65698
+    "benningshof-it",                                                                     // 65699
+    "Institute of Provenance",                                                            // 65700
+    "Amanger Consultoría Informatica",                                                    // 65701
+    "Weintek",                                                                            // 65702
+    "Intellics Co.,Ltd",                                                                  // 65703
+    "Extop AB",                                                                           // 65704
+    "SMARTOPTIMUS TECHNOLOGIES FZ LLC",                                                   // 65705
+    "Perspic AS",                                                                         // 65706
+    "Fidelity International",                                                             // 65707
+    "FIL Fondsbank GmbH",                                                                 // 65708
+    "qonduit GmbH",                                                                       // 65709
+    "Sharonview Federal Credit Union",                                                    // 65710
+    "Intalio",                                                                            // 65711
+    "INNO LOTUS PTY LTD",                                                                 // 65712
+    "Athena Cybersecurity Pty Ltd",                                                       // 65713
+    "Lab Acacia Open Source",                                                             // 65714
+    "Neuro Protocol Suites Committee",                                                    // 65715
+    "Clinical Science Systems",                                                           // 65716
+    "EZMA GmbH",                                                                          // 65717
+    "Foam Design, Inc.",                                                                  // 65718
+    "Techinova AB",                                                                       // 65719
+    "Shaanxi Zhongke Lixing Intelligent Technology Co., Ltd.",                            // 65720
+    "SAKO Brno, a.s.",                                                                    // 65721
+    "Markgraf Consulting",                                                                // 65722
+    "Firma Chile",                                                                        // 65723
+    "Ace Power Works",                                                                    // 65724
+    "Zeev Lazarev",                                                                       // 65725
+    "The CORE Group",                                                                     // 65726
+    "Narayana OÜ",                                                                        // 65727
+    "Xygeni Security",                                                                    // 65728
+    "Medizinischer Dienst Westfalen-Lippe",                                               // 65729
+    "F/G/M Mettchen Müller GmbH & Co. KG",                                                // 65730
+    "ldaldx+ml",                                                                          // 65731
+    "Qrypt Inc",                                                                          // 65732
+    "Moultbase",                                                                          // 65733
+    "PicoKeys",                                                                           // 65734
+    "vossic",                                                                             // 65735
+    "AceBIT GmbH",                                                                        // 65736
+    "Zomputer Kft.",                                                                      // 65737
+    "netcosystems GmbH",                                                                  // 65738
+    "ARZ Haan AG Unternehmensgruppe",                                                     // 65739
+    "SAIC MOTOR Overseas Intelligent Mobility Technology Co., Ltd.",                      // 65740
+    "Maxworks Systems LLC",                                                               // 65741
+    "Li lilingyi",                                                                        // 65742
+    "LeSoluzioni scarl",                                                                  // 65743
+    "Inspakt Teknoloji A.Ş.",                                                             // 65744
+    "MOKA",                                                                               // 65745
+    "ShenZhen HCAILink Technology Co.,Ltd",                                               // 65746
+    "Harrison Lee",                                                                       // 65747
+    "wattsonic",                                                                          // 65748
+    "iWave Global",                                                                       // 65749
+    "Kuvik",                                                                              // 65750
+    "Wavera Health, Inc.",                                                                // 65751
+    "Kared Sp. z o.o.",                                                                   // 65752
+    "Prologin",                                                                           // 65753
+    "Veranet B.V.",                                                                       // 65754
+    "Timber Group Oy",                                                                    // 65755
+    "Iver AB",                                                                            // 65756
+    "kematek.com",                                                                        // 65757
+    "Hochschule fuer Musik und Darstellende Kunst Frankfurt am Main",                     // 65758
+    "Devix Portugal, Lda",                                                                // 65759
+    "Maestranza Diesel",                                                                  // 65760
+    "MeediaLabs SpA",                                                                     // 65761
+    "IKnowICT",                                                                           // 65762
+    "China Hualu Panasonic AVC Networks Co.,Ltd.",                                        // 65763
+    "Gravity8",                                                                           // 65764
+    "NetSense CyberSecurity Private Limited",                                             // 65765
+    "Zambia Information and Communications Technology Authority",                         // 65766
+    "BOTWORX",                                                                            // 65767
+    "JSC Ural Factories",                                                                 // 65768
+    "Sekom Iletisim Sistemleri A.S.",                                                     // 65769
+    "Wireskop",                                                                           // 65770
+    "LYNX VISION",                                                                        // 65771
+    "Web Lite Solutions Corp.",                                                           // 65772
+    "AGROWAY TECNOLOGIA",                                                                 // 65773
+    "Kimber Mfg., Inc.",                                                                  // 65774
+    "SIRECOM S.A.R.L",                                                                    // 65775
+    "Mapsted Corp",                                                                       // 65776
+    "Nemzeti Üzleti Szolgáltató Zrt.",                                                    // 65777
+    "Business Opportunity Management",                                                    // 65778
+    "TransWorld Scribes Limited",                                                         // 65779
+    "FGDConsulting AB",                                                                   // 65780
+    "Sun Electronics Co., Ltd.",                                                          // 65781
+    "Resonance Health",                                                                   // 65782
+    "Taifun Tofu GmbH",                                                                   // 65783
+    "ENFASYS INGENIERIA SL",                                                              // 65784
+    "Insightexus",                                                                        // 65785
+    "Simple Sign",                                                                        // 65786
+    "CANOPY",                                                                             // 65787
+    "Airiam",                                                                             // 65788
+    "Thessia s.r.o.",                                                                     // 65789
+    "SevenLayerTea",                                                                      // 65790
+    "Hasil Technologies Inc.",                                                            // 65791
+    "Lampyris Factory LLC",                                                               // 65792
+    "CELLCON BIOMEDICAL TECH. CO., LTD.",                                                 // 65793
+    "Gospower",                                                                           // 65794
+    "homelabsdx",                                                                         // 65795
+    "Niklas Vlach",                                                                       // 65796
+    "STORYBEL",                                                                           // 65797
+    "Be-ys Health Solutions France",                                                      // 65798
+    "TLI",                                                                                // 65799
+    "Keynua Peru S.A.C.",                                                                 // 65800
+    "CNS-LINK",                                                                           // 65801
+    "Configura",                                                                          // 65802
+    "John Michael Kane",                                                                  // 65803
+    "Sintela, Inc.",                                                                      // 65804
+    "HIT Systempartner GmbH (PC-SPEZIALIST Hannover)"                                     // 65805
 };
 
 const char* global_enterprises_lookup(uint32_t value)
