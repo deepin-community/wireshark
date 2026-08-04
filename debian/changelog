@@ -1,3 +1,11 @@
+wireshark (4.4.16-0+deb13u1) trixie; urgency=medium
+
+  * Non-maintainer upload.
+  * New upstream release.
+    - CVE-2026-9759: ROHC protocol dissector crash
+
+ -- Adrian Bunk <bunk@debian.org>  Wed, 01 Jul 2026 12:02:06 +0300
+
 wireshark (4.4.15-0+deb13u1) trixie-security; urgency=medium
 
   * Team upload.
