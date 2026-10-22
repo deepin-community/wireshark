@@ -25,7 +25,7 @@ variables:
   # The Qt versions that we ship in our offical installers. Must match
   # windows-qt6-lts-version and macos-qt6-lts-version in
   # doc/wsdg_src/developer-guide.adoc in master.
-  WINDOWS_QT6_LTS_VERSION: "6.5.3"
+  WINDOWS_QT6_LTS_VERSION: "6.7.3"
   MACOS_QT6_LTS_VERSION: "6.5.3"
   # Enable color output in various tools.
   # CMake, Ninja, and others: https://bixense.com/clicolors/
@@ -184,7 +184,7 @@ workflow:
     - $env:Path += ";C:\Program Files\CMake\bin"
     - $env:CMAKE_PREFIX_PATH = "C:\qt\$($env:WINDOWS_QT6_LTS_VERSION)\msvc2019_64"
     # https://help.appveyor.com/discussions/questions/18777-how-to-use-vcvars64bat-from-powershell
-    - cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars.txt"
+    - cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars.txt"
     - Get-Content "$env:temp\vcvars.txt" | Foreach-Object { if ($_ -match "^(.*?)=(.*)$") { Set-Content "env:\$($matches[1])" $matches[2] } }
     # Testing / debugging only.
     # - cmd.exe /c "set CI_PIPELINE_SOURCE"
@@ -295,10 +295,18 @@ Source Package:
     # - ccache --max-size $( du --summarize --block-size=1M "$CI_PROJECT_DIR/build" | awk '{printf ("%dM", $1 * 1.5)}' )
     - if [ "$CI_JOB_STATUS" != "success" ]; then exit 0 ; fi
     - if [ -n "$SCHEDULE_TYPE" ] ; then exit 0 ; fi
+    - rclone config create wireshark s3
+      provider=AWS
+      region=us-east-2
+      env_auth=true
+      endpoint=$S3_ENDPOINT_WIRESHARK
+      acl=private
+      --non-interactive --obscure
+    # --no-output
     - stat --format="%n %s bytes" wireshark-*.tar.*
     - for digest in sha512 sha256 sha1 ; do openssl $digest wireshark-*.tar.* ; done
-    - if [ -n "$MC_DESTINATION_DIST" ] ; then mc --quiet cp wireshark-*.tar.* "$MC_DESTINATION_DIST/" ; fi
-    - if [ -n "$MC_DESTINATION_RELEASE" ] ; then mc --quiet cp wireshark-release-notes-*.{txt,html} "$MC_DESTINATION_RELEASE/" ; fi
+    - if [ -n "$S3_DESTINATION_DIST" ] ; then rclone copy . "wireshark:$S3_DESTINATION_DIST" --include "wireshark-*.tar.*" ; fi
+    - if [ -n "$S3_DESTINATION_RELEASE" ] ; then rclone copy . "wireshark:$S3_DESTINATION_RELEASE" --include "wireshark-release-notes-*.{txt,html}" ; fi
   artifacts:
     paths:
       - wireshark-*.tar.*
@@ -354,7 +362,7 @@ Fedora RPM Package:
     # https://gitlab.com/gitlab-com/support-forum/issues/2790
     - export FORCE_CMAKE_NINJA_NON_VERBOSE=1
     - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
-    - cmake3 -G Ninja ..
+    - cmake -G Ninja ..
     - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
     - ninja wireshark_rpm
 
@@ -408,7 +416,12 @@ Ubuntu APT Package:
     # build-ubuntu puts us in `build`.
     - cd ..
     - ln --symbolic --no-dereference --force packaging/debian
-    - CC=/usr/lib/ccache/gcc CXX=/usr/lib/ccache/g++ MAKE=ninja dpkg-buildpackage -us -uc -rfakeroot -jauto -zfast
+    # Shared GitLab runners limit the log size to 4M, so reduce verbosity. See
+    # https://gitlab.com/gitlab-com/support-forum/issues/2790
+    - export DEB_BUILD_OPTIONS="nocheck parallel=$(( $(getconf _NPROCESSORS_ONLN) + 2 ))"
+    - export DH_QUIET=1
+    - export MAKEFLAGS=--silent
+    - CC=/usr/lib/ccache/gcc CXX=/usr/lib/ccache/g++ dpkg-buildpackage -us -uc -rfakeroot -jauto -zfast
     # Please don't add a Lintian step unless you can guarantee that someone
     # will fix any breakages that invariably pop up.
     - mkdir ubuntu-packages
@@ -446,14 +459,14 @@ Windows x64 Package:
     - $env:Configuration = "RelWithDebInfo"
     - $env:CMAKE_PREFIX_PATH = "C:\Qt\$($env:WINDOWS_QT6_LTS_VERSION)\msvc2019_64"
     # https://help.appveyor.com/discussions/questions/18777-how-to-use-vcvars64bat-from-powershell
-    - cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars.txt"
+    - cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars.txt"
     - Get-Content "$env:temp\vcvars.txt" | Foreach-Object { if ($_ -match "^(.*?)=(.*)$") { Set-Content "env:\$($matches[1])" $matches[2] } }
     - mkdir build
     - cd build
   script:
     - C:\Windows\py.exe ..\tools\make-version.py --set-release --version-file=wireshark_version.txt ..
-    - cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DENABLE_SIGNED_NSIS=on ..
-    - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.sln
+    - cmake -G "Visual Studio 18 2026" -A x64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DENABLE_SIGNED_NSIS=on ..
+    - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.slnx
     - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
     - msbuild /verbosity:minimal /maxcpucount wireshark_nsis_prep.vcxproj
     - msbuild /verbosity:minimal /maxcpucount wireshark_wix_prep.vcxproj
@@ -492,14 +505,14 @@ Windows Arm64 Package:
     - $env:Configuration = "RelWithDebInfo"
     - $env:CMAKE_PREFIX_PATH = "C:\Qt\$($env:WINDOWS_QT6_LTS_VERSION)\msvc2019_arm64"
     # https://help.appveyor.com/discussions/questions/18777-how-to-use-vcvars64bat-from-powershell
-    - cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsarm64.bat`" && set > %temp%\vcvars.txt"
+    - cmd.exe /c "call `"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsarm64.bat`" && set > %temp%\vcvars.txt"
     - Get-Content "$env:temp\vcvars.txt" | Foreach-Object { if ($_ -match "^(.*?)=(.*)$") { Set-Content "env:\$($matches[1])" $matches[2] } }
     - mkdir build
     - cd build
   script:
     - C:\Windows\py.exe ..\tools\make-version.py --set-release --version-file=wireshark_version.txt ..
-    - cmake -G "Visual Studio 17 2022" -A arm64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DENABLE_SIGNED_NSIS=on -DQT_HOST_PATH="C:\Qt\$($env:WINDOWS_QT6_LTS_VERSION)\msvc2019_64" ..
-    - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.sln
+    - cmake -G "Visual Studio 18 2026" -A arm64 -DENABLE_WERROR=ON -DENABLE_LTO=off -DENABLE_SIGNED_NSIS=on -DQT_HOST_PATH="C:\Qt\$($env:WINDOWS_QT6_LTS_VERSION)\msvc2019_64" ..
+    - msbuild /verbosity:minimal "/consoleloggerparameters:PerformanceSummary;NoSummary" /maxcpucount Wireshark.slnx
     - msbuild /verbosity:minimal /maxcpucount test-programs.vcxproj
     - msbuild /verbosity:minimal /maxcpucount wireshark_nsis_prep.vcxproj
     - C:\gitlab-builds\bin\sign-files.ps1 -Recurse -Path run\RelWithDebInfo
@@ -519,6 +532,27 @@ Windows Arm64 Package:
   artifacts:
     paths:
       - build/wireshark-release-info-*.ini
+
+Ubuntu Qt5 Build:
+  extends: .build-ubuntu
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      interruptible: true
+      changes:
+        - "ui/**/*"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: manual
+      allow_failure: true
+  needs:
+    - job: "Commit Check"
+      optional: true
+  script:
+    - ../tools/debian-setup.sh --install-qt5-deps --yes --no-install-recommends
+    - printf "\e[0Ksection_start:%s:cmake_section[collapsed=true]\r\e[0KRunning CMake" "$( date +%s)"
+    - cmake -G Ninja -DENABLE_CCACHE=ON -DENABLE_WERROR=ON -DUSE_qt6=OFF ..
+    - printf "\e[0Ksection_end:%s:cmake_section\r\e[0K" "$( date +%s)"
+    - ninja
+    - run/wireshark -v
 
 # Fedora doesn't appear to have checks in place to ensure that their MinGW Qt
 # packages work, so disable the MinGW builds for now.
@@ -540,6 +574,7 @@ macOS Arm Package:
   stage: build
   rules: !reference [.if-w-w-only-merged]
   variables:
+    CCACHE_DIR: "$CI_PROJECT_DIR/../ccache"
     CODE_SIGN_IDENTITY: "Wireshark Foundation"
     WIRESHARK_BASE_DIR: "$CI_PROJECT_DIR/../wireshark-third-party"
   tags:
@@ -588,7 +623,7 @@ macOS Arm Package:
     - DMG_SHA256=$( shasum --algorithm 256 Wireshark?[1-9]*.dmg | awk '{print $1}' )
     - WIRESHARK_VERSION=$(< ../wireshark_version.txt)
     - printf '[DEFAULT]\nsparkle_signature = %s\ndmg_sha256 = %s\n' "$SPARKLE_SIGNATURE" "$DMG_SHA256" > wireshark-release-info-${WIRESHARK_VERSION}-macos-arm64.ini
-    - if [[ -n "$S3_DESTINATION_RELEASE" ]] ; then aws s3 cp wireshark-release-info-${WIRESHARK_VERSION}-macos-arm64.ini "$S3_DESTINATION_RELEASE/" ; fi
+    - if [[ -n "$S3_DESTINATION_RELEASE" ]] ; then aws s3 cp wireshark-release-info-${WIRESHARK_VERSION}-macos-arm64.ini "s3://$S3_DESTINATION_RELEASE/" ; fi
     - cd ..
     - ninja test
   artifacts:
@@ -600,6 +635,7 @@ macOS Intel Package:
   stage: build
   rules: !reference [.if-w-w-only-merged]
   variables:
+    CCACHE_DIR: "$CI_PROJECT_DIR/../ccache"
     CODE_SIGN_IDENTITY: "Wireshark Foundation"
   tags:
     - wireshark-macos-intel-package
@@ -636,7 +672,7 @@ macOS Intel Package:
     - DMG_SHA256=$( shasum --algorithm 256 Wireshark?[1-9]*.dmg | awk '{print $1}' )
     - WIRESHARK_VERSION=$(< ../wireshark_version.txt)
     - printf '[DEFAULT]\nsparkle_signature = %s\ndmg_sha256 = %s\n' "$SPARKLE_SIGNATURE" "$DMG_SHA256" > wireshark-release-info-${WIRESHARK_VERSION}-macos-intel64.ini
-    - if [[ -n "$S3_DESTINATION_RELEASE" ]] ; then aws s3 cp wireshark-release-info-${WIRESHARK_VERSION}-macos-intel64.ini "$S3_DESTINATION_RELEASE/" ; fi
+    - if [[ -n "$S3_DESTINATION_RELEASE" ]] ; then aws s3 cp wireshark-release-info-${WIRESHARK_VERSION}-macos-intel64.ini "s3://$S3_DESTINATION_RELEASE/" ; fi
     - cd ..
     - ninja test
   artifacts:
@@ -660,7 +696,7 @@ macOS Intel Package:
   script:
     # XXX We might want to move this to wireshark-ubuntu-dev or debian-setup.sh.
     - DEBIAN_FRONTEND=noninteractive apt-get update
-    - DEBIAN_FRONTEND=noninteractive apt-get --yes install ruby-asciidoctor-pdf ruby-coderay ruby-dev
+    - DEBIAN_FRONTEND=noninteractive apt-get --yes install asciidoctor-pdf ruby-coderay ruby-dev
     - NOKOGIRI_USE_SYSTEM_LIBRARIES=1 gem install asciidoctor-epub3
     - mkdir build
     - cd build
@@ -885,8 +921,8 @@ Windows Build:
   script:
     # lib{sinsp,scap} don't support Configuration=Debug, so we can't enable
     # BUILD_logray or BUILD_falcodump here just yet.
-    - cmake -G "Visual Studio 17 2022" -A x64 -DENABLE_WERROR=ON -DENABLE_LTO=off ..
-    - msbuild /verbosity:minimal /maxcpucount /property:Configuration=Debug Wireshark.sln
+    - cmake -G "Visual Studio 18 2026" -A x64 -DENABLE_WERROR=ON -DENABLE_LTO=off ..
+    - msbuild /verbosity:minimal /maxcpucount /property:Configuration=Debug Wireshark.slnx
     - msbuild /verbosity:minimal /maxcpucount /property:Configuration=Debug test-programs.vcxproj
     - C:\Windows\py.exe -m pytest --disable-gui --build-type=Debug
 

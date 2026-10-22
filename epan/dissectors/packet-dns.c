@@ -3794,10 +3794,8 @@ dissect_dns_answer(tvbuff_t *tvb, int offsetx, int dns_data_offset,
         /* Base 32 Encoding with Extended Hex Alphabet (see RFC 4648 section 7) */
         const char    *base32hex = "0123456789abcdefghijklmnopqrstuv";
         wmem_strbuf_t *hash_value_base32hex = wmem_strbuf_new(pinfo->pool, "");
-        int            group, in_offset, out_offset;
-        for (in_offset = 0, out_offset = 0;
-            in_offset / 8 < hash_len;
-            in_offset += 5, out_offset += 1) {
+        unsigned       group, in_offset;
+        for (in_offset = 0; in_offset / 8 < hash_len; in_offset += 5) {
           group = tvb_get_bits8(tvb, cur_offset * 8 + in_offset, 5);
           wmem_strbuf_append_c(hash_value_base32hex, base32hex[group]);
         }
@@ -6853,12 +6851,12 @@ proto_register_dns(void)
         NULL, HFILL }},
 
     { &hf_dns_dnskey_flags_secure_entry_point,
-      { "Key Signing Key", "dns.dnskey.flags.secure_entry_point",
+      { "Secure Entry Point", "dns.dnskey.flags.secure_entry_point",
         FT_BOOLEAN, 16, TFS(&tfs_yes_no), DNSKEY_FLAGS_SEP,
         NULL, HFILL }},
 
     { &hf_dns_dnskey_flags_reserved,
-      { "Key Signing Key", "dns.dnskey.flags.reserved",
+      { "Reserved", "dns.dnskey.flags.reserved",
         FT_UINT16, BASE_HEX, NULL, DNSKEY_FLAGS_RSV,
         "Must be zero", HFILL }},
 

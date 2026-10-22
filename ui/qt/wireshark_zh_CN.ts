@@ -2,14 +2,6 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_CN">
 <context>
-    <name>Abbreviation</name>
-    <message>
-        <source></source>
-        <comment>for &quot;not applicable&quot;</comment>
-        <translation></translation>
-    </message>
-</context>
-<context>
     <name>AboutDialog</name>
     <message>
         <source>About Wireshark</source>
@@ -4351,11 +4343,11 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>2 ms</source>
-        <translation type="unfinished">100毫秒 {2 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>5 ms</source>
-        <translation type="unfinished">100毫秒 {5 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>10 ms</source>
@@ -4363,11 +4355,11 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>20 ms</source>
-        <translation type="unfinished">100毫秒 {20 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>50 ms</source>
-        <translation type="unfinished">100毫秒 {50 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>100 ms</source>
@@ -4375,27 +4367,27 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>200 ms</source>
-        <translation type="unfinished">100毫秒 {200 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>500 ms</source>
-        <translation type="unfinished">100毫秒 {500 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>2 sec</source>
-        <translation type="unfinished">10秒 {2 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>5 sec</source>
-        <translation type="unfinished">10秒 {5 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>2 min</source>
-        <translation type="unfinished">10分钟 {2 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>5 min</source>
-        <translation type="unfinished">10分钟 {5 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Wireshark I/O Graphs: %1</source>
@@ -8680,31 +8672,31 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>LCID 32</source>
-        <translation type="unfinished">LCID 32</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>LCID 33</source>
-        <translation type="unfinished">LCID 33</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>LCID 34</source>
-        <translation type="unfinished">LCID 34</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>LCID 35</source>
-        <translation type="unfinished">LCID 35</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>LCID 36</source>
-        <translation type="unfinished">LCID 36</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>LCID 37</source>
-        <translation type="unfinished">LCID 37</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>LCID 38</source>
-        <translation type="unfinished">LCID 38</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>TM</source>
@@ -8745,6 +8737,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>UE Id</source>
         <translation>UE ID</translation>
+    </message>
+    <message>
+        <source></source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Name</source>
@@ -8877,13 +8873,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Right</source>
         <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>QObject::QObject::QObject</name>
-    <message>
-        <source>CCCH</source>
-        <translation type="unfinished">CCCH</translation>
     </message>
 </context>
 <context>

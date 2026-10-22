@@ -1,3 +1,76 @@
+wireshark (4.4.19-0+deb13u1) trixie-security; urgency=medium
+
+  * Team upload.
+  * New upstream version 4.4.19 (Closes: #1149644)
+    - CVE-2026-95387: SPDY dissector crash, allows DoS
+    - CVE-2026-95388: Crash in sharkd, allows DoS
+    - CVE-2026-95389: SCTP dissector crash, allows DoS
+    - CVE-2026-95392: MBIM dissector crash, allows DoS
+    - CVE-2026-95393: CSN.1 dissector crash, allows DoS
+    - CVE-2026-95394: MNM parser large loop, allows DoS
+    - CVE-2026-95395: IEEE C37.118 dissector memory leak, allows DoS
+    - CVE-2026-96415: Catapult DCT2000 dissector crash, allows DoS
+    - CVE-2026-96416: IEEE 802.11 dissector crash, allows DoS
+    - CVE-2026-96417: RF4CE dissector crash, allows DoS
+    - CVE-2026-96418: TIFF dissector infinite loop, allows DoS
+    - CVE-2026-96419: Profile import crash, possible code execution
+    - CVE-2026-96420: Toshiba parser crash, allows DoS
+    - CVE-2026-96421: USB HID dissector memory leak, allows DoS
+    - CVE-2026-96422: Frame metadissector crash, allows DoS
+    - CVE-2026-96423: X11 dissector crash, allows DoS
+
+ -- Matheus Polkorny <polkorny@debian.org>  Fri, 02 Oct 2026 10:45:05 -0300
+
+wireshark (4.4.18-0+deb13u1) trixie-security; urgency=medium
+
+  * Team upload.
+  * New upstream version 4.4.18 (Closes: #1142268, #1144924)
+    - CVE-2026-15163: Multiple loops in dissectors, allows DoS
+    - CVE-2026-15164: Crash in ciscodump, allows DoS
+    - CVE-2026-15166: IEEE 802.11 dissector crash, allows DoS
+    - CVE-2026-15167: DBS Etherwatch parser crash, allows DoS
+    - CVE-2026-15168: BLF parser, allows information disclosure
+    - CVE-2026-15169: UMTS FP dissector crash, allows DoS
+    - CVE-2026-15170: Z39.50 dissector crash, allows DoS
+    - CVE-2026-15171: SSH dissector crash, allows DoS
+    - CVE-2026-15172: FMP/NOTIFY dissector crash, allows DoS
+    - CVE-2026-15174: Catapult DCT2000 dissector crash, allows DoS
+    - CVE-2026-76879: C12.22 dissector crash, allows DoS
+    - CVE-2026-76880: RRC dissector crash, allows DoS
+    - CVE-2026-76881: CMS dissector crash, allows DoS
+    - CVE-2026-76882: Bluetooth Attribute dissector crash, allows DoS
+    - CVE-2026-76883: Catapult DCT2000 parser crash, allows DoS
+    - CVE-2026-76884: ERF parser crash, allows DoS
+    - CVE-2026-76885: Tektronix K12xx parser crash, allows DoS
+    - CVE-2026-76886: C12.22 dissector crash, allows DoS
+    - CVE-2026-76887: Dissection engine crash, allows DoS
+    - CVE-2026-76888: RDP dissector crash, allows DoS
+    - CVE-2026-76889: UMTS FP dissector crash, allows DoS
+    - CVE-2026-76890: Crash in sharkd, allows DoS
+    - CVE-2026-76891: Crash in sharkd, allows DoS
+    - CVE-2026-76917: Bluetooth AVRCP dissector crash, allows DoS
+    - CVE-2026-76918: SSH dissector crash, allows DoS
+    - CVE-2026-76919: ESS dissector crash, allows DoS
+    - CVE-2026-76920: 3gpp phone log parser crash, allows DoS
+    - CVE-2026-76921: CMS dissector crash, allows DoS
+    - CVE-2026-76922: Bluetooth BR/EDR FHS dissector crash, allows DoS
+    - CVE-2026-76923: Bluetooth HFP dissector crash, allows DoS
+    - CVE-2026-76924: Kerberos dissector crash, allows DoS
+    - CVE-2026-76926: BUSMASTER parser abnormal exit, allows DoS
+    - CVE-2026-76927: H.245 dissector crash, allows DoS
+    - CVE-2026-76928: X.509IF dissector crash, allows DoS
+    - CVE-2026-76929: Pcapng parser crash, allows DoS
+
+ -- Matheus Polkorny <mpolkorny@gmail.com>  Sun, 23 Aug 2026 12:34:57 -0300
+
+wireshark (4.4.16-0+deb13u1) trixie; urgency=medium
+
+  * Non-maintainer upload.
+  * New upstream release.
+    - CVE-2026-9759: ROHC protocol dissector crash
+
+ -- Adrian Bunk <bunk@debian.org>  Wed, 01 Jul 2026 12:02:06 +0300
+
 wireshark (4.4.15-0+deb13u1) trixie-security; urgency=medium
 
   * Team upload.

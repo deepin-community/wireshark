@@ -1784,7 +1784,7 @@ static bool erf_dump(
   int      erf_type;
   int64_t  alignbytes   = 0;
   unsigned padbytes   = 0;
-  int      round_down   = 0;
+  unsigned round_down   = 0;
   bool must_add_crc = false;
   uint32_t crc32        = 0x00000000;
   erf_dump_t *dump_priv = (erf_dump_t*)wdh->priv;
@@ -1887,7 +1887,12 @@ static bool erf_dump(
 
     padbytes = ERF_PADDING_TO_8(total_rlen);  /*calculate how much padding will be required */
     if(rec->rec_header.packet_header.caplen < rec->rec_header.packet_header.len){ /*if packet has been snapped, we need to round down what we output*/
-      round_down = (8 - padbytes) % 8;
+      round_down = (8U - padbytes) % 8U;
+      if (rec->rec_header.packet_header.caplen < round_down) {
+        *err = WTAP_ERR_UNWRITABLE_REC_DATA;
+        *err_info = ws_strdup_printf("erf: Truncated record too short to align for output");
+        return false;
+      }
       total_rlen -= round_down;
     }else{
       total_rlen += padbytes;
@@ -3276,6 +3281,15 @@ static int populate_summary_info(erf_t *erf_priv, wtap *wth, union wtap_pseudo_h
       if(state.gen_time == 0U
           && tag.type == ERF_META_TAG_gen_time
           ) {
+        if (tag.length < sizeof(state.gen_time)) {
+          /*
+           * Skip the record if the time tag is bogusly short.
+           * XXX - Should this, and other tags with bogus length,
+           * be reported as an error and bad file?
+           */
+          return 0;
+        }
+
         memcpy(&state.gen_time, tag.value, sizeof(state.gen_time));
 
         /*
