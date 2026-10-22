@@ -2,14 +2,6 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="uk">
 <context>
-    <name>Abbreviation</name>
-    <message>
-        <source></source>
-        <comment>for &quot;not applicable&quot;</comment>
-        <translation></translation>
-    </message>
-</context>
-<context>
     <name>AboutDialog</name>
     <message>
         <source>About Wireshark</source>
@@ -4383,19 +4375,19 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>2 sec</source>
-        <translation type="unfinished">10 сек {2 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>5 sec</source>
-        <translation type="unfinished">10 сек {5 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>2 min</source>
-        <translation type="unfinished">10 хв {2 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>5 min</source>
-        <translation type="unfinished">10 хв {5 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Wireshark I/O Graphs: %1</source>
@@ -6452,7 +6444,7 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Move Up 100 Pixels</source>
-        <translation type="unfinished">Переміститися Вгору На 10 Пікселів {100 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>PgUp</source>
@@ -8745,6 +8737,10 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source></source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8875,13 +8871,6 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     <message>
         <source>Right</source>
         <translation type="unfinished">Вправо</translation>
-    </message>
-</context>
-<context>
-    <name>QObject::QObject::QObject</name>
-    <message>
-        <source>CCCH</source>
-        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -9915,11 +9904,11 @@ For example, use 1 hour to have a new file created every hour on the hour.</sour
     </message>
     <message>
         <source>Move Left 1 Pixels</source>
-        <translation type="unfinished">Переміститися Вліво На 10 Пікселів {1 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Move Right 1 Pixels</source>
-        <translation type="unfinished">Переміститися Вправо На 10 Пікселів {1 ?}</translation>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Go To Packet Under Cursor</source>

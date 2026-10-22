@@ -128,8 +128,7 @@ typedef struct _x11_conv_data {
       unsigned     byte_order;       /* byte order of connection */
       bool      resync;           /* resynchronization of sequence number performed */
 
-      int       *keycodemap[256]; /* keycode to keysymvalue map. */
-      int       keysyms_per_keycode;
+      wmem_array_t *keycodemap[256]; /* keycode to keysymvalue map. */
       int       first_keycode;
       int       *modifiermap[array_length(modifiers)];/* modifier to keycode.*/
       int       keycodes_per_modifier;
@@ -1087,7 +1086,7 @@ static const value_string zero_is_none_vals[] = {
 #define CARD8(name)    FIELD8(name)
 #define CARD16(name)   (FIELD16(name))
 #define CARD32(name)   (FIELD32(name))
-#define COLOR_FLAGS(name) colorFlags(tvb, offsetp, t)
+#define COLOR_FLAGS(name) colorFlags(tvb, pinfo, offsetp, t)
 #define COLORMAP(name) FIELD32(name)
 #define CURSOR(name)   FIELD32(name)
 #define DRAWABLE(name) FIELD32(name)
@@ -1103,8 +1102,8 @@ static const value_string zero_is_none_vals[] = {
 #define KEYCODE_DECODED(name, keycode, mask)  do {                    \
       proto_tree_add_uint_format(t, hf_x11_##name, tvb, offset, 1,    \
       keycode, "keycode: %d (%s)",                                    \
-      keycode,  keycode2keysymString(state->keycodemap,               \
-      state->first_keycode, state->keysyms_per_keycode,               \
+      keycode,  keycode2keysymString(pinfo->pool, state->keycodemap,  \
+      state->first_keycode,                                           \
       state->modifiermap, state->keycodes_per_modifier,               \
       keycode, mask));                                                \
       ++offset;                                                       \
@@ -1125,7 +1124,7 @@ static const value_string zero_is_none_vals[] = {
                                val_to_str(eventcode & 0x7F,           \
                                           state->eventcode_vals,      \
                                           "<Unknown eventcode %u>")); \
-      decode_x11_event(next_tvb, eventcode, sent, event_proto_tree,   \
+      decode_x11_event(next_tvb, pinfo, eventcode, sent, event_proto_tree,   \
                        state, byte_order);                            \
       offset = next_offset;                                           \
 } while (0)
@@ -1137,7 +1136,7 @@ static const value_string zero_is_none_vals[] = {
 #define LISTofIPADDRESS(name, length) { listOfByte(tvb, offsetp, t, hf_x11_##name, (length), false); }
 #define LISTofCARD16(name, length) { listOfCard16(tvb, offsetp, t, hf_x11_##name, hf_x11_##name##_item, (length) / 2, byte_order); }
 #define LISTofCARD32(name, length) { listOfCard32(tvb, offsetp, t, hf_x11_##name, hf_x11_##name##_item, (length) / 4, byte_order); }
-#define LISTofCOLORITEM(name, length) { listOfColorItem(tvb, offsetp, t, hf_x11_##name, (length) / 12, byte_order); }
+#define LISTofCOLORITEM(name, length) { listOfColorItem(tvb, pinfo, offsetp, t, hf_x11_##name, (length) / 12, byte_order); }
 #define LISTofKEYCODE(map, name, length) { listOfKeycode(tvb, offsetp, t, hf_x11_##name, map, (length), byte_order); }
 #define LISTofKEYSYM(name, map, keycode_first, keycode_count, \
     keysyms_per_keycode) {\
@@ -1147,9 +1146,9 @@ static const value_string zero_is_none_vals[] = {
 #define LISTofPIXMAPFORMAT(name, length) { listOfPixmapFormat(tvb, offsetp, t, hf_x11_##name, (length), byte_order); }
 #define LISTofSCREEN(name, length) { listOfScreen(tvb, offsetp, t, hf_x11_##name, (length), byte_order); }
 #define LISTofSEGMENT(name) { listOfSegment(tvb, offsetp, t, hf_x11_##name, (next_offset - *offsetp) / 8, byte_order); }
-#define LISTofSTRING8(name, length) { listOfString8(tvb, offsetp, t, hf_x11_##name, hf_x11_##name##_string, (length), byte_order); }
-#define LISTofTEXTITEM8(name) { listOfTextItem(tvb, offsetp, t, hf_x11_##name, false, next_offset, byte_order); }
-#define LISTofTEXTITEM16(name) { listOfTextItem(tvb, offsetp, t, hf_x11_##name, true, next_offset, byte_order); }
+#define LISTofSTRING8(name, length) { listOfString8(tvb, pinfo, offsetp, t, hf_x11_##name, hf_x11_##name##_string, (length), byte_order); }
+#define LISTofTEXTITEM8(name) { listOfTextItem(tvb, pinfo, offsetp, t, hf_x11_##name, false, next_offset, byte_order); }
+#define LISTofTEXTITEM16(name) { listOfTextItem(tvb, pinfo, offsetp, t, hf_x11_##name, true, next_offset, byte_order); }
 #define OPCODE() {                                                \
       opcode = tvb_get_uint8(tvb, *offsetp);                             \
       proto_tree_add_uint(t, hf_x11_opcode, tvb, *offsetp,        \
@@ -1165,7 +1164,7 @@ static const value_string zero_is_none_vals[] = {
 #define SETofKEYBUTMASK(name) { setOfKeyButMask(tvb, offsetp, t, byte_order, 1); }
 #define SETofPOINTEREVENT(name) { setOfPointerEvent(tvb, offsetp, t, byte_order); }
 #define STRING8(name, length)  { string8(tvb, offsetp, t, hf_x11_##name, length); }
-#define STRING16(name, length)  { string16(tvb, offsetp, t, hf_x11_##name, hf_x11_##name##_bytes, length, byte_order); }
+#define STRING16(name, length)  { string16(tvb, pinfo, offsetp, t, hf_x11_##name, hf_x11_##name##_bytes, length, byte_order); }
 #define TIMESTAMP(name){ timestamp(tvb, offsetp, t, hf_x11_##name, byte_order); }
 #define UNDECODED(x)   { proto_tree_add_item(t, hf_x11_undecoded, tvb, *offsetp,  x, ENC_NA); *offsetp += x; }
 #define PAD()          { if (next_offset - *offsetp > 0) proto_tree_add_item(t, hf_x11_unused, tvb, *offsetp, next_offset - *offsetp, ENC_NA); *offsetp = next_offset; }
@@ -1266,7 +1265,7 @@ dissect_x11_event(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                   unsigned byte_order);
 
 static void
-decode_x11_event(tvbuff_t *tvb, unsigned char eventcode, const char *sent,
+decode_x11_event(tvbuff_t *tvb, packet_info* pinfo, unsigned char eventcode, const char *sent,
                  proto_tree *t, x11_conv_data_t *state,
                  unsigned byte_order);
 
@@ -1312,7 +1311,7 @@ static uint32_t add_boolean(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf)
       return v;
 }
 
-static void colorFlags(tvbuff_t *tvb, int *offsetp, proto_tree *t)
+static void colorFlags(tvbuff_t *tvb, packet_info* pinfo, int *offsetp, proto_tree *t)
 {
       unsigned do_red_green_blue = tvb_get_uint8(tvb, *offsetp);
       proto_item *ti;
@@ -1320,7 +1319,7 @@ static void colorFlags(tvbuff_t *tvb, int *offsetp, proto_tree *t)
 
       if (do_red_green_blue) {
             bool sep = false;
-            wmem_strbuf_t *buffer = wmem_strbuf_create(wmem_packet_scope());
+            wmem_strbuf_t *buffer = wmem_strbuf_create(pinfo->pool);
             wmem_strbuf_append(buffer, "flags: ");
 
             if (do_red_green_blue & 0x1) {
@@ -1505,7 +1504,7 @@ static void listOfDouble(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
       }
 }
 
-static void listOfColorItem(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
+static void listOfColorItem(tvbuff_t *tvb, packet_info* pinfo, int *offsetp, proto_tree *t, int hf,
                             int length, unsigned byte_order)
 {
       proto_item *ti = proto_tree_add_item(t, hf, tvb, *offsetp, length * 8, byte_order);
@@ -1518,7 +1517,7 @@ static void listOfColorItem(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
             wmem_strbuf_t *buffer;
             const char *sep;
 
-            buffer=wmem_strbuf_create(wmem_packet_scope());
+            buffer=wmem_strbuf_create(pinfo->pool);
             wmem_strbuf_append(buffer, "colorItem ");
             red = tvb_get_uint16(tvb, *offsetp + 4, byte_order);
             green = tvb_get_uint16(tvb, *offsetp + 6, byte_order);
@@ -1547,18 +1546,11 @@ static void listOfColorItem(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
             *offsetp += 2;
             proto_tree_add_item(ttt, hf_x11_coloritem_blue, tvb, *offsetp, 2, byte_order);
             *offsetp += 2;
-            colorFlags(tvb, offsetp, ttt);
+            colorFlags(tvb, pinfo, offsetp, ttt);
             proto_tree_add_item(ttt, hf_x11_coloritem_unused, tvb, *offsetp, 1, byte_order);
             *offsetp += 1;
       }
 }
-
-#if 0  /* XXX: Use of GTree no longer needed; use value_string_ext */
-static int compareGuint32(const void *a, const void *b)
-{
-      return GPOINTER_TO_INT(b) - GPOINTER_TO_INT(a);
-}
-#endif
 
 static void
 XConvertCase(register int sym, int *lower, int *upper)
@@ -1662,8 +1654,7 @@ XConvertCase(register int sym, int *lower, int *upper)
 }
 
 static const char *
-keycode2keysymString(int *keycodemap[256], int first_keycode,
-                     int keysyms_per_keycode,
+keycode2keysymString(wmem_allocator_t* allocator, wmem_array_t *keycodemap[256], int first_keycode,
                      int *modifiermap[array_length(modifiers)],
                      int keycodes_per_modifier,
                      uint32_t keycode, uint32_t bitmask)
@@ -1673,15 +1664,19 @@ keycode2keysymString(int *keycodemap[256], int first_keycode,
       int lockmod_is_capslock = 0, lockmod_is_shiftlock = 0;
       int lockmod_is_nosymbol = 1;
       int modifier, kc, keysym;
+      int keysyms_per_keycode;
 
-      if ((syms = keycodemap[keycode]) == NULL)
+      if ((keycodemap[keycode]) == NULL)
             return "<Unknown>";
 
-      for (kc = first_keycode, groupmodkc = numlockkc = -1; kc < 256; ++kc)
+      for (kc = first_keycode, groupmodkc = numlockkc = -1; kc < 256; ++kc) {
+            if (keycodemap[kc] == NULL) {
+                  continue;
+            }
+            keysyms_per_keycode = wmem_array_get_count(keycodemap[kc]);
+            syms = wmem_array_get_raw(keycodemap[kc]);
             for (keysym = 0; keysym < keysyms_per_keycode; ++keysym) {
-                  if (keycodemap[kc] == NULL)
-                        return "<Unknown>";
-                  switch (keycodemap[kc][keysym]) {
+                  switch (syms[keysym]) {
                         case 0xff7e:
                               groupmodkc = kc;
                               break;
@@ -1699,7 +1694,7 @@ keycode2keysymString(int *keycodemap[256], int first_keycode,
                               break;
                   }
             }
-
+      }
 
       /*
        * If we have not seen the modifiermap we don't know what the
@@ -1733,6 +1728,9 @@ keycode2keysymString(int *keycodemap[256], int first_keycode,
                   lockmod_is_capslock = lockmod_is_nosymbol = 0;
                   break;
             }
+
+      keysyms_per_keycode = wmem_array_get_count(keycodemap[keycode]);
+      syms = wmem_array_get_raw(keycodemap[keycode]);
 
 #if 0
       /*
@@ -1782,7 +1780,7 @@ keycode2keysymString(int *keycodemap[256], int first_keycode,
 #else /* _XTranslateKey() based code. */
 
       while (keysyms_per_keycode > 2
-             && keycodemap[keysyms_per_keycode - 1] == NoSymbol)
+             && syms[keysyms_per_keycode - 1] == NoSymbol)
             --keysyms_per_keycode;
       if (keysyms_per_keycode > 2
           && (groupmod >= 0 && (modifiermask[groupmod] & bitmask))) {
@@ -1837,7 +1835,7 @@ keycode2keysymString(int *keycodemap[256], int first_keycode,
       if (keysym == XK_VoidSymbol)
             keysym = NoSymbol;
 
-      return wmem_strdup_printf(wmem_packet_scope(), "%d, \"%s\"", keysym, keysymString(keysym));
+      return wmem_strdup_printf(allocator, "%d, \"%s\"", keysym, keysymString(keysym));
 #endif
 }
 
@@ -1893,7 +1891,7 @@ static void listOfKeycode(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
 }
 
 static void listOfKeysyms(tvbuff_t *tvb, packet_info *pinfo, int *offsetp, proto_tree *t, int hf,
-                          int hf_item, int *keycodemap[256],
+                          int hf_item, wmem_array_t *keycodemap[256],
                           int keycode_first, int keycode_count,
                           int keysyms_per_keycode, unsigned byte_order)
 {
@@ -1901,6 +1899,7 @@ static void listOfKeysyms(tvbuff_t *tvb, packet_info *pinfo, int *offsetp, proto
       proto_tree *tt = proto_item_add_subtree(ti, ett_x11_list_of_keysyms);
       proto_item *tti;
       proto_tree *ttt;
+      int *syms;
       int i, keycode;
 
       DISSECTOR_ASSERT(keycode_first >= 0);
@@ -1920,8 +1919,15 @@ static void listOfKeysyms(tvbuff_t *tvb, packet_info *pinfo, int *offsetp, proto
             ttt = proto_item_add_subtree(tti, ett_x11_keysym);
 
             tvb_ensure_bytes_exist(tvb, *offsetp, 4 * keysyms_per_keycode);
+            /* XXX - To be more correct, this should be a tree that stores
+             * the lists at different frame numbers, so that nonsequential
+             * dissection on later passes works before and after a
+             * ChangeKeyboardMapping opcode. */
+            if (keycodemap[keycode]) {
+                  wmem_destroy_array(keycodemap[keycode]);
+            }
             keycodemap[keycode]
-                  =  (int *)wmem_alloc(wmem_file_scope(), sizeof(*keycodemap[keycode]) * keysyms_per_keycode);
+                  = wmem_array_sized_new(wmem_file_scope(), sizeof(int), keysyms_per_keycode);
 
             for(i = 0; i < keysyms_per_keycode; ++i) {
                   /* keysymvalue = byte3 * 256 + byte4. */
@@ -1933,33 +1939,34 @@ static void listOfKeysyms(tvbuff_t *tvb, packet_info *pinfo, int *offsetp, proto
                                              "keysym (keycode %d): 0x%08x (%s)",
                                              keycode, v, keysymString(v));
 
-                  keycodemap[keycode][i] = v;
+                  wmem_array_append_one(keycodemap[keycode], v);
                   *offsetp += 4;
             }
 
+            syms = wmem_array_get_raw(keycodemap[keycode]);
             for (i = 1; i < keysyms_per_keycode; ++i)
-                  if (keycodemap[keycode][i] != NoSymbol)
+                  if (syms[i] != NoSymbol)
                         break;
 
             if (i == keysyms_per_keycode) {
                   /* all but (possibly) first were NoSymbol. */
                   if (keysyms_per_keycode == 4) {
-                        keycodemap[keycode][1] = NoSymbol;
-                        keycodemap[keycode][2] = keycodemap[keycode][0];
-                        keycodemap[keycode][3] = NoSymbol;
+                        syms[1] = NoSymbol;
+                        syms[2] = syms[0];
+                        syms[3] = NoSymbol;
                   }
 
                   continue;
             }
 
             for (i = 2; i < keysyms_per_keycode; ++i)
-                  if (keycodemap[keycode][i] != NoSymbol)
+                  if (syms[i] != NoSymbol)
                         break;
             if (i == keysyms_per_keycode) {
                   /* all but (possibly) first two were NoSymbol. */
                   if (keysyms_per_keycode == 4) {
-                        keycodemap[keycode][2] = keycodemap[keycode][0];
-                        keycodemap[keycode][3] =  keycodemap[keycode][1];
+                        syms[2] = syms[0];
+                        syms[3] = syms[1];
                   }
 
                   continue;
@@ -2187,7 +2194,7 @@ static void listOfPixmapFormat(tvbuff_t *tvb, int *offsetp, proto_tree *t, int h
       }
 }
 
-static void listOfString8(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
+static void listOfString8(tvbuff_t *tvb, packet_info* pinfo, int *offsetp, proto_tree *t, int hf,
                           int hf_item, int length, unsigned byte_order)
 {
       char *s = NULL;
@@ -2209,7 +2216,7 @@ static void listOfString8(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
 
       while(length--) {
             unsigned l = tvb_get_uint8(tvb, *offsetp);
-            s = tvb_get_string_enc(wmem_packet_scope(), tvb, *offsetp + 1, l, ENC_ASCII);
+            s = tvb_get_string_enc(pinfo->pool, tvb, *offsetp + 1, l, ENC_ASCII);
             proto_tree_add_string_format(tt, hf_item, tvb, *offsetp, l + 1, s, "\"%s\"", s);
             *offsetp += l + 1;
       }
@@ -2227,12 +2234,12 @@ static int stringIsActuallyAn8BitString(tvbuff_t *tvb, int offset, unsigned leng
 /* XXX - assumes that the string encoding is ASCII; even if 0x00 through
    0x7F are ASCII, 0x80 through 0xFF might not be, and even 0x00 through
    0x7F aren't necessarily ASCII. */
-static char *tvb_get_ascii_string16(tvbuff_t *tvb, int offset, unsigned length)
+static char *tvb_get_ascii_string16(wmem_allocator_t* scope, tvbuff_t *tvb, int offset, unsigned length)
 {
       wmem_strbuf_t *str;
       uint8_t ch;
 
-      str = wmem_strbuf_new_sized(wmem_packet_scope(), length + 1);
+      str = wmem_strbuf_new_sized(scope, length + 1);
 
       while(length--) {
             offset++;
@@ -2246,7 +2253,7 @@ static char *tvb_get_ascii_string16(tvbuff_t *tvb, int offset, unsigned length)
       return wmem_strbuf_finalize(str);
 }
 
-static void listOfTextItem(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
+static void listOfTextItem(tvbuff_t *tvb, packet_info* pinfo, int *offsetp, proto_tree *t, int hf,
     int sizeIs16, int next_offset, unsigned byte_order)
 {
       char *s = NULL;
@@ -2283,7 +2290,7 @@ static void listOfTextItem(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
                   int8_t delta = tvb_get_uint8(tvb, *offsetp + 1);
                   if (sizeIs16) {
                         if (stringIsActuallyAn8BitString(tvb, *offsetp + 2, l)) {
-                              s = tvb_get_ascii_string16(tvb, *offsetp + 2, l);
+                              s = tvb_get_ascii_string16(pinfo->pool, tvb, *offsetp + 2, l);
                               tti = proto_tree_add_none_format(tt, hf_x11_textitem_string, tvb, *offsetp, l*2 + 2,
                                                                "textitem (string): delta = %d, \"%s\"",
                                                                delta, s);
@@ -2295,14 +2302,14 @@ static void listOfTextItem(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
                               tti = proto_tree_add_none_format(tt, hf_x11_textitem_string, tvb, *offsetp, l*2 + 2,
                                                                "textitem (string): delta = %d, %s",
                                                                delta,
-                                                               tvb_bytes_to_str(wmem_packet_scope(), tvb, *offsetp + 2, l*2));
+                                                               tvb_bytes_to_str(pinfo->pool, tvb, *offsetp + 2, l*2));
                               ttt = proto_item_add_subtree(tti, ett_x11_text_item);
                               proto_tree_add_item(ttt, hf_x11_textitem_string_delta, tvb, *offsetp + 1, 1, byte_order);
                               proto_tree_add_item(ttt, hf_x11_textitem_string_string16_bytes, tvb, *offsetp + 2, l*2, byte_order);
                         }
                         *offsetp += l*2 + 2;
                   } else {
-                        s = tvb_get_string_enc(wmem_packet_scope(), tvb, *offsetp + 2, l, ENC_ASCII);
+                        s = tvb_get_string_enc(pinfo->pool, tvb, *offsetp + 2, l, ENC_ASCII);
                         tti = proto_tree_add_none_format(tt, hf_x11_textitem_string, tvb, *offsetp, l + 2,
                                                          "textitem (string): delta = %d, \"%s\"",
                                                          delta, s);
@@ -2694,14 +2701,14 @@ static void string8(tvbuff_t *tvb, int *offsetp, proto_tree *t,
 
 /* The length supplied is the length of the string in CHAR2Bs (half the number of bytes) */
 
-static void string16(tvbuff_t *tvb, int *offsetp, proto_tree *t, int hf,
+static void string16(tvbuff_t *tvb, packet_info* pinfo, int *offsetp, proto_tree *t, int hf,
     int hf_bytes, unsigned length, unsigned byte_order)
 {
       unsigned l = length*2; /* byte count */
       char *s;
 
       if (stringIsActuallyAn8BitString(tvb, *offsetp, length)) {
-            s = tvb_get_ascii_string16(tvb, *offsetp, length);
+            s = tvb_get_ascii_string16(pinfo->pool, tvb, *offsetp, length);
             proto_tree_add_string_format_value(t, hf, tvb, *offsetp, l, s, "\"%s\"", s);
       } else
             proto_tree_add_item(t, hf_bytes, tvb, *offsetp, l, byte_order);
@@ -5113,7 +5120,7 @@ x11_stateinit(conversation_t *conversation)
       static x11_conv_data_t stateinit;
       int i;
 
-      state = wmem_new(wmem_file_scope(), x11_conv_data_t);
+      state = wmem_new0(wmem_file_scope(), x11_conv_data_t);
       *state = stateinit;
 
       /* initialise opcodes */
@@ -5631,11 +5638,11 @@ dissect_x11_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                   REPLYCONTENTS_COMMON();
                   break;
 
-            case X_GetKeyboardMapping:
+            case X_GetKeyboardMapping: {
                   state->first_keycode =
                         state->request.GetKeyboardMapping.first_keycode;
                   REPLY(reply);
-                  state->keysyms_per_keycode =
+                  int keysyms_per_keycode =
                         FIELD8(keysyms_per_keycode);
                   SEQUENCENUMBER_REPLY(sequencenumber);
                   length = REPLYLENGTH(replylength);
@@ -5643,11 +5650,12 @@ dissect_x11_reply(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
                   *offsetp += 24;
                   LISTofKEYSYM(keysyms, state->keycodemap,
                                state->request.GetKeyboardMapping.first_keycode,
-                               /* XXX - length / state->keysyms_per_keycode can raise a division by zero,
+                               /* XXX - length / keysyms_per_keycode can raise a division by zero,
                                 * don't know if this is the *right* way to fix it ... */
-                               state->keysyms_per_keycode ? length / state->keysyms_per_keycode : 0,
-                               state->keysyms_per_keycode);
+                               keysyms_per_keycode ? length / keysyms_per_keycode : 0,
+                               keysyms_per_keycode);
                   break;
+            }
 
             case X_GetKeyboardControl:
                   REPLYCONTENTS_COMMON();
@@ -5762,13 +5770,13 @@ dissect_x11_event(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree,
       if (tree == NULL)
             return;
 
-      decode_x11_event(tvb, eventcode, sent, t, state, byte_order);
+      decode_x11_event(tvb, pinfo, eventcode, sent, t, state, byte_order);
 
       return;
 }
 
 static void
-decode_x11_event(tvbuff_t *tvb, unsigned char eventcode, const char *sent,
+decode_x11_event(tvbuff_t *tvb, packet_info* pinfo, unsigned char eventcode, const char *sent,
                  proto_tree *t, x11_conv_data_t *state,
                  unsigned byte_order)
 {

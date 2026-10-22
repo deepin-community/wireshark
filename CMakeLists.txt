@@ -57,7 +57,7 @@ endif()
 # Updated by tools/make-version.py
 set(PROJECT_MAJOR_VERSION 4)
 set(PROJECT_MINOR_VERSION 4)
-set(PROJECT_PATCH_VERSION 15)
+set(PROJECT_PATCH_VERSION 19)
 set(PROJECT_BUILD_VERSION 0)
 set(PROJECT_VERSION_EXTENSION "")
 
@@ -360,6 +360,20 @@ if(NOT (WIN32 OR APPLE OR USE_STATIC))
 	endif()
 endif()
 
+# Preprocessor definitions common to all compilers
+# Do not put any add_[compile_]definitions calls before this,
+# as this overrides the existing values.
+# These only depend on values from CMakeOptions.txt and CMAKE_BUILD_TYPE,
+# which have been handled above.
+set_property(DIRECTORY
+	PROPERTY COMPILE_DEFINITIONS
+		"G_DISABLE_DEPRECATED"
+		"G_DISABLE_SINGLE_INCLUDES"
+		$<$<OR:$<BOOL:${ENABLE_DEBUG}>,$<CONFIG:Debug>>:WS_DEBUG>
+		$<$<OR:$<AND:$<BOOL:${ENABLE_DEBUG}>,$<BOOL:${ENABLE_DEBUG_UTF_8}>>,$<CONFIG:Debug>>:WS_DEBUG_UTF_8>
+		$<$<BOOL:${ENABLE_ASSERT}>:ENABLE_ASSERT>
+)
+
 # Ensure that executables in the build directory always have the same RPATH.
 # This ensures relocatable binaries and reproducible builds (invariant of the
 # build directory location). (Requires CMake 3.14)
@@ -521,16 +535,6 @@ endif()
 # -fPIC/-fPIE (so set CMAKE_POSITION_INDEPENDENT_CODE to enable that).
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Preprocessor definitions common to all compilers
-set_property(DIRECTORY
-	PROPERTY COMPILE_DEFINITIONS
-		"G_DISABLE_DEPRECATED"
-		"G_DISABLE_SINGLE_INCLUDES"
-		$<$<OR:$<BOOL:${ENABLE_DEBUG}>,$<CONFIG:Debug>>:WS_DEBUG>
-		$<$<OR:$<AND:$<BOOL:${ENABLE_DEBUG}>,$<BOOL:${ENABLE_DEBUG_UTF_8}>>,$<CONFIG:Debug>>:WS_DEBUG_UTF_8>
-		$<$<BOOL:${ENABLE_ASSERT}>:ENABLE_ASSERT>
-)
-
 if(WIN32)
 	#
 	# NOTE: Because of the way Qt moc is including "config.h" (not as the
@@ -598,6 +602,13 @@ if( CMAKE_C_COMPILER_ID MATCHES "MSVC")
 	set(LOCAL_CFLAGS
 		/MP
 		/W2
+
+		# Some of our code requires object files with
+		# a 32-bit index to the section table instead of 16-bit.
+		# This makes the .obj files slightly larger (~2%) and makes
+		# it so that Microsoft linkers prior to MSVC 2005 can't read
+		# the files, but those are too old anyway.
+		/bigobj
 	)
 
 	set(WS_LINK_FLAGS "/LARGEADDRESSAWARE /MANIFEST:NO /INCREMENTAL:NO /RELEASE")
@@ -1010,12 +1021,6 @@ if(ENABLE_ASAN)
 		add_compile_options(${ASAN_FLAG})
 	endif()
 	if(MSVC)
-		# Using ASAN makes some of our code require object files with
-		# a 32-bit index to the section table instead of 16-bit.
-		# This makes the .obj files slightly larger (~2%) and makes
-		# it so that Microsoft linkers prior to MSVC 2005 can't read
-		# the files, but those are too old anyway.
-		add_compile_options(/bigobj)
 		# The Microsoft LINK linker doesn't recognize or need the
 		# ASAN flag, and will give a LNK4044 warning.
 	else()
@@ -1293,6 +1298,16 @@ ws_find_package(PCAP ENABLE_PCAP HAVE_LIBPCAP)
 ws_find_package(AIRPCAP ENABLE_AIRPCAP HAVE_AIRPCAP)
 ws_find_package(Systemd BUILD_sdjournal HAVE_SYSTEMD)
 
+# The SpeexDSP resampler is required iff building sharkd, or building
+# Wireshark or Logray with Qt Multimedia
+if(BUILD_sharkd)
+	reset_find_package(SPEEXDSP)
+	find_package(SpeexDSP REQUIRED)
+elseif(BUILD_wireshark OR BUILD_logray)
+	reset_find_package(SPEEXDSP)
+	find_package(SpeexDSP)
+endif()
+
 # Build one of the Qt GUIs?
 if(BUILD_wireshark OR BUILD_logray)
 	if(USE_qt6)
@@ -1322,8 +1337,11 @@ if(BUILD_wireshark OR BUILD_logray)
 				Core5Compat
 			OPTIONAL_COMPONENTS
 				DBus
-				Multimedia
 		)
+
+		if (SPEEXDSP_FOUND)
+			find_package(Qt6 ${Qt6_VERSION} REQUIRED OPTIONAL_COMPONENTS Multimedia)
+		endif()
 	else(USE_qt6)
 		set(qtver 5)
 		if(DEFINED ENV{WIRESHARK_QT5_PREFIX_PATH})
@@ -1348,9 +1366,13 @@ if(BUILD_wireshark OR BUILD_logray)
 			Qt5Widgets
 			Qt5Concurrent
 		)
-		set(QT5_OPTIONAL_PACKAGELIST
-			Qt5Multimedia
-		)
+
+		if (SPEEXDSP_FOUND)
+			set(QT5_OPTIONAL_PACKAGELIST
+				Qt5Multimedia
+			)
+		endif()
+
 		if(WIN32)
 			list(APPEND QT5_PACKAGELIST Qt5WinExtras)
 		endif()
@@ -1513,11 +1535,6 @@ find_package( Asciidoctor 1.5 )
 find_package( XSLTPROC )
 
 find_package(DOXYGEN)
-
-# The SpeexDSP resampler is required iff building wireshark or sharkd.
-if(BUILD_wireshark OR BUILD_logray OR BUILD_sharkd)
-	find_package(SpeexDSP REQUIRED)
-endif()
 
 # Generate the distribution tarball.
 add_custom_target(dist
@@ -2197,6 +2214,7 @@ if (ASCIIDOCTOR_FOUND)
 		${CMAKE_BINARY_DIR}/doc/man_pages/etwdump.html
 		${CMAKE_BINARY_DIR}/doc/man_pages/rawshark.html
 		${CMAKE_BINARY_DIR}/doc/man_pages/reordercap.html
+		${CMAKE_BINARY_DIR}/doc/man_pages/sharkd.html
 		${CMAKE_BINARY_DIR}/doc/man_pages/sshdump.html
 		${CMAKE_BINARY_DIR}/doc/man_pages/wifidump.html
 		${CMAKE_BINARY_DIR}/doc/man_pages/text2pcap.html
